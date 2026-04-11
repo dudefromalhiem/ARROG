@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Render content in iframe
     const frame = document.getElementById('pv-frame');
-    const htmlDoc = buildPageDocument(page.htmlContent, page.cssContent || '');
+    const htmlDoc = buildPageDocument(page.htmlContent, page.cssContent || '', page.imageUrls || []);
     frame.srcdoc = htmlDoc;
 
     // Show viewer
@@ -209,11 +209,12 @@ function showError() {
   document.getElementById('page-error').classList.remove('hidden');
 }
 
-function buildPageDocument(html, css) {
+function buildPageDocument(html, css, imageUrls) {
   const raw = (html || '').trim();
-  const wrapped = raw.includes('class="page-shell"')
-    ? raw
-    : '<div class="page-shell"><section class="page-section">' + raw + '</section></div>';
+  const htmlWithUploads = embedUploadedImagesIfMissing(raw, imageUrls || []);
+  const wrapped = htmlWithUploads.includes('class="page-shell"')
+    ? htmlWithUploads
+    : '<div class="page-shell"><section class="page-section">' + htmlWithUploads + '</section></div>';
   const safeCss = normalizePageCss(css || '');
 
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
@@ -233,6 +234,28 @@ function normalizePageCss(css) {
     .replace(/#f9f9f9/gi, '#101010')
     .replace(/#ddd\b/gi, '#3a3a3a')
     .replace(/#eee\b/gi, '#2f2f2f');
+}
+
+function embedUploadedImagesIfMissing(html, imageUrls) {
+  const urls = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+  if (!urls.length) return String(html || '');
+
+  const raw = String(html || '');
+  if (raw.includes('class="uploaded-assets"')) return raw;
+  if (urls.some(url => raw.includes(url))) return raw;
+
+  const gallery = '<div class="page-section uploaded-assets">' +
+    '<h2>Uploaded Assets</h2>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
+      urls.map((url, idx) =>
+        '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
+          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" style="display:block;width:100%;height:180px;object-fit:cover;border:1px solid #3a3a3a;background:#111" />' +
+        '</a>'
+      ).join('') +
+    '</div>' +
+  '</div>';
+
+  return raw + gallery;
 }
 </script>
 </body>

@@ -681,6 +681,30 @@ function sanitizeHTML(html) {
   return clean;
 }
 
+function embedUploadedImagesIfMissing(html, imageUrls) {
+  const urls = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+  if (!urls.length) return html || '';
+
+  const raw = String(html || '');
+  if (raw.includes('class="uploaded-assets"')) return raw;
+
+  // If at least one uploaded URL is already used in content, respect author layout.
+  if (urls.some(url => raw.includes(url))) return raw;
+
+  const gallery = '\n<div class="page-section uploaded-assets">' +
+    '<h2>Uploaded Assets</h2>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
+      urls.map((url, idx) =>
+        '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
+          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" style="display:block;width:100%;height:180px;object-fit:cover;border:1px solid #3a3a3a;background:#111" />' +
+        '</a>'
+      ).join('') +
+    '</div>' +
+  '</div>';
+
+  return raw + gallery;
+}
+
 // ═════════════════════════════════════════════════════════════
 // LIVE PREVIEW
 // ═════════════════════════════════════════════════════════════
@@ -791,7 +815,9 @@ async function submitPage() {
 
   btn.textContent = 'Submitting...';
 
-  const sanitizedHTML = sanitizeHTML(htmlContent);
+  const uploadedUrls = uploadedImages.map(img => img.url).filter(Boolean);
+  const htmlWithUploads = embedUploadedImagesIfMissing(htmlContent, uploadedUrls);
+  const sanitizedHTML = sanitizeHTML(htmlWithUploads);
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title);
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
 
@@ -803,7 +829,7 @@ async function submitPage() {
     slug: slug,
     htmlContent: wrappedHTML,
     cssContent: mergedCSS,
-    imageUrls: uploadedImages.map(img => img.url),
+    imageUrls: uploadedUrls,
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
