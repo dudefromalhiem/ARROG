@@ -499,6 +499,21 @@ function buildGuideTemplate() {
 document.addEventListener('DOMContentLoaded', () => {
   const zone = document.getElementById('upload-zone');
   const input = document.getElementById('img-input');
+  const chooseBtn = document.getElementById('choose-images-btn');
+  const uploadStatus = document.getElementById('upload-status');
+
+  function openFilePicker() {
+    input.click();
+  }
+
+  zone.addEventListener('click', openFilePicker);
+  zone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openFilePicker();
+    }
+  });
+  if (chooseBtn) chooseBtn.addEventListener('click', openFilePicker);
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
   zone.addEventListener('drop', e => {
@@ -508,6 +523,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   input.addEventListener('change', e => {
+    if (uploadStatus) {
+      uploadStatus.textContent = e.target.files && e.target.files.length
+        ? e.target.files.length + ' file(s) selected.'
+        : 'No files selected.';
+    }
     handleFiles(e.target.files);
     input.value = '';
   });
@@ -575,8 +595,10 @@ async function uploadImage(file, attempt = 1) {
 
   const progressWrap = document.getElementById('upload-progress');
   const progressBar = document.getElementById('upload-bar');
+  const uploadStatus = document.getElementById('upload-status');
   progressWrap.style.display = 'block';
   progressBar.style.width = '0%';
+  if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '...';
 
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -618,11 +640,13 @@ async function uploadImage(file, attempt = 1) {
         renderImageList();
         refreshImageSelectors();
         progressWrap.style.display = 'none';
+        if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
       }
     );
   } catch (err) {
     alert('Upload error: ' + err.message);
     progressWrap.style.display = 'none';
+    if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '.';
   }
 }
 

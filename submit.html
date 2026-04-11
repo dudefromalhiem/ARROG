@@ -102,11 +102,15 @@
         Upload images to use in your page. In template mode, images are auto-placed. In code mode, copy the URL into your HTML.
         Max 5MB per image. PNG, JPG, GIF, WebP accepted.
       </p>
-      <div class="upload-zone" id="upload-zone">
-        <input type="file" id="img-input" accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif" multiple />
+      <input type="file" id="img-input" accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif" multiple hidden />
+      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Choose image files to upload">
         <div class="uz-icon">⬆</div>
         <div class="uz-text">Click or drag images here to upload</div>
         <div class="uz-hint">PNG, JPG, GIF, WebP, HEIC, HEIF — 5MB max each</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-s" type="button" id="choose-images-btn">Choose Files</button>
+        <span id="upload-status" style="font-size:.75rem;color:var(--wht-f)">No files selected.</span>
       </div>
       <div class="upload-progress" id="upload-progress">
         <div class="upload-progress-bar" id="upload-bar"></div>

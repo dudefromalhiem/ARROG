@@ -201,7 +201,6 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .upload-zone{border:2px dashed var(--red-d);padding:24px;text-align:center;cursor:pointer;transition:all var(--tr);background:var(--blk-c);position:relative}
 .upload-zone:hover{border-color:var(--red-b);background:rgba(139,0,0,.05)}
 .upload-zone.dragover{border-color:var(--red-g);background:rgba(255,26,26,.08)}
-.upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer}
 .upload-zone .uz-icon{font-size:2rem;color:var(--red-d);margin-bottom:8px}
 .upload-zone .uz-text{font-size:.8rem;color:var(--wht-d)}
 .upload-zone .uz-hint{font-size:.7rem;color:var(--wht-f);margin-top:4px}
