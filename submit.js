@@ -590,6 +590,15 @@ function handleFiles(files) {
   });
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function uploadImage(file, attempt = 1) {
   if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
 
@@ -603,6 +612,11 @@ async function uploadImage(file, attempt = 1) {
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = 'submissions/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
+  const localUrl = await fileToDataUrl(file);
+  const uploadRecord = { name: file.name, url: localUrl, source: 'local', path: path };
+  uploadedImages.push(uploadRecord);
+  renderImageList();
+  refreshImageSelectors();
   let ref;
 
   try {
@@ -636,7 +650,8 @@ async function uploadImage(file, attempt = 1) {
       },
       async () => {
         const url = await ref.getDownloadURL();
-        uploadedImages.push({ name: file.name, url: url });
+        uploadRecord.url = url;
+        uploadRecord.source = 'remote';
         renderImageList();
         refreshImageSelectors();
         progressWrap.style.display = 'none';
@@ -841,9 +856,9 @@ async function submitPage() {
   btn.textContent = 'Submitting...';
 
   const uploadedUrls = uploadedImages.map(img => img.url).filter(Boolean);
-  const htmlWithUploads = embedUploadedImagesIfMissing(htmlContent, uploadedUrls);
-  const sanitizedHTML = sanitizeHTML(htmlWithUploads);
-  const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title);
+  const sanitizedHTML = sanitizeHTML(htmlContent);
+  const htmlWithUploads = embedUploadedImagesIfMissing(sanitizedHTML, uploadedUrls);
+  const wrappedHTML = wrapWithDefaultSchema(htmlWithUploads, title);
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
 
   const submission = {
