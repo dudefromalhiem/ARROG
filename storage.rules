@@ -6,25 +6,31 @@ service firebase.storage {
       allow read: if true;
     }
 
+    // Helper function to check if user is admin or owner
+    function isAdminOrOwner() {
+      let rolesDoc = firestore.get(/databases/(default)/documents/config/roles).data;
+      return request.auth.token.email in rolesDoc.owners ||
+             request.auth.token.email in rolesDoc.admins;
+    }
+
     // Only admins/owner can upload to artworks
     match /artworks/{fileName} {
-      allow write: if request.auth != null &&
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'owner'];
+      allow write: if request.auth != null && isAdminOrOwner();
     }
 
     // Only admins/owner can upload to general uploads
     match /uploads/{fileName} {
-      allow write: if request.auth != null &&
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'owner'];
+      allow write: if request.auth != null && isAdminOrOwner();
     }
 
     // Authenticated users can upload images to their own submissions folder
-    // Max 5MB, must be image type
+    // Max 5MB, image type or undetected type (browsers sometimes send octet-stream)
     match /submissions/{userId}/{fileName} {
       allow write: if request.auth != null &&
         request.auth.uid == userId &&
         request.resource.size < 5 * 1024 * 1024 &&
-        request.resource.contentType.matches('image/.*');
+        (request.resource.contentType.matches('image/.*') ||
+         request.resource.contentType == 'application/octet-stream');
     }
   }
 }

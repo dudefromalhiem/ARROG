@@ -1017,11 +1017,35 @@ function getStorageBucketCandidates() {
   return candidates.filter((bucket, idx) => bucket && candidates.indexOf(bucket) === idx);
 }
 
+function getImageMimeType(file) {
+  // If browser detected the MIME type, use it
+  if (file.type && file.type.startsWith('image/')) {
+    return file.type;
+  }
+
+  // Otherwise, detect from file extension
+  const ext = (file.name || '').toLowerCase().split('.').pop();
+  const mimeMap = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'heic': 'image/heic',
+    'heif': 'image/heif',
+    'bmp': 'image/bmp',
+    'tiff': 'image/tiff',
+    'svg': 'image/svg+xml'
+  };
+
+  return mimeMap[ext] || 'application/octet-stream';
+}
+
 function createUploadTask(ref, file, onProgress) {
   return new Promise((resolve, reject) => {
     let lastProgressAt = Date.now();
     const metadata = {
-      contentType: file.type || 'application/octet-stream',
+      contentType: getImageMimeType(file),
       cacheControl: 'public,max-age=31536000,immutable'
     };
     const task = ref.put(file, metadata);

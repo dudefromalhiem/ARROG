@@ -799,7 +799,15 @@ async function uploadAdminArtworkFile(file, attempt = 1) {
   }
 
   try {
-    const task = ref.put(file);
+    const ext = (file.name || '').toLowerCase().split('.').pop();
+    const mimeMap = {
+      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+      'gif': 'image/gif', 'webp': 'image/webp', 'heic': 'image/heic',
+      'heif': 'image/heif', 'bmp': 'image/bmp', 'tiff': 'image/tiff'
+    };
+    const contentType = file.type && file.type.startsWith('image/') ? file.type : (mimeMap[ext] || 'image/jpeg');
+    const metadata = { contentType: contentType, cacheControl: 'public,max-age=31536000,immutable' };
+    const task = ref.put(file, metadata);
     task.on('state_changed',
       snap => {
         const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
