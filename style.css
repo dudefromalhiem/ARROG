@@ -238,6 +238,10 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .review-modal-meta dt{color:var(--red-b);text-transform:uppercase;letter-spacing:1px;font-size:.7rem;margin-top:12px}
 .review-modal-meta dt:first-child{margin-top:0}
 .review-modal-meta dd{color:var(--wht-m);margin:4px 0 0 0}
+.review-upload-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+.review-upload-item{display:block;border:1px solid var(--red-d);background:var(--blk-c);overflow:hidden}
+.review-upload-item img{display:block;width:100%;height:90px;object-fit:cover;opacity:.92;transition:opacity var(--tr),transform var(--tr)}
+.review-upload-item:hover img{opacity:1;transform:scale(1.03)}
 .review-actions{display:flex;gap:8px;margin-top:16px}
 @media(max-width:768px){.review-modal-body{flex-direction:column}.review-modal-meta{width:100%}}
 

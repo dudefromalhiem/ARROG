@@ -427,6 +427,14 @@ async function previewSubmission(id) {
     if (!doc.exists) { alert('Submission not found.'); return; }
     const s = doc.data();
     const date = s.submittedAt ? new Date(s.submittedAt.seconds * 1000).toLocaleDateString() : '—';
+    const uploaded = Array.isArray(s.imageUrls) ? s.imageUrls.filter(Boolean) : [];
+    const imagesMarkup = uploaded.length
+      ? '<div class="review-upload-grid">' + uploaded.map((url, idx) =>
+          '<a href="' + url + '" target="_blank" rel="noopener noreferrer" class="review-upload-item" title="Open image ' + (idx + 1) + '">' +
+            '<img src="' + url + '" alt="Uploaded image ' + (idx + 1) + '" />' +
+          '</a>'
+        ).join('') + '</div>'
+      : '<div style="font-size:.75rem;color:var(--wht-f);margin-top:6px">No uploaded images.</div>';
 
     // Build review modal
     const modal = document.createElement('div');
@@ -447,7 +455,8 @@ async function previewSubmission(id) {
             <dt>Tags</dt><dd>${(s.tags || []).join(', ') || 'None'}</dd>
             <dt>Status</dt><dd><span class="status status-${s.status}">${s.status}</span></dd>
             <dt>Submitted</dt><dd>${date}</dd>
-            <dt>Images</dt><dd>${(s.imageUrls || []).length} uploaded</dd>
+            <dt>Images</dt><dd>${uploaded.length} uploaded</dd>
+            <dt>Uploaded Assets</dt><dd>${imagesMarkup}</dd>
           </dl>
           ${s.status === 'pending' ? `
           <div class="review-actions">
