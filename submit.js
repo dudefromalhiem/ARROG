@@ -623,7 +623,7 @@ async function uploadImage(file, attempt = 1) {
   const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
   const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
   const localUrl = await fileToDataUrl(file);
-  const uploadRecord = { id: uploadId, name: file.name, url: localUrl, localUrl: localUrl, remoteUrl: '', status: 'uploading', removed: false, path: path, task: null, fingerprint: fingerprint };
+  const uploadRecord = { id: uploadId, name: file.name, file: file, url: localUrl, localUrl: localUrl, remoteUrl: '', status: 'uploading', removed: false, path: path, task: null, fingerprint: fingerprint, timeoutId: null };
   uploadedImages.push(uploadRecord);
   renderImageList();
   refreshImageSelectors();
@@ -644,6 +644,15 @@ async function uploadImage(file, attempt = 1) {
   try {
     const task = ref.put(file);
     uploadRecord.task = task;
+    uploadRecord.timeoutId = setTimeout(() => {
+      if (uploadRecord.status === 'uploading') {
+        try { task.cancel(); } catch (e) { /* ignore */ }
+        uploadRecord.status = 'failed';
+        renderImageList();
+        progressWrap.style.display = 'none';
+        if (uploadStatus) uploadStatus.textContent = 'Upload timed out for ' + file.name + '. Click Retry.';
+      }
+    }, 45000);
     if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '...';
     task.on('state_changed',
       snap => {
@@ -651,11 +660,17 @@ async function uploadImage(file, attempt = 1) {
         progressBar.style.width = pct + '%';
       },
       err => {
+        if (uploadRecord.timeoutId) {
+          clearTimeout(uploadRecord.timeoutId);
+          uploadRecord.timeoutId = null;
+        }
         const code = err && err.code ? err.code : '';
         uploadRecord.status = 'failed';
         renderImageList();
         if (code === 'storage/unauthorized') {
           alert('Upload denied by Firebase Storage rules. Confirm you are signed in and using your own submissions folder.');
+        } else if (code === 'storage/retry-limit-exceeded') {
+          alert('Upload timed out reaching Firebase Storage. Click Retry on this image.');
         } else {
           alert('Upload failed: ' + (err.message || code || 'Unknown storage error'));
         }
@@ -663,6 +678,10 @@ async function uploadImage(file, attempt = 1) {
         if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '.';
       },
       async () => {
+        if (uploadRecord.timeoutId) {
+          clearTimeout(uploadRecord.timeoutId);
+          uploadRecord.timeoutId = null;
+        }
         const url = await ref.getDownloadURL();
         if (uploadRecord.removed) return;
         uploadRecord.remoteUrl = url;
@@ -696,10 +715,18 @@ function renderImageList() {
         <div style="font-size:.65rem;color:var(--wht-f);margin-top:3px;text-transform:uppercase;letter-spacing:1px">${label}</div>
       </div>
       <button class="btn btn-sm btn-s btn-copy" type="button" onclick="copyImageUrl('${img.id}', this)">Copy URL</button>
+      ${img.status === 'failed' ? '<button class="btn btn-sm btn-s" type="button" onclick="retryUploadedImage(\'' + img.id + '\')">Retry</button>' : ''}
       <button class="btn btn-sm btn-d" type="button" onclick="removeUploadedImage('${img.id}')">Remove</button>
     </div>
   `;
   }).join('');
+}
+
+function retryUploadedImage(id) {
+  const record = uploadedImages.find(img => img.id === id);
+  if (!record || !record.file) return;
+  removeUploadedImage(id);
+  uploadImage(record.file);
 }
 
 function removeUploadedImage(id) {
@@ -709,6 +736,9 @@ function removeUploadedImage(id) {
   record.removed = true;
   if (record.task && record.status === 'uploading' && typeof record.task.cancel === 'function') {
     try { record.task.cancel(); } catch (e) { /* ignore */ }
+  }
+  if (record.timeoutId) {
+    try { clearTimeout(record.timeoutId); } catch (e) { /* ignore */ }
   }
   uploadedImages.splice(index, 1);
   renderImageList();
