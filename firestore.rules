@@ -67,10 +67,10 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    // ── Site Configuration ────────────────────────────────
-    match /site_config/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
+    // ── Configuration (Including Roles) ───────────────────
+    match /config/{docId} {
+      allow read: if true; // Roles must be public so the app can resolve permissions
+      allow write: if isOwner(); // Only the owner can modify roles
     }
   }
 }
