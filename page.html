@@ -85,6 +85,7 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="seed-data.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════
  *  PAGE VIEWER — Renders approved pages in a sandboxed iframe
@@ -116,18 +117,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (pageId) {
       // Direct Firestore ID lookup
       const doc = await db.collection('pages').doc(pageId).get();
-      if (!doc.exists || !doc.data().htmlContent) { showError(); return; }
-      page = doc.data();
-      docId = doc.id;
-    } else {
+      if (doc.exists && doc.data().htmlContent) {
+        page = doc.data();
+        docId = doc.id;
+      }
+    } else if (slug) {
       // Slug-based lookup
       const snap = await db.collection('pages').where('slug', '==', slug).limit(1).get();
-      if (snap.empty) { showError(); return; }
-      const doc = snap.docs[0];
-      page = doc.data();
-      docId = doc.id;
-      if (!page.htmlContent && !page.content) { showError(); return; }
+      if (!snap.empty) {
+        const doc = snap.docs[0];
+        if (doc.data().htmlContent || doc.data().content) {
+          page = doc.data();
+          docId = doc.id;
+        }
+      }
     }
+    
+    // Fallback to local seed data if not found in Firestore
+    if (!page && typeof PAGE_SEED !== 'undefined') {
+      const seedItem = PAGE_SEED.find(p => (pageId && p.id === pageId) || (slug && p.slug === slug));
+      if (seedItem) {
+        page = { ...seedItem, createdAt: { seconds: Date.now() / 1000 } };
+      }
+    }
+
+    if (!page) { showError(); return; }
     
     window.__pageDocId = docId;
 

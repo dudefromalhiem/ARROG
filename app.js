@@ -289,12 +289,18 @@ async function updateAuthUI(user) {
 // PLACEHOLDER DATA (used when Firestore isn't configured yet)
 // ═════════════════════════════════════════════════════════════
 
-const FALLBACK_ANOMALIES = [
-  { id: 'ROG-001', title: 'The Wandering Oak', type: 'Anomaly', tags: ['flora', 'mobile', 'keter'], excerpt: 'A sentient oak tree that relocates itself every lunar cycle, leaving behind calcified root networks.' },
-  { id: 'ROG-002', title: 'The Crimson Log', type: 'Anomaly', tags: ['object', 'safe', 'biological'], excerpt: 'A section of fallen timber that hemorrhages a blood-analogue fluid when exposed to frequencies above 18kHz.' },
-  { id: 'ROG-003', title: 'Millipede Protocol', type: 'Anomaly', tags: ['entity', 'euclid', 'arthropod'], excerpt: 'An anomalous species of centipede exhibiting collective intelligence and rudimentary tool usage in Sector 7G.' },
-  { id: 'ROG-004', title: 'The Flat Cap Specter', type: 'Anomaly', tags: ['humanoid', 'euclid', 'spectral'], excerpt: 'A recurring apparition of a man wearing a flat cap, manifesting near sites of botanical anomaly activity.' },
-];
+const FALLBACK_ANOMALIES = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.filter(p => p.type === 'Anomaly').slice(0, 4).map(p => {
+  const parts = p.title.split(': ');
+  return {
+    id: parts[0],
+    title: p.title,
+    type: p.type,
+    slug: p.slug,
+    tags: p.tags,
+    htmlContent: p.htmlContent,
+    excerpt: (p.htmlContent.match(/<p>(.*?)<\/p>/) || [])[1]?.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...' || ''
+  };
+}) : [];
 
 const FALLBACK_NEWS = [
   { title: 'Guild Archives v2.4 Deployed', body: 'The archive indexing system has been upgraded. All anomaly classifications now support multi-tag filtering.', date: '2026-04-08' },
@@ -308,13 +314,14 @@ const FALLBACK_ART = [
   { id: '3', title: 'Containment Echo', imageUrl: 'logo.png' },
 ];
 
-const FALLBACK_NEWEST = [
-  { id: 'p1', title: 'ROG-005: The Hollow Stump', type: 'Anomaly', updatedAt: '2026-04-10' },
-  { id: 'p2', title: 'Tale: The Man Who Planted Shadows', type: 'Tale', updatedAt: '2026-04-09' },
-  { id: 'p3', title: 'ROG-006: Ring Rot Phenomenon', type: 'Anomaly', updatedAt: '2026-04-09' },
-  { id: 'p4', title: 'Tale: Under the Canopy', type: 'Tale', updatedAt: '2026-04-08' },
-  { id: 'p5', title: 'Artwork: Roots of Red', type: 'Artwork', updatedAt: '2026-04-08' },
-];
+const FALLBACK_NEWEST = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.slice().reverse().slice(0, 5).map((p, i) => ({
+  id: p.slug || ('p' + i),
+  title: p.title,
+  type: p.type,
+  slug: p.slug,
+  htmlContent: p.htmlContent,
+  updatedAt: new Date().toLocaleDateString()
+})) : [];
 
 // ═════════════════════════════════════════════════════════════
 // RENDER FUNCTIONS
@@ -323,8 +330,8 @@ const FALLBACK_NEWEST = [
 function renderFeatured(items) {
   const grid = document.getElementById('featured-grid');
   grid.innerHTML = items.map(item => {
-    const hasPage = item.htmlContent;
-    const href = hasPage ? (item.slug ? 'pages/' + item.slug : 'page.html?id=' + item.id) : '#';
+    const hasPage = item.htmlContent || item.slug;
+    const href = hasPage ? (item.slug ? 'page.html?slug=' + item.slug : 'page.html?id=' + item.id) : '#';
     return `
     <a href="${href}" style="text-decoration:none">
       <div class="card">
@@ -351,8 +358,8 @@ function renderNews(items) {
 function renderNewest(items) {
   const feed = document.getElementById('newest-feed');
   feed.innerHTML = items.map(p => {
-    const hasPage = p.htmlContent;
-    const href = hasPage ? (p.slug ? 'pages/' + p.slug : 'page.html?id=' + p.id) : '#';
+    const hasPage = p.htmlContent || p.slug;
+    const href = hasPage ? (p.slug ? 'page.html?slug=' + p.slug : 'page.html?id=' + p.id) : '#';
     const dateStr = p.updatedAt || (p.createdAt && p.createdAt.seconds ? new Date(p.createdAt.seconds * 1000).toLocaleDateString() : '—');
     return `
     <div class="newest-row">
