@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page — Red Oaker Guild</title>
+  <meta name="description" content="View a community-submitted page in the Red Oaker Guild archive." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="index.html#resources">Read</a></li>
+      <li><a href="submit.html">Create</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<!-- ═══ MAIN CONTENT ═══ -->
+<main class="wrap">
+
+  <!-- Loading State -->
+  <div id="page-loading" class="section tc" style="max-width:500px;margin:60px auto">
+    <div class="section-hd">Loading Document...</div>
+    <p style="font-size:.85rem;color:var(--wht-d)">Retrieving classified archive entry...</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="page-error" class="section tc hidden" style="max-width:500px;margin:60px auto">
+    <div class="section-hd">Document Not Found</div>
+    <p style="font-size:.85rem;color:var(--wht-d)">
+      The requested document does not exist or has not been approved.
+      <br /><a href="index.html">Return to Main Archive</a>
+    </p>
+  </div>
+
+  <!-- Page Viewer -->
+  <div id="page-viewer" class="hidden">
+    <div class="page-viewer-header">
+      <div>
+        <div class="page-viewer-title" id="pv-title">—</div>
+        <div class="page-viewer-meta">
+          <span id="pv-type"></span>
+          <span id="pv-author"></span>
+          <span id="pv-approved"></span>
+          <span id="pv-date"></span>
+        </div>
+      </div>
+      <div id="pv-tags" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+    <iframe class="page-viewer-frame" id="pv-frame" sandbox="allow-same-origin" title="Page content"></iframe>
+    <div id="pv-actions" class="tc hidden" style="margin-top:24px;"></div>
+  </div>
+
+</main>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="ftr">
+  <div class="ftr-in">
+    <ul class="ftr-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="submit.html">Create a Page</a></li>
+    </ul>
+    <p class="ftr-copy">
+      &copy; 2026 Red Oaker Guild — All rights reserved.<br>
+      <span style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-4 CLEARANCE REQUIRED</span>
+    </p>
+  </div>
+</footer>
+
+<!-- Firebase SDK (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+ *  PAGE VIEWER — Renders approved pages in a sandboxed iframe
+ *  Supports: ?id=<firestoreId>, ?slug=<slug>, or /pages/<slug>
+ * ═══════════════════════════════════════════════════════════════ */
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(window.location.search);
+  let pageId = params.get('id');
+  let slug = params.get('slug');
+
+  // Support /pages/<slug> path (from Vercel rewrites or 404.html redirect)
+  if (!pageId && !slug) {
+    const path = window.location.pathname;
+    const match = path.match(/\/pages\/([a-z0-9-]+)\/?$/i);
+    if (match) {
+      slug = match[1];
+    }
+  }
+
+  if (!pageId && !slug) {
+    showError();
+    return;
+  }
+
+  try {
+    let page, docId;
+
+    if (pageId) {
+      // Direct Firestore ID lookup
+      const doc = await db.collection('pages').doc(pageId).get();
+      if (!doc.exists || !doc.data().htmlContent) { showError(); return; }
+      page = doc.data();
+      docId = doc.id;
+    } else {
+      // Slug-based lookup
+      const snap = await db.collection('pages').where('slug', '==', slug).limit(1).get();
+      if (snap.empty) { showError(); return; }
+      const doc = snap.docs[0];
+      page = doc.data();
+      docId = doc.id;
+      if (!page.htmlContent && !page.content) { showError(); return; }
+    }
+    
+    window.__pageDocId = docId;
+
+    // Update page title + meta
+    document.title = page.title + ' — Red Oaker Guild';
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.content = page.title + ' — ' + (page.type || 'Page') + ' in the Red Oaker Guild archive.';
+
+    // Fill metadata bar
+    document.getElementById('pv-title').textContent = page.title;
+    document.getElementById('pv-type').innerHTML = '<span class="tag">' + (page.type || 'Page') + '</span>';
+
+    const authorDisplay = page.authorName || 'Unknown Agent';
+    document.getElementById('pv-author').textContent = 'by ' + authorDisplay;
+
+    if (page.approvedBy) {
+      document.getElementById('pv-approved').innerHTML = ` <span style="color:var(--wht-d)">|</span> Approved by: <span style="color:var(--red-b)">${page.approvedBy}</span> <span style="color:var(--wht-d)">|</span> `;
+    } else {
+      document.getElementById('pv-approved').innerHTML = ' <span style="color:var(--wht-d)">|</span> ';
+    }
+
+    const dateStr = page.approvedAt ? new Date(page.approvedAt.seconds * 1000).toLocaleDateString() :
+                    page.createdAt ? new Date(page.createdAt.seconds * 1000).toLocaleDateString() : '—';
+    document.getElementById('pv-date').textContent = dateStr;
+
+    const tagsEl = document.getElementById('pv-tags');
+    if (page.tags && page.tags.length) {
+      tagsEl.innerHTML = page.tags.map(t => '<span class="tag">' + t + '</span>').join('');
+    }
+
+    // Render content in iframe
+    const frame = document.getElementById('pv-frame');
+    const htmlDoc = buildPageDocument(page.htmlContent, page.cssContent || '');
+    frame.srcdoc = htmlDoc;
+
+    // Show viewer
+    document.getElementById('page-loading').classList.add('hidden');
+    document.getElementById('page-viewer').classList.remove('hidden');
+
+  } catch (err) {
+    console.error('Failed to load page:', err);
+    showError();
+  }
+
+  // Auth UI
+  auth.onAuthStateChanged(async user => {
+    await rolesReady;
+    const navAuth = document.getElementById('nav-auth');
+    if (user) {
+      const displayLabel = user.displayName || 'Agent';
+      navAuth.innerHTML = '<button class="nav-btn" onclick="auth.signOut()">' + displayLabel + ' (Sign Out)</button>';
+      
+      // Inject admin actions
+      let actionsDiv = document.getElementById('pv-actions');
+      if (isAdmin(user.email)) {
+        actionsDiv.classList.remove('hidden');
+        actionsDiv.innerHTML = `<button class="btn btn-s" onclick="location.href='admin.html?editId=${window.__pageDocId || ''}'">>> Edit Document [Admin]</button>`;
+      }
+    }
+  });
+});
+
+function showError() {
+  document.getElementById('page-loading').classList.add('hidden');
+  document.getElementById('page-error').classList.remove('hidden');
+}
+
+function buildPageDocument(html, css) {
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.7;padding:24px;color:#222;background:#fff}img{max-width:100%;height:auto}' + css.replace(/<\/style>/gi, '') + '</style></head><body>' + html + '</body></html>';
+}
+</script>
+</body>
+</html>

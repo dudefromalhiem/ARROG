@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Red Oaker Guild — Classified Archive</title>
+  <meta name="description" content="The Red Oaker Guild: a secretive, archival collective documenting anomalous phenomena. Explore contained anomalies, tales, and classified artworks." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══ TERMINAL EASTER EGG ═══ -->
+<div class="term" id="terminal">
+  <div class="term-body" id="term-body"></div>
+  <div class="term-skip">
+    <button class="btn btn-sm btn-s" onclick="skipTerminal()">Skip &gt;&gt;</button>
+  </div>
+</div>
+
+<!-- ═══ AUTH MODAL ═══ -->
+<div class="auth-ov hidden" id="auth-modal">
+  <div class="auth-box">
+    <button class="auth-x" onclick="closeAuth()">✕</button>
+    <h2 id="auth-title">Sign In</h2>
+    <p class="auth-err hidden" id="auth-err"></p>
+    <div class="fg">
+      <input class="fi" id="auth-email" type="email" placeholder="Email address" />
+    </div>
+    <div class="fg">
+      <input class="fi" id="auth-pass" type="password" placeholder="Password" />
+    </div>
+    <button class="btn btn-p" style="width:100%" onclick="handleAuth()">&gt;&gt; Access Terminal</button>
+    <button class="btn btn-s" style="width:100%;margin-top:8px" onclick="handleGoogle()">Sign In with Google</button>
+    <div class="auth-tog">
+      <span id="auth-tog-text">No account? </span>
+      <a onclick="toggleAuthMode()" id="auth-tog-link">Register here</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HEADER ═══ -->
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="#about">About</a></li>
+      <li><a href="#community">Community</a></li>
+      <li><a href="#resources">Resources</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Submit</a></li>
+      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<!-- ═══ MAIN CONTENT ═══ -->
+<main class="wrap">
+
+  <!-- Intro -->
+  <section class="intro" id="about">
+    <div class="intro-hero">
+      <img src="logo.png" alt="" class="intro-logo" />
+      <h1 class="intro-t">Red Oaker Guild</h1>
+    </div>
+    <div class="intro-cl">● Clearance Level 4 Required ● Classified Document ●</div>
+    <div class="intro-r"></div>
+    <p class="intro-sub">
+      We are the watchers at the threshold. The Red Oaker Guild exists to document, contain, and understand anomalous phenomena that defy conventional science. Our archive is vast. Our protocols are absolute. What you read here will change what you believe is possible.
+    </p>
+  </section>
+
+  <!-- Warning Banner -->
+  <div class="warn" id="warning">
+    <h2>⚠ Warning: The Guild Will Open Your Eyes ⚠</h2>
+    <div class="bgrp">
+      <a href="#featured" class="btn btn-p">Explore the Universe</a>
+      <a href="#about" class="btn btn-s">About the Guild</a>
+    </div>
+  </div>
+
+  <!-- Onboarding -->
+  <div class="g2" id="community" style="margin-bottom:64px">
+    <div class="section" style="margin-bottom:0">
+      <div class="section-hd">Get Started</div>
+      <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
+        Welcome, new operative. Before accessing classified materials, familiarize yourself with Guild protocols and containment procedures. Registration grants basic clearance.
+      </p>
+      <ol style="padding-left:20px;font-size:.85rem;color:var(--wht-d);margin-bottom:16px;line-height:1.8">
+        <li>Create an account or sign in above.</li>
+        <li>Read the <a href="#">Newcomer's Guide</a>.</li>
+        <li>Browse the <a href="#featured">Anomaly Registry</a>.</li>
+        <li><a href="submit.html">Submit your first contribution</a>.</li>
+      </ol>
+    </div>
+    <div class="section" style="margin-bottom:0">
+      <div class="section-hd">Be an Admin</div>
+      <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
+        The Guild requires dedicated operatives to maintain the archive, curate content, and enforce containment protocols. Admin clearance provides full CRUD access to all compartments, sections, and uploads.
+      </p>
+      <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">Requirements: Active account, demonstrated contributions, and Owner approval.</p>
+      <a href="#" class="btn btn-p">Apply for Admin Clearance</a>
+    </div>
+  </div>
+
+  <!-- Create Page CTA -->
+  <div class="create-cta" id="create-cta">
+    <h2>✦ Create a Page ✦</h2>
+    <p>Document an anomaly, write a tale, or showcase your artwork. No coding required — use our template builder or write custom HTML/CSS.</p>
+    <a href="submit.html" class="btn btn-p">>> Start Creating</a>
+  </div>
+
+  <!-- Featured Anomalies -->
+  <div class="section" id="featured">
+    <div class="section-hd">Featured Anomalies</div>
+    <div class="g2" id="featured-grid">
+      <!-- Filled by JS or static fallback -->
+    </div>
+  </div>
+
+  <!-- Art Spotlight -->
+  <div class="section">
+    <div class="section-hd">Art Spotlight</div>
+    <div class="carousel" id="art-carousel">
+      <div class="carousel-track" id="carousel-track"></div>
+      <div class="carousel-dots" id="carousel-dots"></div>
+      <div class="carousel-label" id="carousel-label"></div>
+    </div>
+  </div>
+
+  <!-- Site News -->
+  <div class="section" id="news">
+    <div class="section-hd">Site News</div>
+    <div id="news-feed"></div>
+  </div>
+
+  <!-- Read Section -->
+  <div class="section" id="resources">
+    <div class="section-hd">Read</div>
+    <div class="g3">
+      <a href="#" style="text-decoration:none">
+        <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
+          <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">◈</div>
+          <div class="card-t">Anomalies</div>
+          <div class="card-b" style="font-size:.8rem">Browse the full registry of catalogued anomalous objects, entities, and phenomena.</div>
+        </div>
+      </a>
+      <a href="#" style="text-decoration:none">
+        <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
+          <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">◇</div>
+          <div class="card-t">Tales</div>
+          <div class="card-b" style="font-size:.8rem">Narrative accounts, field reports, and canonical stories from Guild operatives.</div>
+        </div>
+      </a>
+      <a href="#" style="text-decoration:none">
+        <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
+          <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">▣</div>
+          <div class="card-t">Artworks</div>
+          <div class="card-b" style="font-size:.8rem">Visual documentation and creative interpretations submitted by the community.</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Newest Pages -->
+  <div class="section" id="newest">
+    <div class="section-hd">Newest Pages</div>
+    <div id="newest-feed"></div>
+  </div>
+
+</main>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="ftr">
+  <div class="ftr-in">
+    <ul class="ftr-links">
+      <li><a href="submit.html">Contribute</a></li>
+      <li><a href="#">List of Hubs</a></li>
+      <li><a href="#">Licensing</a></li>
+      <li><a href="submit.html">Sandbox</a></li>
+    </ul>
+    <p class="ftr-copy">
+      &copy; 2026 Red Oaker Guild — All rights reserved.<br>
+      <span style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-4 CLEARANCE REQUIRED</span>
+    </p>
+  </div>
+</footer>
+
+<!-- Firebase SDK (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

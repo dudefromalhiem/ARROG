@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Redirecting — Red Oaker Guild</title>
+  <script>
+    // GitHub Pages SPA redirect:
+    // If the path matches /pages/<slug>, redirect to page.html?slug=<slug>
+    // Otherwise, redirect to index.html
+    (function() {
+      var path = window.location.pathname;
+      var match = path.match(/\/pages\/([a-z0-9-]+)\/?$/i);
+      if (match) {
+        // Redirect to page.html with slug param
+        window.location.replace(
+          window.location.origin +
+          (window.location.pathname.replace(/\/pages\/[^/]+\/?$/, '/')) +
+          'page.html?slug=' + match[1]
+        );
+      } else {
+        // Unknown path → go home
+        window.location.replace(window.location.origin + '/');
+      }
+    })();
+  </script>
+  <style>
+    body {
+      background: #000;
+      color: #cc0000;
+      font-family: 'IBM Plex Mono', monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .msg { text-align: center; }
+    .msg h1 { font-size: 1.2rem; letter-spacing: 4px; text-transform: uppercase; }
+    .msg p { color: #666; font-size: .8rem; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="msg">
+    <h1>Redirecting...</h1>
+    <p>Locating classified document in the archive.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create a Page — Red Oaker Guild</title>
+  <meta name="description" content="Create and submit a custom page to the Red Oaker Guild archive. Use templates or write your own HTML & CSS." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="index.html#resources">Read</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<!-- ═══ MAIN CONTENT ═══ -->
+<main class="wrap">
+
+  <!-- Auth Gate -->
+  <div class="section tc" id="submit-denied" style="max-width:500px;margin:60px auto">
+    <div class="section-hd">Authentication Required</div>
+    <p style="font-size:.85rem;color:var(--wht-d)">
+      You must be signed in to create pages.
+      <a href="index.html">Sign in on the main page</a> first.
+    </p>
+  </div>
+
+  <!-- Create Panel (hidden until auth) -->
+  <div class="hidden" id="submit-panel">
+
+    <!-- ═══ PAGE HERO ═══ -->
+    <div class="create-hero">
+      <h1>Create a Page</h1>
+      <p>Document an anomaly, write a tale, or showcase art. Choose a template or write your own code — your creation will be reviewed by Guild admins before going live.</p>
+    </div>
+
+    <!-- ═══ MODE SELECTOR ═══ -->
+    <div class="mode-selector" id="mode-selector">
+      <button class="mode-btn active" id="mode-template" onclick="switchMode('template')">
+        <div class="mode-icon">◈</div>
+        <div class="mode-label">Template Builder</div>
+        <div class="mode-desc">No coding required — fill in the form</div>
+      </button>
+      <button class="mode-btn" id="mode-code" onclick="switchMode('code')">
+        <div class="mode-icon">◇</div>
+        <div class="mode-label">Code Editor</div>
+        <div class="mode-desc">Write custom HTML &amp; CSS</div>
+      </button>
+    </div>
+
+    <!-- ═══ PAGE METADATA (shared) ═══ -->
+    <div class="section" style="margin-bottom:24px">
+      <div class="section-hd">Page Details</div>
+      <div class="g2 mb-md">
+        <div class="fg"><label class="fl" id="lbl-title">Title</label><input class="fi" id="sf-title" placeholder="e.g. ROG-007: The Hollow Mirror" required /></div>
+        <div class="fg"><label class="fl">Type</label>
+          <select class="fi" id="sf-type" onchange="onTypeChange()">
+            <option>Anomaly</option><option>Tale</option><option>Artwork</option><option>Hub</option><option>Guide</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Tags (comma-separated)</label><input class="fi" id="sf-tags" placeholder="e.g. object, euclid, temporal" /></div>
+      <div class="fg">
+        <label class="fl">Page URL Slug</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:.8rem;color:var(--wht-f);white-space:nowrap">/pages/</span>
+          <input class="fi" id="sf-slug" placeholder="auto-generated from title" style="font-family:var(--font-m);font-size:.8rem" />
+        </div>
+        <span style="font-size:.7rem;color:var(--wht-f)">Leave blank to auto-generate from title. Use lowercase, hyphens only.</span>
+      </div>
+    </div>
+
+    <!-- ═══ IMAGE UPLOAD (shared) ═══ -->
+    <div class="section" style="margin-bottom:24px">
+      <div class="section-hd">Image Uploads</div>
+      <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
+        Upload images to use in your page. In template mode, images are auto-placed. In code mode, copy the URL into your HTML.
+        Max 5MB per image. PNG, JPG, GIF, WebP accepted.
+      </p>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="img-input" accept="image/png,image/jpeg,image/gif,image/webp" multiple />
+        <div class="uz-icon">⬆</div>
+        <div class="uz-text">Click or drag images here to upload</div>
+        <div class="uz-hint">PNG, JPG, GIF, WebP — 5MB max each</div>
+      </div>
+      <div class="upload-progress" id="upload-progress">
+        <div class="upload-progress-bar" id="upload-bar"></div>
+      </div>
+      <div class="img-list" id="img-list"></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- TEMPLATE BUILDER MODE                                   -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <div id="template-mode">
+
+      <!-- Template Chooser -->
+      <div class="section" style="margin-bottom:24px">
+        <div class="section-hd">Choose a Template</div>
+        <div class="tpl-grid">
+          <button class="tpl-card active" onclick="selectTemplate('anomaly')" id="tpl-anomaly">
+            <div class="tpl-icon">◈</div>
+            <div class="tpl-name">Anomaly Report</div>
+            <div class="tpl-desc">Standard ROG classification format with containment procedures</div>
+          </button>
+          <button class="tpl-card" onclick="selectTemplate('tale')" id="tpl-tale">
+            <div class="tpl-icon">◇</div>
+            <div class="tpl-name">Tale / Story</div>
+            <div class="tpl-desc">Narrative format with chapters and atmospheric prose</div>
+          </button>
+          <button class="tpl-card" onclick="selectTemplate('artwork')" id="tpl-artwork">
+            <div class="tpl-icon">▣</div>
+            <div class="tpl-name">Artwork Showcase</div>
+            <div class="tpl-desc">Image-focused layout with description and artist info</div>
+          </button>
+          <button class="tpl-card" onclick="selectTemplate('guide')" id="tpl-guide">
+            <div class="tpl-icon">▤</div>
+            <div class="tpl-name">Guide / Document</div>
+            <div class="tpl-desc">Structured document with table of contents</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Anomaly Template Fields -->
+      <div class="section" style="margin-bottom:24px" id="tpl-fields-anomaly">
+        <div class="section-hd">Anomaly Details</div>
+        <div class="g2 mb-md">
+          <div class="fg"><label class="fl">Object Class</label>
+            <select class="fi" id="tf-object-class">
+              <option>Safe</option><option>Euclid</option><option>Keter</option><option>Thaumiel</option><option>Neutralized</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">Hero Image</label>
+          <select class="fi" id="tf-hero-img">
+            <option value="">None — No hero image</option>
+          </select>
+          <span style="font-size:.7rem;color:var(--wht-f)">Upload images above, then select one here.</span>
+        </div>
+        <div class="fg"><label class="fl">Containment Procedures</label>
+          <textarea class="fta" id="tf-containment" placeholder="Describe how this anomaly is contained..."></textarea>
+        </div>
+        <div class="fg"><label class="fl">Description</label>
+          <textarea class="fta" id="tf-description" placeholder="Describe the anomaly in detail..."></textarea>
+        </div>
+
+        <!-- Dynamic Subsections -->
+        <div id="tf-subsections"></div>
+        <button class="btn btn-s" onclick="addSubsection('anomaly')" style="margin-top:12px">+ Add Subsection</button>
+      </div>
+
+      <!-- Tale Template Fields -->
+      <div class="section hidden" style="margin-bottom:24px" id="tpl-fields-tale">
+        <div class="section-hd">Tale Details</div>
+        <div class="fg"><label class="fl">Subtitle / Tagline</label><input class="fi" id="tf-tale-subtitle" placeholder="e.g. A Guild Operative's Account" /></div>
+        <div class="fg">
+          <label class="fl">Hero Image</label>
+          <select class="fi" id="tf-tale-hero">
+            <option value="">None — No hero image</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Prologue / Opening</label>
+          <textarea class="fta" id="tf-tale-intro" placeholder="Write the opening passage..."></textarea>
+        </div>
+
+        <div id="tf-tale-sections"></div>
+        <button class="btn btn-s" onclick="addSubsection('tale')" style="margin-top:12px">+ Add Chapter / Section</button>
+      </div>
+
+      <!-- Artwork Template Fields -->
+      <div class="section hidden" style="margin-bottom:24px" id="tpl-fields-artwork">
+        <div class="section-hd">Artwork Details</div>
+        <div class="fg"><label class="fl">Featured Image</label>
+          <select class="fi" id="tf-art-img">
+            <option value="">Upload an image above first</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Artist Name</label><input class="fi" id="tf-art-artist" placeholder="Your name or handle" /></div>
+        <div class="fg"><label class="fl">Medium / Technique</label><input class="fi" id="tf-art-medium" placeholder="e.g. Digital painting, Ink on paper" /></div>
+        <div class="fg"><label class="fl">Description</label>
+          <textarea class="fta" id="tf-art-desc" placeholder="Describe the artwork and its inspiration..."></textarea>
+        </div>
+      </div>
+
+      <!-- Guide Template Fields -->
+      <div class="section hidden" style="margin-bottom:24px" id="tpl-fields-guide">
+        <div class="section-hd">Guide Details</div>
+        <div class="fg"><label class="fl">Introduction</label>
+          <textarea class="fta" id="tf-guide-intro" placeholder="Write the introduction..."></textarea>
+        </div>
+        <div class="fg">
+          <label class="fl">Hero Image</label>
+          <select class="fi" id="tf-guide-hero">
+            <option value="">None — No hero image</option>
+          </select>
+        </div>
+
+        <div id="tf-guide-sections"></div>
+        <button class="btn btn-s" onclick="addSubsection('guide')" style="margin-top:12px">+ Add Section</button>
+      </div>
+
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- CODE EDITOR MODE                                        -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <div id="code-mode" class="hidden">
+      <div class="section" style="margin-bottom:24px">
+        <div class="section-hd">Content Editor</div>
+        <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
+          Write fully custom HTML and CSS. <span style="color:var(--red-b)">JavaScript is not allowed</span> — only HTML and CSS.
+        </p>
+        <div class="editor-wrap">
+          <div class="editor-pane">
+            <div class="editor-label"><span class="icon">◈</span> HTML</div>
+            <textarea id="sf-html" placeholder="<!-- Write your page HTML here -->
+<div class=&quot;anomaly-header&quot;>
+  <h1>ROG-007: The Hollow Mirror</h1>
+  <p class=&quot;class-label&quot;>Object Class: Euclid</p>
+</div>
+
+<div class=&quot;description&quot;>
+  <h2>Description</h2>
+  <p>Your anomaly description here...</p>
+</div>"></textarea>
+          </div>
+          <div class="editor-pane">
+            <div class="editor-label"><span class="icon">◇</span> CSS</div>
+            <textarea id="sf-css" placeholder="/* Style your page here */
+.anomaly-header {
+  text-align: center;
+  padding: 24px;
+  border-bottom: 2px solid #8b0000;
+}
+
+.description {
+  padding: 24px;
+  line-height: 1.8;
+}"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LIVE PREVIEW (both modes) ═══ -->
+    <div class="section" style="margin-bottom:24px">
+      <div class="section-hd">Live Preview</div>
+      <div class="preview-header">
+        <span>Preview — HTML + CSS rendered (no JavaScript)</span>
+        <span class="badge">SANDBOXED</span>
+      </div>
+      <iframe class="preview-frame" id="preview-frame" sandbox="allow-same-origin" title="Live preview of your page"></iframe>
+    </div>
+
+    <!-- ═══ SUBMIT ═══ -->
+    <div class="submit-bar">
+      <div>
+        <span style="font-size:.75rem;color:var(--wht-f)">Your page will appear at: </span>
+        <span style="font-size:.8rem;color:var(--red-b);font-family:var(--font-m)" id="slug-preview">/pages/...</span>
+      </div>
+      <div style="display:flex;gap:12px">
+        <button class="btn btn-s" onclick="resetSubmitForm()">Clear All</button>
+        <button class="btn btn-p" id="submit-btn" onclick="submitPage()">>> Submit for Review</button>
+      </div>
+    </div>
+
+    <!-- ═══ MY SUBMISSIONS ═══ -->
+    <div class="section" id="my-submissions-section">
+      <div class="section-hd">My Submissions</div>
+      <div id="my-submissions">
+        <p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">Loading...</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="ftr">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Submission Terminal</p>
+  </div>
+</footer>
+
+<!-- Firebase SDK (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="submit.js"></script>
+</body>
+</html>

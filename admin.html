@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Terminal — Red Oaker Guild</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <ul class="nav">
+      <li><a href="index.html">Home</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<!-- ═══ ADMIN CONTENT ═══ -->
+<main class="wrap">
+  <h1>Admin Terminal</h1>
+  <p id="admin-info" style="color:var(--wht-d);font-size:.85rem;margin-bottom:24px"></p>
+
+  <!-- Access Denied (shown by default) -->
+  <div class="section tc" id="admin-denied" style="max-width:500px;margin:60px auto">
+    <div class="section-hd">Access Denied</div>
+    <p style="font-size:.85rem;color:var(--wht-d)">
+      Authentication required. Sign in with an authorized account on the
+      <a href="index.html">main page</a> to access the Admin Terminal.
+    </p>
+  </div>
+
+  <!-- Admin Panel (hidden until auth) -->
+  <div class="hidden" id="admin-panel">
+    <div class="adm">
+      <div class="adm-side" id="adm-tabs">
+        <a class="on" onclick="switchTab('pages')">Pages</a>
+        <a onclick="switchTab('submissions')">Submissions</a>
+        <a onclick="switchTab('artworks')">Artworks</a>
+        <a onclick="switchTab('news')">News</a>
+        <a onclick="switchTab('users')" id="tab-users" class="hidden">Users</a>
+        <a onclick="switchTab('roles')" id="tab-roles" class="hidden">Roles</a>
+      </div>
+      <div class="adm-main" id="adm-main">
+        <!-- Dynamically filled -->
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="ftr">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Admin Terminal</p>
+  </div>
+</footer>
+
+<!-- Firebase SDK (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

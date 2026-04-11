@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Database Seeding Terminal</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { padding: 40px; }
+    .log-box { background: #111; border: 1px solid #333; padding: 20px; font-family: monospace; color: #0f0; max-height: 400px; overflow-y: auto; margin-top: 20px; }
+    .log-line { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Guild Database Initialization</h1>
+  <p>Pushing 44 Lore and Anomaly documents to Firestore.</p>
+  <button id="seed-btn" class="btn btn-p" onclick="startSeeding()">EXECUTE SEEDING PROTOCOL</button>
+  
+  <div id="log" class="log-box"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="seed-data.js"></script>
+  <script>
+    function logMsg(msg) {
+      const el = document.createElement('div');
+      el.className = 'log-line';
+      el.textContent = `> ${msg}`;
+      const logBox = document.getElementById('log');
+      logBox.appendChild(el);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    async function startSeeding() {
+      const user = auth.currentUser;
+      if (!user) {
+         logMsg("ERROR: UNAUTHORIZED (Please log in on index.html first)");
+         return;
+      }
+      
+      document.getElementById('seed-btn').disabled = true;
+      logMsg("Authenticating payload...");
+      logMsg(`Agent ${user.displayName || 'Unknown'} verified.`);
+
+      // Step 0: Seed config/roles document
+      logMsg("[RBAC] Seeding config/roles document...");
+      try {
+        await db.collection('config').doc('roles').set({
+          owners: [],
+          admins: []
+        });
+        logMsg("[OK] config/roles seeded with owner emails.");
+      } catch(e) {
+        logMsg("[WARN] config/roles may already exist or failed: " + e.message);
+      }
+
+      logMsg(`Starting batch import of ${PAGE_SEED.length} documents...`);
+
+      const dbCol = db.collection('pages');
+      let successCount = 0;
+
+      for (let i=0; i<PAGE_SEED.length; i++) {
+        const item = PAGE_SEED[i];
+        try {
+          const docData = {
+            title: item.title,
+            slug: item.slug,
+            type: item.type,
+            tags: item.tags,
+            htmlContent: item.htmlContent,
+            cssContent: item.cssContent || '.wiki-box { border: 1px solid var(--wht-d); padding: 16px; margin-bottom: 24px; background: rgba(200,0,0,0.05); border-left: 4px solid var(--red-b); } .wiki-meta { font-family: monospace; color: var(--wht-m); margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; font-size: 0.9rem; } .wiki-h { color: var(--red-b); margin-top: 24px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }',
+            authorName: user.displayName || 'System',
+            approvedBy: "System_Auto_Deploy",
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          
+          await dbCol.add(docData);
+          logMsg(`[OK] Inserted: ${item.title}`);
+          successCount++;
+        } catch(e) {
+          logMsg(`[ERR] Failed on: ${item.title} - ${e.message}`);
+        }
+      }
+
+      logMsg(`\nSEEDING COMPLETE! Total inserted: ${successCount} / ${PAGE_SEED.length}`);
+    }
+  </script>
+</body>
+</html>
