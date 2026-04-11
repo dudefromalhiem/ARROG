@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anomaly Registry — Red Oaker Guild</title>
+  <meta name="description" content="Searchable database of classified anomalies." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .reg-wrap { max-width: 1000px; margin: 40px auto; }
+    .reg-ctrl { background: var(--blk-b); border: 1px solid var(--blk-m); padding: 20px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap; }
+    .reg-ctrl .fi { flex: 1; min-width: 200px; }
+    .reg-table { width: 100%; border-collapse: collapse; font-family: var(--font-m); }
+    .reg-table th { background: var(--red-d); color: var(--wht-b); text-align: left; padding: 12px; font-weight: bold; text-transform: uppercase; font-size: .8rem; letter-spacing: 1px; }
+    .reg-table td { background: var(--blk-b); padding: 12px; border-bottom: 1px solid var(--blk-m); font-size: .9rem; color: var(--wht-m); }
+    .reg-table tr:hover td { background: var(--blk-m); color: var(--wht-b); cursor: pointer; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 2px; font-size: .7rem; text-transform: uppercase; font-weight: bold; }
+    .badge-Safe { background: #2ca02c; color: #fff; }
+    .badge-Euclid { background: #ff7f0e; color: #fff; }
+    .badge-Keter { background: #d62728; color: #fff; }
+    .badge-Thaumiel { background: #1f77b4; color: #fff; }
+    .badge-Neutralized { background: #7f7f7f; color: #fff; }
+    /* Generic fallback for unknown classes */
+    .badge-unknown { background: #444; color: #fff; }
+    
+    .loading-tbl { text-align: center; padding: 40px; color: var(--wht-d); font-style: italic; }
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="ROG" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="explore.html">Explore</a></li>
+      <li><a href="guide.html">Guide</a></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap reg-wrap">
+  <div class="section-hd" style="border-bottom:none">Anomaly Registry</div>
+  <p style="color:var(--wht-d); margin-bottom:24px; font-size:.9rem;">
+    Accessing the primary database. All interactions are logged. Use the filters below to isolate specific documentation.
+  </p>
+
+  <div class="reg-ctrl">
+    <input class="fi" type="text" id="filter-text" placeholder="Search ID or Keyword (e.g. ROS-0001)..." />
+    <select class="fi" id="filter-class" style="max-width:200px">
+      <option value="">All Object Classes</option>
+      <option value="Safe">Safe</option>
+      <option value="Euclid">Euclid</option>
+      <option value="Keter">Keter</option>
+      <option value="Thaumiel">Thaumiel</option>
+      <option value="Neutralized">Neutralized</option>
+    </select>
+  </div>
+
+  <table class="reg-table" id="reg-table">
+    <thead>
+      <tr>
+        <th>Designation & Title</th>
+        <th style="width:120px">Class</th>
+        <th>Excerpt / Description</th>
+      </tr>
+    </thead>
+    <tbody id="reg-body">
+      <tr><td colspan="3" class="loading-tbl">Accessing databanks...</td></tr>
+    </tbody>
+  </table>
+
+</main>
+
+<footer class="ftr" style="margin-top:60px;">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Classified Database</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="seed-data.js"></script>
+
+<script>
+  let allAnomalies = [];
+
+  async function loadRegistry() {
+    let combined = [];
+
+    // 1. Get from PAGE_SEED fallback
+    if (typeof PAGE_SEED !== 'undefined') {
+      combined = PAGE_SEED.filter(p => p.type === 'Anomaly').map(p => {
+        // Try to extact class from tags or assume Euclid
+        let objClass = 'unknown';
+        ['Safe', 'Euclid', 'Keter', 'Thaumiel', 'Neutralized'].forEach(c => {
+          if (p.htmlContent && p.htmlContent.includes('Class:</span> ' + c)) {
+            objClass = c;
+          } else if (p.tags && p.tags.includes(c.toLowerCase())) {
+            objClass = c;
+          }
+        });
+        // If still unknown, look for Euclid in text
+        if (objClass === 'unknown' && p.htmlContent && p.htmlContent.includes('Euclid')) objClass = 'Euclid';
+        if (objClass === 'unknown') objClass = 'Safe';
+
+        const idMatch = p.title.match(/^([A-Z]{2,4}-\d+)/i);
+        const anomalyId = idMatch ? idMatch[1].toUpperCase() : p.slug;
+
+        return {
+          id: p.id || p.slug,
+          slug: p.slug,
+          title: p.title,
+          anomalyId: anomalyId,
+          objClass: objClass,
+          excerpt: (p.htmlContent.match(/<p>(.*?)<\/p>/) || [])[1]?.replace(/<[^>]*>?/gm, '').substring(0, 100) + '...' || ''
+        };
+      });
+    }
+
+    // 2. Fetch live data from Firestore
+    try {
+      const snap = await db.collection('pages').where('type', '==', 'Anomaly').get();
+      snap.docs.forEach(doc => {
+        const data = doc.data();
+        
+        // Skip if we already have it from seed to prevent double entries (using slug)
+        if (combined.some(c => c.slug === data.slug)) return;
+
+        let objClass = 'unknown';
+        if (data.htmlContent) {
+           ['Safe', 'Euclid', 'Keter', 'Thaumiel', 'Neutralized'].forEach(c => {
+             if (data.htmlContent.includes(c)) objClass = c;
+           });
+        }
+        
+        combined.push({
+          id: doc.id,
+          slug: data.slug,
+          title: data.title,
+          anomalyId: data.anomalyId || '',
+          objClass: objClass,
+          excerpt: data.htmlContent ? data.htmlContent.replace(/<[^>]*>?/gm, '').substring(0, 100) + '...' : ''
+        });
+      });
+    } catch(e) {
+      console.warn("Could not fetch remote anomalies.", e);
+    }
+
+    allAnomalies = combined;
+    renderTable();
+  }
+
+  function renderTable() {
+    const txtFilter = document.getElementById('filter-text').value.toLowerCase();
+    const clsFilter = document.getElementById('filter-class').value;
+    const body = document.getElementById('reg-body');
+
+    const filtered = allAnomalies.filter(item => {
+      if (clsFilter && item.objClass !== clsFilter) return false;
+      if (txtFilter && !item.title.toLowerCase().includes(txtFilter) && !item.anomalyId.toLowerCase().includes(txtFilter)) return false;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      body.innerHTML = '<tr><td colspan="3" class="loading-tbl">No records found matching criteria.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = filtered.map(item => {
+      const clsBadge = 'badge-' + (item.objClass || 'unknown');
+      const href = item.slug ? 'page.html?slug=' + item.slug : 'page.html?id=' + item.id;
+      return '<tr onclick="window.location.href=\\'' + href + '\\'">' +
+        '<td><div style="font-weight:bold;color:var(--wht-b); margin-bottom:4px;">' + (item.anomalyId || item.title.split(': ')[0]) + '</div><div style="font-size:.8rem;">' + item.title + '</div></td>' +
+        '<td><span class="badge ' + clsBadge + '">' + (item.objClass || 'Unknown') + '</span></td>' +
+        '<td>' + item.excerpt + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  document.getElementById('filter-text').addEventListener('input', renderTable);
+  document.getElementById('filter-class').addEventListener('change', renderTable);
+
+  document.addEventListener('DOMContentLoaded', loadRegistry);
+</script>
+</body>
+</html>

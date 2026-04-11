@@ -653,7 +653,12 @@ async function submitPage() {
   const slug = manualSlug || generateSlug(title);
 
   if (!title) { alert('Please enter a title.'); return; }
-  if (!slug) { alert('Could not generate a URL slug. Please enter a title or slug.'); return; }
+  const idMatch = title.match(/^([A-Z]{2,4}-\d+)/i) || title.match(/^([A-Za-z]+-\d+)/i);
+  if (!idMatch) {
+    alert("The submission Title MUST begin with an Anomaly ID designation (e.g. ROG-001, ROS-0050). This is compulsory for search indexing.");
+    return;
+  }
+  const anomalyId = idMatch[1].toUpperCase();
 
   let htmlContent, cssContent;
 
@@ -668,8 +673,33 @@ async function submitPage() {
     if (!htmlContent.trim()) { alert('Please enter some HTML content.'); return; }
   }
 
-  // Check slug uniqueness
   const btn = document.getElementById('submit-btn');
+  btn.textContent = 'Verifying ID constraints...';
+  btn.disabled = true;
+
+  if (type === 'Anomaly') {
+    try {
+      let found = false;
+      if (typeof PAGE_SEED !== 'undefined') {
+        found = PAGE_SEED.some(p => p.type === 'Anomaly' && p.title.toUpperCase().startsWith(anomalyId));
+      }
+      if (!found) {
+        const existingPages = await db.collection('pages').where('type', '==', 'Anomaly').where('anomalyId', '==', anomalyId).limit(1).get();
+        const existingSubs = await db.collection('submissions').where('type', '==', 'Anomaly').where('anomalyId', '==', anomalyId).where('status', '==', 'pending').limit(1).get();
+        found = !existingPages.empty || !existingSubs.empty;
+      }
+
+      if (found) {
+        alert('An Anomaly entry for ID "' + anomalyId + '" already exists or is pending review. You cannot create a duplicate Anomaly designation, though you may submit Tales or Art for it.');
+        btn.textContent = '>> Submit for Review';
+        btn.disabled = false;
+        return;
+      }
+    } catch(e) {
+      console.warn("Uniqueness check skipped due to missing composite index.", e);
+    }
+  }
+
   btn.textContent = 'Checking slug...';
   btn.disabled = true;
 
@@ -692,6 +722,7 @@ async function submitPage() {
 
   const submission = {
     title: title,
+    anomalyId: anomalyId,
     type: type,
     tags: tags,
     slug: slug,

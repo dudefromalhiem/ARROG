@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Explore the Universe — Red Oaker Guild</title>
+  <meta name="description" content="Search the expanding universe of anomalies, tales, and artwork." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .exp-wrap { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+    .exp-search { 
+      background: var(--blk-b); border: 2px solid var(--red-b); padding: 32px; 
+      margin-bottom: 40px; text-align: center; border-radius: 4px;
+    }
+    .exp-search h1 { font-family: var(--font-h); color: var(--wht-b); margin-bottom: 16px; letter-spacing: 2px; text-transform: uppercase; }
+    .exp-search p { color: var(--wht-d); margin-bottom: 24px; font-size: .9rem; }
+    .exp-search input { 
+      width: 100%; max-width: 600px; padding: 16px; font-size: 1.1rem; 
+      background: rgba(0,0,0,0.5); border: 1px solid var(--red-d); color: var(--wht-b);
+      font-family: var(--font-m); text-align: center;
+    }
+    
+    .exp-section { margin-bottom: 48px; }
+    .exp-section-hd { 
+      display: flex; justify-content: space-between; align-items: flex-end;
+      border-bottom: 1px solid var(--blk-m); padding-bottom: 12px; margin-bottom: 24px;
+    }
+    .exp-section-hd h2 { font-size: 1.5rem; color: var(--red-b); text-transform: uppercase; letter-spacing: 2px; }
+    .exp-section-hd a { color: var(--wht-m); text-decoration: none; font-size: .8rem; text-transform: uppercase; transition: color 0.2s; }
+    .exp-section-hd a:hover { color: var(--wht-b); }
+    
+    .exp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+    
+    .exp-card { 
+      background: var(--blk-b); border: 1px solid var(--blk-d); padding: 16px;
+      display: flex; flex-direction: column; transition: transform 0.2s, border-color 0.2s;
+    }
+    .exp-card:hover { transform: translateY(-4px); border-color: var(--red-m); cursor: pointer; }
+    .exp-card-type { font-size: .7rem; color: var(--red-b); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; font-weight: bold; }
+    .exp-card-title { font-size: 1.1rem; color: var(--wht-b); margin-bottom: 12px; font-weight: bold; }
+    .exp-card-excerpt { font-size: .85rem; color: var(--wht-m); line-height: 1.6; flex-grow: 1; margin-bottom: 16px; }
+    
+    /* Artwork variation */
+    .exp-art-card { padding: 0; background: #000; overflow: hidden; position: relative; }
+    .exp-art-card img { width: 100%; height: 200px; object-fit: cover; opacity: 0.7; transition: opacity 0.3s; }
+    .exp-art-card:hover img { opacity: 1; }
+    .exp-art-info { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.9)); padding: 16px; }
+    
+    .no-results { text-align: center; color: var(--wht-d); padding: 40px; font-style: italic; background: rgba(255,255,255,0.02); border: 1px dashed var(--blk-m); }
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="ROG" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="guide.html">Guide</a></li>
+      <li><a href="registry.html">Registry</a></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap exp-wrap">
+
+  <div class="exp-search">
+    <h1>Explore the Universe</h1>
+    <p>Search via keyword or Designation ID (e.g., ROS-0001) to cross-reference anomalies, tales, and artwork.</p>
+    <input type="text" id="universe-search" placeholder="Enter keyword or anomaly ID..." />
+  </div>
+
+  <div class="exp-section" id="sec-anom">
+    <div class="exp-section-hd">
+      <h2>Anomalies</h2>
+      <a href="registry.html">Go to Registry »</a>
+    </div>
+    <div class="exp-grid" id="grid-anom">
+      <div class="no-results">Accessing databanks...</div>
+    </div>
+  </div>
+
+  <div class="exp-section" id="sec-tale">
+    <div class="exp-section-hd">
+      <h2>Field Reports & Tales</h2>
+    </div>
+    <div class="exp-grid" id="grid-tale">
+      <div class="no-results">Accessing databanks...</div>
+    </div>
+  </div>
+
+  <div class="exp-section" id="sec-art">
+    <div class="exp-section-hd">
+      <h2>Artwork & Visual Assets</h2>
+    </div>
+    <div class="exp-grid" id="grid-art">
+      <div class="no-results">Accessing databanks...</div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="ftr">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Universal Cross-Reference System</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="seed-data.js"></script>
+
+<script>
+  let universeData = { Anomaly: [], Tale: [], Artwork: [] };
+
+  function buildSnippet(html) {
+    if (!html) return '';
+    return html.replace(/<[^>]*>?/gm, '').substring(0, 120) + '...';
+  }
+  
+  function getImgSrc(html) {
+    if (!html) return null;
+    const match = html.match(/<img[^>]+src="([^">]+)"/i);
+    return match ? match[1] : null;
+  }
+
+  async function loadUniverse() {
+    // 1. Load from PAGE_SEED
+    if (typeof PAGE_SEED !== 'undefined') {
+      PAGE_SEED.forEach(p => {
+        if (!universeData[p.type]) return; // Only process Anomaly, Tale, Artwork
+        universeData[p.type].push({
+          id: p.slug || p.title,
+          slug: p.slug,
+          title: p.title,
+          type: p.type,
+          excerpt: buildSnippet(p.htmlContent),
+          img: getImgSrc(p.htmlContent)
+        });
+      });
+    }
+
+    // 2. Load from Firestore
+    try {
+      const snap = await db.collection('pages').get();
+      snap.docs.forEach(doc => {
+        const d = doc.data();
+        if (!universeData[d.type]) return;
+        
+        // Prevent dupes
+        if (universeData[d.type].some(u => u.slug === d.slug)) return;
+        
+        universeData[d.type].push({
+          id: doc.id,
+          slug: d.slug,
+          title: d.title,
+          type: d.type,
+          excerpt: buildSnippet(d.htmlContent),
+          img: getImgSrc(d.htmlContent)
+        });
+      });
+    } catch(e) {
+      console.warn("Could not fetch from Firestore, utilizing seed databanks only.");
+    }
+
+    renderAll();
+  }
+
+  function renderGrid(type, gridId, filterTxt) {
+    const grid = document.getElementById(gridId);
+    
+    let items = universeData[type];
+    
+    if (filterTxt) {
+      const q = filterTxt.toLowerCase();
+      items = items.filter(i => (i.title && i.title.toLowerCase().includes(q)) || (i.slug && i.slug.toLowerCase().includes(q)));
+    } else {
+      // By default show up to 6 per category
+      items = items.slice(0, 8);
+    }
+
+    if (items.length === 0) {
+      grid.innerHTML = '<div class="no-results">No ' + type.toLowerCase() + 's found matching criteria.</div>';
+      return;
+    }
+
+    grid.innerHTML = items.map(i => {
+      const href = i.slug ? 'page.html?slug=' + i.slug : 'page.html?id=' + i.id;
+      
+      if (type === 'Artwork' && i.img) {
+        return '<div class="exp-card exp-art-card" onclick="window.location.href=\\'' + href + '\\'">' +
+               '<img src="' + i.img + '" alt="' + i.title + '" />' +
+               '<div class="exp-art-info">' +
+                 '<div class="exp-card-title" style="margin:0">' + i.title + '</div>' +
+               '</div></div>';
+      }
+      
+      return '<div class="exp-card" onclick="window.location.href=\\'' + href + '\\'">' +
+             '<div class="exp-card-type">' + type + '</div>' +
+             '<div class="exp-card-title">' + i.title + '</div>' +
+             '<div class="exp-card-excerpt">' + i.excerpt + '</div>' +
+             '</div>';
+    }).join('');
+  }
+
+  function renderAll() {
+    const q = document.getElementById('universe-search').value;
+    renderGrid('Anomaly', 'grid-anom', q);
+    renderGrid('Tale', 'grid-tale', q);
+    renderGrid('Artwork', 'grid-art', q);
+  }
+
+  document.getElementById('universe-search').addEventListener('input', renderAll);
+  document.addEventListener('DOMContentLoaded', loadUniverse);
+
+</script>
+</body>
+</html>

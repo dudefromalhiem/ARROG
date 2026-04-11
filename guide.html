@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newcomer's Guide — Red Oaker Guild</title>
+  <meta name="description" content="Official orientation and classification guide for new Red Oaker Guild operatives." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .doc-wrap { max-width: 800px; margin: 40px auto; background: var(--wht-b); color: var(--blk-b); padding: 40px; box-shadow: 0 0 20px rgba(0,0,0,0.5); font-family: var(--font-m); }
+    @media(max-width: 600px) { .doc-wrap { margin: 20px 12px; padding: 20px; } }
+    .doc-hdr { border-bottom: 4px solid var(--red-b); padding-bottom: 16px; margin-bottom: 32px; text-align: center; }
+    .doc-hdr img { max-width: 100px; margin-bottom: 16px; }
+    .doc-hdr h1 { font-family: var(--font-h); font-size: 2.5rem; color: var(--blk-b); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+    .doc-hdr p { font-weight: 700; color: var(--red-b); text-transform: uppercase; letter-spacing: 4px; }
+    .doc-section { margin-bottom: 32px; }
+    .doc-section h2 { font-size: 1.5rem; border-bottom: 2px solid var(--blk-m); padding-bottom: 8px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; }
+    .doc-section p { margin-bottom: 16px; line-height: 1.8; text-indent: 2em; }
+    .doc-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    .doc-table th, .doc-table td { border: 1px solid var(--blk-d); padding: 12px; text-align: left; }
+    .doc-table th { background: var(--blk-b); color: var(--wht-b); text-transform: uppercase; letter-spacing: 1px; }
+    .doc-table tr:nth-child(even) { background: rgba(0,0,0,0.05); }
+    .classified-stamp { color: var(--red-b); font-family: var(--font-h); font-size: 2rem; border: 3px solid var(--red-b); display: inline-block; padding: 8px 16px; transform: rotate(-5deg); margin-bottom: 24px; opacity: 0.8; }
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="ROG" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="explore.html">Explore</a></li>
+      <li><a href="registry.html">Registry</a></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap" style="padding-top:40px; padding-bottom:60px;">
+  <div class="doc-wrap">
+    <div class="doc-hdr">
+      <img src="logo.png" alt="Guild Logo" style="filter: invert(1);" />
+      <h1>Orientation Directive 001</h1>
+      <p>Standard Operating Procedures & Classifications</p>
+    </div>
+
+    <div class="tc"><div class="classified-stamp">CONFIDENTIAL</div></div>
+
+    <div class="doc-section">
+      <h2>Welcome to the Guild</h2>
+      <p>If you are reading this document, you have been granted provisional clearance to the Red Oaker Guild's internal archives. You are no longer blind to the anomalous realities that intersect our dimension. The Guild operates with a singular directive: **Document. Contain. Understand.**</p>
+      <p>We are archivists first, jailers second. The items, entities, and phenomena detailed within this database (collectively referred to as Anomalies) defy conventional physics, biology, and logic. Your interaction with these materials is strictly monitored. Ignorance of protocol is considered a breach of conduct.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Object Class Designations</h2>
+      <p>Every documented anomaly is assigned an Object Class. This class does not indicate how dangerous an object is, but rather how difficult it is to reliably contain.</p>
+      <table class="doc-table">
+        <thead><tr><th>Class</th><th>Containment Difficulty</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Safe</strong></td><td>Low</td><td>The anomaly is sufficiently understood that reliable, permanent containment is achievable. Does not mean "harmless" (e.g. a loaded gun is safe if locked in a box, but deadly if fired).</td></tr>
+          <tr><td><strong>Euclid</strong></td><td>Medium</td><td>The anomaly is insufficiently understood or inherently unpredictable. Sentient or autonomous anomalies are usually classified as Euclid by default.</td></tr>
+          <tr><td><strong>Keter</strong></td><td>High</td><td>The anomaly is exceedingly difficult to contain consistently, often requiring complex, extensive procedures. The Guild may lack the technology to fully contain it.</td></tr>
+          <tr><td><strong>Thaumiel</strong></td><td>Special</td><td>Anomalies that the Guild utilizes to contain *other* anomalies or to mitigate existential threats.</td></tr>
+          <tr><td><strong>Neutralized</strong></td><td>None</td><td>Anomalies that are destroyed, have lost their anomalous properties, or are otherwise no longer of concern.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doc-section">
+      <h2>Threat Levels (Clearance)</h2>
+      <p>While Object Class indicates containment difficulty, the Threat Level corresponds directly to the danger the anomaly poses, and consequentially, the Security Clearance required to access its complete file.</p>
+      <table class="doc-table">
+        <thead><tr><th>Threat Level</th><th>Clearance</th><th>Risk Profile</th></tr></thead>
+        <tbody>
+          <tr><td style="color:#2ca02c;font-weight:bold;">Green</td><td>Level 1</td><td>Minimal threat. Object exhibits passive anomalous traits. No immediate physical danger.</td></tr>
+          <tr><td style="color:#ff7f0e;font-weight:bold;">Yellow</td><td>Level 2</td><td>Moderate threat. Potential for localized harm. Operatives must follow Standard Caution protocols.</td></tr>
+          <tr><td style="color:#d62728;font-weight:bold;">Red</td><td>Level 3</td><td>High threat. Highly aggressive or possesses wide-area destructive capabilities. Restricted access.</td></tr>
+          <tr><td style="color:#9467bd;font-weight:bold;">Soros</td><td>Level 4+</td><td>Extreme threat. Capabilities threaten global stability or normalcy. Information restricted to Archons and Site Directors.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doc-section">
+      <h2>Militarized Response Detachments (MRD)</h2>
+      <p>When containment fails, the Guild deploys highly specialized squadrons known as MRDs. Unlike standard security teams, each MRD unit is trained to handle specific topological, temporal, or biological threats. Familiarize yourself with their designations via the MRD Directory should standard containment procedures collapse.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Submission Protocols</h2>
+      <p>As a researcher, you are permitted to submit new findings to the archive. You must adhere to the following mandate: <strong>All anomaly submissions must begin with a unique Designation ID (e.g., ROG-XXXX)</strong>. Failure to do so will result in the automated rejection of your file by the indexing system.</p>
+      <p>Tales (narrative reports) and Artworks related to anomalies may utilize the same ID in their submissions to appropriately link to the main entry.</p>
+    </div>
+
+  </div>
+</main>
+
+<footer class="ftr">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Internal Document</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+</body>
+</html>
