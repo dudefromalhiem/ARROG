@@ -121,6 +121,74 @@ async function saveConfig() {
   }
 }
 
+async function normalizeAllStoredPageStyles() {
+  const btn = document.getElementById('btn-normalize-pages');
+  const statusEl = document.getElementById('normalize-status');
+  if (!btn || !statusEl) return;
+
+  const ok = confirm('Normalize and re-save CSS colors for all stored pages? This updates existing Firestore page records.');
+  if (!ok) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Normalizing...';
+  statusEl.textContent = 'Scanning pages collection...';
+
+  let scanned = 0;
+  let updated = 0;
+  let lastDoc = null;
+
+  try {
+    while (true) {
+      let query = db.collection('pages')
+        .orderBy(firebase.firestore.FieldPath.documentId())
+        .limit(100);
+
+      if (lastDoc) query = query.startAfter(lastDoc.id);
+
+      const snap = await query.get();
+      if (snap.empty) break;
+
+      const batch = db.batch();
+      let batchUpdates = 0;
+
+      snap.docs.forEach(doc => {
+        scanned++;
+        const page = doc.data() || {};
+        const currentCss = page.cssContent || '';
+        const normalizedCss = normalizePageCss(currentCss);
+
+        if (normalizedCss !== currentCss) {
+          batch.update(doc.ref, {
+            cssContent: normalizedCss,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            styleNormalizedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          batchUpdates++;
+          updated++;
+        }
+      });
+
+      if (batchUpdates > 0) {
+        await batch.commit();
+      }
+
+      lastDoc = snap.docs[snap.docs.length - 1];
+      statusEl.textContent = 'Scanned ' + scanned + ' pages, updated ' + updated + '...';
+
+      if (snap.size < 100) break;
+    }
+
+    statusEl.textContent = 'Done. Scanned ' + scanned + ' pages and updated ' + updated + ' with readable colors.';
+    alert('Normalization complete.\nScanned: ' + scanned + '\nUpdated: ' + updated);
+  } catch (err) {
+    statusEl.textContent = 'Failed: ' + err.message;
+    alert('Normalization failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Normalize Existing Page Colors';
+  }
+}
+
 
 // ── Username Management ───────────────────────────────────────
 async function changeUsername() {

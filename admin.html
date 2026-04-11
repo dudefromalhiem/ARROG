@@ -77,7 +77,11 @@
               <label class="fl">Official Tags (comma-separated)</label>
               <input class="fi" id="cfg-tags" placeholder="safe, euclid, keter, humanoid..." />
             </div>
-            <button class="btn btn-p" onclick="saveConfig()" style="margin-top:16px">Save Configuration</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+              <button class="btn btn-p" onclick="saveConfig()">Save Configuration</button>
+              <button class="btn btn-s" id="btn-normalize-pages" onclick="normalizeAllStoredPageStyles()">Normalize Existing Page Colors</button>
+            </div>
+            <p id="normalize-status" style="font-size:.75rem;color:var(--wht-f);margin-top:10px">Updates low-contrast legacy CSS in Firestore pages collection.</p>
           </div>
           
           <div class="card">
