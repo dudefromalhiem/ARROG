@@ -29,8 +29,16 @@
 <!-- ═══ MAIN CONTENT ═══ -->
 <main class="wrap">
 
-  <!-- Auth Gate -->
-  <div class="section tc" id="submit-denied" style="max-width:500px;margin:60px auto">
+  <!-- Loading State -->
+  <div class="section tc" id="submit-loading" style="max-width:500px;margin:60px auto">
+    <div class="section-hd">Establishing secure link...</div>
+    <p style="font-size:.85rem;color:var(--wht-d)">
+      Verifying credentials with the Guild central server.
+    </p>
+  </div>
+
+  <!-- Auth Gate (hidden by default) -->
+  <div class="section tc hidden" id="submit-denied" style="max-width:500px;margin:60px auto">
     <div class="section-hd">Authentication Required</div>
     <p style="font-size:.85rem;color:var(--wht-d)">
       You must be signed in to create pages.

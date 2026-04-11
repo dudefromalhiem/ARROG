@@ -8,6 +8,7 @@ let activeTab = 'pages';
 // ── Auth Gate ─────────────────────────────────────────────────
 auth.onAuthStateChanged(async user => {
   await rolesReady;
+  document.getElementById('admin-loading').classList.add('hidden');
   if (!user) {
     document.getElementById('admin-denied').classList.remove('hidden');
     document.getElementById('admin-panel').classList.add('hidden');
@@ -70,13 +71,54 @@ function switchTab(tab) {
 
 function loadTab() {
   const main = document.getElementById('adm-main');
-  if (activeTab === 'pages') loadPages(main);
-  else if (activeTab === 'submissions') loadSubmissions(main);
-  else if (activeTab === 'artworks') loadArtworks(main);
-  else if (activeTab === 'news') loadNewsAdmin(main);
-  else if (activeTab === 'users') loadUsers(main);
-  else if (activeTab === 'roles') loadRolesManager(main);
+  const cfgSection = document.getElementById('section-config');
+  
+  // Toggle visibility
+  if (activeTab === 'config') {
+    main.classList.add('hidden');
+    cfgSection.classList.remove('hidden');
+    loadConfig();
+  } else {
+    main.classList.remove('hidden');
+    cfgSection.classList.add('hidden');
+    
+    if (activeTab === 'pages') loadPages(main);
+    else if (activeTab === 'submissions') loadSubmissions(main);
+    else if (activeTab === 'artworks') loadArtworks(main);
+    else if (activeTab === 'news') loadNewsAdmin(main);
+    else if (activeTab === 'users') loadUsers(main);
+    else if (activeTab === 'roles') loadRolesManager(main);
+  }
 }
+
+// ── Site Configuration ────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const doc = await db.collection('config').doc('site').get();
+    if (doc.exists) {
+      const data = doc.data();
+      document.getElementById('cfg-categories').value = (data.categories || []).join(', ');
+      document.getElementById('cfg-tags').value = (data.tags || []).join(', ');
+      document.getElementById('st-db').textContent = 'CONNECTED';
+      document.getElementById('st-db').className = 'tag';
+    }
+  } catch (err) {
+    console.warn('Config load failed:', err);
+  }
+}
+
+async function saveConfig() {
+  const categories = document.getElementById('cfg-categories').value.split(',').map(s => s.trim()).filter(Boolean);
+  const tags = document.getElementById('cfg-tags').value.split(',').map(s => s.trim()).filter(Boolean);
+  
+  try {
+    await db.collection('config').doc('site').set({ categories, tags });
+    alert('System configuration updated successfully.');
+  } catch (err) {
+    alert('Failed to save config: ' + err.message);
+  }
+}
+
 
 // ── Username Management ───────────────────────────────────────
 async function changeUsername() {

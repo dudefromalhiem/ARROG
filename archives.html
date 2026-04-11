@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guild Archives — Red Oaker Guild</title>
+  <meta name="description" content="Official Red Oaker Guild archives: Archon lineage, MRD units, and threat classifications." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Archive Specific Styles */
+    .arch-hub { display: flex; flex-direction: column; gap: 64px; margin-top: 40px; }
+    
+    /* Timeline */
+    .timeline { position: relative; padding-left: 32px; border-left: 2px solid var(--red-b); margin-left: 10px; }
+    .tl-item { position: relative; margin-bottom: 40px; }
+    .tl-item::before { content: ''; position: absolute; left: -41px; top: 8px; width: 16px; height: 16px; background: var(--blk); border: 2px solid var(--red-b); border-radius: 50%; z-index: 1; }
+    .tl-date { font-family: var(--font-m); font-size: .75rem; color: var(--red-b); margin-bottom: 4px; letter-spacing: 2px; }
+    .tl-name { font-size: 1.4rem; font-weight: bold; color: var(--wht); margin-bottom: 8px; }
+    .tl-gap { border: 1px dashed var(--red-m); padding: 16px; background: rgba(255,0,0,0.05); color: var(--red-m); font-style: italic; font-size: .85rem; margin-bottom: 40px; }
+
+    /* MRD Grid */
+    .mrd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .mrd-card { border: 1px solid var(--wht-f); padding: 24px; background: rgba(255,255,255,0.02); transition: 0.3s; }
+    .mrd-card:hover { border-color: var(--red-b); background: rgba(255,0,0,0.03); }
+    .mrd-unit { font-family: var(--font-m); font-size: 1.2rem; color: var(--red-b); margin-bottom: 4px; letter-spacing: 2px; }
+    .mrd-focus { font-size: .8rem; color: var(--wht-f); margin-bottom: 12px; text-transform: uppercase; }
+    .mrd-desc { font-size: .85rem; line-height: 1.6; color: var(--wht-m); }
+
+    /* Table */
+    .arch-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: .85rem; }
+    .arch-table th, .arch-table td { text-align: left; padding: 12px; border: 1px solid var(--wht-f); }
+    .arch-table th { background: var(--wht-f); color: var(--blk); text-transform: uppercase; font-size: .7rem; letter-spacing: 2px; }
+    .td-lvl { font-family: var(--font-m); color: var(--red-b); font-weight: bold; width: 100px; }
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="index.html#resources">Archives</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap" style="padding-top: 40px">
+  <div class="intro" style="margin-bottom: 40px">
+    <div class="intro-cl">● Official Archive Hub ● Clearance Level 4 Required ●</div>
+    <h1 class="intro-t" style="font-size: 2.5rem">Guild Clinical Archives</h1>
+    <p class="intro-sub">The following data is extracted from the Primary Site's central database. Any redistribution of this material outside of authorized Guild channels is grounds for immediate Level-4 disciplinary action.</p>
+  </div>
+
+  <div class="arch-hub">
+    
+    <!-- Archon Timeline -->
+    <section id="timeline">
+      <div class="section-hd">Archon Lineage Timeline</div>
+      <div class="timeline" id="tl-container">
+        <!-- Filled by JS -->
+      </div>
+    </section>
+
+    <!-- MRD Units -->
+    <section id="mrd">
+      <div class="section-hd">Militarized Response Detachments (MRD)</div>
+      <div class="mrd-grid" id="mrd-container">
+        <!-- Filled by JS -->
+      </div>
+    </section>
+
+    <!-- Clearances & Classifications -->
+    <section id="clearance">
+      <div class="section-hd">Access Tiers & Threat Levels</div>
+      <div class="g2">
+        <div>
+          <h3 style="color:var(--red-b); margin-bottom:12px; font-size:.9rem; letter-spacing:2px">CLEARANCE LEVELS</h3>
+          <table class="arch-table" id="clearance-table">
+            <thead>
+              <tr><th>Level</th><th>Operational Scope</th></tr>
+            </thead>
+            <tbody id="clearance-body"></tbody>
+          </table>
+        </div>
+        <div>
+          <h3 style="color:var(--red-b); margin-bottom:12px; font-size:.9rem; letter-spacing:2px">THREAT CLASSIFICATIONS</h3>
+          <table class="arch-table" id="class-table">
+            <thead>
+              <tr><th>Class</th><th>Protocol Severity</th></tr>
+            </thead>
+            <tbody id="class-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="ftr">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Archive Dept.</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  // Simple Archive Loader
+  const archons = [
+    { name: 'Dr. Mateo Hoffman', born: 'Jan 6, 1852', tenure: 'Mar 8, 1890 – Oct 16, 1942', desc: 'The Founder. Established the foundational texts of the collective.' },
+    { name: 'Dr. Hans Schroeder', born: 'Aug 25, 1890', tenure: 'Oct 20, 1942 – Oct 20, 1972', desc: 'The Architect of Control. Militarized the Guild and founded the MRD.' },
+    { name: 'Dr. Praskovya Sidorov', born: 'May 5, 1940', tenure: 'Nov 5, 1972 – May 6, 1986', desc: 'The Visionary. Formalized the modern classification system.' },
+    { type: 'gap', label: '1986–1989 Instability Period', desc: 'Internal factionalism. Primary Site sealed. No Archon appointed.' },
+    { name: 'Mikolov "Ekat" Gunitsky', born: 'Sept 10, 1942', tenure: 'Nov 23, 1989 – Dec 19, 2005', desc: 'The Rebuilder. Ruled with paranoid protocols to save the Guild from collapse.' },
+    { name: 'Charolette Windsor', born: 'Jan 1, 1952', tenure: 'Jan 9, 2006 – Dec 21, 2012', desc: 'The Refined Leader. Codified ecological anomaly protection.' },
+    { type: 'gap', label: '2012–2015 Government Interim', desc: 'Inquiry period. Collective authority under global oversight.' },
+    { name: 'Javier Quincy', born: 'Nov 8, 1980', tenure: 'April 6, 2015 – Present', desc: 'The Modern Stabilizer. Removed Guild from federal oversight.' }
+  ];
+
+  const mrd = [
+    { unit: 'Apate', focus: 'Information Control', desc: 'Public amnestication and timeline restructuring.' },
+    { unit: 'Vanir', focus: 'Acquisition', desc: 'Artifact recovery in hostile environments.' },
+    { unit: 'Artemis', focus: 'Bio-Containment', desc: 'Management of pathogenic and flora/fauna anomalies.' },
+    { unit: 'Osiris', focus: 'Internal Security', desc: 'Enforcement of Guild testing protocols.' },
+    { unit: 'Prometheus', focus: 'Direct Combat', desc: 'Main suppression force for Soros-class entities.' },
+    { unit: 'Ivar', focus: 'Environmental', desc: 'Spatial and environmental anomaly management.' },
+    { unit: 'Osiris-A1', focus: 'Black Protocol', desc: 'Site-wide termination failsafe.' },
+    { unit: 'Ares', focus: 'Rapid Response', desc: 'Global shock troopers with 45min window.' }
+  ];
+
+  const clearance = [
+    ['Level 1', 'Front-facing operations. Logistics and civilian fronts.'],
+    ['Level 2', 'Junior personnel. Restricted access to Alona/Delphi.'],
+    ['Level 3', 'Containment specialists. Full Soros access.'],
+    ['Level 4', 'Senior leadership. Vega access and cross-site command.'],
+    ['Level 5', 'Executive Board. Head of Site oversight.'],
+    ['Level 6', 'Supreme Authority. Override status (Owner only).']
+  ];
+
+  const threat = [
+    ['Alona', 'Minimal threat. Safe or beneficial.'],
+    ['Delphi', 'Moderate threat. Moveable/predictable.'],
+    ['Soros', 'High threat. Dangerous and unstable.'],
+    ['Vega', 'Catastrophic. Regional existential risk.'],
+    ['Erebus', 'World-Ending. Zero containment protocols.']
+  ];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Fill Timeline
+    const tl = document.getElementById('tl-container');
+    tl.innerHTML = archons.map(a => {
+      if (a.type === 'gap') return `<div class="tl-gap"><strong>GAP:</strong> ${a.label}<br>${a.desc}</div>`;
+      return `
+        <div class="tl-item">
+          <div class="tl-date">${a.tenure}</div>
+          <div class="tl-name">${a.name}</div>
+          <p style="font-size:.85rem;color:var(--wht-m)">Born: ${a.born}</p>
+          <p style="font-size:.85rem;color:var(--wht-d);margin-top:4px">${a.desc}</p>
+        </div>
+      `;
+    }).join('');
+
+    // Fill MRD
+    const mrdC = document.getElementById('mrd-container');
+    mrdC.innerHTML = mrd.map(u => `
+      <div class="mrd-card">
+        <div class="mrd-unit">${u.unit}</div>
+        <div class="mrd-focus">${u.focus}</div>
+        <p class="mrd-desc">${u.desc}</p>
+      </div>
+    `).join('');
+
+    // Fill Tables
+    document.getElementById('clearance-body').innerHTML = clearance.map(c => `<tr><td class="td-lvl">${c[0]}</td><td>${c[1]}</td></tr>`).join('');
+    document.getElementById('class-body').innerHTML = threat.map(t => `<tr><td class="td-lvl">${t[0]}</td><td>${t[1]}</td></tr>`).join('');
+
+    // Auth sync
+    auth.onAuthStateChanged(user => {
+      const navAuth = document.getElementById('nav-auth');
+      if (user) navAuth.innerHTML = '<button class="nav-btn" onclick="auth.signOut()">' + (user.displayName || 'Agent') + ' (Sign Out)</button>';
+      else navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    });
+  });
+</script>
+</body>
+</html>

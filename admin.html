@@ -28,8 +28,16 @@
   <h1>Admin Terminal</h1>
   <p id="admin-info" style="color:var(--wht-d);font-size:.85rem;margin-bottom:24px"></p>
 
-  <!-- Access Denied (shown by default) -->
-  <div class="section tc" id="admin-denied" style="max-width:500px;margin:60px auto">
+  <!-- Loading State -->
+  <div class="section tc" id="admin-loading" style="max-width:500px;margin:60px auto">
+    <div class="section-hd">Authenticating...</div>
+    <p style="font-size:.85rem;color:var(--wht-d)">
+      Establishing secure connection to Guild servers.
+    </p>
+  </div>
+
+  <!-- Access Denied (hidden by default) -->
+  <div class="section tc hidden" id="admin-denied" style="max-width:500px;margin:60px auto">
     <div class="section-hd">Access Denied</div>
     <p style="font-size:.85rem;color:var(--wht-d)">
       Authentication required. Sign in with an authorized account on the
@@ -47,9 +55,40 @@
         <a onclick="switchTab('news')">News</a>
         <a onclick="switchTab('users')" id="tab-users" class="hidden">Users</a>
         <a onclick="switchTab('roles')" id="tab-roles" class="hidden">Roles</a>
+        <a onclick="switchTab('config')" id="tab-config">Config</a>
       </div>
       <div class="adm-main" id="adm-main">
         <!-- Dynamically filled -->
+      </div>
+      
+      <!-- Config Tab (Hidden by default, shown by switchTab) -->
+      <div id="section-config" class="hidden" style="flex:1; padding:24px">
+        <div class="section-hd">System Configuration</div>
+        <p style="font-size: .8rem; color: var(--wht-f); margin-bottom: 24px">Manage dynamic site-wide categories, tags, and compartments.</p>
+        
+        <div class="g2">
+          <div class="card">
+            <div class="card-t">Compartments & Tags</div>
+            <div class="fg" style="margin-top:12px">
+              <label class="fl">Page Categories (comma-separated)</label>
+              <input class="fi" id="cfg-categories" placeholder="Anomaly, Tale, Artwork, Hub..." />
+            </div>
+            <div class="fg">
+              <label class="fl">Official Tags (comma-separated)</label>
+              <input class="fi" id="cfg-tags" placeholder="safe, euclid, keter, humanoid..." />
+            </div>
+            <button class="btn btn-p" onclick="saveConfig()" style="margin-top:16px">Save Configuration</button>
+          </div>
+          
+          <div class="card">
+            <div class="card-t">System Status</div>
+            <p style="font-size: .8rem; color: var(--wht-d); margin-top: 12px">
+              Firestore Connection: <span id="st-db" class="tag">ACTIVE</span><br>
+              Auth Provider: <span id="st-auth" class="tag">FIREBASE</span><br>
+              Admin Session: <span id="st-adm" class="tag">AUTHENTICATED</span>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   </div>

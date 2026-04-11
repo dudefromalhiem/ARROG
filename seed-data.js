@@ -59,6 +59,12 @@ function createMRD(name, summary, desc) {
 }
 
 
+// --- DOCTRINE ---
+PAGE_SEED.push({
+  title: 'Doctrine: ROSED', slug: 'doctrine-rosed', type: 'Lore (Doctrine)', tags: ['lore', 'command'],
+  htmlContent: createClass('ROSED', 'Red Oaker Shelter and Execution Department', 'The central command authority of the Red Oaker Guild. Operating under a strict dual-mandate: Shelter first, Execution/Kill if necessary. ROSED dictates that containment and study are the primary objectives for any anomaly, but authorizes immediate, absolute lethal force if an entity poses an uncontainable existential threat.')
+});
+
 // --- ARCHONS ---
 PAGE_SEED.push({
   title: 'Archon: Dr. Mateo Hoffman', slug: 'archon-mateo-hoffman', type: 'Lore (Archon)', tags: ['archon', 'lore'],

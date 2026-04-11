@@ -15,6 +15,7 @@ let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
 // ═════════════════════════════════════════════════════════════
 
 auth.onAuthStateChanged(user => {
+  document.getElementById('submit-loading').classList.add('hidden');
   const navAuth = document.getElementById('nav-auth');
   if (user) {
     currentUserForSubmit = user;
