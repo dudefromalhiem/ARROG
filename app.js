@@ -310,9 +310,9 @@ const FALLBACK_ANOMALIES = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.filter(p
 }) : [];
 
 const FALLBACK_NEWS = [
-  { title: 'Guild Archives v2.4 Deployed', body: 'The archive indexing system has been upgraded. All anomaly classifications now support multi-tag filtering.', date: '2026-04-08' },
-  { title: 'New Containment Protocols for Sector 7G', body: 'Updated containment procedures have been issued for all flora-class anomalies within Sector 7G.', date: '2026-04-05' },
-  { title: 'Community Art Submission Window Open', body: 'Artists may now submit works for the monthly Art Spotlight rotation. Submissions close on the 25th.', date: '2026-04-01' },
+  { title: 'Guild Archives v2.4 Deployed', body: 'The archive indexing system has been upgraded. All anomaly classifications now support multi-tag filtering.', date: '2026-04-08', imageUrl: 'logo.png' },
+  { title: 'New Containment Protocols for Sector 7G', body: 'Updated containment procedures have been issued for all flora-class anomalies within Sector 7G.', date: '2026-04-05', imageUrl: 'logo.png' },
+  { title: 'Community Art Submission Window Open', body: 'Artists may now submit works for the monthly Art Spotlight rotation. Submissions close on the 25th.', date: '2026-04-01', imageUrl: 'logo.png' },
 ];
 
 const FALLBACK_ART = [
@@ -353,13 +353,18 @@ function renderFeatured(items) {
 
 function renderNews(items) {
   const feed = document.getElementById('news-feed');
-  feed.innerHTML = items.map(n => `
-    <div class="news-item">
-      <div class="news-dt">${n.date}</div>
-      <div class="news-tt">${n.title}</div>
-      <div class="news-bd">${n.body}</div>
-    </div>
-  `).join('');
+  feed.innerHTML = items.map(n => {
+    const hasImage = !!(n.imageUrl && String(n.imageUrl).trim());
+    return `
+    <div class="news-item" style="display:grid;grid-template-columns:${hasImage ? '180px 1fr' : '1fr'};gap:16px;align-items:start">
+      ${hasImage ? `<a href="${n.imageUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none"><img src="${n.imageUrl}" alt="${n.title}" style="width:100%;height:140px;object-fit:cover;border:1px solid var(--blk-d);background:#111" /></a>` : ''}
+      <div>
+        <div class="news-dt">${n.date}</div>
+        <div class="news-tt">${n.title}</div>
+        <div class="news-bd">${n.body}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderNewest(items) {

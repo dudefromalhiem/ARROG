@@ -1402,7 +1402,6 @@ function sanitizeHTML(html) {
   clean = clean.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '');
   clean = clean.replace(/javascript\s*:/gi, 'blocked:');
   clean = clean.replace(/<\s*\/?\s*(iframe|object|embed|applet|meta|link)\b[^>]*>/gi, '');
-  clean = clean.replace(/src\s*=\s*["']?\s*data\s*:/gi, 'src="blocked:');
   return clean;
 }
 

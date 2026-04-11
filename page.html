@@ -144,6 +144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!page) { showError(); return; }
     
     window.__pageDocId = docId;
+    window.__pageSlug = page.slug || slug || '';
 
     // Update page title + meta
     document.title = page.title + ' — Red Oaker Guild';
@@ -198,7 +199,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       let actionsDiv = document.getElementById('pv-actions');
       if (isAdmin(user.email)) {
         actionsDiv.classList.remove('hidden');
-        actionsDiv.innerHTML = `<button class="btn btn-s" onclick="location.href='admin.html?editId=${window.__pageDocId || ''}'">>> Edit Document [Admin]</button>`;
+        const editHref = window.__pageDocId
+          ? `admin.html?editId=${window.__pageDocId}`
+          : `admin.html?editSlug=${encodeURIComponent(window.__pageSlug || '')}`;
+        actionsDiv.innerHTML = `<button class="btn btn-s" onclick="location.href='${editHref}'">>> Edit Document [Owner]</button>`;
       }
     }
   });

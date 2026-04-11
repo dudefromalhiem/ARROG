@@ -5,6 +5,7 @@
 
 let activeTab = 'pages';
 let adminArtworkUploadUrl = '';
+let adminNewsImageUrl = '';
 
 function getCurrentRole() {
   return resolveRole(auth.currentUser?.email || '');
@@ -28,6 +29,75 @@ function isGuideType(type) {
 
 function canManageGuidePages() {
   return isOwner(auth.currentUser?.email);
+}
+
+function toDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function dataUrlBytes(dataUrl) {
+  const parts = String(dataUrl || '').split(',');
+  if (parts.length < 2) return 0;
+  const base64 = parts[1];
+  const padding = (base64.match(/=+$/) || [''])[0].length;
+  return Math.floor((base64.length * 3) / 4) - padding;
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not decode image.'));
+    img.src = url;
+  });
+}
+
+async function optimizeImageToDataUrl(file, maxDim = 1280, maxBytes = 250 * 1024) {
+  const original = await toDataUrl(file);
+  const image = await loadImage(original);
+
+  let width = image.naturalWidth || image.width;
+  let height = image.naturalHeight || image.height;
+  const scale = Math.min(1, maxDim / Math.max(width, height));
+  width = Math.max(1, Math.floor(width * scale));
+  height = Math.max(1, Math.floor(height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not initialize canvas.');
+
+  ctx.drawImage(image, 0, 0, width, height);
+  let quality = 0.82;
+  let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+  while (dataUrlBytes(dataUrl) > maxBytes && quality > 0.45) {
+    quality -= 0.08;
+    dataUrl = canvas.toDataURL('image/jpeg', quality);
+  }
+
+  let shrinkPass = 0;
+  while (dataUrlBytes(dataUrl) > maxBytes && shrinkPass < 4) {
+    width = Math.max(1, Math.floor(width * 0.85));
+    height = Math.max(1, Math.floor(height * 0.85));
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(image, 0, 0, width, height);
+    dataUrl = canvas.toDataURL('image/jpeg', Math.max(0.45, quality));
+    shrinkPass++;
+  }
+
+  if (dataUrlBytes(dataUrl) > maxBytes) {
+    throw new Error('Image is too large after optimization. Use a smaller image.');
+  }
+
+  return dataUrl;
 }
 
 function applyTabVisibilityForRole(role) {
@@ -92,6 +162,7 @@ auth.onAuthStateChanged(async user => {
 
   const params = new URLSearchParams(window.location.search);
   const editId = params.get('editId');
+  const editSlug = params.get('editSlug');
   if (editId && !isModOnlyRole()) {
     activeTab = 'pages';
     document.querySelectorAll('#adm-tabs a').forEach(a => a.classList.remove('on'));
@@ -100,6 +171,32 @@ auth.onAuthStateChanged(async user => {
     
     loadTab();
     setTimeout(() => { editPage(editId); }, 300);
+  } else if (editSlug && !isModOnlyRole()) {
+    activeTab = 'pages';
+    document.querySelectorAll('#adm-tabs a').forEach(a => a.classList.remove('on'));
+    const pageTabEl = Array.from(document.querySelectorAll('#adm-tabs a')).find(a => a.textContent.includes('Pages'));
+    if (pageTabEl) pageTabEl.classList.add('on');
+
+    loadTab();
+    setTimeout(async () => {
+      const snap = await db.collection('pages').where('slug', '==', editSlug).limit(1).get();
+      if (!snap.empty) {
+        editPage(snap.docs[0].id);
+        return;
+      }
+
+      resetPageForm();
+      const titleEl = document.getElementById('pf-title');
+      const slugEl = document.getElementById('pf-slug');
+      const typeEl = document.getElementById('pf-type');
+      if (titleEl) titleEl.value = editSlug.replace(/-/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+      if (slugEl) slugEl.value = editSlug;
+      if (typeEl) typeEl.value = editSlug.toLowerCase() === 'guide' ? 'Guide' : 'Hub';
+      document.getElementById('pf-html').value = editSlug.toLowerCase() === 'guide'
+        ? '<div class="page-shell">\n  <header class="page-header">\n    <h1 class="page-title">New Guide</h1>\n    <p class="page-subtitle">Owner Editable Guide</p>\n  </header>\n  <section class="page-section">\n    <h2>Overview</h2>\n    <p>Start editing this guide here.</p>\n  </section>\n</div>'
+        : defaultSchemaHTML();
+      document.getElementById('pf-css').value = defaultSchemaCSS();
+    }, 300);
   } else {
     loadTab();
   }
@@ -472,6 +569,22 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
   return raw + gallery;
 }
 
+function buildPageDocument(html, css, imageUrls) {
+  const raw = (html || '').trim();
+  const htmlWithUploads = embedUploadedImagesIfMissing(raw, imageUrls || []);
+  const wrapped = htmlWithUploads.includes('class="page-shell"')
+    ? htmlWithUploads
+    : '<div class="page-shell"><section class="page-section">' + htmlWithUploads + '</section></div>';
+  const safeCss = normalizePageCss(css || '');
+
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
+    ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
+    '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
+    safeCss.replace(/<\/style>/gi, '') +
+    '</style></head><body>' + wrapped + '</body></html>';
+}
+
 // ═════════════════════════════════════════════════════════════
 // SUBMISSIONS REVIEW (Admin)
 // ═════════════════════════════════════════════════════════════
@@ -578,6 +691,7 @@ async function previewSubmission(id) {
       <div class="review-modal-body">
         <iframe class="review-modal-preview" sandbox="allow-same-origin" title="Submission preview"></iframe>
         <div class="review-modal-meta">
+          <p style="font-size:.75rem;color:var(--wht-f);margin-bottom:12px;line-height:1.6">Preview is rendered in a large sandboxed canvas using the same page renderer as the public site, including embedded images.</p>
           <dl>
             <dt>Author</dt><dd>${s.authorName || 'Unknown Agent'}</dd>
             <dt>Email</dt><dd>${isOwner(auth.currentUser?.email) ? (s.authorEmail || '[Not Set]') : '[Redacted]'}</dd>
@@ -602,9 +716,7 @@ async function previewSubmission(id) {
     // Fill iframe
     const frame = modal.querySelector('iframe');
     const uploadedImages = Array.isArray(s.imageUrls) ? s.imageUrls.filter(Boolean) : [];
-    const htmlWithUploads = embedUploadedImagesIfMissing(s.htmlContent || '', uploadedImages);
-    const htmlDoc = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.7;padding:24px;color:#222;background:#fff}img{max-width:100%;height:auto}' + (s.cssContent || '').replace(/<\/style>/gi, '') + '</style></head><body>' + htmlWithUploads + '</body></html>';
-    frame.srcdoc = htmlDoc;
+    frame.srcdoc = buildPageDocument(s.htmlContent || '', s.cssContent || '', uploadedImages);
 
   } catch (err) {
     alert('Error loading preview: ' + err.message);
@@ -962,44 +1074,144 @@ async function loadNewsAdmin(container) {
         <div class="fg"><label class="fl">Title</label><input class="fi" id="nf-title" required /></div>
         <div class="fg"><label class="fl">Date</label><input type="date" class="fi" id="nf-date" /></div>
       </div>
+      <div class="fg"><label class="fl">Image URL</label><input class="fi" id="nf-image" placeholder="Optional image URL or upload below" /></div>
+      <div class="fg" style="margin-bottom:12px">
+        <label class="fl">Or Upload News Image</label>
+        <div class="upload-zone" id="nf-upload-zone">
+          <input type="file" id="nf-file" accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif" />
+          <div class="uz-icon">⬆</div>
+          <div class="uz-text">Click or drag image here to attach to news</div>
+          <div class="uz-hint">PNG, JPG, GIF, WebP, HEIC, HEIF - optimized for Firestore</div>
+        </div>
+        <div class="upload-progress" id="nf-upload-progress">
+          <div class="upload-progress-bar" id="nf-upload-bar"></div>
+        </div>
+        <div class="img-list" id="nf-uploaded"></div>
+      </div>
       <div class="fg"><label class="fl">Body</label><textarea class="fta" id="nf-body"></textarea></div>
       <input type="hidden" id="nf-id" />
       <button type="submit" class="btn btn-p" id="nf-btn">&gt;&gt; Publish Article</button>
     </form>
-    <table class="adm-tbl"><thead><tr><th>Date</th><th>Title</th><th>Actions</th></tr></thead><tbody id="news-tbody"></tbody></table>
+    <table class="adm-tbl"><thead><tr><th>Date</th><th>Title</th><th>Image</th><th>Actions</th></tr></thead><tbody id="news-tbody"></tbody></table>
   `;
   document.getElementById('nf-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('news-form').addEventListener('submit', submitNews);
+  bindNewsImageControls();
   await refreshNews();
+}
+
+function bindNewsImageControls() {
+  const zone = document.getElementById('nf-upload-zone');
+  const input = document.getElementById('nf-file');
+  const urlInput = document.getElementById('nf-image');
+  if (!zone || !input || !urlInput) return;
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    handleNewsImageFiles(e.dataTransfer.files);
+  });
+
+  input.addEventListener('change', e => {
+    handleNewsImageFiles(e.target.files);
+    input.value = '';
+  });
+
+  urlInput.addEventListener('input', () => {
+    if (urlInput.value.trim()) {
+      adminNewsImageUrl = urlInput.value.trim();
+      renderNewsImagePreview();
+    }
+  });
+}
+
+function handleNewsImageFiles(files) {
+  if (!files || !files.length) return;
+  const file = files[0];
+  if (!file.type.startsWith('image/')) {
+    alert('Only image files are allowed.');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    alert('File too large (max 5MB).');
+    return;
+  }
+  uploadNewsImageFile(file);
+}
+
+async function uploadNewsImageFile(file) {
+  const progressWrap = document.getElementById('nf-upload-progress');
+  const progressBar = document.getElementById('nf-upload-bar');
+  if (!progressWrap || !progressBar) return;
+
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '10%';
+  try {
+    adminNewsImageUrl = await optimizeImageToDataUrl(file);
+    document.getElementById('nf-image').value = adminNewsImageUrl;
+    progressBar.style.width = '100%';
+    renderNewsImagePreview();
+  } catch (err) {
+    alert('Image processing failed: ' + err.message);
+  } finally {
+    progressWrap.style.display = 'none';
+  }
+}
+
+function renderNewsImagePreview() {
+  const holder = document.getElementById('nf-uploaded');
+  if (!holder) return;
+  if (!adminNewsImageUrl) {
+    holder.innerHTML = '';
+    return;
+  }
+
+  holder.innerHTML = '<div class="img-item">' +
+    '<img src="' + adminNewsImageUrl + '" alt="News image" />' +
+    '<span class="img-url" title="' + adminNewsImageUrl + '">Selected news image</span>' +
+    '<button type="button" class="btn btn-sm btn-s" onclick="clearNewsImageUpload()">Remove</button>' +
+  '</div>';
+}
+
+function clearNewsImageUpload() {
+  adminNewsImageUrl = '';
+  const urlInput = document.getElementById('nf-image');
+  if (urlInput) urlInput.value = '';
+  renderNewsImagePreview();
 }
 
 async function refreshNews() {
   const tbody = document.getElementById('news-tbody');
   try {
     const snap = await db.collection('news').orderBy('date', 'desc').limit(20).get();
-    if (snap.empty) { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">No news items.</td></tr>'; return; }
+    if (snap.empty) { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No news items.</td></tr>'; return; }
     tbody.innerHTML = snap.docs.map(d => {
       const n = d.data();
+      const thumb = n.imageUrl ? '<img src="' + n.imageUrl + '" alt="News thumbnail" style="width:72px;height:48px;object-fit:cover;border:1px solid var(--blk-d);background:#111" />' : '<span style="color:var(--wht-f)">—</span>';
       const deleteBtn = canDeleteManagedContent()
         ? '<button class="btn btn-sm btn-d" onclick="deleteNews(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
         : '';
-      return `<tr><td style="white-space:nowrap">${n.date}</td><td>${n.title}</td><td>
+      return `<tr><td style="white-space:nowrap">${n.date}</td><td>${n.title}</td><td>${thumb}</td><td>
         <button class="btn btn-sm btn-s" onclick="editNews('${d.id}')">Edit</button>
         ${deleteBtn}
       </td></tr>`;
     }).join('');
-  } catch { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
+  } catch { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
 }
 
 async function submitNews(e) {
   e.preventDefault();
   const id = document.getElementById('nf-id').value;
-  const data = { title: document.getElementById('nf-title').value, body: document.getElementById('nf-body').value, date: document.getElementById('nf-date').value };
+  const imageUrl = document.getElementById('nf-image').value.trim() || adminNewsImageUrl || '';
+  const data = { title: document.getElementById('nf-title').value, body: document.getElementById('nf-body').value, date: document.getElementById('nf-date').value, imageUrl: imageUrl };
   try {
     if (id) await db.collection('news').doc(id).update(data);
     else await db.collection('news').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     document.getElementById('news-form').reset(); document.getElementById('nf-id').value = '';
     document.getElementById('nf-date').value = new Date().toISOString().split('T')[0];
+    clearNewsImageUpload();
     await refreshNews();
   } catch (err) { alert('Error: ' + err.message); }
 }
@@ -1012,6 +1224,9 @@ async function editNews(id) {
   document.getElementById('nf-title').value = n.title || '';
   document.getElementById('nf-body').value = n.body || '';
   document.getElementById('nf-date').value = n.date || '';
+  document.getElementById('nf-image').value = n.imageUrl || '';
+  adminNewsImageUrl = n.imageUrl || '';
+  renderNewsImagePreview();
   document.getElementById('nf-btn').textContent = '>> Update Article';
 }
 

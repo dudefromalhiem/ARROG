@@ -8,6 +8,7 @@
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
   <style>
+    .guide-toolbar { display:flex; justify-content:flex-end; margin-bottom:16px; }
     .doc-wrap { max-width: 800px; margin: 40px auto; background: var(--blk-c); color: var(--wht-m); padding: 40px; border: 1px solid var(--red-d); box-shadow: 0 0 20px rgba(0,0,0,0.5); font-family: var(--font-m); }
     @media(max-width: 600px) { .doc-wrap { margin: 20px 12px; padding: 20px; } }
     .doc-hdr { border-bottom: 4px solid var(--red-b); padding-bottom: 16px; margin-bottom: 32px; text-align: center; }
@@ -42,7 +43,14 @@
 </header>
 
 <main class="wrap" style="padding-top:40px; padding-bottom:60px;">
+  <div class="guide-toolbar hidden" id="guide-owner-actions">
+    <button class="btn btn-s" id="guide-edit-btn" type="button">>> Edit Guide [Owner]</button>
+  </div>
+
+  <div id="guide-dynamic" class="hidden"></div>
+
   <div class="doc-wrap">
+    <div id="guide-static">
     <div class="doc-hdr">
       <img src="logo.png" alt="Guild Logo" />
       <h1>Orientation Directive 001</h1>
@@ -96,6 +104,7 @@
       <p>As a researcher, you are permitted to submit new findings to the archive. You must adhere to the following mandate: <strong>All anomaly submissions must begin with a unique Designation ID (e.g., ROG-XXXX)</strong>. Failure to do so will result in the automated rejection of your file by the indexing system.</p>
       <p>Tales (narrative reports) and Artworks related to anomalies may utilize the same ID in their submissions to appropriately link to the main entry.</p>
     </div>
+    </div>
 
   </div>
 </main>
@@ -110,5 +119,44 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script>
+function buildGuideDocument(html, css) {
+  const raw = String(html || '').trim();
+  const wrapped = raw.includes('class="page-shell"') ? raw : '<div class="page-shell"><section class="page-section">' + raw + '</section></div>';
+  const safeCss = String(css || '');
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
+    ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
+    '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
+    safeCss.replace(/<\/style>/gi, '') +
+    '</style></head><body>' + wrapped + '</body></html>';
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await rolesReady;
+  auth.onAuthStateChanged(async user => {
+    const ownerActions = document.getElementById('guide-owner-actions');
+    if (user && isOwner(user.email)) {
+      ownerActions.classList.remove('hidden');
+      document.getElementById('guide-edit-btn').onclick = () => location.href = 'admin.html?editSlug=guide';
+    }
+  });
+
+  try {
+    const snap = await db.collection('pages').where('slug', '==', 'guide').limit(1).get();
+    if (!snap.empty) {
+      const doc = snap.docs[0].data();
+      const dynamic = document.getElementById('guide-dynamic');
+      const staticWrap = document.querySelector('.doc-wrap');
+      dynamic.classList.remove('hidden');
+      dynamic.innerHTML = '<iframe id="guide-frame" title="Guide content" sandbox="allow-same-origin" style="width:100%;min-height:1200px;border:1px solid var(--red-d);background:#000"></iframe>';
+      document.getElementById('guide-frame').srcdoc = buildGuideDocument(doc.htmlContent || '', doc.cssContent || '');
+      staticWrap.classList.add('hidden');
+    }
+  } catch (err) {
+    console.warn('Guide override unavailable:', err);
+  }
+});
+</script>
 </body>
 </html>
