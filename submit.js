@@ -607,7 +607,19 @@ function fileToDataUrl(file) {
   });
 }
 
-async function uploadImage(file, attempt = 1) {
+function getUploadBucketCandidates() {
+  const app = firebase.app();
+  const projectId = app.options.projectId || '';
+  const raw = [
+    app.options.storageBucket || '',
+    projectId ? projectId + '.firebasestorage.app' : '',
+    projectId ? projectId + '.appspot.com' : ''
+  ].filter(Boolean).map(v => String(v).replace(/^gs:\/\//, ''));
+
+  return Array.from(new Set(raw));
+}
+
+async function uploadImage(file) {
   if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
 
   const progressWrap = document.getElementById('upload-progress');
@@ -628,78 +640,136 @@ async function uploadImage(file, attempt = 1) {
   renderImageList();
   refreshImageSelectors();
 
-  let ref;
+  const buckets = getUploadBucketCandidates();
+  let bucketIndex = 0;
+  let finished = false;
 
-  try {
-    ref = getStorageRef(path);
-  } catch (initErr) {
-    uploadRecord.status = 'failed';
-    renderImageList();
-    if (uploadStatus) uploadStatus.textContent = 'Upload unavailable for ' + file.name + '.';
-    alert('Upload unavailable: ' + (initErr.message || initErr));
-    progressWrap.style.display = 'none';
-    return;
+  const retryableCodes = new Set([
+    'storage/retry-limit-exceeded',
+    'storage/network-request-failed',
+    'storage/invalid-default-bucket',
+    'storage/bucket-not-found',
+    'storage/unknown'
+  ]);
+
+  function clearTimer() {
+    if (uploadRecord.timeoutId) {
+      clearTimeout(uploadRecord.timeoutId);
+      uploadRecord.timeoutId = null;
+    }
   }
 
-  try {
-    const task = ref.put(file);
+  function finalizeFailure(msg) {
+    if (finished || uploadRecord.removed) return;
+    finished = true;
+    clearTimer();
+    uploadRecord.status = 'failed';
+    renderImageList();
+    progressWrap.style.display = 'none';
+    if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '. Click Retry.';
+    if (msg) alert(msg);
+  }
+
+  function finalizeSuccess(url) {
+    if (finished || uploadRecord.removed) return;
+    finished = true;
+    clearTimer();
+    uploadRecord.remoteUrl = url;
+    uploadRecord.url = url;
+    uploadRecord.status = 'ready';
+    renderImageList();
+    refreshImageSelectors();
+    progressWrap.style.display = 'none';
+    if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
+  }
+
+  function tryNextBucket(reasonText) {
+    bucketIndex += 1;
+    if (bucketIndex >= buckets.length) {
+      finalizeFailure(reasonText || 'Upload failed after trying all storage endpoints.');
+      return;
+    }
+    startUploadOnCurrentBucket();
+  }
+
+  function startUploadOnCurrentBucket() {
+    if (finished || uploadRecord.removed) return;
+
+    const bucket = buckets[bucketIndex];
+    let ref;
+    try {
+      ref = getStorageRef(path, bucket);
+    } catch (initErr) {
+      tryNextBucket('Upload unavailable on current storage endpoint.');
+      return;
+    }
+
+    let task;
+    try {
+      task = ref.put(file);
+    } catch (putErr) {
+      tryNextBucket(putErr.message || 'Could not start upload task.');
+      return;
+    }
+
     uploadRecord.task = task;
-    uploadRecord.timeoutId = setTimeout(() => {
-      if (uploadRecord.status === 'uploading') {
-        try { task.cancel(); } catch (e) { /* ignore */ }
-        uploadRecord.status = 'failed';
-        renderImageList();
-        progressWrap.style.display = 'none';
-        if (uploadStatus) uploadStatus.textContent = 'Upload timed out for ' + file.name + '. Click Retry.';
-      }
-    }, 45000);
+    uploadRecord.status = 'uploading';
+    renderImageList();
     if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '...';
+
+    clearTimer();
+    uploadRecord.timeoutId = setTimeout(() => {
+      if (finished || uploadRecord.removed) return;
+      try { task.cancel(); } catch (e) { /* ignore */ }
+      tryNextBucket('Upload timed out reaching Firebase Storage.');
+    }, 45000);
+
     task.on('state_changed',
       snap => {
         const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
         progressBar.style.width = pct + '%';
       },
       err => {
-        if (uploadRecord.timeoutId) {
-          clearTimeout(uploadRecord.timeoutId);
-          uploadRecord.timeoutId = null;
-        }
+        clearTimer();
+        if (finished || uploadRecord.removed) return;
         const code = err && err.code ? err.code : '';
-        uploadRecord.status = 'failed';
-        renderImageList();
-        if (code === 'storage/unauthorized') {
-          alert('Upload denied by Firebase Storage rules. Confirm you are signed in and using your own submissions folder.');
-        } else if (code === 'storage/retry-limit-exceeded') {
-          alert('Upload timed out reaching Firebase Storage. Click Retry on this image.');
-        } else {
-          alert('Upload failed: ' + (err.message || code || 'Unknown storage error'));
+
+        if (code === 'storage/canceled') {
+          // Timeout path cancels the current task before switching buckets.
+          return;
         }
-        progressWrap.style.display = 'none';
-        if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '.';
+
+        if (code === 'storage/unauthorized') {
+          finalizeFailure('Upload denied by Firebase Storage rules. Confirm you are signed in and using your own submissions folder.');
+          return;
+        }
+
+        if (retryableCodes.has(code)) {
+          tryNextBucket(err.message || 'Temporary Firebase Storage upload error.');
+          return;
+        }
+
+        finalizeFailure('Upload failed: ' + (err.message || code || 'Unknown storage error'));
       },
       async () => {
-        if (uploadRecord.timeoutId) {
-          clearTimeout(uploadRecord.timeoutId);
-          uploadRecord.timeoutId = null;
+        clearTimer();
+        if (finished || uploadRecord.removed) return;
+        try {
+          const url = await ref.getDownloadURL();
+          finalizeSuccess(url);
+        } catch (downloadErr) {
+          const code = downloadErr && downloadErr.code ? downloadErr.code : '';
+          if (retryableCodes.has(code)) {
+            tryNextBucket(downloadErr.message || 'Could not finalize uploaded file URL.');
+            return;
+          }
+          finalizeFailure('Upload completed but URL retrieval failed: ' + (downloadErr.message || code || 'Unknown error'));
         }
-        const url = await ref.getDownloadURL();
-        if (uploadRecord.removed) return;
-        uploadRecord.remoteUrl = url;
-        uploadRecord.url = url;
-        uploadRecord.status = 'ready';
-        renderImageList();
-        refreshImageSelectors();
-        progressWrap.style.display = 'none';
-        if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
       }
     );
-  } catch (err) {
-    uploadRecord.status = 'failed';
-    renderImageList();
-    alert('Upload error: ' + err.message);
-    progressWrap.style.display = 'none';
-    if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '.';
   }
+
+  startUploadOnCurrentBucket();
 }
 
 function renderImageList() {
