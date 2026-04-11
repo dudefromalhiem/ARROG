@@ -8,14 +8,19 @@ service cloud.firestore {
     }
 
     function isOwner() {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+      return isSignedIn() && (
+        request.auth.token.email == 'jaimejoselaureano@gmail.com' ||
+        request.auth.token.email == 'dudefromalhiem@gmail.com' ||
+        (exists(/databases/$(database)/documents/config/roles) && 
+         request.auth.token.email in get(/databases/$(database)/documents/config/roles).data.owners)
+      );
     }
 
     function isAdmin() {
       return isSignedIn() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        isOwner()
+        isOwner() ||
+        (exists(/databases/$(database)/documents/config/roles) && 
+         request.auth.token.email in get(/databases/$(database)/documents/config/roles).data.admins)
       );
     }
 
