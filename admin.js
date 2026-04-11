@@ -267,7 +267,18 @@ function wrapWithDefaultSchema(html) {
 }
 
 function mergeWithDefaultSchemaCSS(css) {
-  return (css || '').trim();
+  return normalizePageCss(css || '').trim();
+}
+
+function normalizePageCss(css) {
+  return String(css || '')
+    .replace(/#1a1a1a/gi, '#f2f2f2')
+    .replace(/#444\b/gi, '#d7d7d7')
+    .replace(/#888\b/gi, '#c7c7c7')
+    .replace(/#f5f5f5/gi, '#111111')
+    .replace(/#f9f9f9/gi, '#101010')
+    .replace(/#ddd\b/gi, '#3a3a3a')
+    .replace(/#eee\b/gi, '#2f2f2f');
 }
 
 // ═════════════════════════════════════════════════════════════
