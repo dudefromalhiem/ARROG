@@ -84,7 +84,32 @@
           </select>
         </div>
       </div>
-      <div class="fg"><label class="fl">Tags (comma-separated)</label><input class="fi" id="sf-tags" placeholder="e.g. object, euclid, temporal" /></div>
+      <div class="fg">
+        <label class="fl">Tags</label>
+        <select class="fi" id="sf-tags" multiple size="6" aria-label="Choose one or more tags">
+          <option value="object">object</option>
+          <option value="animal">animal</option>
+          <option value="humanoid">humanoid</option>
+          <option value="plant">plant</option>
+          <option value="artifact">artifact</option>
+          <option value="document">document</option>
+          <option value="digital">digital</option>
+          <option value="memetic">memetic</option>
+          <option value="cognitohazard">cognitohazard</option>
+          <option value="spatial">spatial</option>
+          <option value="temporal">temporal</option>
+          <option value="biological">biological</option>
+          <option value="dangerous">dangerous</option>
+          <option value="neutralized">neutralized</option>
+          <option value="safe">safe</option>
+          <option value="euclid">euclid</option>
+          <option value="keter">keter</option>
+          <option value="thaumiel">thaumiel</option>
+          <option value="archive">archive</option>
+          <option value="field-report">field-report</option>
+        </select>
+        <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px;">Hold Ctrl or Shift to select multiple tags.</span>
+      </div>
       <div class="fg">
         <label class="fl">Page URL Slug</label>
         <div style="display:flex;align-items:center;gap:8px">

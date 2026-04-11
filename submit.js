@@ -607,21 +607,26 @@ async function uploadImage(file, attempt = 1) {
   const uploadStatus = document.getElementById('upload-status');
   progressWrap.style.display = 'block';
   progressBar.style.width = '0%';
-  if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '...';
+  if (uploadStatus) uploadStatus.textContent = 'Preparing ' + file.name + '...';
 
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = 'submissions/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
+  const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
   const localUrl = await fileToDataUrl(file);
-  const uploadRecord = { name: file.name, url: localUrl, source: 'local', path: path };
+  const uploadRecord = { id: uploadId, name: file.name, url: localUrl, localUrl: localUrl, remoteUrl: '', status: 'uploading', removed: false, path: path, task: null };
   uploadedImages.push(uploadRecord);
   renderImageList();
   refreshImageSelectors();
+
   let ref;
 
   try {
     ref = getStorageRef(path);
   } catch (initErr) {
+    uploadRecord.status = 'failed';
+    renderImageList();
+    if (uploadStatus) uploadStatus.textContent = 'Upload unavailable for ' + file.name + '.';
     alert('Upload unavailable: ' + (initErr.message || initErr));
     progressWrap.style.display = 'none';
     return;
@@ -629,6 +634,8 @@ async function uploadImage(file, attempt = 1) {
 
   try {
     const task = ref.put(file);
+    uploadRecord.task = task;
+    if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '...';
     task.on('state_changed',
       snap => {
         const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
@@ -641,17 +648,22 @@ async function uploadImage(file, attempt = 1) {
           uploadImage(file, attempt + 1);
           return;
         }
+        uploadRecord.status = 'failed';
+        renderImageList();
         if (code === 'storage/unauthorized') {
           alert('Upload denied by Firebase Storage rules. Confirm you are signed in and using your own submissions folder.');
         } else {
           alert('Upload failed: ' + (err.message || code || 'Unknown storage error'));
         }
         progressWrap.style.display = 'none';
+        if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '.';
       },
       async () => {
         const url = await ref.getDownloadURL();
+        if (uploadRecord.removed) return;
+        uploadRecord.remoteUrl = url;
         uploadRecord.url = url;
-        uploadRecord.source = 'remote';
+        uploadRecord.status = 'ready';
         renderImageList();
         refreshImageSelectors();
         progressWrap.style.display = 'none';
@@ -659,6 +671,8 @@ async function uploadImage(file, attempt = 1) {
       }
     );
   } catch (err) {
+    uploadRecord.status = 'failed';
+    renderImageList();
     alert('Upload error: ' + err.message);
     progressWrap.style.display = 'none';
     if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '.';
@@ -667,13 +681,36 @@ async function uploadImage(file, attempt = 1) {
 
 function renderImageList() {
   const list = document.getElementById('img-list');
-  list.innerHTML = uploadedImages.map((img, i) => `
+  list.innerHTML = uploadedImages.map((img) => {
+    const displayUrl = img.remoteUrl || img.localUrl || img.url || '';
+    const label = img.status === 'ready' ? 'Uploaded' : img.status === 'failed' ? 'Failed' : 'Uploading';
+    return `
     <div class="img-item">
-      <img src="${img.url}" alt="${img.name}" />
-      <span class="img-url" title="${img.url}">${img.name}</span>
-      <button class="btn btn-sm btn-s btn-copy" onclick="copyImageUrl(${i})">Copy URL</button>
+      <img src="${displayUrl}" alt="${img.name}" />
+      <div style="flex:1;min-width:0">
+        <span class="img-url" title="${displayUrl}">${img.name}</span>
+        <div style="font-size:.65rem;color:var(--wht-f);margin-top:3px;text-transform:uppercase;letter-spacing:1px">${label}</div>
+      </div>
+      <button class="btn btn-sm btn-s btn-copy" type="button" onclick="copyImageUrl('${img.id}', this)">Copy URL</button>
+      <button class="btn btn-sm btn-d" type="button" onclick="removeUploadedImage('${img.id}')">Remove</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+function removeUploadedImage(id) {
+  const index = uploadedImages.findIndex(img => img.id === id);
+  if (index === -1) return;
+  const record = uploadedImages[index];
+  record.removed = true;
+  if (record.task && record.status === 'uploading' && typeof record.task.cancel === 'function') {
+    try { record.task.cancel(); } catch (e) { /* ignore */ }
+  }
+  uploadedImages.splice(index, 1);
+  renderImageList();
+  refreshImageSelectors();
+  const uploadStatus = document.getElementById('upload-status');
+  if (uploadStatus) uploadStatus.textContent = 'Image removed.';
 }
 
 function refreshImageSelectors() {
@@ -694,13 +731,14 @@ function refreshImageSelectors() {
   });
 }
 
-function copyImageUrl(index) {
-  const url = uploadedImages[index].url;
+function copyImageUrl(id, buttonEl) {
+  const record = uploadedImages.find(img => img.id === id);
+  if (!record) return;
+  const url = record.remoteUrl || record.localUrl || record.url;
   navigator.clipboard.writeText(url).then(() => {
-    const btns = document.querySelectorAll('.btn-copy');
-    if (btns[index]) {
-      btns[index].textContent = 'Copied!';
-      setTimeout(() => { btns[index].textContent = 'Copy URL'; }, 1500);
+    if (buttonEl) {
+      buttonEl.textContent = 'Copied!';
+      setTimeout(() => { buttonEl.textContent = 'Copy URL'; }, 1500);
     }
   }).catch(() => {
     prompt('Copy this URL:', url);
@@ -785,7 +823,7 @@ async function submitPage() {
     title = title.toUpperCase(); // Ensure uppercase for anomaly numbers
   }
   const type = document.getElementById('sf-type').value;
-  const tags = document.getElementById('sf-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const tags = Array.from(document.getElementById('sf-tags').selectedOptions).map(opt => opt.value).filter(Boolean);
   const manualSlug = document.getElementById('sf-slug').value.trim();
   const slug = manualSlug || generateSlug(title);
 
@@ -855,10 +893,17 @@ async function submitPage() {
 
   btn.textContent = 'Submitting...';
 
-  const uploadedUrls = uploadedImages.map(img => img.url).filter(Boolean);
+  const pendingUploads = uploadedImages.filter(img => !img.removed && !img.remoteUrl);
+  if (pendingUploads.length) {
+    alert('Please wait until all image uploads finish, or remove the unfinished images before submitting.');
+    btn.textContent = '>> Submit for Review';
+    btn.disabled = false;
+    return;
+  }
+
+  const uploadedUrls = uploadedImages.filter(img => !img.removed && img.remoteUrl).map(img => img.remoteUrl);
   const sanitizedHTML = sanitizeHTML(htmlContent);
-  const htmlWithUploads = embedUploadedImagesIfMissing(sanitizedHTML, uploadedUrls);
-  const wrappedHTML = wrapWithDefaultSchema(htmlWithUploads, title);
+  const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title);
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
 
   const submission = {
@@ -893,7 +938,7 @@ async function submitPage() {
 function resetSubmitForm() {
   document.getElementById('sf-title').value = '';
   document.getElementById('sf-type').value = 'Anomaly';
-  document.getElementById('sf-tags').value = '';
+  Array.from(document.getElementById('sf-tags').options).forEach(opt => { opt.selected = false; });
   document.getElementById('sf-slug').value = '';
   document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
   document.getElementById('sf-css').value = '';

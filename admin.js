@@ -143,7 +143,7 @@ async function normalizeAllStoredPageStyles() {
         .orderBy(firebase.firestore.FieldPath.documentId())
         .limit(100);
 
-      if (lastDoc) query = query.startAfter(lastDoc.id);
+      if (lastDoc) query = query.startAfter(lastDoc);
 
       const snap = await query.get();
       if (snap.empty) break;
@@ -493,8 +493,8 @@ async function previewSubmission(id) {
 
     // Fill iframe
     const frame = modal.querySelector('iframe');
-    const uploaded = Array.isArray(s.imageUrls) ? s.imageUrls.filter(Boolean) : [];
-    const htmlWithUploads = embedUploadedImagesIfMissing(s.htmlContent || '', uploaded);
+    const uploadedImages = Array.isArray(s.imageUrls) ? s.imageUrls.filter(Boolean) : [];
+    const htmlWithUploads = embedUploadedImagesIfMissing(s.htmlContent || '', uploadedImages);
     const htmlDoc = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.7;padding:24px;color:#222;background:#fff}img{max-width:100%;height:auto}' + (s.cssContent || '').replace(/<\/style>/gi, '') + '</style></head><body>' + htmlWithUploads + '</body></html>';
     frame.srcdoc = htmlDoc;
 
