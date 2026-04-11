@@ -6,8 +6,8 @@ const firebaseConfig = {
   apiKey: "AIzaSyDq8UwN7P1EDfa0IvR2-jUUgV3dHt67f3M",
   authDomain: "redoakerguild.firebaseapp.com",
   projectId: "redoakerguild",
-  // Prefer the modern Firebase Storage bucket domain for better compatibility.
-  storageBucket: "redoakerguild.firebasestorage.app",
+  // Canonical Cloud Storage bucket for Firebase uploads.
+  storageBucket: "redoakerguild.appspot.com",
   messagingSenderId: "847903433642",
   appId: "1:847903433642:web:95a9fdddef4099ff8981d3",
   measurementId: "G-WLR20NDRQL"
@@ -23,15 +23,6 @@ function configureStorageClient(client) {
   if (!client) return;
   client.setMaxUploadRetryTime(120000);
   client.setMaxOperationRetryTime(120000);
-}
-
-function resolveBucketCandidates() {
-  const projectId = firebase.app().options.projectId || '';
-  return [
-    firebase.app().options.storageBucket || '',
-    projectId ? projectId + '.firebasestorage.app' : '',
-    projectId ? projectId + '.appspot.com' : ''
-  ].filter(Boolean);
 }
 
 function ensureStorageClient(preferredBucket) {
@@ -52,27 +43,7 @@ function getStorageRef(path, preferredBucket) {
   const cleanPath = String(path || '').replace(/^\/+/, '');
   if (!cleanPath) throw new Error('Storage path is required.');
 
-  const candidates = preferredBucket ? [preferredBucket] : resolveBucketCandidates();
-  let lastError = null;
-
-  // Try the default storage instance first when no explicit bucket is requested.
-  if (!preferredBucket) {
-    try {
-      return ensureStorageClient().ref(cleanPath);
-    } catch (err) {
-      lastError = err;
-    }
-  }
-
-  for (const bucket of candidates) {
-    try {
-      return ensureStorageClient(bucket).ref(cleanPath);
-    } catch (err) {
-      lastError = err;
-    }
-  }
-
-  throw lastError || new Error('Could not initialize Firebase Storage.');
+  return ensureStorageClient(preferredBucket).ref(cleanPath);
 }
 
 // Try to warm up storage when SDK is available, but keep non-upload pages functional.
