@@ -578,6 +578,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function handleFiles(files) {
   Array.from(files).forEach(file => {
+    const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
+    const alreadyQueued = uploadedImages.some(img => !img.removed && img.fingerprint === fingerprint && (img.status === 'uploading' || img.status === 'ready'));
+    if (alreadyQueued) {
+      const uploadStatus = document.getElementById('upload-status');
+      if (uploadStatus) uploadStatus.textContent = file.name + ' is already queued.';
+      return;
+    }
+
     if (!file.type.startsWith('image/')) {
       alert('Only image files are allowed: ' + file.name);
       return;
@@ -613,8 +621,9 @@ async function uploadImage(file, attempt = 1) {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = 'submissions/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
   const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
+  const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
   const localUrl = await fileToDataUrl(file);
-  const uploadRecord = { id: uploadId, name: file.name, url: localUrl, localUrl: localUrl, remoteUrl: '', status: 'uploading', removed: false, path: path, task: null };
+  const uploadRecord = { id: uploadId, name: file.name, url: localUrl, localUrl: localUrl, remoteUrl: '', status: 'uploading', removed: false, path: path, task: null, fingerprint: fingerprint };
   uploadedImages.push(uploadRecord);
   renderImageList();
   refreshImageSelectors();
@@ -643,11 +652,6 @@ async function uploadImage(file, attempt = 1) {
       },
       err => {
         const code = err && err.code ? err.code : '';
-        if ((code === 'storage/retry-limit-exceeded' || code === 'storage/invalid-default-bucket' || code === 'storage/bucket-not-found') && attempt < 2) {
-          progressBar.style.width = '0%';
-          uploadImage(file, attempt + 1);
-          return;
-        }
         uploadRecord.status = 'failed';
         renderImageList();
         if (code === 'storage/unauthorized') {
@@ -893,7 +897,7 @@ async function submitPage() {
 
   btn.textContent = 'Submitting...';
 
-  const pendingUploads = uploadedImages.filter(img => !img.removed && !img.remoteUrl);
+  const pendingUploads = uploadedImages.filter(img => !img.removed && img.status === 'uploading');
   if (pendingUploads.length) {
     alert('Please wait until all image uploads finish, or remove the unfinished images before submitting.');
     btn.textContent = '>> Submit for Review';
