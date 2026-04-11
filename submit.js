@@ -32,7 +32,11 @@ auth.onAuthStateChanged(user => {
     currentUserForSubmit = user;
     document.getElementById('submit-denied').classList.add('hidden');
     document.getElementById('submit-panel').classList.remove('hidden');
-    navAuth.innerHTML = '<button class="nav-btn" onclick="auth.signOut()">' + (user.displayName || 'Agent') + ' (Sign Out)</button>';
+    navAuth.innerHTML =
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' +
+        '<button class="nav-btn" onclick="changeUsername()" title="Click to change your username">' + (user.displayName || 'Agent') + '</button>' +
+        '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
+      '</div>';
     loadMySubmissions();
   } else {
     currentUserForSubmit = null;
@@ -627,6 +631,7 @@ async function uploadImage(file) {
   uploadedImages.push(uploadRecord);
   renderImageList();
   refreshImageSelectors();
+  let lastProgressAt = Date.now();
   const retryableCodes = new Set([
     'storage/retry-limit-exceeded',
     'storage/network-request-failed',
@@ -673,15 +678,16 @@ async function uploadImage(file) {
     if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '...';
 
     clearTimer();
-    uploadRecord.timeoutId = setTimeout(() => {
-      if (uploadRecord.status === 'uploading' && uploadRecord.task === task) {
-        try { task.cancel(); } catch (e) { /* ignore */ }
-        finalizeFailure('Upload timed out reaching Firebase Storage.');
-      }
-    }, 30000);
+    uploadRecord.timeoutId = setInterval(() => {
+      if (uploadRecord.status !== 'uploading' || uploadRecord.task !== task) return;
+      if (Date.now() - lastProgressAt <= 300000) return;
+      try { task.cancel(); } catch (e) { /* ignore */ }
+      finalizeFailure('Upload stalled reaching Firebase Storage.');
+    }, 15000);
 
     task.on('state_changed',
       snap => {
+        lastProgressAt = Date.now();
         const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
         progressBar.style.width = pct + '%';
       },

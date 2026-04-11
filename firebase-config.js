@@ -46,6 +46,38 @@ function getStorageRef(path, preferredBucket) {
   return ensureStorageClient(preferredBucket).ref(cleanPath);
 }
 
+async function changeUsername() {
+  const user = auth.currentUser;
+  if (!user) {
+    alert('Please sign in first.');
+    return;
+  }
+
+  const currentName = user.displayName || '';
+  const newName = prompt('Enter new Username/Display Name:', currentName);
+  if (newName === null) return;
+
+  const trimmed = newName.trim();
+  if (!trimmed) {
+    alert('Username cannot be empty.');
+    return;
+  }
+
+  try {
+    await user.updateProfile({ displayName: trimmed });
+    await db.collection('users').doc(user.uid).set({
+      uid: user.uid,
+      email: user.email,
+      displayName: trimmed,
+      lastLogin: new Date().toISOString()
+    }, { merge: true });
+    alert('Username updated to ' + trimmed + '.');
+    location.reload();
+  } catch (err) {
+    alert('Failed to update username: ' + err.message);
+  }
+}
+
 // Try to warm up storage when SDK is available, but keep non-upload pages functional.
 try {
   storage = ensureStorageClient();
