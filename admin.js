@@ -349,6 +349,28 @@ function normalizePageCss(css) {
     .replace(/#eee\b/gi, '#2f2f2f');
 }
 
+function embedUploadedImagesIfMissing(html, imageUrls) {
+  const urls = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+  if (!urls.length) return String(html || '');
+
+  const raw = String(html || '');
+  if (raw.includes('class="uploaded-assets"')) return raw;
+  if (urls.some(url => raw.includes(url))) return raw;
+
+  const gallery = '<div class="page-section uploaded-assets">' +
+    '<h2>Uploaded Assets</h2>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
+      urls.map((url, idx) =>
+        '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
+          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" style="display:block;width:100%;height:180px;object-fit:cover;border:1px solid #3a3a3a;background:#111" />' +
+        '</a>'
+      ).join('') +
+    '</div>' +
+  '</div>';
+
+  return raw + gallery;
+}
+
 // ═════════════════════════════════════════════════════════════
 // SUBMISSIONS REVIEW (Admin)
 // ═════════════════════════════════════════════════════════════
@@ -471,7 +493,9 @@ async function previewSubmission(id) {
 
     // Fill iframe
     const frame = modal.querySelector('iframe');
-    const htmlDoc = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.7;padding:24px;color:#222;background:#fff}img{max-width:100%;height:auto}' + (s.cssContent || '').replace(/<\/style>/gi, '') + '</style></head><body>' + (s.htmlContent || '') + '</body></html>';
+    const uploaded = Array.isArray(s.imageUrls) ? s.imageUrls.filter(Boolean) : [];
+    const htmlWithUploads = embedUploadedImagesIfMissing(s.htmlContent || '', uploaded);
+    const htmlDoc = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.7;padding:24px;color:#222;background:#fff}img{max-width:100%;height:auto}' + (s.cssContent || '').replace(/<\/style>/gi, '') + '</style></head><body>' + htmlWithUploads + '</body></html>';
     frame.srcdoc = htmlDoc;
 
   } catch (err) {
