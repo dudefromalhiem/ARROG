@@ -7,6 +7,25 @@
   <meta name="description" content="Create and submit a custom page to the Red Oaker Guild archive. Use templates or write your own HTML & CSS." />
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .doc-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .doc-toolbar .btn { min-width:44px; }
+    .doc-toolbar .fi { max-width:160px; }
+    .doc-adders { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .doc-canvas { border:1px solid var(--blk-m); background:var(--blk-b); padding:12px; }
+    .doc-block { border:1px solid var(--blk-d); background:rgba(0,0,0,.35); margin-bottom:12px; }
+    .doc-block-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--blk-d); }
+    .doc-block-actions { display:flex; gap:6px; }
+    .doc-block-body { padding:10px; }
+    .doc-editable {
+      min-height:90px; border:1px solid var(--blk-m); padding:10px; background:#0d0d0d; color:var(--wht-m);
+      line-height:1.7;
+    }
+    .doc-editable:focus { outline:1px solid var(--red-b); }
+    .doc-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .doc-image-preview { max-width:100%; max-height:220px; display:block; margin-top:8px; border:1px solid var(--blk-m); }
+    @media (max-width: 760px) { .doc-grid-2 { grid-template-columns:1fr; } }
+  </style>
 </head>
 <body>
 
@@ -61,6 +80,11 @@
         <div class="mode-icon">◈</div>
         <div class="mode-label">Template Builder</div>
         <div class="mode-desc">No coding required — fill in the form</div>
+      </button>
+      <button class="mode-btn" id="mode-doc" onclick="switchMode('doc')">
+        <div class="mode-icon">▦</div>
+        <div class="mode-label">Document Studio</div>
+        <div class="mode-desc">Word-like visual editor with draggable-style blocks</div>
       </button>
       <button class="mode-btn" id="mode-code" onclick="switchMode('code')">
         <div class="mode-icon">◇</div>
@@ -254,6 +278,46 @@
         <button class="btn btn-s" onclick="addSubsection('guide')" style="margin-top:12px">+ Add Section</button>
       </div>
 
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- DOCUMENT STUDIO MODE                                    -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <div id="doc-mode" class="hidden">
+      <div class="section" style="margin-bottom:24px">
+        <div class="section-hd">Document Studio</div>
+        <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
+          Build pages like a document editor. Add titles, rich text, images, quotes, lists, code snippets, and move blocks up/down.
+        </p>
+
+        <div class="doc-toolbar" id="doc-toolbar">
+          <button class="btn btn-s" type="button" data-doc-cmd="bold" title="Bold"><strong>B</strong></button>
+          <button class="btn btn-s" type="button" data-doc-cmd="italic" title="Italic"><em>I</em></button>
+          <button class="btn btn-s" type="button" data-doc-cmd="underline" title="Underline"><u>U</u></button>
+          <button class="btn btn-s" type="button" data-doc-cmd="insertUnorderedList" title="Bullet List">• List</button>
+          <button class="btn btn-s" type="button" data-doc-cmd="insertOrderedList" title="Numbered List">1. List</button>
+          <button class="btn btn-s" type="button" id="doc-link-btn" title="Insert Link">Link</button>
+          <button class="btn btn-s" type="button" data-doc-cmd="removeFormat" title="Clear Formatting">Clear</button>
+          <select class="fi" id="doc-format-select" aria-label="Paragraph style">
+            <option value="">Block Style</option>
+            <option value="P">Paragraph</option>
+            <option value="H2">Heading 2</option>
+            <option value="H3">Heading 3</option>
+          </select>
+        </div>
+
+        <div class="doc-adders" id="doc-adders">
+          <button class="btn btn-p" type="button" data-add-block="title">+ Title</button>
+          <button class="btn btn-p" type="button" data-add-block="text">+ Text</button>
+          <button class="btn btn-p" type="button" data-add-block="image">+ Image</button>
+          <button class="btn btn-p" type="button" data-add-block="quote">+ Quote</button>
+          <button class="btn btn-p" type="button" data-add-block="list">+ List</button>
+          <button class="btn btn-p" type="button" data-add-block="code">+ Code</button>
+          <button class="btn btn-p" type="button" data-add-block="divider">+ Divider</button>
+        </div>
+
+        <div class="doc-canvas" id="doc-blocks"></div>
+      </div>
     </div>
 
     <!-- ════════════════════════════════════════════════════════ -->

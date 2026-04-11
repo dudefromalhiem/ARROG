@@ -6,9 +6,11 @@
 let uploadedImages = [];
 let currentUserForSubmit = null;
 let previewDebounce = null;
-let currentMode = 'template'; // 'template' | 'code'
+let currentMode = 'template'; // 'template' | 'doc' | 'code'
 let currentTemplate = 'anomaly'; // 'anomaly' | 'tale' | 'artwork' | 'guide'
 let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
+let docBlocks = [];
+let activeDocEditable = null;
 const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
@@ -23,6 +25,43 @@ const DEFAULT_NEW_PAGE_HTML = `<div class="page-shell">
     <p>Start writing the page content here.</p>
   </section>
 </div>`;
+
+const DOC_DEFAULT_CSS = `
+.doc-editor-page { max-width: 860px; margin: 0 auto; }
+.doc-editor-page .doc-title-main {
+  font-family: var(--font-d);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #f2f2f2;
+  margin-bottom: 18px;
+}
+.doc-editor-page .doc-rich, .doc-editor-page p { color: #d8d8d8; margin-bottom: 14px; }
+.doc-editor-page h2 { color: #f2f2f2; margin-bottom: 10px; letter-spacing: 2px; text-transform: uppercase; }
+.doc-editor-page h3 { color: #d7d7d7; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; }
+.doc-editor-page .doc-image-wrap { margin: 22px 0; }
+.doc-editor-page .doc-image-wrap img { max-width: 100%; border: 1px solid #3a3a3a; background: #111111; }
+.doc-editor-page .doc-image-wrap figcaption { margin-top: 8px; color: #c7c7c7; font-size: .85rem; }
+.doc-editor-page .align-left { text-align: left; }
+.doc-editor-page .align-center { text-align: center; }
+.doc-editor-page .align-right { text-align: right; }
+.doc-editor-page blockquote {
+  border-left: 3px solid #8b0000;
+  background: #101010;
+  padding: 14px 18px;
+  color: #d7d7d7;
+  margin: 20px 0;
+}
+.doc-editor-page blockquote footer { margin-top: 8px; color: #c7c7c7; font-size: .85rem; }
+.doc-editor-page hr { border: none; border-top: 1px dashed #4a4a4a; margin: 24px 0; }
+.doc-editor-page pre {
+  margin: 20px 0;
+  padding: 14px;
+  border: 1px solid #333;
+  background: #0f0f0f;
+  color: #f2f2f2;
+  overflow-x: auto;
+}
+`;
 
 // ═════════════════════════════════════════════════════════════
 // AUTH GATE
@@ -77,8 +116,10 @@ function updateSlugPreview() {
 function switchMode(mode) {
   currentMode = mode;
   document.getElementById('mode-template').classList.toggle('active', mode === 'template');
+  document.getElementById('mode-doc').classList.toggle('active', mode === 'doc');
   document.getElementById('mode-code').classList.toggle('active', mode === 'code');
   document.getElementById('template-mode').classList.toggle('hidden', mode !== 'template');
+  document.getElementById('doc-mode').classList.toggle('hidden', mode !== 'doc');
   document.getElementById('code-mode').classList.toggle('hidden', mode !== 'code');
   schedulePreview();
 }
@@ -166,6 +207,281 @@ function buildTemplateHTML() {
   if (currentTemplate === 'artwork') return buildArtworkTemplate();
   if (currentTemplate === 'guide') return buildGuideTemplate();
   return { html: '', css: '' };
+}
+
+function createDocBlock(type) {
+  if (type === 'title') return { type: 'title', text: '' };
+  if (type === 'text') return { type: 'text', html: '' };
+  if (type === 'image') return { type: 'image', url: '', caption: '', align: 'center', width: '100' };
+  if (type === 'quote') return { type: 'quote', text: '', source: '' };
+  if (type === 'list') return { type: 'list', items: '' };
+  if (type === 'code') return { type: 'code', code: '' };
+  if (type === 'divider') return { type: 'divider' };
+  return { type: 'text', html: '' };
+}
+
+function escapeAttr(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function stripTags(html) {
+  const el = document.createElement('div');
+  el.innerHTML = String(html || '');
+  return (el.textContent || '').trim();
+}
+
+function getUploadedImageOptions(selected) {
+  const images = uploadedImages.filter(img => img.status === 'ready' && img.remoteUrl);
+  const options = ['<option value="">Select uploaded image</option>'];
+  images.forEach(img => {
+    const isSel = selected && selected === img.remoteUrl ? ' selected' : '';
+    options.push('<option value="' + escapeAttr(img.remoteUrl) + '"' + isSel + '>' + escapeHtml(img.name) + '</option>');
+  });
+  return options.join('');
+}
+
+function renderDocBlocks() {
+  const holder = document.getElementById('doc-blocks');
+  if (!holder) return;
+
+  if (!docBlocks.length) {
+    holder.innerHTML = '<div class="no-results">No blocks yet. Use the + buttons above to build your page.</div>';
+    return;
+  }
+
+  holder.innerHTML = docBlocks.map((block, idx) => {
+    const head = '<div class="doc-block-head"><strong style="font-size:.8rem;color:var(--wht-b);text-transform:uppercase;letter-spacing:1px">' +
+      escapeHtml(block.type) +
+      '</strong><div class="doc-block-actions">' +
+      '<button class="btn btn-sm btn-s" type="button" data-action="up" data-index="' + idx + '">↑</button>' +
+      '<button class="btn btn-sm btn-s" type="button" data-action="down" data-index="' + idx + '">↓</button>' +
+      '<button class="btn btn-sm btn-d" type="button" data-action="delete" data-index="' + idx + '">Delete</button>' +
+      '</div></div>';
+
+    let body = '';
+    if (block.type === 'title') {
+      body = '<input class="fi" data-field="text" data-index="' + idx + '" value="' + escapeAttr(block.text || '') + '" placeholder="Section title" />';
+    } else if (block.type === 'text') {
+      body = '<div class="doc-editable" contenteditable="true" data-field="html" data-index="' + idx + '">' + (block.html || '') + '</div>';
+    } else if (block.type === 'image') {
+      const imageSrc = block.url ? '<img class="doc-image-preview" src="' + escapeAttr(block.url) + '" alt="Selected" />' : '';
+      body = '<div class="doc-grid-2">' +
+        '<div><label class="fl">Uploaded Images</label><select class="fi" data-field="uploadSelect" data-index="' + idx + '">' + getUploadedImageOptions(block.url || '') + '</select></div>' +
+        '<div><label class="fl">Image URL</label><input class="fi" data-field="url" data-index="' + idx + '" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
+        '<div><label class="fl">Caption</label><input class="fi" data-field="caption" data-index="' + idx + '" value="' + escapeAttr(block.caption || '') + '" placeholder="Optional caption" /></div>' +
+        '<div><label class="fl">Alignment</label><select class="fi" data-field="align" data-index="' + idx + '"><option value="left"' + (block.align === 'left' ? ' selected' : '') + '>Left</option><option value="center"' + (block.align !== 'left' && block.align !== 'right' ? ' selected' : '') + '>Center</option><option value="right"' + (block.align === 'right' ? ' selected' : '') + '>Right</option></select></div>' +
+      '</div>' + imageSrc;
+    } else if (block.type === 'quote') {
+      body = '<textarea class="fta" data-field="text" data-index="' + idx + '" placeholder="Quote text">' + escapeHtml(block.text || '') + '</textarea>' +
+        '<input class="fi" data-field="source" data-index="' + idx + '" value="' + escapeAttr(block.source || '') + '" placeholder="Quote source" />';
+    } else if (block.type === 'list') {
+      body = '<textarea class="fta" data-field="items" data-index="' + idx + '" placeholder="One item per line">' + escapeHtml(block.items || '') + '</textarea>';
+    } else if (block.type === 'code') {
+      body = '<textarea class="fta" data-field="code" data-index="' + idx + '" placeholder="Code or fixed-width text">' + escapeHtml(block.code || '') + '</textarea>';
+    } else {
+      body = '<div style="font-size:.8rem;color:var(--wht-f)">Horizontal divider</div>';
+    }
+
+    return '<div class="doc-block" data-index="' + idx + '">' + head + '<div class="doc-block-body">' + body + '</div></div>';
+  }).join('');
+}
+
+function moveDocBlock(index, delta) {
+  const next = index + delta;
+  if (next < 0 || next >= docBlocks.length) return;
+  const temp = docBlocks[index];
+  docBlocks[index] = docBlocks[next];
+  docBlocks[next] = temp;
+  renderDocBlocks();
+  schedulePreview();
+}
+
+function removeDocBlock(index) {
+  docBlocks.splice(index, 1);
+  renderDocBlocks();
+  schedulePreview();
+}
+
+function initDocumentStudio() {
+  const toolbar = document.getElementById('doc-toolbar');
+  const adders = document.getElementById('doc-adders');
+  const holder = document.getElementById('doc-blocks');
+  const formatSelect = document.getElementById('doc-format-select');
+  const linkBtn = document.getElementById('doc-link-btn');
+  if (!toolbar || !adders || !holder) return;
+
+  if (!docBlocks.length) {
+    docBlocks = [
+      { type: 'title', text: 'Overview' },
+      { type: 'text', html: '<p>Start writing your document here.</p>' }
+    ];
+  }
+  renderDocBlocks();
+
+  adders.addEventListener('click', e => {
+    const btn = e.target.closest('[data-add-block]');
+    if (!btn) return;
+    docBlocks.push(createDocBlock(btn.getAttribute('data-add-block')));
+    renderDocBlocks();
+    schedulePreview();
+  });
+
+  toolbar.addEventListener('click', e => {
+    const btn = e.target.closest('[data-doc-cmd]');
+    if (!btn) return;
+    if (!activeDocEditable) {
+      alert('Click inside a text block first.');
+      return;
+    }
+    activeDocEditable.focus();
+    document.execCommand(btn.getAttribute('data-doc-cmd'), false, null);
+    schedulePreview();
+  });
+
+  if (linkBtn) {
+    linkBtn.addEventListener('click', () => {
+      if (!activeDocEditable) {
+        alert('Click inside a text block first.');
+        return;
+      }
+      const url = prompt('Enter link URL:');
+      if (!url) return;
+      activeDocEditable.focus();
+      document.execCommand('createLink', false, url);
+      schedulePreview();
+    });
+  }
+
+  if (formatSelect) {
+    formatSelect.addEventListener('change', () => {
+      if (!activeDocEditable || !formatSelect.value) return;
+      activeDocEditable.focus();
+      document.execCommand('formatBlock', false, formatSelect.value);
+      formatSelect.value = '';
+      schedulePreview();
+    });
+  }
+
+  holder.addEventListener('focusin', e => {
+    if (e.target.matches('[contenteditable="true"]')) {
+      activeDocEditable = e.target;
+    }
+  });
+
+  holder.addEventListener('click', e => {
+    const actionBtn = e.target.closest('[data-action]');
+    if (!actionBtn) return;
+    const index = Number(actionBtn.getAttribute('data-index'));
+    const action = actionBtn.getAttribute('data-action');
+    if (action === 'up') moveDocBlock(index, -1);
+    if (action === 'down') moveDocBlock(index, 1);
+    if (action === 'delete') removeDocBlock(index);
+  });
+
+  function handleBlockValueChange(target) {
+    const index = Number(target.getAttribute('data-index'));
+    const field = target.getAttribute('data-field');
+    if (!Number.isFinite(index) || index < 0 || index >= docBlocks.length || !field) return;
+
+    if (target.matches('[contenteditable="true"]')) {
+      docBlocks[index][field] = target.innerHTML;
+      schedulePreview();
+      return;
+    }
+
+    const value = target.value;
+    if (field === 'uploadSelect') {
+      docBlocks[index].url = value;
+      renderDocBlocks();
+      schedulePreview();
+      return;
+    }
+
+    if (field === 'url') {
+      docBlocks[index][field] = value;
+      renderDocBlocks();
+      schedulePreview();
+      return;
+    }
+
+    if (field === 'align') {
+      docBlocks[index][field] = value;
+      schedulePreview();
+      return;
+    } else {
+      docBlocks[index][field] = value;
+    }
+    schedulePreview();
+  }
+
+  holder.addEventListener('input', e => {
+    if (e.target.hasAttribute('data-field')) handleBlockValueChange(e.target);
+  });
+
+  holder.addEventListener('change', e => {
+    if (e.target.hasAttribute('data-field')) handleBlockValueChange(e.target);
+  });
+}
+
+function buildDocumentModeHTML() {
+  const parts = [];
+  docBlocks.forEach(block => {
+    if (block.type === 'title' && block.text && block.text.trim()) {
+      parts.push('<h2 class="doc-title-main">' + escapeHtml(block.text.trim()) + '</h2>');
+      return;
+    }
+    if (block.type === 'text' && stripTags(block.html || '').length) {
+      parts.push('<div class="doc-rich">' + (block.html || '') + '</div>');
+      return;
+    }
+    if (block.type === 'image' && block.url) {
+      const align = (block.align === 'left' || block.align === 'right') ? block.align : 'center';
+      const caption = block.caption ? '<figcaption>' + escapeHtml(block.caption) + '</figcaption>' : '';
+      parts.push('<figure class="doc-image-wrap align-' + align + '"><img src="' + escapeAttr(block.url) + '" alt="Document image" />' + caption + '</figure>');
+      return;
+    }
+    if (block.type === 'quote' && (block.text || '').trim()) {
+      const source = block.source ? '<footer>— ' + escapeHtml(block.source) + '</footer>' : '';
+      parts.push('<blockquote><p>' + escapeHtml(block.text.trim()) + '</p>' + source + '</blockquote>');
+      return;
+    }
+    if (block.type === 'list' && (block.items || '').trim()) {
+      const items = String(block.items).split(/\n+/).map(s => s.trim()).filter(Boolean);
+      if (items.length) {
+        parts.push('<ul>' + items.map(item => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>');
+      }
+      return;
+    }
+    if (block.type === 'code' && (block.code || '').trim()) {
+      parts.push('<pre><code>' + escapeHtml(block.code.trim()) + '</code></pre>');
+      return;
+    }
+    if (block.type === 'divider') {
+      parts.push('<hr />');
+    }
+  });
+
+  return {
+    html: '<div class="doc-editor-page">' + parts.join('\n') + '</div>',
+    css: DOC_DEFAULT_CSS
+  };
+}
+
+function hasDocumentContent() {
+  return docBlocks.some(block => {
+    if (block.type === 'title') return !!String(block.text || '').trim();
+    if (block.type === 'text') return !!stripTags(block.html || '');
+    if (block.type === 'image') return !!String(block.url || '').trim();
+    if (block.type === 'quote') return !!String(block.text || '').trim();
+    if (block.type === 'list') return String(block.items || '').split(/\n+/).map(s => s.trim()).filter(Boolean).length > 0;
+    if (block.type === 'code') return !!String(block.code || '').trim();
+    if (block.type === 'divider') return true;
+    return false;
+  });
 }
 
 function wrapWithDefaultSchema(html, title) {
@@ -577,6 +893,8 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('change', schedulePreview);
   });
 
+  initDocumentStudio();
+
   document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
   document.getElementById('sf-css').value = '';
   updateSlugPreview();
@@ -842,6 +1160,19 @@ function refreshImageSelectors() {
       sel.value = prev;
     }
   });
+
+  refreshDocumentImagePickers();
+}
+
+function refreshDocumentImagePickers() {
+  document.querySelectorAll('#doc-blocks select[data-field="uploadSelect"]').forEach(selectEl => {
+    const index = Number(selectEl.getAttribute('data-index'));
+    const selected = Number.isFinite(index) && docBlocks[index] ? (docBlocks[index].url || '') : '';
+    selectEl.innerHTML = getUploadedImageOptions(selected);
+    if (selected && Array.from(selectEl.options).some(option => option.value === selected)) {
+      selectEl.value = selected;
+    }
+  });
 }
 
 function copyImageUrl(id, buttonEl) {
@@ -915,6 +1246,10 @@ function updatePreview() {
     const result = buildTemplateHTML();
     html = result.html;
     css = result.css;
+  } else if (currentMode === 'doc') {
+    const result = buildDocumentModeHTML();
+    html = result.html;
+    css = result.css;
   } else {
     html = document.getElementById('sf-html').value;
     css = document.getElementById('sf-css').value;
@@ -960,6 +1295,11 @@ async function submitPage() {
     htmlContent = result.html;
     cssContent = result.css;
     if (!htmlContent.trim()) { alert('Please fill in at least some template fields.'); return; }
+  } else if (currentMode === 'doc') {
+    const result = buildDocumentModeHTML();
+    htmlContent = result.html;
+    cssContent = result.css;
+    if (!hasDocumentContent()) { alert('Please add at least one content block in Document Studio.'); return; }
   } else {
     htmlContent = document.getElementById('sf-html').value;
     cssContent = document.getElementById('sf-css').value;
@@ -1090,6 +1430,12 @@ function resetSubmitForm() {
     if (el) el.innerHTML = '';
   });
   subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
+
+  docBlocks = [
+    { type: 'title', text: 'Overview' },
+    { type: 'text', html: '<p>Start writing your document here.</p>' }
+  ];
+  renderDocBlocks();
 
   uploadedImages = [];
   renderImageList();

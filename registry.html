@@ -177,11 +177,11 @@
     body.innerHTML = filtered.map(item => {
       const clsBadge = 'badge-' + (item.objClass || 'unknown');
       const href = item.slug ? 'page.html?slug=' + item.slug : 'page.html?id=' + item.id;
-      return '<tr onclick="window.location.href=\\'' + href + '\\'">' +
-        '<td><div style="font-weight:bold;color:var(--wht-b); margin-bottom:4px;">' + (item.anomalyId || item.title.split(': ')[0]) + '</div><div style="font-size:.8rem;">' + item.title + '</div></td>' +
-        '<td><span class="badge ' + clsBadge + '">' + (item.objClass || 'Unknown') + '</span></td>' +
-        '<td>' + item.excerpt + '</td>' +
-      '</tr>';
+      return `<tr onclick="window.location.href='${href}'">
+        <td><div style="font-weight:bold;color:var(--wht-b); margin-bottom:4px;">${item.anomalyId || item.title.split(': ')[0]}</div><div style="font-size:.8rem;">${item.title}</div></td>
+        <td><span class="badge ${clsBadge}">${item.objClass || 'Unknown'}</span></td>
+        <td>${item.excerpt}</td>
+      </tr>`;
     }).join('');
   }
 

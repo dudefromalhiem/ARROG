@@ -195,18 +195,18 @@
       const href = i.slug ? 'page.html?slug=' + i.slug : 'page.html?id=' + i.id;
       
       if (type === 'Artwork' && i.img) {
-        return '<div class="exp-card exp-art-card" onclick="window.location.href=\\'' + href + '\\'">' +
-               '<img src="' + i.img + '" alt="' + i.title + '" />' +
-               '<div class="exp-art-info">' +
-                 '<div class="exp-card-title" style="margin:0">' + i.title + '</div>' +
-               '</div></div>';
+        return `<div class="exp-card exp-art-card" onclick="window.location.href='${href}'">
+               <img src="${i.img}" alt="${i.title}" />
+               <div class="exp-art-info">
+                 <div class="exp-card-title" style="margin:0">${i.title}</div>
+               </div></div>`;
       }
-      
-      return '<div class="exp-card" onclick="window.location.href=\\'' + href + '\\'">' +
-             '<div class="exp-card-type">' + type + '</div>' +
-             '<div class="exp-card-title">' + i.title + '</div>' +
-             '<div class="exp-card-excerpt">' + i.excerpt + '</div>' +
-             '</div>';
+
+      return `<div class="exp-card" onclick="window.location.href='${href}'">
+             <div class="exp-card-type">${type}</div>
+             <div class="exp-card-title">${i.title}</div>
+             <div class="exp-card-excerpt">${i.excerpt}</div>
+             </div>`;
     }).join('');
   }
 
