@@ -715,7 +715,7 @@ async function loadArtworks(container) {
           <input type="file" id="af-file" accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif" />
           <div class="uz-icon">⬆</div>
           <div class="uz-text">Click or drag image here to upload</div>
-          <div class="uz-hint">PNG, JPG, GIF, WebP, HEIC, HEIF - 5MB max</div>
+          <div class="uz-hint">PNG, JPG, GIF, WebP, HEIC, HEIF - optimized for Firestore</div>
         </div>
         <div class="upload-progress" id="af-upload-progress">
           <div class="upload-progress-bar" id="af-upload-bar"></div>
@@ -786,57 +786,82 @@ async function uploadAdminArtworkFile(file, attempt = 1) {
   progressWrap.style.display = 'block';
   progressBar.style.width = '0%';
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = 'artworks/' + Date.now() + '_' + safeName;
-  let ref;
+  function toDataUrl(f) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(reader.error || new Error('Could not read file.'));
+      reader.readAsDataURL(f);
+    });
+  }
 
-  try {
-    ref = getStorageRef(path);
-  } catch (initErr) {
-    alert('Upload unavailable: ' + (initErr.message || initErr));
-    progressWrap.style.display = 'none';
-    return;
+  function dataUrlBytes(dataUrl) {
+    const parts = String(dataUrl || '').split(',');
+    if (parts.length < 2) return 0;
+    const base64 = parts[1];
+    const padding = (base64.match(/=+$/) || [''])[0].length;
+    return Math.floor((base64.length * 3) / 4) - padding;
+  }
+
+  function loadImage(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Could not decode image.'));
+      img.src = url;
+    });
   }
 
   try {
-    const ext = (file.name || '').toLowerCase().split('.').pop();
-    const mimeMap = {
-      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
-      'gif': 'image/gif', 'webp': 'image/webp', 'heic': 'image/heic',
-      'heif': 'image/heif', 'bmp': 'image/bmp', 'tiff': 'image/tiff'
-    };
-    const contentType = file.type && file.type.startsWith('image/') ? file.type : (mimeMap[ext] || 'image/jpeg');
-    const metadata = { contentType: contentType, cacheControl: 'public,max-age=31536000,immutable' };
-    const task = ref.put(file, metadata);
-    task.on('state_changed',
-      snap => {
-        const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
-        progressBar.style.width = pct + '%';
-      },
-      err => {
-        const code = err && err.code ? err.code : '';
-        if ((code === 'storage/retry-limit-exceeded' || code === 'storage/invalid-default-bucket' || code === 'storage/bucket-not-found') && attempt < 2) {
-          progressBar.style.width = '0%';
-          uploadAdminArtworkFile(file, attempt + 1);
-          return;
-        }
-        if (code === 'storage/unauthorized') {
-          alert('Upload denied by Firebase Storage rules. Admin/Owner role is required for /artworks uploads.');
-        } else {
-          alert('Upload failed: ' + (err.message || code || 'Unknown storage error'));
-        }
-        progressWrap.style.display = 'none';
-      },
-      async () => {
-        const url = await ref.getDownloadURL();
-        adminArtworkUploadUrl = url;
-        document.getElementById('af-url').value = url;
-        renderAdminArtworkUploadPreview();
-        progressWrap.style.display = 'none';
-      }
-    );
+    progressBar.style.width = '15%';
+    const original = await toDataUrl(file);
+    const image = await loadImage(original);
+
+    const maxDim = 1280;
+    let width = image.naturalWidth || image.width;
+    let height = image.naturalHeight || image.height;
+    const scale = Math.min(1, maxDim / Math.max(width, height));
+    width = Math.max(1, Math.floor(width * scale));
+    height = Math.max(1, Math.floor(height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not initialize canvas.');
+
+    ctx.drawImage(image, 0, 0, width, height);
+    let quality = 0.82;
+    let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+    progressBar.style.width = '60%';
+    while (dataUrlBytes(dataUrl) > 250 * 1024 && quality > 0.45) {
+      quality -= 0.08;
+      dataUrl = canvas.toDataURL('image/jpeg', quality);
+    }
+
+    let shrinkPass = 0;
+    while (dataUrlBytes(dataUrl) > 250 * 1024 && shrinkPass < 4) {
+      width = Math.max(1, Math.floor(width * 0.85));
+      height = Math.max(1, Math.floor(height * 0.85));
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(image, 0, 0, width, height);
+      dataUrl = canvas.toDataURL('image/jpeg', Math.max(0.45, quality));
+      shrinkPass++;
+    }
+
+    if (dataUrlBytes(dataUrl) > 250 * 1024) {
+      throw new Error('Image is too large after optimization. Use a smaller image.');
+    }
+
+    progressBar.style.width = '100%';
+    adminArtworkUploadUrl = dataUrl;
+    document.getElementById('af-url').value = dataUrl;
+    renderAdminArtworkUploadPreview();
+    progressWrap.style.display = 'none';
   } catch (err) {
-    alert('Upload error: ' + err.message);
+    alert('Image processing failed: ' + err.message);
     progressWrap.style.display = 'none';
   }
 }

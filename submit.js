@@ -15,6 +15,9 @@ let docDragIndex = -1;
 const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
+const FIRESTORE_IMAGE_MAX_BYTES = 250 * 1024;
+const FIRESTORE_IMAGE_MAX_DIMENSION = 1280;
+const FIRESTORE_IMAGE_LIMIT = 3;
 
 const DEFAULT_NEW_PAGE_HTML = `<div class="page-shell">
   <header class="page-header">
@@ -1002,6 +1005,69 @@ function fileToDataUrl(file) {
   });
 }
 
+function dataUrlByteLength(dataUrl) {
+  const parts = String(dataUrl || '').split(',');
+  if (parts.length < 2) return 0;
+  const base64 = parts[1];
+  const padding = (base64.match(/=+$/) || [''])[0].length;
+  return Math.floor((base64.length * 3) / 4) - padding;
+}
+
+function loadImageFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not decode image for optimization.'));
+    img.src = dataUrl;
+  });
+}
+
+async function optimizeImageForFirestore(file) {
+  const original = await fileToDataUrl(file);
+  const image = await loadImageFromDataUrl(original);
+
+  let width = image.naturalWidth || image.width;
+  let height = image.naturalHeight || image.height;
+  const maxDim = FIRESTORE_IMAGE_MAX_DIMENSION;
+  const scale = Math.min(1, maxDim / Math.max(width, height));
+  width = Math.max(1, Math.floor(width * scale));
+  height = Math.max(1, Math.floor(height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not create canvas context for image optimization.');
+  ctx.drawImage(image, 0, 0, width, height);
+
+  // Convert to JPEG to keep payloads Firestore-friendly for Spark limits.
+  let quality = 0.82;
+  let out = canvas.toDataURL('image/jpeg', quality);
+
+  while (dataUrlByteLength(out) > FIRESTORE_IMAGE_MAX_BYTES && quality > 0.45) {
+    quality -= 0.08;
+    out = canvas.toDataURL('image/jpeg', quality);
+  }
+
+  let shrinkPass = 0;
+  while (dataUrlByteLength(out) > FIRESTORE_IMAGE_MAX_BYTES && shrinkPass < 4) {
+    width = Math.max(1, Math.floor(width * 0.85));
+    height = Math.max(1, Math.floor(height * 0.85));
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(image, 0, 0, width, height);
+    out = canvas.toDataURL('image/jpeg', Math.max(0.45, quality));
+    shrinkPass++;
+  }
+
+  const bytes = dataUrlByteLength(out);
+  if (bytes > FIRESTORE_IMAGE_MAX_BYTES) {
+    throw new Error('Image remains too large after optimization. Use a smaller image.');
+  }
+
+  return { dataUrl: out, bytes: bytes, width: width, height: height };
+}
+
 function getStorageBucketCandidates() {
   const configured = (firebaseConfig && firebaseConfig.storageBucket) ? String(firebaseConfig.storageBucket).replace(/^gs:\/\//, '') : '';
   const projectId = (firebaseConfig && firebaseConfig.projectId) ? String(firebaseConfig.projectId).trim() : '';
@@ -1168,6 +1234,13 @@ async function uploadImage(file) {
   progressBar.style.width = '0%';
   if (uploadStatus) uploadStatus.textContent = 'Preparing ' + file.name + '...';
 
+  const activeCount = uploadedImages.filter(img => !img.removed).length;
+  if (activeCount >= FIRESTORE_IMAGE_LIMIT) {
+    progressWrap.style.display = 'none';
+    alert('You can attach up to ' + FIRESTORE_IMAGE_LIMIT + ' images per submission in Spark mode.');
+    return;
+  }
+
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = 'submissions/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
@@ -1206,20 +1279,21 @@ async function uploadImage(file) {
   try {
     uploadRecord.status = 'uploading';
     renderImageList();
-    if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '...';
-    const url = await uploadWithBucketFallback(path, file, uploadRecord, snap => {
-      const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
-      progressBar.style.width = pct + '%';
-    });
-    finalizeSuccess(url);
+    if (uploadStatus) uploadStatus.textContent = 'Optimizing ' + file.name + ' for Firestore...';
+    progressBar.style.width = '20%';
+
+    const optimized = await optimizeImageForFirestore(file);
+    progressBar.style.width = '100%';
+    finalizeSuccess(optimized.dataUrl);
+    uploadRecord.sizeBytes = optimized.bytes;
+    uploadRecord.storageMode = 'firestore-embedded';
+    if (uploadStatus) {
+      uploadStatus.textContent = 'Prepared ' + file.name + ' (' + Math.round(optimized.bytes / 1024) + ' KB)';
+    }
   } catch (err) {
     const code = err && err.code ? err.code : '';
     if (code === 'storage/canceled' && uploadRecord.removed) return;
-    if (code === 'storage/unauthorized') {
-      finalizeFailure('Upload denied by Firebase Storage rules. Confirm you are signed in and uploading under your own account.');
-      return;
-    }
-    finalizeFailure('Upload failed: ' + (err.message || code || 'Unknown storage error'));
+    finalizeFailure('Image processing failed: ' + (err.message || code || 'Unknown error'));
   }
 }
 
