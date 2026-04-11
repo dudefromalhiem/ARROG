@@ -1044,10 +1044,22 @@ function getImageMimeType(file) {
 function createUploadTask(ref, file, onProgress) {
   return new Promise((resolve, reject) => {
     let lastProgressAt = Date.now();
+    let uploadStarted = false;
+    let uploadCompleted = false;
     const metadata = {
       contentType: getImageMimeType(file),
       cacheControl: 'public,max-age=31536000,immutable'
     };
+    
+    // Timeout if nothing happens for 30 seconds
+    const initialTimeout = setTimeout(() => {
+      if (!uploadStarted) {
+        try { task.cancel(); } catch (e) { /* ignore */ }
+        clearInterval(stallTimer);
+        reject(new Error('Upload timeout: No progress after 30 seconds. Check Firebase Storage rules and network connection.'));
+      }
+    }, 30000);
+
     const task = ref.put(file, metadata);
 
     const stallTimer = setInterval(() => {
@@ -1058,19 +1070,29 @@ function createUploadTask(ref, file, onProgress) {
 
     task.on('state_changed',
       snap => {
+        uploadStarted = true;
+        clearTimeout(initialTimeout);
         lastProgressAt = Date.now();
         if (typeof onProgress === 'function') onProgress(snap, task);
       },
       err => {
+        if (uploadCompleted) return;
+        uploadCompleted = true;
         clearInterval(stallTimer);
+        clearTimeout(initialTimeout);
+        console.error('[Upload Error]', err.code, err.message);
         reject(err);
       },
       async () => {
+        if (uploadCompleted) return;
+        uploadCompleted = true;
         clearInterval(stallTimer);
+        clearTimeout(initialTimeout);
         try {
           const url = await ref.getDownloadURL();
           resolve({ task, url });
         } catch (downloadErr) {
+          console.error('[Download URL Error]', downloadErr);
           reject(downloadErr);
         }
       }
@@ -1080,6 +1102,7 @@ function createUploadTask(ref, file, onProgress) {
 
 async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
   const buckets = getStorageBucketCandidates();
+  console.log('[uploadWithBucketFallback] Buckets to try:', buckets);
   const retryable = new Set([
     'storage/retry-limit-exceeded',
     'storage/network-request-failed',
@@ -1101,10 +1124,12 @@ async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
     }
 
     const bucket = attempts[i];
+    console.log('[uploadWithBucketFallback] Attempt', i, 'bucket:', bucket || '(default)');
     let ref;
     try {
       ref = bucket ? getStorageRef(path, bucket) : getStorageRef(path);
     } catch (initErr) {
+      console.error('[uploadWithBucketFallback] Ref init failed:', initErr);
       errors.push(initErr);
       continue;
     }
@@ -1112,9 +1137,11 @@ async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
     try {
       const { task, url } = await createUploadTask(ref, file, setProgress);
       uploadRecord.task = task;
+      console.log('[uploadWithBucketFallback] Upload succeeded');
       return url;
     } catch (err) {
       const code = err && err.code ? err.code : '';
+      console.error('[uploadWithBucketFallback] Upload failed:', code, err.message);
       errors.push(err);
       if (code === 'storage/unauthorized' || code === 'storage/canceled') throw err;
       if (!retryable.has(code)) throw err;
@@ -1122,6 +1149,7 @@ async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
   }
 
   const finalErr = errors[errors.length - 1] || new Error('Upload failed after bucket fallback attempts.');
+  console.error('[uploadWithBucketFallback] All attempts failed:', finalErr);
   throw finalErr;
 }
 
@@ -1151,12 +1179,15 @@ async function uploadImage(file) {
   renderImageList();
   refreshImageSelectors();
 
+  console.log('[Upload] Starting upload:', { uid: currentUserForSubmit.uid, path, fileName: file.name, fileSize: file.size });
+
   function finalizeFailure(msg) {
     if (uploadRecord.removed) return;
     uploadRecord.status = 'failed';
     renderImageList();
     progressWrap.style.display = 'none';
     if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '. Click Retry.';
+    console.error('[Upload] Failed:', msg);
     if (msg) alert(msg);
   }
 
@@ -1169,6 +1200,7 @@ async function uploadImage(file) {
     refreshImageSelectors();
     progressWrap.style.display = 'none';
     if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
+    console.log('[Upload] Success:', url);
   }
 
   try {
