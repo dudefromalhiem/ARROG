@@ -407,17 +407,24 @@ async function filterSubmissions(status) {
 async function refreshSubmissions(status) {
   const tbody = document.getElementById('subs-tbody');
   try {
-    let query = db.collection('submissions').orderBy('submittedAt', 'desc').limit(50);
-    if (status && status !== 'all') {
-      query = db.collection('submissions').where('status', '==', status).orderBy('submittedAt', 'desc').limit(50);
-    }
-    const snap = await query.get();
-    if (snap.empty) {
+    const snap = await db.collection('submissions').get();
+    const docs = snap.docs
+      .map(doc => ({ id: doc.id, data: doc.data() }))
+      .filter(entry => !status || status === 'all' || entry.data.status === status)
+      .sort((a, b) => {
+        const aTime = a.data.submittedAt?.seconds || 0;
+        const bTime = b.data.submittedAt?.seconds || 0;
+        return bTime - aTime;
+      })
+      .slice(0, 50);
+
+    if (docs.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" class="tc" style="padding:24px;color:var(--wht-f)">No ' + (status === 'all' ? '' : status + ' ') + 'submissions found.</td></tr>';
       return;
     }
-    tbody.innerHTML = snap.docs.map(d => {
-      const s = d.data();
+    tbody.innerHTML = docs.map(entry => {
+      const d = entry;
+      const s = entry.data;
       const statusClass = 'status status-' + s.status;
       const date = s.submittedAt ? new Date(s.submittedAt.seconds * 1000).toLocaleDateString() : '—';
       let actions = '<button class="btn btn-sm btn-s" onclick="previewSubmission(\'' + d.id + '\')" style="margin-right:4px">Preview</button>';
