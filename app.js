@@ -141,7 +141,7 @@ function skipTerminal() {
 }
 
 // ═════════════════════════════════════════════════════════════
-// CLEARANCE WELCOME SCREEN (User = Level 2, Admin = Level 4, Owner = Level 5)
+// CLEARANCE WELCOME SCREEN (Guest=3, User=4, Mod=5, Admin/Owner=6)
 // ═════════════════════════════════════════════════════════════
 
 function showClearanceWelcome(role) {
@@ -256,13 +256,15 @@ async function updateAuthUI(user) {
   const navAuth = document.getElementById('nav-auth');
   const adminLink = document.getElementById('admin-link');
   const submitLink = document.getElementById('submit-link');
+  const shownRole = sessionStorage.getItem('clearanceWelcomedRole');
+
   if (user) {
     currentUser = user;
     currentRole = resolveRole(user.email);
     const displayLabel = user.displayName || 'Agent';
       navAuth.innerHTML = renderUserMenuHTML(displayLabel);
     if (submitLink) submitLink.classList.remove('hidden');
-    if (isAdmin(user.email)) adminLink.classList.remove('hidden');
+    if (isModerator(user.email)) adminLink.classList.remove('hidden');
     else adminLink.classList.add('hidden');
     // upsert user doc
     db.collection('users').doc(user.uid).set({
@@ -273,17 +275,20 @@ async function updateAuthUI(user) {
       lastLogin: new Date().toISOString()
     }, { merge: true }).catch(() => { });
 
-    // Show clearance welcome for owner/admin if not shown yet this session
-    if ((currentRole === 'owner' || currentRole === 'admin') && !sessionStorage.getItem('clearanceWelcomed')) {
+    if (shownRole !== currentRole) {
       showClearanceWelcome(currentRole);
-      sessionStorage.setItem('clearanceWelcomed', 'true');
+      sessionStorage.setItem('clearanceWelcomedRole', currentRole);
     }
   } else {
     currentUser = null;
-    currentRole = 'user';
+    currentRole = 'guest';
     navAuth.innerHTML = '<button class="nav-btn" onclick="openAuth()">Sign In</button>';
     adminLink.classList.add('hidden');
     if (submitLink) submitLink.classList.add('hidden');
+    if (shownRole !== 'guest') {
+      showClearanceWelcome('guest');
+      sessionStorage.setItem('clearanceWelcomedRole', 'guest');
+    }
   }
 }
 

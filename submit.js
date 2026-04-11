@@ -9,6 +9,9 @@ let previewDebounce = null;
 let currentMode = 'template'; // 'template' | 'code'
 let currentTemplate = 'anomaly'; // 'anomaly' | 'tale' | 'artwork' | 'guide'
 let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
+const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+const UPLOAD_STALL_CHECK_MS = 15000;
+const UPLOAD_STALL_TIMEOUT_MS = 300000;
 
 const DEFAULT_NEW_PAGE_HTML = `<div class="page-shell">
   <header class="page-header">
@@ -594,7 +597,7 @@ function handleFiles(files) {
       alert('Only image files are allowed: ' + file.name);
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > UPLOAD_MAX_BYTES) {
       alert('File too large (max 5MB): ' + file.name);
       return;
     }
@@ -611,12 +614,116 @@ function fileToDataUrl(file) {
   });
 }
 
+function getStorageBucketCandidates() {
+  const configured = (firebaseConfig && firebaseConfig.storageBucket) ? String(firebaseConfig.storageBucket).replace(/^gs:\/\//, '') : '';
+  const projectId = (firebaseConfig && firebaseConfig.projectId) ? String(firebaseConfig.projectId).trim() : '';
+  const candidates = [];
+
+  if (configured) candidates.push(configured);
+  if (projectId) {
+    candidates.push(projectId + '.firebasestorage.app');
+    candidates.push(projectId + '.appspot.com');
+  }
+
+  // Keep first occurrence only.
+  return candidates.filter((bucket, idx) => bucket && candidates.indexOf(bucket) === idx);
+}
+
+function createUploadTask(ref, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    let lastProgressAt = Date.now();
+    const metadata = {
+      contentType: file.type || 'application/octet-stream',
+      cacheControl: 'public,max-age=31536000,immutable'
+    };
+    const task = ref.put(file, metadata);
+
+    const stallTimer = setInterval(() => {
+      if (Date.now() - lastProgressAt > UPLOAD_STALL_TIMEOUT_MS) {
+        try { task.cancel(); } catch (e) { /* ignore */ }
+      }
+    }, UPLOAD_STALL_CHECK_MS);
+
+    task.on('state_changed',
+      snap => {
+        lastProgressAt = Date.now();
+        if (typeof onProgress === 'function') onProgress(snap, task);
+      },
+      err => {
+        clearInterval(stallTimer);
+        reject(err);
+      },
+      async () => {
+        clearInterval(stallTimer);
+        try {
+          const url = await ref.getDownloadURL();
+          resolve({ task, url });
+        } catch (downloadErr) {
+          reject(downloadErr);
+        }
+      }
+    );
+  });
+}
+
+async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
+  const buckets = getStorageBucketCandidates();
+  const retryable = new Set([
+    'storage/retry-limit-exceeded',
+    'storage/network-request-failed',
+    'storage/invalid-default-bucket',
+    'storage/bucket-not-found',
+    'storage/unknown'
+  ]);
+  const errors = [];
+
+  // First attempt: default initialized storage client.
+  const defaultAttempts = [''];
+  const attempts = defaultAttempts.concat(buckets);
+
+  for (let i = 0; i < attempts.length; i++) {
+    if (uploadRecord.removed) {
+      const removedErr = new Error('Upload canceled by user.');
+      removedErr.code = 'storage/canceled';
+      throw removedErr;
+    }
+
+    const bucket = attempts[i];
+    let ref;
+    try {
+      ref = bucket ? getStorageRef(path, bucket) : getStorageRef(path);
+    } catch (initErr) {
+      errors.push(initErr);
+      continue;
+    }
+
+    try {
+      const { task, url } = await createUploadTask(ref, file, setProgress);
+      uploadRecord.task = task;
+      return url;
+    } catch (err) {
+      const code = err && err.code ? err.code : '';
+      errors.push(err);
+      if (code === 'storage/unauthorized' || code === 'storage/canceled') throw err;
+      if (!retryable.has(code)) throw err;
+    }
+  }
+
+  const finalErr = errors[errors.length - 1] || new Error('Upload failed after bucket fallback attempts.');
+  throw finalErr;
+}
+
 async function uploadImage(file) {
   if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
 
   const progressWrap = document.getElementById('upload-progress');
   const progressBar = document.getElementById('upload-bar');
   const uploadStatus = document.getElementById('upload-status');
+  if (!progressWrap || !progressBar) {
+    alert('Upload UI is unavailable on this page.');
+    return;
+  }
+
   progressWrap.style.display = 'block';
   progressBar.style.width = '0%';
   if (uploadStatus) uploadStatus.textContent = 'Preparing ' + file.name + '...';
@@ -631,24 +738,8 @@ async function uploadImage(file) {
   uploadedImages.push(uploadRecord);
   renderImageList();
   refreshImageSelectors();
-  let lastProgressAt = Date.now();
-  const retryableCodes = new Set([
-    'storage/retry-limit-exceeded',
-    'storage/network-request-failed',
-    'storage/invalid-default-bucket',
-    'storage/bucket-not-found',
-    'storage/unknown'
-  ]);
-
-  function clearTimer() {
-    if (uploadRecord.timeoutId) {
-      clearTimeout(uploadRecord.timeoutId);
-      uploadRecord.timeoutId = null;
-    }
-  }
 
   function finalizeFailure(msg) {
-    clearTimer();
     if (uploadRecord.removed) return;
     uploadRecord.status = 'failed';
     renderImageList();
@@ -658,7 +749,6 @@ async function uploadImage(file) {
   }
 
   function finalizeSuccess(url) {
-    clearTimer();
     if (uploadRecord.removed) return;
     uploadRecord.remoteUrl = url;
     uploadRecord.url = url;
@@ -670,52 +760,22 @@ async function uploadImage(file) {
   }
 
   try {
-    const ref = getStorageRef(path);
-    const task = ref.put(file);
-    uploadRecord.task = task;
     uploadRecord.status = 'uploading';
     renderImageList();
     if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '...';
-
-    clearTimer();
-    uploadRecord.timeoutId = setInterval(() => {
-      if (uploadRecord.status !== 'uploading' || uploadRecord.task !== task) return;
-      if (Date.now() - lastProgressAt <= 300000) return;
-      try { task.cancel(); } catch (e) { /* ignore */ }
-      finalizeFailure('Upload stalled reaching Firebase Storage.');
-    }, 15000);
-
-    task.on('state_changed',
-      snap => {
-        lastProgressAt = Date.now();
-        const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
-        progressBar.style.width = pct + '%';
-      },
-      err => {
-        const code = err && err.code ? err.code : '';
-        if (code === 'storage/canceled') return;
-        if (code === 'storage/unauthorized') {
-          finalizeFailure('Upload denied by Firebase Storage rules. Confirm you are signed in and using your own submissions folder.');
-          return;
-        }
-        if (retryableCodes.has(code)) {
-          finalizeFailure('Upload failed: ' + (err.message || code || 'Unknown storage error'));
-          return;
-        }
-        finalizeFailure('Upload failed: ' + (err.message || code || 'Unknown storage error'));
-      },
-      async () => {
-        try {
-          const url = await ref.getDownloadURL();
-          finalizeSuccess(url);
-        } catch (downloadErr) {
-          const code = downloadErr && downloadErr.code ? downloadErr.code : '';
-          finalizeFailure('Upload completed but URL retrieval failed: ' + (downloadErr.message || code || 'Unknown error'));
-        }
-      }
-    );
+    const url = await uploadWithBucketFallback(path, file, uploadRecord, snap => {
+      const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
+      progressBar.style.width = pct + '%';
+    });
+    finalizeSuccess(url);
   } catch (err) {
-    finalizeFailure('Upload error: ' + err.message);
+    const code = err && err.code ? err.code : '';
+    if (code === 'storage/canceled' && uploadRecord.removed) return;
+    if (code === 'storage/unauthorized') {
+      finalizeFailure('Upload denied by Firebase Storage rules. Confirm you are signed in and uploading under your own account.');
+      return;
+    }
+    finalizeFailure('Upload failed: ' + (err.message || code || 'Unknown storage error'));
   }
 }
 
@@ -772,20 +832,26 @@ function refreshImageSelectors() {
     const prev = sel.value;
     const noneLabel = selId.includes('art') ? 'Upload an image above first' : 'None — No hero image';
     sel.innerHTML = '<option value="">' + noneLabel + '</option>';
-    uploadedImages.forEach((img, i) => {
+    uploadedImages.filter(img => img.status === 'ready' && img.remoteUrl).forEach((img, i) => {
       const opt = document.createElement('option');
-      opt.value = img.url;
+      opt.value = img.remoteUrl;
       opt.textContent = img.name;
       sel.appendChild(opt);
     });
-    if (prev) sel.value = prev;
+    if (prev && Array.from(sel.options).some(option => option.value === prev)) {
+      sel.value = prev;
+    }
   });
 }
 
 function copyImageUrl(id, buttonEl) {
   const record = uploadedImages.find(img => img.id === id);
   if (!record) return;
-  const url = record.remoteUrl || record.localUrl || record.url;
+  const url = record.remoteUrl || '';
+  if (!url) {
+    alert('Image is not uploaded yet. Please wait for upload completion.');
+    return;
+  }
   navigator.clipboard.writeText(url).then(() => {
     if (buttonEl) {
       buttonEl.textContent = 'Copied!';
@@ -879,6 +945,7 @@ async function submitPage() {
   const slug = manualSlug || generateSlug(title);
 
   if (!title) { alert('Please enter a title.'); return; }
+  if (!slug) { alert('Please enter a valid slug.'); return; }
   const idMatch = title.match(/^([A-Z]{2,4}-\d+)/i) || title.match(/^([A-Za-z]+-\d+)/i);
   if (!idMatch) {
     alert("The submission Title MUST begin with an Anomaly ID designation (e.g. ROG-001, ROS-0050). This is compulsory for search indexing.");
@@ -944,9 +1011,17 @@ async function submitPage() {
 
   btn.textContent = 'Submitting...';
 
-  const pendingUploads = uploadedImages.filter(img => !img.removed && img.status === 'uploading');
-  if (pendingUploads.length) {
-    alert('Please wait until all image uploads finish, or remove the unfinished images before submitting.');
+  const inFlightUploads = uploadedImages.filter(img => !img.removed && img.status === 'uploading');
+  if (inFlightUploads.length) {
+    alert('Please wait until all image uploads finish before submitting.');
+    btn.textContent = '>> Submit for Review';
+    btn.disabled = false;
+    return;
+  }
+
+  const failedUploads = uploadedImages.filter(img => !img.removed && img.status === 'failed');
+  if (failedUploads.length) {
+    alert('One or more uploads failed. Retry or remove failed images before submitting.');
     btn.textContent = '>> Submit for Review';
     btn.disabled = false;
     return;
@@ -1032,12 +1107,14 @@ async function loadMySubmissions() {
   const container = document.getElementById('my-submissions');
 
   try {
-    const snap = await db.collection('submissions').get();
+    const snap = await db.collection('submissions')
+      .where('authorUid', '==', currentUserForSubmit.uid)
+      .orderBy('submittedAt', 'desc')
+      .limit(20)
+      .get();
     const submissions = snap.docs
       .map(doc => ({ id: doc.id, data: doc.data() }))
-      .filter(entry => entry.data.authorUid === currentUserForSubmit.uid)
-      .sort((a, b) => (b.data.submittedAt?.seconds || 0) - (a.data.submittedAt?.seconds || 0))
-      .slice(0, 20);
+      .sort((a, b) => (b.data.submittedAt?.seconds || 0) - (a.data.submittedAt?.seconds || 0));
 
     if (submissions.length === 0) {
       container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">No submissions yet. Create your first page above!</p>';

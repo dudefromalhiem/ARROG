@@ -132,7 +132,7 @@ try {
 
 // Bootstrap — only used if Firestore config/roles doesn't exist yet
 const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
-let ROLE_DATA = { owners: [], admins: [] };
+let ROLE_DATA = { owners: [], admins: [], mods: [] };
 
 const rolesReady = (async () => {
   try {
@@ -141,6 +141,7 @@ const rolesReady = (async () => {
       const d = doc.data();
       ROLE_DATA.owners = (d.owners || []).map(e => e.toLowerCase());
       ROLE_DATA.admins = (d.admins || []).map(e => e.toLowerCase());
+      ROLE_DATA.mods = (d.mods || []).map(e => e.toLowerCase());
     }
   } catch (e) {
     console.warn('[RBAC] Could not fetch roles from Firestore — using bootstrap.');
@@ -157,12 +158,18 @@ function resolveRole(email) {
   const e = email.toLowerCase();
   if (ROLE_DATA.owners.includes(e)) return "owner";
   if (ROLE_DATA.admins.includes(e)) return "admin";
+  if (ROLE_DATA.mods.includes(e)) return "mod";
   return "user";
+}
+function isModerator(email) {
+  const r = resolveRole(email);
+  return r === "mod" || r === "admin" || r === "owner";
 }
 function isAdmin(email) { const r = resolveRole(email); return r === "admin" || r === "owner"; }
 function isOwner(email) { return resolveRole(email) === "owner"; }
 function clearanceLevelForRole(role) {
-  if (role === "owner") return 5;
-  if (role === "admin") return 4;
-  return 2;
+  if (role === "owner" || role === "admin") return 6;
+  if (role === "mod") return 5;
+  if (role === "user") return 4;
+  return 3;
 }

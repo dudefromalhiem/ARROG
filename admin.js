@@ -6,6 +6,49 @@
 let activeTab = 'pages';
 let adminArtworkUploadUrl = '';
 
+function getCurrentRole() {
+  return resolveRole(auth.currentUser?.email || '');
+}
+
+function isModOnlyRole() {
+  return getCurrentRole() === 'mod';
+}
+
+function canModerateSubmissions() {
+  return isModerator(auth.currentUser?.email);
+}
+
+function canDeleteManagedContent() {
+  return isAdmin(auth.currentUser?.email);
+}
+
+function applyTabVisibilityForRole(role) {
+  const pagesTab = document.getElementById('tab-pages');
+  const submissionsTab = document.getElementById('tab-submissions');
+  const artworksTab = document.getElementById('tab-artworks');
+  const newsTab = document.getElementById('tab-news');
+  const usersTab = document.getElementById('tab-users');
+  const rolesTab = document.getElementById('tab-roles');
+  const configTab = document.getElementById('tab-config');
+
+  const isModOnly = role === 'mod';
+
+  if (pagesTab) pagesTab.classList.toggle('hidden', isModOnly);
+  if (submissionsTab) submissionsTab.classList.remove('hidden');
+  if (artworksTab) artworksTab.classList.toggle('hidden', isModOnly);
+  if (newsTab) newsTab.classList.toggle('hidden', isModOnly);
+  if (configTab) configTab.classList.toggle('hidden', isModOnly);
+
+  if (usersTab) usersTab.classList.toggle('hidden', !isAdmin(auth.currentUser?.email));
+  if (rolesTab) rolesTab.classList.toggle('hidden', !isOwner(auth.currentUser?.email));
+
+  if (isModOnly && activeTab !== 'submissions') {
+    activeTab = 'submissions';
+    document.querySelectorAll('#adm-tabs a').forEach(a => a.classList.remove('on'));
+    if (submissionsTab) submissionsTab.classList.add('on');
+  }
+}
+
 // ── Auth Gate ─────────────────────────────────────────────────
 auth.onAuthStateChanged(async user => {
   await rolesReady;
@@ -19,10 +62,10 @@ auth.onAuthStateChanged(async user => {
   }
 
   const role = resolveRole(user.email);
-  if (!isAdmin(user.email)) {
+  if (!isModerator(user.email)) {
     document.getElementById('admin-denied').querySelector('.section-hd').textContent = 'Insufficient Clearance';
     document.getElementById('admin-denied').querySelector('p').innerHTML =
-      `Your account does not have Admin privileges. Contact the Guild Owner.`;
+      `Your account does not have moderation privileges. Contact the Guild Owner.`;
     const displayLabel = user.displayName || 'Agent';
     document.getElementById('nav-auth').innerHTML = renderUserMenuHTML(displayLabel);
     return;
@@ -37,16 +80,11 @@ auth.onAuthStateChanged(async user => {
     `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Clearance: <span style="color:var(--red-b);text-transform:uppercase">${role}</span> (Level ${clearanceLevel})
      <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
   document.getElementById('nav-auth').innerHTML = renderUserMenuHTML(displayLabel);
-
-  document.getElementById('tab-users').classList.remove('hidden'); // allow admins to see the list
-
-  if (isOwner(user.email)) {
-    document.getElementById('tab-roles').classList.remove('hidden');
-  }
+  applyTabVisibilityForRole(role);
 
   const params = new URLSearchParams(window.location.search);
   const editId = params.get('editId');
-  if (editId) {
+  if (editId && !isModOnlyRole()) {
     activeTab = 'pages';
     document.querySelectorAll('#adm-tabs a').forEach(a => a.classList.remove('on'));
     const pageTabEl = Array.from(document.querySelectorAll('#adm-tabs a')).find(a => a.textContent.includes('Pages'));
@@ -61,9 +99,16 @@ auth.onAuthStateChanged(async user => {
 
 // ── Tab Switching ─────────────────────────────────────────────
 function switchTab(tab) {
+  if (isModOnlyRole() && tab !== 'submissions') {
+    tab = 'submissions';
+  }
   activeTab = tab;
   document.querySelectorAll('#adm-tabs a').forEach(a => a.classList.remove('on'));
-  event.target.classList.add('on');
+  if (typeof event !== 'undefined' && event && event.target) event.target.classList.add('on');
+  else {
+    const selected = document.getElementById('tab-' + tab);
+    if (selected) selected.classList.add('on');
+  }
   
   // Clear any editId from url so refreshing doesn't keep locking into edit
   window.history.replaceState({}, document.title, window.location.pathname);
@@ -72,6 +117,10 @@ function switchTab(tab) {
 }
 
 function loadTab() {
+  if (isModOnlyRole() && activeTab !== 'submissions') {
+    activeTab = 'submissions';
+  }
+
   const main = document.getElementById('adm-main');
   const cfgSection = document.getElementById('section-config');
   
@@ -251,12 +300,15 @@ async function refreshPages() {
     }
     tbody.innerHTML = snap.docs.map(d => {
       const p = d.data();
+      const deleteBtn = canDeleteManagedContent()
+        ? '<button class="btn btn-sm btn-d" onclick="deletePage(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
+        : '';
       return `<tr>
         <td>${p.title}</td>
         <td><span class="tag">${p.type}</span></td>
         <td>
           <button class="btn btn-sm btn-s" onclick="editPage('${d.id}')">Edit</button>
-          <button class="btn btn-sm btn-d" onclick="deletePage('${d.id}')" style="margin-left:4px">Delete</button>
+          ${deleteBtn}
         </td>
       </tr>`;
     }).join('');
@@ -296,6 +348,10 @@ async function editPage(id) {
 }
 
 async function deletePage(id) {
+  if (!canDeleteManagedContent()) {
+    alert('Only Admins and Owners can delete pages.');
+    return;
+  }
   if (!confirm('Delete this page permanently?')) return;
   try { await db.collection('pages').doc(id).delete(); await refreshPages(); }
   catch (err) { alert('Delete failed: ' + err.message); }
@@ -378,7 +434,7 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
 async function loadSubmissions(container) {
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Submission Review Queue</h3>
-    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">Review user-submitted pages. Approved pages are published to the site. Rejected pages are returned to the author with feedback.</p>
+    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">Review user-submitted pages. Approved pages are published to the site. Rejected pages are returned to the author with feedback. Moderators can approve/reject but cannot delete records.</p>
     <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-sm btn-p" id="filter-pending" onclick="filterSubmissions('pending')" style="opacity:1">Pending</button>
       <button class="btn btn-sm btn-s" id="filter-approved" onclick="filterSubmissions('approved')">Approved</button>
@@ -516,6 +572,10 @@ function closeReviewModal() {
 }
 
 async function approveSubmission(id) {
+  if (!canModerateSubmissions()) {
+    alert('Moderator access is required to approve submissions.');
+    return;
+  }
   if (!confirm('Approve this submission and publish it to the site?')) return;
 
   try {
@@ -569,6 +629,10 @@ function showRejectForm(id) {
 }
 
 async function rejectSubmission(id, reason) {
+  if (!canModerateSubmissions()) {
+    alert('Moderator access is required to reject submissions.');
+    return;
+  }
   try {
     const reviewer = auth.currentUser;
     await db.collection('submissions').doc(id).update({
@@ -750,9 +814,12 @@ async function refreshArt() {
     if (snap.empty) { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">No artworks found.</td></tr>'; return; }
     tbody.innerHTML = snap.docs.map(d => {
       const a = d.data();
+      const deleteBtn = canDeleteManagedContent()
+        ? '<button class="btn btn-sm btn-d" onclick="deleteArt(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
+        : '';
       return `<tr><td>${a.title}</td><td>${a.displayInSpotlight ? '✓' : '—'}</td><td>
         <button class="btn btn-sm btn-s" onclick="editArt('${d.id}')">Edit</button>
-        <button class="btn btn-sm btn-d" onclick="deleteArt('${d.id}')" style="margin-left:4px">Delete</button>
+        ${deleteBtn}
       </td></tr>`;
     }).join('');
   } catch { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
@@ -792,6 +859,10 @@ async function editArt(id) {
 }
 
 async function deleteArt(id) {
+  if (!canDeleteManagedContent()) {
+    alert('Only Admins and Owners can delete artworks.');
+    return;
+  }
   if (!confirm('Remove this artwork?')) return;
   try { await db.collection('artworks').doc(id).delete(); await refreshArt(); }
   catch (err) { alert('Error: ' + err.message); }
@@ -827,9 +898,12 @@ async function refreshNews() {
     if (snap.empty) { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">No news items.</td></tr>'; return; }
     tbody.innerHTML = snap.docs.map(d => {
       const n = d.data();
+      const deleteBtn = canDeleteManagedContent()
+        ? '<button class="btn btn-sm btn-d" onclick="deleteNews(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
+        : '';
       return `<tr><td style="white-space:nowrap">${n.date}</td><td>${n.title}</td><td>
         <button class="btn btn-sm btn-s" onclick="editNews('${d.id}')">Edit</button>
-        <button class="btn btn-sm btn-d" onclick="deleteNews('${d.id}')" style="margin-left:4px">Delete</button>
+        ${deleteBtn}
       </td></tr>`;
     }).join('');
   } catch { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
@@ -860,6 +934,10 @@ async function editNews(id) {
 }
 
 async function deleteNews(id) {
+  if (!canDeleteManagedContent()) {
+    alert('Only Admins and Owners can delete news.');
+    return;
+  }
   if (!confirm('Delete this news item?')) return;
   try { await db.collection('news').doc(id).delete(); await refreshNews(); }
   catch (err) { alert('Error: ' + err.message); }
@@ -903,14 +981,20 @@ async function loadRolesManager(container) {
   }
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Roles Management (Owner Only)</h3>
-    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:24px">Add or remove admin access. Changes take effect on next login. Roles are stored securely in Firebase — not in the codebase.</p>
+    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:24px">Assign Moderator or Admin access. Changes take effect on next login. Roles are stored in Firebase config.</p>
     <div style="margin-bottom:24px;border:1px solid var(--wht-f);padding:16px">
-      <h4 style="margin-bottom:12px;color:var(--red-b)">Add New Admin</h4>
+      <h4 style="margin-bottom:12px;color:var(--red-b)">Add Staff Role</h4>
       <div style="display:flex;gap:8px;align-items:center">
         <input class="fi" id="role-email" placeholder="email@example.com" style="flex:1" />
-        <button class="btn btn-p" onclick="addAdminRole()">+ Add Admin</button>
+        <select class="fi" id="role-kind" style="max-width:180px">
+          <option value="mod">Moderator (Level 5)</option>
+          <option value="admin">Admin (Level 6)</option>
+        </select>
+        <button class="btn btn-p" onclick="addStaffRole()">+ Add Role</button>
       </div>
     </div>
+    <h4 style="margin-bottom:8px">Current Moderators</h4>
+    <div id="mods-list" style="margin-bottom:24px"></div>
     <h4 style="margin-bottom:8px">Current Admins</h4>
     <div id="roles-list" style="margin-bottom:24px"></div>
     <h4 style="margin-bottom:8px;color:var(--wht-d)">Owners (Bootstrap — cannot be changed here)</h4>
@@ -920,9 +1004,10 @@ async function loadRolesManager(container) {
 }
 
 async function refreshRolesDisplay() {
+  const modsList = document.getElementById('mods-list');
   const adminsList = document.getElementById('roles-list');
   const ownersList = document.getElementById('owners-list');
-  if (!adminsList || !ownersList) return;
+  if (!modsList || !adminsList || !ownersList) return;
 
   // Refresh from Firestore
   try {
@@ -931,8 +1016,20 @@ async function refreshRolesDisplay() {
       const d = doc.data();
       ROLE_DATA.owners = (d.owners || []).map(e => e.toLowerCase());
       ROLE_DATA.admins = (d.admins || []).map(e => e.toLowerCase());
+      ROLE_DATA.mods = (d.mods || []).map(e => e.toLowerCase());
     }
   } catch(e) { /* keep cached */ }
+
+  if (ROLE_DATA.mods.length === 0) {
+    modsList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No moderators assigned yet.</p>';
+  } else {
+    modsList.innerHTML = ROLE_DATA.mods.map(email => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
+        <span>${email}</span>
+        <button class="btn btn-sm btn-d" onclick="removeStaffRole('mod','${email}')">Revoke</button>
+      </div>
+    `).join('');
+  }
 
   if (ROLE_DATA.admins.length === 0) {
     adminsList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No admins assigned yet.</p>';
@@ -940,7 +1037,7 @@ async function refreshRolesDisplay() {
     adminsList.innerHTML = ROLE_DATA.admins.map(email => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
         <span>${email}</span>
-        <button class="btn btn-sm btn-d" onclick="removeAdminRole('${email}')">Revoke</button>
+        <button class="btn btn-sm btn-d" onclick="removeStaffRole('admin','${email}')">Revoke</button>
       </div>
     `).join('');
   }
@@ -952,39 +1049,56 @@ async function refreshRolesDisplay() {
   `).join('');
 }
 
-async function addAdminRole() {
+async function addStaffRole() {
   const input = document.getElementById('role-email');
+  const kindInput = document.getElementById('role-kind');
   const email = (input.value || '').trim().toLowerCase();
+  const kind = (kindInput && kindInput.value) || 'mod';
   if (!email || !email.includes('@')) { alert('Enter a valid email address.'); return; }
   if (ROLE_DATA.owners.includes(email)) { alert('This email is already an Owner.'); return; }
-  if (ROLE_DATA.admins.includes(email)) { alert('This email is already an Admin.'); return; }
+
+  if (kind === 'admin' && ROLE_DATA.admins.includes(email)) { alert('This email is already an Admin.'); return; }
+  if (kind === 'mod' && ROLE_DATA.mods.includes(email)) { alert('This email is already a Moderator.'); return; }
 
   try {
-    ROLE_DATA.admins.push(email);
+    if (kind === 'admin') {
+      ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
+      ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
+      ROLE_DATA.admins.push(email);
+    } else {
+      ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
+      ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
+      ROLE_DATA.mods.push(email);
+    }
+
     await db.collection('config').doc('roles').set({
       owners: ROLE_DATA.owners,
-      admins: ROLE_DATA.admins
+      admins: ROLE_DATA.admins,
+      mods: ROLE_DATA.mods
     });
+
     input.value = '';
-    alert('Admin access granted to ' + email);
+    alert((kind === 'admin' ? 'Admin' : 'Moderator') + ' access granted to ' + email);
     await refreshRolesDisplay();
   } catch (err) {
-    ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
-    alert('Failed to add admin: ' + err.message);
+    alert('Failed to add role: ' + err.message);
   }
 }
 
-async function removeAdminRole(email) {
-  if (!confirm('Revoke admin access for ' + email + '?')) return;
+async function removeStaffRole(kind, email) {
+  if (!confirm('Revoke ' + (kind === 'admin' ? 'admin' : 'moderator') + ' access for ' + email + '?')) return;
   try {
-    ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
+    if (kind === 'admin') ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
+    else ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
+
     await db.collection('config').doc('roles').set({
       owners: ROLE_DATA.owners,
-      admins: ROLE_DATA.admins
+      admins: ROLE_DATA.admins,
+      mods: ROLE_DATA.mods
     });
-    alert('Admin access revoked for ' + email);
+    alert((kind === 'admin' ? 'Admin' : 'Moderator') + ' access revoked for ' + email);
     await refreshRolesDisplay();
   } catch (err) {
-    alert('Failed to remove admin: ' + err.message);
+    alert('Failed to remove role: ' + err.message);
   }
 }
