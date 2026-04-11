@@ -1,6 +1,44 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function rolesDocExists() {
+      return firestore.exists(/databases/(default)/documents/config/roles);
+    }
+
+    function isBootstrapOwner() {
+      return request.auth.token.email == 'jaimejoselaureano@gmail.com' ||
+        request.auth.token.email == 'dudefromalhiem@gmail.com';
+    }
+
+    function isOwnerFromRoles() {
+      return rolesDocExists() &&
+        ('owners' in firestore.get(/databases/(default)/documents/config/roles).data) &&
+        request.auth.token.email in firestore.get(/databases/(default)/documents/config/roles).data.owners;
+    }
+
+    function isAdminFromRoles() {
+      return rolesDocExists() &&
+        ('admins' in firestore.get(/databases/(default)/documents/config/roles).data) &&
+        request.auth.token.email in firestore.get(/databases/(default)/documents/config/roles).data.admins;
+    }
+
+    function isAdminOrOwner() {
+      return isBootstrapOwner() || isOwnerFromRoles() || isAdminFromRoles();
+    }
+
+    function isAllowedImageUpload() {
+      return request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType != null &&
+        (
+          request.resource.contentType.matches('image/.*') ||
+          request.resource.contentType == 'application/octet-stream'
+        );
+    }
+
     // Public read for all files (artwork images, submissions, etc.)
     match /{allPaths=**} {
       allow read: if true;
@@ -8,32 +46,20 @@ service firebase.storage {
 
     // Only admins/owner can upload to artworks
     match /artworks/{fileName} {
-      allow write: if request.auth != null &&
-        (request.auth.token.email == 'jaimejoselaureano@gmail.com' ||
-         request.auth.token.email == 'dudefromalhiem@gmail.com' ||
-         (firestore.exists(/databases/(default)/documents/config/roles) &&
-          ((request.auth.token.email in firestore.get(/databases/(default)/documents/config/roles).data.owners) ||
-           (request.auth.token.email in firestore.get(/databases/(default)/documents/config/roles).data.admins))));
+      allow write: if isSignedIn() && isAdminOrOwner() && isAllowedImageUpload();
     }
 
     // Only admins/owner can upload to general uploads
     match /uploads/{fileName} {
-      allow write: if request.auth != null &&
-        (request.auth.token.email == 'jaimejoselaureano@gmail.com' ||
-         request.auth.token.email == 'dudefromalhiem@gmail.com' ||
-         (firestore.exists(/databases/(default)/documents/config/roles) &&
-          ((request.auth.token.email in firestore.get(/databases/(default)/documents/config/roles).data.owners) ||
-           (request.auth.token.email in firestore.get(/databases/(default)/documents/config/roles).data.admins))));
+      allow write: if isSignedIn() && isAdminOrOwner() && isAllowedImageUpload();
     }
 
     // Authenticated users can upload images to their own submissions folder
     // Max 5MB, image type or undetected type (browsers sometimes send octet-stream)
     match /submissions/{userId}/{fileName} {
-      allow write: if request.auth != null &&
+      allow write: if isSignedIn() &&
         request.auth.uid == userId &&
-        request.resource.size < 5 * 1024 * 1024 &&
-        (request.resource.contentType.matches('image/.*') ||
-         request.resource.contentType == 'application/octet-stream');
+        isAllowedImageUpload();
     }
   }
 }
