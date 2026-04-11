@@ -570,7 +570,15 @@ async function uploadImage(file, attempt = 1) {
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = 'submissions/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
-  const ref = storage.ref(path);
+  let ref;
+
+  try {
+    ref = getStorageRef(path);
+  } catch (initErr) {
+    alert('Upload unavailable: ' + (initErr.message || initErr));
+    progressWrap.style.display = 'none';
+    return;
+  }
 
   try {
     const task = ref.put(file);
@@ -580,12 +588,17 @@ async function uploadImage(file, attempt = 1) {
         progressBar.style.width = pct + '%';
       },
       err => {
-        if (err && err.code === 'storage/retry-limit-exceeded' && attempt < 2) {
+        const code = err && err.code ? err.code : '';
+        if ((code === 'storage/retry-limit-exceeded' || code === 'storage/invalid-default-bucket' || code === 'storage/bucket-not-found') && attempt < 2) {
           progressBar.style.width = '0%';
           uploadImage(file, attempt + 1);
           return;
         }
-        alert('Upload failed: ' + err.message);
+        if (code === 'storage/unauthorized') {
+          alert('Upload denied by Firebase Storage rules. Confirm you are signed in and using your own submissions folder.');
+        } else {
+          alert('Upload failed: ' + (err.message || code || 'Unknown storage error'));
+        }
         progressWrap.style.display = 'none';
       },
       async () => {

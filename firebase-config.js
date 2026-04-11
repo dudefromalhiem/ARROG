@@ -17,10 +17,70 @@ firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
-// Increase retry windows for slower connections and larger uploads.
-storage.setMaxUploadRetryTime(120000);
-storage.setMaxOperationRetryTime(120000);
+let storage = null;
+
+function configureStorageClient(client) {
+  if (!client) return;
+  client.setMaxUploadRetryTime(120000);
+  client.setMaxOperationRetryTime(120000);
+}
+
+function resolveBucketCandidates() {
+  const projectId = firebase.app().options.projectId || '';
+  return [
+    firebase.app().options.storageBucket || '',
+    projectId ? projectId + '.firebasestorage.app' : '',
+    projectId ? projectId + '.appspot.com' : ''
+  ].filter(Boolean);
+}
+
+function ensureStorageClient(preferredBucket) {
+  if (typeof firebase.storage !== 'function') {
+    throw new Error('Firebase Storage SDK is not loaded on this page.');
+  }
+
+  const bucket = (preferredBucket || '').replace(/^gs:\/\//, '');
+  if (!bucket && storage) return storage;
+
+  const next = bucket ? firebase.app().storage('gs://' + bucket) : firebase.storage();
+  configureStorageClient(next);
+  if (!bucket) storage = next;
+  return next;
+}
+
+function getStorageRef(path, preferredBucket) {
+  const cleanPath = String(path || '').replace(/^\/+/, '');
+  if (!cleanPath) throw new Error('Storage path is required.');
+
+  const candidates = preferredBucket ? [preferredBucket] : resolveBucketCandidates();
+  let lastError = null;
+
+  // Try the default storage instance first when no explicit bucket is requested.
+  if (!preferredBucket) {
+    try {
+      return ensureStorageClient().ref(cleanPath);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  for (const bucket of candidates) {
+    try {
+      return ensureStorageClient(bucket).ref(cleanPath);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('Could not initialize Firebase Storage.');
+}
+
+// Try to warm up storage when SDK is available, but keep non-upload pages functional.
+try {
+  storage = ensureStorageClient();
+} catch (e) {
+  console.warn('[Storage] Initialization skipped:', e.message || e);
+}
 
 /* ═══════════════════════════════════════════════════════════════
  *  RBAC — Dynamic role resolution via Firestore (config/roles)
