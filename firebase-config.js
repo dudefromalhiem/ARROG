@@ -25,7 +25,7 @@ const storage = firebase.storage();
  * ═══════════════════════════════════════════════════════════════ */
 
 // Bootstrap — only used if Firestore config/roles doesn't exist yet
-const _BOOTSTRAP = [];
+const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
 let ROLE_DATA = { owners: [], admins: [] };
 
 const rolesReady = (async () => {
