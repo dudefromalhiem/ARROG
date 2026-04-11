@@ -186,7 +186,13 @@
     // Auth sync
     auth.onAuthStateChanged(user => {
       const navAuth = document.getElementById('nav-auth');
-      if (user) navAuth.innerHTML = '<button class="nav-btn" onclick="auth.signOut()">' + (user.displayName || 'Agent') + ' (Sign Out)</button>';
+      if (user) {
+        navAuth.innerHTML =
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' +
+            '<button class="nav-btn" onclick="changeUsername()" title="Click to change your username">' + (user.displayName || 'Agent') + '</button>' +
+            '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
+          '</div>';
+      }
       else navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     });
   });

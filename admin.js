@@ -36,7 +36,11 @@ auth.onAuthStateChanged(async user => {
   document.getElementById('admin-info').innerHTML =
     `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Clearance: <span style="color:var(--red-b);text-transform:uppercase">${role}</span> (Level ${clearanceLevel})
      <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
-  document.getElementById('nav-auth').innerHTML = `<button class="nav-btn" onclick="auth.signOut()">${displayLabel} (Sign Out)</button>`;
+  document.getElementById('nav-auth').innerHTML =
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' +
+      '<button class="nav-btn" onclick="changeUsername()" title="Click to change your username">' + displayLabel + '</button>' +
+      '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
+    '</div>';
 
   document.getElementById('tab-users').classList.remove('hidden'); // allow admins to see the list
 

@@ -260,7 +260,11 @@ async function updateAuthUI(user) {
     currentUser = user;
     currentRole = resolveRole(user.email);
     const displayLabel = user.displayName || 'Agent';
-    navAuth.innerHTML = '<button class="nav-btn" onclick="auth.signOut()">' + displayLabel + ' (Sign Out)</button>';
+    navAuth.innerHTML =
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' +
+        '<button class="nav-btn" onclick="changeUsername()" title="Click to change your username">' + displayLabel + '</button>' +
+        '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
+      '</div>';
     if (submitLink) submitLink.classList.remove('hidden');
     if (isAdmin(user.email)) adminLink.classList.remove('hidden');
     else adminLink.classList.add('hidden');

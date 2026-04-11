@@ -192,7 +192,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const navAuth = document.getElementById('nav-auth');
     if (user) {
       const displayLabel = user.displayName || 'Agent';
-      navAuth.innerHTML = '<button class="nav-btn" onclick="auth.signOut()">' + displayLabel + ' (Sign Out)</button>';
+      navAuth.innerHTML =
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' +
+          '<button class="nav-btn" onclick="changeUsername()" title="Click to change your username">' + displayLabel + '</button>' +
+          '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
+        '</div>';
       
       // Inject admin actions
       let actionsDiv = document.getElementById('pv-actions');
