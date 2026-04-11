@@ -51,8 +51,12 @@ service cloud.firestore {
     // ── Pages (Anomalies, Tales, etc.) ────────────────────
     match /pages/{pageId} {
       allow read: if true; // Public wiki
-      allow create, update: if isModerator();
-      allow delete: if isAdmin();
+      allow create: if isOwner() ||
+        (isModerator() && request.resource.data.type != 'Guide');
+      allow update: if isOwner() ||
+        (isModerator() && resource.data.type != 'Guide' && request.resource.data.type != 'Guide');
+      allow delete: if isOwner() ||
+        (isAdmin() && resource.data.type != 'Guide');
     }
 
     // ── Submissions (User-created pages pending review) ───

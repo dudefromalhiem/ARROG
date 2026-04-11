@@ -8,20 +8,27 @@
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .doc-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .doc-toolbar {
+      display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;
+      position: sticky; top: 8px; z-index: 4; padding: 10px;
+      background: rgba(8,8,8,0.96); border: 1px solid var(--blk-d);
+    }
     .doc-toolbar .btn { min-width:44px; }
     .doc-toolbar .fi { max-width:160px; }
     .doc-adders { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
     .doc-canvas { border:1px solid var(--blk-m); background:var(--blk-b); padding:12px; }
-    .doc-block { border:1px solid var(--blk-d); background:rgba(0,0,0,.35); margin-bottom:12px; }
+    .doc-block { border:1px solid var(--blk-d); background:rgba(0,0,0,.35); margin-bottom:12px; border-radius:4px; }
     .doc-block-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--blk-d); }
     .doc-block-actions { display:flex; gap:6px; }
+    .doc-drag-handle { cursor: grab; }
+    .doc-drag-handle:active { cursor: grabbing; }
     .doc-block-body { padding:10px; }
     .doc-editable {
       min-height:90px; border:1px solid var(--blk-m); padding:10px; background:#0d0d0d; color:var(--wht-m);
       line-height:1.7;
     }
     .doc-editable:focus { outline:1px solid var(--red-b); }
+    .doc-block:focus-within { border-color: var(--red-b); }
     .doc-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .doc-image-preview { max-width:100%; max-height:220px; display:block; margin-top:8px; border:1px solid var(--blk-m); }
     @media (max-width: 760px) { .doc-grid-2 { grid-template-columns:1fr; } }

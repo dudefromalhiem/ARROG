@@ -22,6 +22,14 @@ function canDeleteManagedContent() {
   return isAdmin(auth.currentUser?.email);
 }
 
+function isGuideType(type) {
+  return String(type || '').toLowerCase() === 'guide';
+}
+
+function canManageGuidePages() {
+  return isOwner(auth.currentUser?.email);
+}
+
 function applyTabVisibilityForRole(role) {
   const pagesTab = document.getElementById('tab-pages');
   const submissionsTab = document.getElementById('tab-submissions');
@@ -300,14 +308,18 @@ async function refreshPages() {
     }
     tbody.innerHTML = snap.docs.map(d => {
       const p = d.data();
-      const deleteBtn = canDeleteManagedContent()
+      const guideLocked = isGuideType(p.type) && !canManageGuidePages();
+      const editBtn = guideLocked
+        ? '<span style="font-size:.7rem;color:var(--wht-f)">Owner-only guide</span>'
+        : '<button class="btn btn-sm btn-s" onclick="editPage(\'' + d.id + '\')">Edit</button>';
+      const deleteBtn = canDeleteManagedContent() && !guideLocked
         ? '<button class="btn btn-sm btn-d" onclick="deletePage(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
         : '';
       return `<tr>
         <td>${p.title}</td>
         <td><span class="tag">${p.type}</span></td>
         <td>
-          <button class="btn btn-sm btn-s" onclick="editPage('${d.id}')">Edit</button>
+          ${editBtn}
           ${deleteBtn}
         </td>
       </tr>`;
@@ -326,8 +338,28 @@ async function submitPage(e) {
     cssContent: mergeWithDefaultSchemaCSS(document.getElementById('pf-css').value),
   };
   try {
-    if (id) { await db.collection('pages').doc(id).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); }
-    else { await db.collection('pages').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); }
+    if (!id && isGuideType(data.type) && !canManageGuidePages()) {
+      alert('Only the Owner can create Guide pages.');
+      return;
+    }
+
+    if (id) {
+      const existingDoc = await db.collection('pages').doc(id).get();
+      if (!existingDoc.exists) {
+        alert('Page no longer exists.');
+        return;
+      }
+
+      const existingType = existingDoc.data().type;
+      if ((isGuideType(existingType) || isGuideType(data.type)) && !canManageGuidePages()) {
+        alert('Only the Owner can edit Guide pages.');
+        return;
+      }
+
+      await db.collection('pages').doc(id).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } else {
+      await db.collection('pages').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    }
     resetPageForm();
     await refreshPages();
   } catch (err) { alert('Error: ' + err.message); }
@@ -337,6 +369,10 @@ async function editPage(id) {
   const doc = await db.collection('pages').doc(id).get();
   if (!doc.exists) return;
   const p = doc.data();
+  if (isGuideType(p.type) && !canManageGuidePages()) {
+    alert('Only the Owner can edit Guide pages.');
+    return;
+  }
   document.getElementById('pf-id').value = id;
   document.getElementById('pf-title').value = p.title || '';
   document.getElementById('pf-type').value = p.type || 'Anomaly';
@@ -352,6 +388,15 @@ async function deletePage(id) {
     alert('Only Admins and Owners can delete pages.');
     return;
   }
+
+  const doc = await db.collection('pages').doc(id).get();
+  if (!doc.exists) return;
+  const p = doc.data() || {};
+  if (isGuideType(p.type) && !canManageGuidePages()) {
+    alert('Only the Owner can delete Guide pages.');
+    return;
+  }
+
   if (!confirm('Delete this page permanently?')) return;
   try { await db.collection('pages').doc(id).delete(); await refreshPages(); }
   catch (err) { alert('Delete failed: ' + err.message); }
@@ -582,6 +627,10 @@ async function approveSubmission(id) {
     const doc = await db.collection('submissions').doc(id).get();
     if (!doc.exists) { alert('Submission not found.'); return; }
     const s = doc.data();
+    if (isGuideType(s.type) && !canManageGuidePages()) {
+      alert('Only the Owner can approve Guide submissions.');
+      return;
+    }
     const reviewer = auth.currentUser;
 
     // Generate slug if not present

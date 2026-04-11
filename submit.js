@@ -11,6 +11,7 @@ let currentTemplate = 'anomaly'; // 'anomaly' | 'tale' | 'artwork' | 'guide'
 let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
 let docBlocks = [];
 let activeDocEditable = null;
+let docDragIndex = -1;
 const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
@@ -257,8 +258,10 @@ function renderDocBlocks() {
     const head = '<div class="doc-block-head"><strong style="font-size:.8rem;color:var(--wht-b);text-transform:uppercase;letter-spacing:1px">' +
       escapeHtml(block.type) +
       '</strong><div class="doc-block-actions">' +
+      '<button class="btn btn-sm btn-s doc-drag-handle" draggable="true" type="button" title="Drag to move" data-action="drag" data-index="' + idx + '">↕</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="up" data-index="' + idx + '">↑</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="down" data-index="' + idx + '">↓</button>' +
+      '<button class="btn btn-sm btn-s" type="button" data-action="duplicate" data-index="' + idx + '">Clone</button>' +
       '<button class="btn btn-sm btn-d" type="button" data-action="delete" data-index="' + idx + '">Delete</button>' +
       '</div></div>';
 
@@ -290,6 +293,22 @@ function renderDocBlocks() {
   }).join('');
 }
 
+function updateDocImagePreviewInBlock(blockEl, url) {
+  if (!blockEl) return;
+  let img = blockEl.querySelector('.doc-image-preview');
+  if (!url) {
+    if (img) img.remove();
+    return;
+  }
+  if (!img) {
+    img = document.createElement('img');
+    img.className = 'doc-image-preview';
+    img.alt = 'Selected';
+    blockEl.querySelector('.doc-block-body').appendChild(img);
+  }
+  img.src = url;
+}
+
 function moveDocBlock(index, delta) {
   const next = index + delta;
   if (next < 0 || next >= docBlocks.length) return;
@@ -302,6 +321,14 @@ function moveDocBlock(index, delta) {
 
 function removeDocBlock(index) {
   docBlocks.splice(index, 1);
+  renderDocBlocks();
+  schedulePreview();
+}
+
+function duplicateDocBlock(index) {
+  if (index < 0 || index >= docBlocks.length) return;
+  const copy = JSON.parse(JSON.stringify(docBlocks[index]));
+  docBlocks.splice(index + 1, 0, copy);
   renderDocBlocks();
   schedulePreview();
 }
@@ -379,7 +406,50 @@ function initDocumentStudio() {
     const action = actionBtn.getAttribute('data-action');
     if (action === 'up') moveDocBlock(index, -1);
     if (action === 'down') moveDocBlock(index, 1);
+    if (action === 'duplicate') duplicateDocBlock(index);
     if (action === 'delete') removeDocBlock(index);
+  });
+
+  holder.addEventListener('dragstart', e => {
+    const handle = e.target.closest('.doc-drag-handle');
+    if (!handle) return;
+    const block = handle.closest('.doc-block');
+    if (!block) return;
+    docDragIndex = Number(block.getAttribute('data-index'));
+    if (Number.isFinite(docDragIndex)) {
+      e.dataTransfer.effectAllowed = 'move';
+      block.style.opacity = '0.45';
+    }
+  });
+
+  holder.addEventListener('dragend', e => {
+    const block = e.target.closest('.doc-block');
+    if (block) block.style.opacity = '1';
+    docDragIndex = -1;
+    holder.querySelectorAll('.doc-block').forEach(el => el.style.borderColor = '');
+  });
+
+  holder.addEventListener('dragover', e => {
+    e.preventDefault();
+    const targetBlock = e.target.closest('.doc-block');
+    if (!targetBlock) return;
+    holder.querySelectorAll('.doc-block').forEach(el => el.style.borderColor = '');
+    targetBlock.style.borderColor = 'var(--red-b)';
+  });
+
+  holder.addEventListener('drop', e => {
+    e.preventDefault();
+    const targetBlock = e.target.closest('.doc-block');
+    if (!targetBlock || !Number.isFinite(docDragIndex) || docDragIndex < 0) return;
+
+    const targetIndex = Number(targetBlock.getAttribute('data-index'));
+    if (!Number.isFinite(targetIndex) || targetIndex === docDragIndex) return;
+
+    const moved = docBlocks.splice(docDragIndex, 1)[0];
+    const insertAt = docDragIndex < targetIndex ? targetIndex : targetIndex;
+    docBlocks.splice(insertAt, 0, moved);
+    renderDocBlocks();
+    schedulePreview();
   });
 
   function handleBlockValueChange(target) {
@@ -396,14 +466,14 @@ function initDocumentStudio() {
     const value = target.value;
     if (field === 'uploadSelect') {
       docBlocks[index].url = value;
-      renderDocBlocks();
+      updateDocImagePreviewInBlock(target.closest('.doc-block'), value);
       schedulePreview();
       return;
     }
 
     if (field === 'url') {
       docBlocks[index][field] = value;
-      renderDocBlocks();
+      updateDocImagePreviewInBlock(target.closest('.doc-block'), value);
       schedulePreview();
       return;
     }
