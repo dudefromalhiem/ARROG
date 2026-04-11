@@ -487,7 +487,6 @@ function buildGuideTemplate() {
 document.addEventListener('DOMContentLoaded', () => {
   const zone = document.getElementById('upload-zone');
   const input = document.getElementById('img-input');
-    zone.addEventListener('click', () => input.click());
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
   zone.addEventListener('drop', e => {

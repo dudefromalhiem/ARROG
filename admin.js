@@ -4,6 +4,7 @@
  * ═══════════════════════════════════════════════════════════════ */
 
 let activeTab = 'pages';
+let adminArtworkUploadUrl = '';
 
 // ── Auth Gate ─────────────────────────────────────────────────
 auth.onAuthStateChanged(async user => {
@@ -476,6 +477,19 @@ async function loadArtworks(container) {
         <div class="fg"><label class="fl">Title</label><input class="fi" id="af-title" required /></div>
         <div class="fg"><label class="fl">Image URL</label><input class="fi" id="af-url" required /></div>
       </div>
+      <div class="fg" style="margin-bottom:12px">
+        <label class="fl">Or Upload Image File</label>
+        <div class="upload-zone" id="af-upload-zone">
+          <input type="file" id="af-file" accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif" />
+          <div class="uz-icon">⬆</div>
+          <div class="uz-text">Click or drag image here to upload</div>
+          <div class="uz-hint">PNG, JPG, GIF, WebP, HEIC, HEIF - 5MB max</div>
+        </div>
+        <div class="upload-progress" id="af-upload-progress">
+          <div class="upload-progress-bar" id="af-upload-bar"></div>
+        </div>
+        <div class="img-list" id="af-uploaded"></div>
+      </div>
       <div class="fg"><label style="font-size:.8rem;color:var(--wht-d);cursor:pointer"><input type="checkbox" id="af-spot" checked style="margin-right:8px" /> Display in Art Spotlight</label></div>
       <input type="hidden" id="af-id" />
       <button type="submit" class="btn btn-p" id="af-btn">&gt;&gt; Add Artwork</button>
@@ -483,7 +497,131 @@ async function loadArtworks(container) {
     <table class="adm-tbl"><thead><tr><th>Title</th><th>Spotlight</th><th>Actions</th></tr></thead><tbody id="art-tbody"></tbody></table>
   `;
   document.getElementById('art-form').addEventListener('submit', submitArt);
+  bindArtworkUploadControls();
   await refreshArt();
+}
+
+function bindArtworkUploadControls() {
+  const zone = document.getElementById('af-upload-zone');
+  const input = document.getElementById('af-file');
+  if (!zone || !input) return;
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    handleAdminArtworkFiles(e.dataTransfer.files);
+  });
+
+  input.addEventListener('change', e => {
+    handleAdminArtworkFiles(e.target.files);
+    input.value = '';
+  });
+
+  const urlInput = document.getElementById('af-url');
+  if (urlInput) {
+    urlInput.addEventListener('input', () => {
+      if (urlInput.value.trim()) {
+        adminArtworkUploadUrl = urlInput.value.trim();
+        renderAdminArtworkUploadPreview();
+      }
+    });
+  }
+}
+
+function handleAdminArtworkFiles(files) {
+  if (!files || !files.length) return;
+  const file = files[0];
+
+  if (!file.type.startsWith('image/')) {
+    alert('Only image files are allowed.');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    alert('File too large (max 5MB).');
+    return;
+  }
+
+  uploadAdminArtworkFile(file);
+}
+
+async function uploadAdminArtworkFile(file, attempt = 1) {
+  const progressWrap = document.getElementById('af-upload-progress');
+  const progressBar = document.getElementById('af-upload-bar');
+  if (!progressWrap || !progressBar) return;
+
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = 'artworks/' + Date.now() + '_' + safeName;
+  let ref;
+
+  try {
+    ref = getStorageRef(path);
+  } catch (initErr) {
+    alert('Upload unavailable: ' + (initErr.message || initErr));
+    progressWrap.style.display = 'none';
+    return;
+  }
+
+  try {
+    const task = ref.put(file);
+    task.on('state_changed',
+      snap => {
+        const pct = (snap.bytesTransferred / snap.totalBytes) * 100;
+        progressBar.style.width = pct + '%';
+      },
+      err => {
+        const code = err && err.code ? err.code : '';
+        if ((code === 'storage/retry-limit-exceeded' || code === 'storage/invalid-default-bucket' || code === 'storage/bucket-not-found') && attempt < 2) {
+          progressBar.style.width = '0%';
+          uploadAdminArtworkFile(file, attempt + 1);
+          return;
+        }
+        if (code === 'storage/unauthorized') {
+          alert('Upload denied by Firebase Storage rules. Admin/Owner role is required for /artworks uploads.');
+        } else {
+          alert('Upload failed: ' + (err.message || code || 'Unknown storage error'));
+        }
+        progressWrap.style.display = 'none';
+      },
+      async () => {
+        const url = await ref.getDownloadURL();
+        adminArtworkUploadUrl = url;
+        document.getElementById('af-url').value = url;
+        renderAdminArtworkUploadPreview();
+        progressWrap.style.display = 'none';
+      }
+    );
+  } catch (err) {
+    alert('Upload error: ' + err.message);
+    progressWrap.style.display = 'none';
+  }
+}
+
+function renderAdminArtworkUploadPreview() {
+  const holder = document.getElementById('af-uploaded');
+  if (!holder) return;
+
+  if (!adminArtworkUploadUrl) {
+    holder.innerHTML = '';
+    return;
+  }
+
+  holder.innerHTML = '<div class="img-item">' +
+    '<img src="' + adminArtworkUploadUrl + '" alt="Uploaded artwork" />' +
+    '<span class="img-url" title="' + adminArtworkUploadUrl + '">Selected artwork image</span>' +
+    '<button type="button" class="btn btn-sm btn-s" onclick="clearAdminArtworkUpload()">Remove</button>' +
+  '</div>';
+}
+
+function clearAdminArtworkUpload() {
+  adminArtworkUploadUrl = '';
+  const urlInput = document.getElementById('af-url');
+  if (urlInput) urlInput.value = '';
+  renderAdminArtworkUploadPreview();
 }
 
 async function refreshArt() {
@@ -504,11 +642,19 @@ async function refreshArt() {
 async function submitArt(e) {
   e.preventDefault();
   const id = document.getElementById('af-id').value;
-  const data = { title: document.getElementById('af-title').value, imageUrl: document.getElementById('af-url').value, displayInSpotlight: document.getElementById('af-spot').checked };
+  const imageUrl = document.getElementById('af-url').value.trim();
+  if (!imageUrl) {
+    alert('Provide an image URL or upload an image file.');
+    return;
+  }
+  const data = { title: document.getElementById('af-title').value, imageUrl: imageUrl, displayInSpotlight: document.getElementById('af-spot').checked };
   try {
     if (id) await db.collection('artworks').doc(id).update(data);
     else await db.collection('artworks').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    document.getElementById('art-form').reset(); document.getElementById('af-id').value = '';
+    document.getElementById('art-form').reset();
+    document.getElementById('af-id').value = '';
+    document.getElementById('af-btn').textContent = '>> Add Artwork';
+    clearAdminArtworkUpload();
     await refreshArt();
   } catch (err) { alert('Error: ' + err.message); }
 }
@@ -520,6 +666,8 @@ async function editArt(id) {
   document.getElementById('af-id').value = id;
   document.getElementById('af-title').value = a.title || '';
   document.getElementById('af-url').value = a.imageUrl || '';
+  adminArtworkUploadUrl = a.imageUrl || '';
+  renderAdminArtworkUploadPreview();
   document.getElementById('af-spot').checked = !!a.displayInSpotlight;
   document.getElementById('af-btn').textContent = '>> Update Artwork';
 }
