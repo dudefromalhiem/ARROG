@@ -74,7 +74,7 @@
     </ul>
     <p class="ftr-copy">
       &copy; 2026 Red Oaker Guild — All rights reserved.<br>
-      <span style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-4 CLEARANCE REQUIRED</span>
+      <span style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-2 CLEARANCE REQUIRED</span>
     </p>
   </div>
 </footer>
@@ -210,7 +210,17 @@ function showError() {
 }
 
 function buildPageDocument(html, css) {
-  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.7;padding:24px;color:#222;background:#fff}img{max-width:100%;height:auto}' + css.replace(/<\/style>/gi, '') + '</style></head><body>' + html + '</body></html>';
+  const raw = (html || '').trim();
+  const wrapped = raw.includes('class="page-shell"')
+    ? raw
+    : '<div class="page-shell"><section class="page-section">' + raw + '</section></div>';
+
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
+    ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
+    '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
+    css.replace(/<\/style>/gi, '') +
+    '</style></head><body>' + wrapped + '</body></html>';
 }
 </script>
 </body>

@@ -31,8 +31,9 @@ auth.onAuthStateChanged(async user => {
   const displayLabel = user.displayName || 'Agent';
   document.getElementById('admin-denied').classList.add('hidden');
   document.getElementById('admin-panel').classList.remove('hidden');
+  const clearanceLevel = clearanceLevelForRole(role);
   document.getElementById('admin-info').innerHTML =
-    `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Clearance: <span style="color:var(--red-b);text-transform:uppercase">${role}</span>
+    `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Clearance: <span style="color:var(--red-b);text-transform:uppercase">${role}</span> (Level ${clearanceLevel})
      <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
   document.getElementById('nav-auth').innerHTML = `<button class="nav-btn" onclick="auth.signOut()">${displayLabel} (Sign Out)</button>`;
 
@@ -167,6 +168,7 @@ async function loadPages(container) {
     <table class="adm-tbl"><thead><tr><th>Title</th><th>Type</th><th>Actions</th></tr></thead><tbody id="pages-tbody"></tbody></table>
   `;
   document.getElementById('page-form').addEventListener('submit', submitPage);
+  resetPageForm();
   await refreshPages();
 }
 
@@ -199,8 +201,8 @@ async function submitPage(e) {
     title: document.getElementById('pf-title').value,
     type: document.getElementById('pf-type').value,
     tags: document.getElementById('pf-tags').value.split(',').map(t => t.trim()).filter(Boolean),
-    htmlContent: document.getElementById('pf-html').value,
-    cssContent: document.getElementById('pf-css').value,
+    htmlContent: wrapWithDefaultSchema(document.getElementById('pf-html').value),
+    cssContent: mergeWithDefaultSchemaCSS(document.getElementById('pf-css').value),
   };
   try {
     if (id) { await db.collection('pages').doc(id).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); }
@@ -233,8 +235,38 @@ async function deletePage(id) {
 function resetPageForm() {
   document.getElementById('page-form').reset();
   document.getElementById('pf-id').value = '';
+  document.getElementById('pf-html').value = defaultSchemaHTML();
+  document.getElementById('pf-css').value = defaultSchemaCSS();
   document.getElementById('pf-btn').textContent = '>> Save Page';
   document.getElementById('pf-cancel').classList.add('hidden');
+}
+
+function defaultSchemaHTML() {
+  return '<div class="page-shell">\n' +
+    '  <header class="page-header">\n' +
+    '    <h1 class="page-title">New Classified Document</h1>\n' +
+    '    <p class="page-subtitle">Clearance Level 2 // Internal Distribution</p>\n' +
+    '  </header>\n' +
+    '  <section class="page-section">\n' +
+    '    <h2>Summary</h2>\n' +
+    '    <p>Start writing the page content here.</p>\n' +
+    '  </section>\n' +
+    '</div>';
+}
+
+function defaultSchemaCSS() {
+  return '';
+}
+
+function wrapWithDefaultSchema(html) {
+  const raw = (html || '').trim();
+  if (!raw) return defaultSchemaHTML();
+  if (raw.includes('class="page-shell"')) return raw;
+  return '<div class="page-shell">\n' + raw + '\n</div>';
+}
+
+function mergeWithDefaultSchemaCSS(css) {
+  return (css || '').trim();
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -382,8 +414,8 @@ async function approveSubmission(id) {
       tags: s.tags || [],
       slug: slug,
       content: s.title, // basic content field for backward compat
-      htmlContent: s.htmlContent,
-      cssContent: s.cssContent || '',
+      htmlContent: wrapWithDefaultSchema(s.htmlContent),
+      cssContent: mergeWithDefaultSchemaCSS(s.cssContent || ''),
       imageUrls: s.imageUrls || [],
       authorUid: s.authorUid,
       authorEmail: s.authorEmail,

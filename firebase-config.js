@@ -6,7 +6,8 @@ const firebaseConfig = {
   apiKey: "AIzaSyDq8UwN7P1EDfa0IvR2-jUUgV3dHt67f3M",
   authDomain: "redoakerguild.firebaseapp.com",
   projectId: "redoakerguild",
-  storageBucket: "redoakerguild.firebasestorage.app",
+  // Use the canonical Cloud Storage bucket domain for Firebase Storage uploads.
+  storageBucket: "redoakerguild.appspot.com",
   messagingSenderId: "847903433642",
   appId: "1:847903433642:web:95a9fdddef4099ff8981d3",
   measurementId: "G-WLR20NDRQL"
@@ -17,6 +18,9 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+// Increase retry windows for slower connections and larger uploads.
+storage.setMaxUploadRetryTime(120000);
+storage.setMaxOperationRetryTime(120000);
 
 /* ═══════════════════════════════════════════════════════════════
  *  RBAC — Dynamic role resolution via Firestore (config/roles)
@@ -55,3 +59,8 @@ function resolveRole(email) {
 }
 function isAdmin(email) { const r = resolveRole(email); return r === "admin" || r === "owner"; }
 function isOwner(email) { return resolveRole(email) === "owner"; }
+function clearanceLevelForRole(role) {
+  if (role === "owner") return 5;
+  if (role === "admin") return 4;
+  return 2;
+}

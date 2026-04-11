@@ -141,12 +141,12 @@ function skipTerminal() {
 }
 
 // ═════════════════════════════════════════════════════════════
-// CLEARANCE WELCOME SCREEN (Owner = Level 5, Admin = Level 4)
+// CLEARANCE WELCOME SCREEN (User = Level 2, Admin = Level 4, Owner = Level 5)
 // ═════════════════════════════════════════════════════════════
 
 function showClearanceWelcome(role) {
   if (document.getElementById('clearance-welcome')) return;
-  const level = role === 'owner' ? 5 : 4;
+  const level = clearanceLevelForRole(role);
 
   // Inject blink keyframes once
   if (!document.getElementById('clearance-blink-style')) {
@@ -268,7 +268,9 @@ async function updateAuthUI(user) {
     db.collection('users').doc(user.uid).set({
       uid: user.uid, email: user.email,
       displayName: user.displayName || '',
-      role: currentRole, lastLogin: new Date().toISOString()
+      role: currentRole,
+      clearanceLevel: clearanceLevelForRole(currentRole),
+      lastLogin: new Date().toISOString()
     }, { merge: true }).catch(() => { });
 
     // Show clearance welcome for owner/admin if not shown yet this session

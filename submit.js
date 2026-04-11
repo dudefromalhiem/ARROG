@@ -10,6 +10,17 @@ let currentMode = 'template'; // 'template' | 'code'
 let currentTemplate = 'anomaly'; // 'anomaly' | 'tale' | 'artwork' | 'guide'
 let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
 
+const DEFAULT_NEW_PAGE_HTML = `<div class="page-shell">
+  <header class="page-header">
+    <h1 class="page-title">New Classified Document</h1>
+    <p class="page-subtitle">Clearance Level 2 // Internal Distribution</p>
+  </header>
+  <section class="page-section">
+    <h2>Summary</h2>
+    <p>Start writing the page content here.</p>
+  </section>
+</div>`;
+
 // ═════════════════════════════════════════════════════════════
 // AUTH GATE
 // ═════════════════════════════════════════════════════════════
@@ -148,6 +159,33 @@ function buildTemplateHTML() {
   if (currentTemplate === 'artwork') return buildArtworkTemplate();
   if (currentTemplate === 'guide') return buildGuideTemplate();
   return { html: '', css: '' };
+}
+
+function wrapWithDefaultSchema(html, title) {
+  const raw = (html || '').trim();
+  const safeTitle = escapeHtml((title || '').trim() || 'New Classified Document');
+  if (!raw) {
+    return DEFAULT_NEW_PAGE_HTML.replace('New Classified Document', safeTitle);
+  }
+  if (raw.includes('class="page-shell"')) return raw;
+  return '<div class="page-shell">\n' +
+    '  <header class="page-header">\n' +
+    '    <h1 class="page-title">' + safeTitle + '</h1>\n' +
+    '    <p class="page-subtitle">Clearance Level 2 // Internal Distribution</p>\n' +
+    '  </header>\n' + raw + '\n</div>';
+}
+
+function mergeWithDefaultSchemaCSS(css) {
+  return (css || '').trim();
+}
+
+function buildSandboxDocument(html, css) {
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
+    ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--wht-d:#999;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
+    '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
+    css.replace(/<\/style>/gi, '') +
+    '</style></head><body>' + html + '</body></html>';
 }
 
 function escapeHtml(text) {
@@ -500,6 +538,11 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('input', schedulePreview);
     el.addEventListener('change', schedulePreview);
   });
+
+  document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
+  document.getElementById('sf-css').value = '';
+  updateSlugPreview();
+  updatePreview();
 });
 
 function handleFiles(files) {
@@ -516,7 +559,7 @@ function handleFiles(files) {
   });
 }
 
-async function uploadImage(file) {
+async function uploadImage(file, attempt = 1) {
   if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
 
   const progressWrap = document.getElementById('upload-progress');
@@ -537,6 +580,11 @@ async function uploadImage(file) {
         progressBar.style.width = pct + '%';
       },
       err => {
+        if (err && err.code === 'storage/retry-limit-exceeded' && attempt < 2) {
+          progressBar.style.width = '0%';
+          uploadImage(file, attempt + 1);
+          return;
+        }
         alert('Upload failed: ' + err.message);
         progressWrap.style.display = 'none';
       },
@@ -632,7 +680,8 @@ function updatePreview() {
 
   const frame = document.getElementById('preview-frame');
   const sanitized = sanitizeHTML(html);
-  const doc = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.7;padding:24px;color:#222;background:#fff}img{max-width:100%;height:auto}' + css.replace(/<\/style>/gi, '') + '</style></head><body>' + sanitized + '</body></html>';
+  const wrappedHtml = wrapWithDefaultSchema(sanitized, document.getElementById('sf-title').value || 'New Classified Document');
+  const doc = buildSandboxDocument(wrappedHtml, mergeWithDefaultSchemaCSS(css));
   frame.srcdoc = doc;
 }
 
@@ -719,6 +768,8 @@ async function submitPage() {
   btn.textContent = 'Submitting...';
 
   const sanitizedHTML = sanitizeHTML(htmlContent);
+  const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title);
+  const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
 
   const submission = {
     title: title,
@@ -726,8 +777,8 @@ async function submitPage() {
     type: type,
     tags: tags,
     slug: slug,
-    htmlContent: sanitizedHTML,
-    cssContent: cssContent,
+    htmlContent: wrappedHTML,
+    cssContent: mergedCSS,
     imageUrls: uploadedImages.map(img => img.url),
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
@@ -754,7 +805,7 @@ function resetSubmitForm() {
   document.getElementById('sf-type').value = 'Anomaly';
   document.getElementById('sf-tags').value = '';
   document.getElementById('sf-slug').value = '';
-  document.getElementById('sf-html').value = '';
+  document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
   document.getElementById('sf-css').value = '';
 
   // Reset template fields
