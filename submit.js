@@ -1085,19 +1085,21 @@ async function loadMySubmissions() {
   const container = document.getElementById('my-submissions');
 
   try {
-    const snap = await db.collection('submissions')
-      .where('authorUid', '==', currentUserForSubmit.uid)
-      .orderBy('submittedAt', 'desc')
-      .limit(20)
-      .get();
+    const snap = await db.collection('submissions').get();
+    const submissions = snap.docs
+      .map(doc => ({ id: doc.id, data: doc.data() }))
+      .filter(entry => entry.data.authorUid === currentUserForSubmit.uid)
+      .sort((a, b) => (b.data.submittedAt?.seconds || 0) - (a.data.submittedAt?.seconds || 0))
+      .slice(0, 20);
 
-    if (snap.empty) {
+    if (submissions.length === 0) {
       container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">No submissions yet. Create your first page above!</p>';
       return;
     }
 
-    container.innerHTML = snap.docs.map(d => {
-      const s = d.data();
+    container.innerHTML = submissions.map(entry => {
+      const d = entry;
+      const s = entry.data;
       const statusClass = 'status status-' + s.status;
       const date = s.submittedAt ? new Date(s.submittedAt.seconds * 1000).toLocaleDateString() : '—';
       const slug = s.slug || '';
