@@ -89,10 +89,19 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .nav-btn{font-family:var(--font-m);font-size:.75rem;padding:4px 16px;border:1px solid var(--red-d);background:transparent;color:var(--red-b);cursor:pointer;text-transform:uppercase;letter-spacing:1px;transition:all var(--tr)}
 .nav-btn:hover{background:var(--red);color:var(--wht)}
 .nav-toggle{display:none;background:none;border:none;color:var(--red-b);font-size:1.5rem;cursor:pointer}
+.user-menu{position:relative;display:inline-block}
+.user-menu-trigger{display:inline-flex;align-items:center;gap:6px}
+.user-menu-caret{font-size:.65rem;line-height:1;opacity:.8}
+.user-menu-panel{position:absolute;top:calc(100% + 8px);right:0;min-width:180px;background:var(--blk-s);border:1px solid var(--red-d);box-shadow:0 8px 24px rgba(0,0,0,.35);padding:6px;display:none;z-index:250}
+.user-menu.open .user-menu-panel{display:block}
+.user-menu-item{display:block;width:100%;padding:10px 12px;background:transparent;border:1px solid transparent;color:var(--wht-d);font-family:var(--font-m);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;text-align:left;cursor:pointer;transition:all var(--tr)}
+.user-menu-item:hover{background:var(--red);color:var(--wht);border-color:var(--red)}
 @media(max-width:768px){
   .nav-toggle{display:block}
   .nav{display:none;position:absolute;top:100%;left:0;width:100%;background:var(--blk-s);flex-direction:column;padding:16px;border-bottom:2px solid var(--red)}
   .nav.open{display:flex}
+  .user-menu{width:100%}
+  .user-menu-panel{position:static;min-width:0;margin-top:8px;width:100%}
 }
 
 /* Footer */

@@ -78,6 +78,45 @@ async function changeUsername() {
   }
 }
 
+function renderUserMenuHTML(displayLabel) {
+  const safeLabel = String(displayLabel || 'Agent').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `
+    <div class="user-menu" data-user-menu>
+      <button class="nav-btn user-menu-trigger" type="button" onclick="toggleUserMenu(this, event)" aria-haspopup="true" aria-expanded="false">
+        <span class="user-menu-label">${safeLabel}</span>
+        <span class="user-menu-caret">▾</span>
+      </button>
+      <div class="user-menu-panel" role="menu" aria-label="User menu">
+        <button class="user-menu-item" type="button" role="menuitem" onclick="changeUsername(); closeUserMenus();">Change Username</button>
+        <button class="user-menu-item" type="button" role="menuitem" onclick="auth.signOut(); closeUserMenus();">Log Out</button>
+      </div>
+    </div>`;
+}
+
+function closeUserMenus() {
+  document.querySelectorAll('[data-user-menu].open').forEach(menu => {
+    menu.classList.remove('open');
+    const trigger = menu.querySelector('.user-menu-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toggleUserMenu(trigger, event) {
+  if (event) event.stopPropagation();
+  const menu = trigger && trigger.closest('[data-user-menu]');
+  if (!menu) return;
+  const shouldOpen = !menu.classList.contains('open');
+  closeUserMenus();
+  if (shouldOpen) {
+    menu.classList.add('open');
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+}
+
+document.addEventListener('click', event => {
+  if (!event.target.closest('[data-user-menu]')) closeUserMenus();
+});
+
 // Try to warm up storage when SDK is available, but keep non-upload pages functional.
 try {
   storage = ensureStorageClient();
