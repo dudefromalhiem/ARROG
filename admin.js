@@ -35,8 +35,9 @@ auth.onAuthStateChanged(async user => {
      <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
   document.getElementById('nav-auth').innerHTML = `<button class="nav-btn" onclick="auth.signOut()">${displayLabel} (Sign Out)</button>`;
 
+  document.getElementById('tab-users').classList.remove('hidden'); // allow admins to see the list
+
   if (isOwner(user.email)) {
-    document.getElementById('tab-users').classList.remove('hidden');
     document.getElementById('tab-roles').classList.remove('hidden');
   }
 
@@ -252,9 +253,10 @@ async function refreshSubmissions(status) {
         const viewUrl = s.slug ? 'pages/' + s.slug : 'page.html?id=' + s.approvedPageId;
         actions += '<a href="' + viewUrl + '" class="btn btn-sm btn-s" target="_blank" style="margin-left:4px">View</a>';
       }
+      const showEmail = isOwner(auth.currentUser?.email) ? (s.authorEmail || '[Not Set]') : '[Redacted]';
       return `<tr>
         <td>${s.title}</td>
-        <td style="font-size:.75rem;color:var(--wht-d)">${s.authorName || 'Unknown Agent'}</td>
+        <td style="font-size:.75rem;color:var(--wht-d)">${s.authorName || 'Unknown Agent'}<br><span style="font-family:monospace;color:var(--red-b)">${showEmail}</span></td>
         <td><span class="tag">${s.type}</span></td>
         <td><span class="${statusClass}">${s.status}</span></td>
         <td>${actions}</td>
@@ -286,6 +288,7 @@ async function previewSubmission(id) {
         <div class="review-modal-meta">
           <dl>
             <dt>Author</dt><dd>${s.authorName || 'Unknown Agent'}</dd>
+            <dt>Email</dt><dd>${isOwner(auth.currentUser?.email) ? (s.authorEmail || '[Not Set]') : '[Redacted]'}</dd>
             <dt>Type</dt><dd>${s.type}</dd>
             <dt>Tags</dt><dd>${(s.tags || []).join(', ') || 'None'}</dd>
             <dt>Status</dt><dd><span class="status status-${s.status}">${s.status}</span></dd>
@@ -526,15 +529,10 @@ async function deleteNews(id) {
 // ═════════════════════════════════════════════════════════════
 
 async function loadUsers(container) {
-  const user = auth.currentUser;
-  if (!isOwner(user?.email)) {
-    container.innerHTML = '<p style="color:var(--red-b)">⚠ Role modifications require Owner clearance.</p>';
-    return;
-  }
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Registered Users</h3>
-    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">All accounts that have signed into the Guild. Manage admin access in the Roles tab.</p>
-    <table class="adm-tbl"><thead><tr><th>Display Name</th><th>Role</th><th>Last Login</th></tr></thead><tbody id="users-tbody"></tbody></table>
+    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">All accounts that have signed into the Guild. Owners may see email addresses; Admins see [Redacted]. Manage admin access in the Roles tab.</p>
+    <table class="adm-tbl"><thead><tr><th>Display Name</th><th>Email</th><th>Role</th><th>Last Login</th></tr></thead><tbody id="users-tbody"></tbody></table>
   `;
   await refreshUsers();
 }
@@ -546,7 +544,8 @@ async function refreshUsers() {
     if (snap.empty) { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>'; return; }
     tbody.innerHTML = snap.docs.map(d => {
       const u = d.data();
-      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td><span class="tag">${u.role}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
+      const showEmail = isOwner(auth.currentUser?.email) ? (u.email || '[Not Set]') : '[Redacted]';
+      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${u.role}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
     }).join('');
   } catch { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
 }
