@@ -70,9 +70,13 @@ async function getUserAdminFlag(user) {
   if (!user) return false;
   try {
     const doc = await db.collection('users').doc(user.uid).get();
-    return !!(doc.exists && doc.data() && doc.data().isAdmin === true);
+    if (doc.exists && doc.data() && doc.data().isAdmin === true) {
+      return true;
+    }
+    // Owner fallback prevents lockout if the isAdmin flag has not been seeded yet.
+    return isOwner(user.email) || isAdmin(user.email);
   } catch (_err) {
-    return false;
+    return isOwner(user.email) || isAdmin(user.email);
   }
 }
 

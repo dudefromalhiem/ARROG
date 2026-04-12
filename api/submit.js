@@ -75,9 +75,21 @@ async function verifyUser(req) {
   return { uid, email: String(decoded.email || ''), name: String(decoded.name || decoded.displayName || '') };
 }
 
-async function isAdminUser(db, uid) {
+const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem@gmail.com']);
+
+async function isAdminUser(db, uid, email) {
+  const normalizedEmail = String(email || '').toLowerCase();
+  if (BOOTSTRAP_OWNERS.has(normalizedEmail)) return true;
+
   const userDoc = await db.collection('users').doc(uid).get();
-  return !!(userDoc.exists && userDoc.data() && userDoc.data().isAdmin === true);
+  if (userDoc.exists && userDoc.data() && userDoc.data().isAdmin === true) {
+    return true;
+  }
+
+  const rolesDoc = await db.collection('config').doc('roles').get();
+  if (!rolesDoc.exists) return false;
+  const owners = Array.isArray(rolesDoc.data()?.owners) ? rolesDoc.data().owners : [];
+  return owners.map(owner => String(owner || '').toLowerCase()).includes(normalizedEmail);
 }
 
 function stripUndefined(data) {
@@ -212,7 +224,7 @@ module.exports = async function handler(req, res) {
           return sendJson(res, 404, { error: 'Submission not found.' });
         }
         const data = doc.data() || {};
-        const adminAccess = await isAdminUser(db, actor.uid);
+        const adminAccess = await isAdminUser(db, actor.uid, actor.email);
         if (!adminAccess && data.authorUid !== actor.uid) {
           return sendJson(res, 403, { error: 'Forbidden.' });
         }
@@ -235,7 +247,7 @@ module.exports = async function handler(req, res) {
       if (!doc.exists) return sendJson(res, 404, { error: 'Submission not found.' });
 
       const data = doc.data() || {};
-      const adminAccess = await isAdminUser(db, actor.uid);
+      const adminAccess = await isAdminUser(db, actor.uid, actor.email);
       if (!adminAccess && data.authorUid !== actor.uid) {
         return sendJson(res, 403, { error: 'Forbidden.' });
       }
@@ -252,7 +264,7 @@ module.exports = async function handler(req, res) {
     const action = String(body.action || 'submit').trim();
     const submissionId = String(body.submissionId || body.id || '').trim();
     const submissionRef = submissionId ? db.collection('submissions').doc(submissionId) : db.collection('submissions').doc();
-    const adminAccess = await isAdminUser(db, actor.uid);
+    const adminAccess = await isAdminUser(db, actor.uid, actor.email);
 
     if (action === 'draft') {
       const payload = buildSubmissionPayload(body, actor);

@@ -6,10 +6,27 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isAdminUser() {
+    function isBootstrapOwner() {
+      return isSignedIn() && (
+        request.auth.token.email == 'jaimejoselaureano@gmail.com' ||
+        request.auth.token.email == 'dudefromalhiem@gmail.com'
+      );
+    }
+
+    function isOwnerFromRolesDoc() {
       return isSignedIn() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+        exists(/databases/$(database)/documents/config/roles) &&
+        ('owners' in get(/databases/$(database)/documents/config/roles).data) &&
+        request.auth.token.email in get(/databases/$(database)/documents/config/roles).data.owners;
+    }
+
+    function isAdminUser() {
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true) ||
+        isBootstrapOwner() ||
+        isOwnerFromRolesDoc()
+      );
     }
 
     function isSelf(userId) {
