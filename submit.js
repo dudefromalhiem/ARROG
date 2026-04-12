@@ -465,7 +465,7 @@ function buildTemplateHTML() {
 function createDocBlock(type) {
   if (type === 'title') return { type: 'title', text: '' };
   if (type === 'text') return { type: 'text', html: '' };
-  if (type === 'image') return { type: 'image', url: '', caption: '', align: 'center', width: '100' };
+  if (type === 'image') return { type: 'image', url: '', caption: '', align: 'center', width: '' };
   if (type === 'quote') return { type: 'quote', text: '', source: '' };
   if (type === 'list') return { type: 'list', items: '' };
   if (type === 'code') return { type: 'code', code: '' };
@@ -491,6 +491,20 @@ function isValidImageSrc(src) {
   const value = String(src || '').trim();
   if (!value) return false;
   return /^(data:image\/(png|jpeg|gif|webp|bmp|svg\+xml);base64,|https?:\/\/|\/)/i.test(value);
+}
+
+function normalizeImageWidthValue(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^\d+(?:\.\d+)?%$/.test(raw) || /^\d+(?:\.\d+)?px$/.test(raw)) return raw;
+  if (/^\d+(?:\.\d+)?$/.test(raw)) return raw + '%';
+  return '';
+}
+
+function buildImageRenderStyle(widthValue) {
+  const width = normalizeImageWidthValue(widthValue);
+  if (width) return 'width:' + width + ';max-width:100%;height:auto;display:block;';
+  return 'width:auto;max-width:100%;height:auto;display:block;';
 }
 
 function htmlBlockToPlainText(html) {
@@ -541,12 +555,15 @@ function renderDocBlocks() {
     } else if (block.type === 'text') {
       body = '<div class="doc-editable" contenteditable="true" data-field="html" data-index="' + idx + '">' + (block.html || '') + '</div>';
     } else if (block.type === 'image') {
-      const imageSrc = block.url ? '<img class="doc-image-preview" src="' + escapeAttr(block.url) + '" alt="Selected" />' : '';
+      const imageSrc = block.url && isValidImageSrc(block.url)
+        ? '<img class="doc-image-preview" src="' + escapeAttr(block.url) + '" alt="Selected" style="' + buildImageRenderStyle(block.width) + '" />'
+        : '';
       body = '<div class="doc-grid-2">' +
         '<div><label class="fl">Uploaded Images</label><select class="fi" data-field="uploadSelect" data-index="' + idx + '">' + getUploadedImageOptions(block.url || '') + '</select></div>' +
         '<div><label class="fl">Image URL</label><input class="fi" data-field="url" data-index="' + idx + '" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
         '<div><label class="fl">Caption</label><input class="fi" data-field="caption" data-index="' + idx + '" value="' + escapeAttr(block.caption || '') + '" placeholder="Optional caption" /></div>' +
         '<div><label class="fl">Alignment</label><select class="fi" data-field="align" data-index="' + idx + '"><option value="left"' + (block.align === 'left' ? ' selected' : '') + '>Left</option><option value="center"' + (block.align !== 'left' && block.align !== 'right' ? ' selected' : '') + '>Center</option><option value="right"' + (block.align === 'right' ? ' selected' : '') + '>Right</option></select></div>' +
+        '<div><label class="fl">Image Width</label><input class="fi" data-field="width" data-index="' + idx + '" value="' + escapeAttr(block.width || '') + '" placeholder="auto, 80%, 420px" /></div>' +
       '</div>' + imageSrc;
     } else if (block.type === 'quote') {
       body = '<textarea class="fta" data-field="text" data-index="' + idx + '" placeholder="Quote text">' + escapeHtml(block.text || '') + '</textarea>' +
@@ -566,6 +583,8 @@ function renderDocBlocks() {
 function updateDocImagePreviewInBlock(blockEl, url) {
   if (!blockEl) return;
   let img = blockEl.querySelector('.doc-image-preview');
+  const index = Number(blockEl.getAttribute('data-index'));
+  const block = Number.isFinite(index) ? docBlocks[index] : null;
   if (!url) {
     if (img) img.remove();
     return;
@@ -577,6 +596,7 @@ function updateDocImagePreviewInBlock(blockEl, url) {
     blockEl.querySelector('.doc-block-body').appendChild(img);
   }
   img.src = url;
+  img.style.cssText = buildImageRenderStyle(block && block.width);
 }
 
 function moveDocBlock(index, delta) {
@@ -750,6 +770,13 @@ function initDocumentStudio() {
 
     if (field === 'align') {
       docBlocks[index][field] = value;
+      schedulePreview();
+      return;
+    }
+
+    if (field === 'width') {
+      docBlocks[index][field] = normalizeImageWidthValue(value);
+      renderDocBlocks();
       schedulePreview();
       return;
     } else {
@@ -1702,7 +1729,7 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
       urls.map((url, idx) =>
         '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
-          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" style="display:block;width:100%;height:180px;object-fit:cover;border:1px solid #3a3a3a;background:#111" />' +
+          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />' +
         '</a>'
       ).join('') +
     '</div>' +
