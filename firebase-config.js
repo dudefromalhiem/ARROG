@@ -119,11 +119,8 @@ function normalizeNavIA() {
   const authLi = nav.querySelector('#nav-auth');
 
   const primary = [
-    { href: 'index.html', label: 'Home' },
     { href: 'explore.html', label: 'Explore' },
-    { href: 'registry.html', label: 'Registry' },
-    { href: 'guide.html', label: 'Guide' },
-    { href: 'archives.html', label: 'Archives' }
+    { href: 'guide.html', label: 'Guide' }
   ];
 
   nav.innerHTML = '';
