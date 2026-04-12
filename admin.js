@@ -129,7 +129,7 @@ function applyTabVisibilityForRole(role, hasAdminAccess = false) {
 }
 
 // ── Auth Gate ─────────────────────────────────────────────────
-function renderAdminBootstrap(user) {
+async function renderAdminBootstrap(user) {
   const adminLoading = document.getElementById('admin-loading');
   const adminDenied = document.getElementById('admin-denied');
   const adminPanel = document.getElementById('admin-panel');
@@ -195,10 +195,10 @@ auth.onAuthStateChanged(async user => {
     await rolesReady;
   }
   if (!user) {
-    renderAdminBootstrap(null);
+    await renderAdminBootstrap(null);
     return;
   }
-  renderAdminBootstrap(user);
+  await renderAdminBootstrap(user);
 });
 
 // ── Tab Switching ─────────────────────────────────────────────
