@@ -560,7 +560,7 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
       urls.map((url, idx) =>
         '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
-          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" style="display:block;width:100%;height:180px;object-fit:cover;border:1px solid #3a3a3a;background:#111" />' +
+          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" loading="lazy" decoding="async" style="display:block;width:100%;height:180px;object-fit:cover;border:1px solid #3a3a3a;background:#111" />' +
         '</a>'
       ).join('') +
     '</div>' +
@@ -674,7 +674,7 @@ async function previewSubmission(id) {
     const imagesMarkup = uploaded.length
       ? '<div class="review-upload-grid">' + uploaded.map((url, idx) =>
           '<a href="' + url + '" target="_blank" rel="noopener noreferrer" class="review-upload-item" title="Open image ' + (idx + 1) + '">' +
-            '<img src="' + url + '" alt="Uploaded image ' + (idx + 1) + '" />' +
+            '<img src="' + url + '" alt="Uploaded image ' + (idx + 1) + '" loading="lazy" decoding="async" />' +
           '</a>'
         ).join('') + '</div>'
       : '<div style="font-size:.75rem;color:var(--wht-f);margin-top:6px">No uploaded images.</div>';
@@ -988,7 +988,7 @@ function renderAdminArtworkUploadPreview() {
   }
 
   holder.innerHTML = '<div class="img-item">' +
-    '<img src="' + adminArtworkUploadUrl + '" alt="Uploaded artwork" />' +
+    '<img src="' + adminArtworkUploadUrl + '" alt="Uploaded artwork" loading="lazy" decoding="async" />' +
     '<span class="img-url" title="' + adminArtworkUploadUrl + '">Selected artwork image</span>' +
     '<button type="button" class="btn btn-sm btn-s" onclick="clearAdminArtworkUpload()">Remove</button>' +
   '</div>';
@@ -1169,7 +1169,7 @@ function renderNewsImagePreview() {
   }
 
   holder.innerHTML = '<div class="img-item">' +
-    '<img src="' + adminNewsImageUrl + '" alt="News image" />' +
+    '<img src="' + adminNewsImageUrl + '" alt="News image" loading="lazy" decoding="async" />' +
     '<span class="img-url" title="' + adminNewsImageUrl + '">Selected news image</span>' +
     '<button type="button" class="btn btn-sm btn-s" onclick="clearNewsImageUpload()">Remove</button>' +
   '</div>';
@@ -1189,7 +1189,7 @@ async function refreshNews() {
     if (snap.empty) { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No news items.</td></tr>'; return; }
     tbody.innerHTML = snap.docs.map(d => {
       const n = d.data();
-      const thumb = n.imageUrl ? '<img src="' + n.imageUrl + '" alt="News thumbnail" style="width:72px;height:48px;object-fit:cover;border:1px solid var(--blk-d);background:#111" />' : '<span style="color:var(--wht-f)">—</span>';
+      const thumb = n.imageUrl ? '<img src="' + n.imageUrl + '" alt="News thumbnail" loading="lazy" decoding="async" style="width:72px;height:48px;object-fit:cover;border:1px solid var(--blk-d);background:#111" />' : '<span style="color:var(--wht-f)">—</span>';
       const deleteBtn = canDeleteManagedContent()
         ? '<button class="btn btn-sm btn-d" onclick="deleteNews(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
         : '';

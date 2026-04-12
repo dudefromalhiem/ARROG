@@ -357,7 +357,7 @@ function renderNews(items) {
     const hasImage = !!(n.imageUrl && String(n.imageUrl).trim());
     return `
     <div class="news-item" style="display:grid;grid-template-columns:${hasImage ? '180px 1fr' : '1fr'};gap:16px;align-items:start">
-      ${hasImage ? `<a href="${n.imageUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none"><img src="${n.imageUrl}" alt="${n.title}" style="width:100%;height:140px;object-fit:cover;border:1px solid var(--blk-d);background:#111" /></a>` : ''}
+      ${hasImage ? `<a href="${n.imageUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none"><img src="${n.imageUrl}" alt="${n.title}" loading="lazy" decoding="async" style="width:100%;height:140px;object-fit:cover;border:1px solid var(--blk-d);background:#111" /></a>` : ''}
       <div>
         <div class="news-dt">${n.date}</div>
         <div class="news-tt">${n.title}</div>
@@ -391,7 +391,7 @@ function initCarousel(items) {
   const track = document.getElementById('carousel-track');
   const dots = document.getElementById('carousel-dots');
   track.innerHTML = items.map(a => `
-    <div class="carousel-slide"><img src="${a.imageUrl}" alt="${a.title}" /></div>
+    <div class="carousel-slide"><img src="${a.imageUrl}" alt="${a.title}" loading="lazy" decoding="async" /></div>
   `).join('');
   dots.innerHTML = items.map((_, i) =>
     `<button class="carousel-dot ${i === 0 ? 'on' : ''}" onclick="goSlide(${i})"></button>`

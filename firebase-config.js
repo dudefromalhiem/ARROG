@@ -17,34 +17,6 @@ firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
 const db = firebase.firestore();
-let storage = null;
-
-function configureStorageClient(client) {
-  if (!client) return;
-  client.setMaxUploadRetryTime(120000);
-  client.setMaxOperationRetryTime(120000);
-}
-
-function ensureStorageClient(preferredBucket) {
-  if (typeof firebase.storage !== 'function') {
-    throw new Error('Firebase Storage SDK is not loaded on this page.');
-  }
-
-  const bucket = (preferredBucket || '').replace(/^gs:\/\//, '');
-  if (!bucket && storage) return storage;
-
-  const next = bucket ? firebase.app().storage('gs://' + bucket) : firebase.storage();
-  configureStorageClient(next);
-  if (!bucket) storage = next;
-  return next;
-}
-
-function getStorageRef(path, preferredBucket) {
-  const cleanPath = String(path || '').replace(/^\/+/, '');
-  if (!cleanPath) throw new Error('Storage path is required.');
-
-  return ensureStorageClient(preferredBucket).ref(cleanPath);
-}
 
 async function changeUsername() {
   const user = auth.currentUser;
@@ -116,13 +88,6 @@ function toggleUserMenu(trigger, event) {
 document.addEventListener('click', event => {
   if (!event.target.closest('[data-user-menu]')) closeUserMenus();
 });
-
-// Try to warm up storage when SDK is available, but keep non-upload pages functional.
-try {
-  storage = ensureStorageClient();
-} catch (e) {
-  console.warn('[Storage] Initialization skipped:', e.message || e);
-}
 
 /* ═══════════════════════════════════════════════════════════════
  *  RBAC — Dynamic role resolution via Firestore (config/roles)
