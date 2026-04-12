@@ -1,6 +1,14 @@
 {
+  "cleanUrls": true,
   "rewrites": [
-    { "source": "/pages/:slug", "destination": "/page.html" }
+    { "source": "/pages/:slug", "destination": "/page.html" },
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/archives", "destination": "/archives.html" },
+    { "source": "/explore", "destination": "/explore.html" },
+    { "source": "/guide", "destination": "/guide.html" },
+    { "source": "/registry", "destination": "/registry.html" },
+    { "source": "/submit", "destination": "/submit.html" }
   ],
   "headers": [
     {

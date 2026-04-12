@@ -220,10 +220,13 @@ function applySiteAccessGate(user) {
 }
 
 auth.onAuthStateChanged(async user => {
-  await rolesReady;
-  await siteStateReady;
-  SITE_STATE.esdLocked = !!SITE_STATE.esdLocked;
   syncSharedNav(user);
   applySiteAccessGate(user);
-  setTimeout(() => document.documentElement.classList.remove('auth-pending'), 150);
+  document.documentElement.classList.remove('auth-pending');
+
+  Promise.allSettled([rolesReady, siteStateReady]).then(() => {
+    SITE_STATE.esdLocked = !!SITE_STATE.esdLocked;
+    syncSharedNav(user);
+    applySiteAccessGate(user);
+  });
 });

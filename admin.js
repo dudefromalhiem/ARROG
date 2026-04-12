@@ -130,7 +130,6 @@ function applyTabVisibilityForRole(role) {
 // ── Auth Gate ─────────────────────────────────────────────────
 auth.onAuthStateChanged(async user => {
   document.getElementById('admin-loading').classList.add('hidden');
-  await waitForReady(rolesReady, 1200);
   if (!user) {
     document.getElementById('admin-denied').classList.remove('hidden');
     document.getElementById('admin-panel').classList.add('hidden');
