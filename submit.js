@@ -157,12 +157,19 @@ async function initializeSubmitEditModeFromUrl() {
     }
 
     if (!pageDoc) {
-      alert('Requested page was not found.');
-      return;
+      const seedItem = typeof PAGE_SEED !== 'undefined'
+        ? PAGE_SEED.find(p => (editId && p.id === editId) || (editSlug && p.slug === editSlug))
+        : null;
+      if (!seedItem) {
+        alert('Requested page was not found.');
+        return;
+      }
+
+      pageDoc = { id: null, data: () => seedItem };
     }
 
     const page = pageDoc.data() || {};
-    submitEditTarget = { id: pageDoc.id };
+    submitEditTarget = { id: pageDoc.id || null, seeded: !pageDoc.id, seedSlug: page.slug || editSlug || '' };
 
     document.getElementById('sf-title').value = page.title || '';
     document.getElementById('sf-type').value = page.type || 'Anomaly';

@@ -58,6 +58,67 @@ function createMRD(name, summary, desc) {
 `;
 }
 
+function createGuideDoc() {
+  return `
+<div class="page-shell">
+  <header class="page-header">
+    <h1 class="page-title">Orientation Directive 001</h1>
+    <p class="page-subtitle">Guild Lore, Operations, and Classification Standard</p>
+  </header>
+
+  <section class="page-section guide-section">
+    <h2>Introduction</h2>
+    <p>Welcome to the Red Oaker Guild. This guide is the working manual for personnel entering the archive, the registry, or the response chain. It summarizes the doctrine that binds the Guild together, the history that shaped it, and the current structure used in live operations.</p>
+    <p>The Red Oaker Guild exists to document, contain, and when necessary execute. ROSED governs that order. Shelter first. Execution only when no viable containment path remains.</p>
+  </section>
+
+  <section class="page-section guide-section">
+    <h2>ROSED Doctrine</h2>
+    <p>ROSED stands for Red Oaker Shelter and Execution Department. It is the Guild's operational philosophy and its command identity. The Shelter mandate prioritizes containment, classification, and study. The Execution mandate authorizes final action against anomalies that cannot be stabilized without unacceptable loss of life or reality integrity.</p>
+    <p>ROSED is not a contradiction. It is a sequence: preserve what can be preserved, destroy what cannot be allowed to spread.</p>
+  </section>
+
+  <section class="page-section guide-section">
+    <h2>Archon Era Timeline</h2>
+    <p><strong>Hoffman Era:</strong> The founding period. Dr. Mateo Hoffman established the study-first archive structure and the first stable taxonomy for anomalies.</p>
+    <p><strong>Schroeder Era:</strong> The control period. Dr. Hans Schroeder militarized the Guild, intensified capture doctrine, and formed early MRD units.</p>
+    <p><strong>Sidorov Era:</strong> The structural period. Dr. Praskovya Sidorov formalized the classification system and built the global containment framework.</p>
+    <p><strong>Instability Period:</strong> Following Sidorov's disappearance, the Guild fractured. The primary site was sealed and archives suffered catastrophic losses.</p>
+    <p><strong>Ekat Era:</strong> Mikolov "Ekat" Gunitsky rebuilt the Guild through surveillance, hard protocol, and severe internal control.</p>
+    <p><strong>Windsor Era:</strong> Charolette Windsor pushed coexistence and mitigation, especially in ecological containment.</p>
+    <p><strong>Government Interim:</strong> Distributed authority slowed operations and proved inefficient for rapid anomaly response.</p>
+    <p><strong>Quincy Era:</strong> Javier Quincy restored centralized command autonomy, modernized the response structure, and expanded MRD independence.</p>
+  </section>
+
+  <section class="page-section guide-section">
+    <h2>Threat Class Framework</h2>
+    <p>The live class model used by the Guild is operational, not cosmetic. Alona marks stable low-risk anomalies. Delphi marks manageable but active risk. Soros marks dangerous entities requiring dedicated response. Vega marks catastrophic regional threat. Apophis marks owner-level override authority. Erebus marks terminal, world-ending risk with no reliable containment path.</p>
+  </section>
+
+  <section class="page-section guide-section">
+    <h2>Clearance Ladder</h2>
+    <p>Level 2 is the minimum authenticated access tier. Level 4 is reserved for moderators. Level 5 is reserved for admins. Level 6 is reserved for the Owner. No Level 1 or Level 3 access is currently active in the live deployment.</p>
+  </section>
+
+  <section class="page-section guide-section">
+    <h2>Militarized Response Detachments</h2>
+    <p><strong>Prometheus</strong> handles direct containment. <strong>Osiris</strong> and <strong>Osiris-A1</strong> enforce internal protocol and black-level fail-safes. <strong>Galen</strong> and <strong>Galen A1</strong> counter digital, memetic, and cognitohazard threats. <strong>Artemis</strong> handles biological hazards. <strong>Thales</strong> handles animalistic anomalies. <strong>Vanir</strong>, <strong>Ares</strong>, <strong>Ivar</strong>, and <strong>Apate</strong> cover recovery, rapid response, large-scale anomalies, and secrecy operations.</p>
+  </section>
+
+  <section class="page-section guide-section">
+    <h2>Submission Taxonomy</h2>
+    <p>Anomaly submissions must begin with an established designation family and exact code. The current live families are ROS, SLOA, SOA, SCTOR, and TL. Tales and artworks may reference an anomaly designation to link back to a primary case file.</p>
+  </section>
+</div>`;
+}
+
+
+// --- DOCTRINE ---
+PAGE_SEED.push({
+  title: 'Orientation Directive 001', slug: 'guide', type: 'Guide', tags: ['guide', 'lore'],
+  htmlContent: createGuideDoc(),
+  cssContent: ''
+});
 
 // --- DOCTRINE ---
 PAGE_SEED.push({

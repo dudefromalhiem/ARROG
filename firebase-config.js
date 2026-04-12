@@ -115,6 +115,7 @@ document.addEventListener('click', event => {
 const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
 let ROLE_DATA = { owners: [], admins: [], mods: [] };
 let SITE_STATE = { esdLocked: false, esdActivatedBy: '', esdActivatedAt: null };
+let rolesReadyResolved = false;
 
 const siteStateReady = (async () => {
   try {
@@ -144,6 +145,7 @@ const rolesReady = (async () => {
     const low = bo.toLowerCase();
     if (!ROLE_DATA.owners.includes(low)) ROLE_DATA.owners.push(low);
   });
+  rolesReadyResolved = true;
 })();
 
 function resolveRole(email) {

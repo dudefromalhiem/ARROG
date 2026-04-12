@@ -98,6 +98,7 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="seed-data.js"></script>
 
 <script>
   let allAnomalies = [];
@@ -115,11 +116,40 @@
   async function loadRegistry() {
     let combined = [];
 
+    // Seed fallback keeps the registry populated while Firestore pages are being migrated.
+    if (typeof PAGE_SEED !== 'undefined') {
+      combined = PAGE_SEED.filter(p => p.type === 'Anomaly').map(p => {
+        let objClass = 'unknown';
+        ['Alona', 'Delphi', 'Soros', 'Vega', 'Apophis', 'Erebus'].forEach(c => {
+          if (p.htmlContent && p.htmlContent.includes('Class:</span> ' + c)) {
+            objClass = c;
+          } else if (p.tags && p.tags.includes(c.toLowerCase())) {
+            objClass = c;
+          }
+        });
+        if (objClass === 'unknown') objClass = 'Alona';
+
+        const idMatch = p.title.match(/^([A-Z]{2,6}-\d+[A-Z]?)/i);
+        const anomalyId = idMatch ? idMatch[1].toUpperCase() : p.slug;
+
+        return {
+          id: p.id || p.slug,
+          slug: p.slug,
+          title: p.title,
+          anomalyId: anomalyId,
+          anomalyListKey: inferListKeyFromId(anomalyId),
+          objClass: objClass,
+          excerpt: (p.htmlContent.match(/<p>(.*?)<\/p>/) || [])[1]?.replace(/<[^>]*>?/gm, '').substring(0, 100) + '...' || ''
+        };
+      });
+    }
+
     // Fetch live data from Firestore
     try {
       const snap = await db.collection('pages').where('type', '==', 'Anomaly').get();
       snap.docs.forEach(doc => {
         const data = doc.data();
+        if (combined.some(c => c.slug === data.slug)) return;
 
         let objClass = 'unknown';
         if (data.htmlContent) {

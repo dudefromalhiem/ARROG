@@ -86,6 +86,7 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="seed-data.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════
  *  PAGE VIEWER — Renders approved pages in a sandboxed iframe
@@ -130,6 +131,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           page = doc.data();
           docId = doc.id;
         }
+      }
+    }
+
+    if (!page && typeof PAGE_SEED !== 'undefined') {
+      const seedItem = PAGE_SEED.find(p => (pageId && p.id === pageId) || (slug && p.slug === slug));
+      if (seedItem) {
+        page = { ...seedItem, createdAt: { seconds: Date.now() / 1000 } };
       }
     }
     
@@ -212,7 +220,7 @@ function confirmEditDocument(editHref) {
 
 async function confirmDeleteDocument() {
   if (!window.__pageDocId) {
-    alert('This page does not have a Firestore document ID and cannot be deleted from here.');
+    alert('This page is seeded/local and cannot be deleted from Firestore.');
     return;
   }
   const ok = confirm('Delete this document permanently? This action cannot be undone.');

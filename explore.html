@@ -118,6 +118,7 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="seed-data.js"></script>
 
 <script>
   let universeData = { Anomaly: [], Tale: [], Artwork: [] };
@@ -134,12 +135,28 @@
   }
 
   async function loadUniverse() {
+    // Load from PAGE_SEED first so the universe remains visible even before Firestore migration
+    if (typeof PAGE_SEED !== 'undefined') {
+      PAGE_SEED.forEach(p => {
+        if (!universeData[p.type]) return;
+        universeData[p.type].push({
+          id: p.slug || p.title,
+          slug: p.slug,
+          title: p.title,
+          type: p.type,
+          excerpt: buildSnippet(p.htmlContent),
+          img: getImgSrc(p.htmlContent)
+        });
+      });
+    }
+
     // Load from Firestore
     try {
       const snap = await db.collection('pages').get();
       snap.docs.forEach(doc => {
         const d = doc.data();
         if (!universeData[d.type]) return;
+        if (universeData[d.type].some(u => u.slug === d.slug)) return;
         
         universeData[d.type].push({
           id: doc.id,

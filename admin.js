@@ -128,35 +128,42 @@ function applyTabVisibilityForRole(role) {
 }
 
 // ── Auth Gate ─────────────────────────────────────────────────
-auth.onAuthStateChanged(async user => {
-  document.getElementById('admin-loading').classList.add('hidden');
+function renderAdminBootstrap(user) {
+  const adminLoading = document.getElementById('admin-loading');
+  const adminDenied = document.getElementById('admin-denied');
+  const adminPanel = document.getElementById('admin-panel');
+  const adminInfo = document.getElementById('admin-info');
+  const navAuth = document.getElementById('nav-auth');
+
   if (!user) {
-    document.getElementById('admin-denied').classList.remove('hidden');
-    document.getElementById('admin-panel').classList.add('hidden');
-    document.getElementById('admin-info').textContent = '';
-    document.getElementById('nav-auth').innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    adminLoading.classList.add('hidden');
+    adminDenied.classList.remove('hidden');
+    adminPanel.classList.add('hidden');
+    adminInfo.textContent = '';
+    navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     return;
   }
 
   const role = resolveRole(user.email);
   if (!isModerator(user.email)) {
-    document.getElementById('admin-denied').querySelector('.section-hd').textContent = 'Insufficient Clearance';
-    document.getElementById('admin-denied').querySelector('p').innerHTML =
-      `Your account does not have moderation privileges. Contact the Guild Owner.`;
-    const displayLabel = user.displayName || 'Agent';
-    document.getElementById('nav-auth').innerHTML = renderUserMenuHTML(displayLabel);
+    adminLoading.classList.add('hidden');
+    adminDenied.classList.remove('hidden');
+    adminDenied.querySelector('.section-hd').textContent = 'Insufficient Clearance';
+    adminDenied.querySelector('p').innerHTML = `Your account does not have moderation privileges. Contact the Guild Owner.`;
+    adminPanel.classList.add('hidden');
+    navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
     return;
   }
 
-  // Authorized
+  adminDenied.classList.add('hidden');
+  adminPanel.classList.remove('hidden');
+  adminLoading.classList.add('hidden');
   const displayLabel = user.displayName || 'Agent';
-  document.getElementById('admin-denied').classList.add('hidden');
-  document.getElementById('admin-panel').classList.remove('hidden');
   const clearanceLevel = clearanceLevelForRole(role);
-  document.getElementById('admin-info').innerHTML =
+  adminInfo.innerHTML =
     `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Clearance: <span style="color:var(--red-b);text-transform:uppercase">${role}</span> (Level ${clearanceLevel})
      <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
-  document.getElementById('nav-auth').innerHTML = renderUserMenuHTML(displayLabel);
+  navAuth.innerHTML = renderUserMenuHTML(displayLabel);
   applyTabVisibilityForRole(role);
 
   const params = new URLSearchParams(window.location.search);
@@ -168,9 +175,21 @@ auth.onAuthStateChanged(async user => {
   } else if (editSlug && !isModOnlyRole()) {
     window.location.href = 'submit.html?editSlug=' + encodeURIComponent(editSlug);
     return;
-  } else {
-    loadTab();
   }
+
+  loadTab();
+}
+
+auth.onAuthStateChanged(async user => {
+  if (!rolesReadyResolved) {
+    document.getElementById('admin-loading').classList.remove('hidden');
+    await rolesReady;
+  }
+  if (!user) {
+    renderAdminBootstrap(null);
+    return;
+  }
+  renderAdminBootstrap(user);
 });
 
 // ── Tab Switching ─────────────────────────────────────────────
