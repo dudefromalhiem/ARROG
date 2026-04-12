@@ -60,6 +60,104 @@
       font-size: .86rem;
       white-space: pre-wrap;
     }
+    .legacy-studio {
+      border-top: 1px solid var(--red-d);
+      margin-top: 10px;
+      padding-top: 14px;
+    }
+    .legacy-studio-head {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .legacy-studio-copy {
+      color: var(--wht-f);
+      font-size: .72rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .legacy-studio-actions { margin-top: 0; }
+    .legacy-blocks {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .legacy-doc-card {
+      border: 1px solid var(--red-d);
+      background: rgba(0, 0, 0, .32);
+      padding: 12px;
+    }
+    .legacy-doc-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .legacy-doc-label {
+      color: var(--red-b);
+      font-size: .8rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .legacy-doc-body {
+      display: grid;
+      gap: 10px;
+    }
+    .legacy-doc-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .legacy-doc-grid .fg { margin-bottom: 0; }
+    .legacy-doc-preview {
+      width: 100%;
+      max-height: 260px;
+      object-fit: cover;
+      border: 1px solid var(--red-d);
+      background: #111;
+    }
+    .legacy-doc-placeholder {
+      font-size: .78rem;
+      color: var(--wht-f);
+      border: 1px dashed var(--red-d);
+      padding: 10px 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .legacy-doc-divider {
+      border: none;
+      border-top: 1px dashed var(--red-d);
+      margin: 4px 0;
+    }
+    .legacy-doc-quote {
+      margin: 0;
+      padding: 14px 16px;
+      border-left: 2px solid var(--red-d);
+      background: rgba(0, 0, 0, .26);
+      color: var(--wht-m);
+      line-height: 1.8;
+      font-size: .86rem;
+    }
+    .legacy-doc-quote footer {
+      margin-top: 8px;
+      color: var(--wht-f);
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .legacy-doc-empty {
+      border: 1px dashed var(--red-d);
+      color: var(--wht-f);
+      font-size: .76rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 12px;
+    }
     .legacy-editor {
       border: 1px solid var(--red-d);
       background: var(--blk-c);
@@ -73,6 +171,7 @@
       .legacy-sheet-wrap { margin: 24px auto; }
       .legacy-sheet { padding: 18px 14px; }
       .legacy-meta { font-size: .72rem; }
+      .legacy-doc-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -88,7 +187,7 @@
       <li><a href="index.html">Home</a></li>
       <li><a href="explore.html">Explore</a></li>
       <li><a href="registry.html">Registry</a></li>
-      <li id="submit-link" class="hidden"><a href="submit.html">Submit</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
     </ul>
@@ -127,6 +226,19 @@
       <label class="fl" for="legacy-current">Current Owner Mandate</label>
       <textarea class="fta" id="legacy-current"></textarea>
     </div>
+    <div class="legacy-studio">
+      <div class="legacy-studio-head">
+        <div class="section-hd" style="font-size:1rem">Document Studio</div>
+        <span class="legacy-studio-copy">Add text, image, quote, or divider blocks below the core record.</span>
+      </div>
+      <div class="legacy-actions legacy-studio-actions">
+        <button class="btn btn-p" type="button" data-legacy-add-block="text">+ Text Block</button>
+        <button class="btn btn-p" type="button" data-legacy-add-block="image">+ Image Block</button>
+        <button class="btn btn-p" type="button" data-legacy-add-block="quote">+ Quote Block</button>
+        <button class="btn btn-p" type="button" data-legacy-add-block="divider">+ Divider</button>
+      </div>
+      <div class="legacy-blocks" id="legacy-blocks"></div>
+    </div>
     <div class="legacy-actions">
       <button class="btn btn-p" type="button" onclick="saveLegacySheet()">Save Legacy Sheet</button>
       <button class="btn btn-s" type="button" onclick="toggleLegacyEditor(false)">Cancel</button>
@@ -147,20 +259,26 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
   const LEGACY_SHEET_ID = 'main';
+  const LEGACY_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+  const LEGACY_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
   const LEGACY_DEFAULT = {
     title: 'Red Oaker Legacy',
     subtitle: 'Compiled ownership record and historical continuity log',
     foundation: 'The Guild emerged from fragmented wardenship circles that protected anomaly folklore, unindexed field artifacts, and containment rituals from erasure. The founding custodians formalized those fragments into a single oath-bound archive.',
     priorOwners: 'Prior custodians preserved doctrine through collapse cycles, each rebuilding from partial ledgers and damaged sectors. Their continuity work established the designation standards that still govern archive naming and reconstruction today.',
     currentOwner: 'The current Owner maintains the archive as a living continuity system: recover missing entries, enforce designation integrity, and keep every active branch accountable to canonical record discipline.',
-    updatedBy: 'System Seed'
+    updatedBy: 'System Seed',
+    blocks: []
   };
 
   let legacySheet = { ...LEGACY_DEFAULT };
+  let legacyBlocks = [];
   let ownerCanEdit = false;
+  const storage = firebase.storage();
 
   function esc(value) {
     return String(value || '')
@@ -171,14 +289,219 @@
       .replace(/'/g, '&#39;');
   }
 
+  function escapeAttr(value) {
+    return esc(value);
+  }
+
+  function isValidLegacyImageSrc(url) {
+    const src = String(url || '').trim();
+    return /^https?:\/\//i.test(src) || /^data:image\//i.test(src);
+  }
+
+  function createLegacyBlock(type) {
+    if (type === 'image') return { type: 'image', url: '', alt: '', caption: '' };
+    if (type === 'quote') return { type: 'quote', text: '', source: '' };
+    if (type === 'divider') return { type: 'divider' };
+    return { type: 'text', text: '' };
+  }
+
+  function normalizeLegacyBlock(block) {
+    const type = String(block && block.type || 'text').toLowerCase();
+    if (type === 'image') {
+      return {
+        type: 'image',
+        url: String(block.url || ''),
+        alt: String(block.alt || ''),
+        caption: String(block.caption || '')
+      };
+    }
+    if (type === 'quote') {
+      return {
+        type: 'quote',
+        text: String(block.text || ''),
+        source: String(block.source || '')
+      };
+    }
+    if (type === 'divider') {
+      return { type: 'divider' };
+    }
+    return {
+      type: 'text',
+      text: String(block.text || '')
+    };
+  }
+
+  function normalizeLegacyBlocks(blocks) {
+    return Array.isArray(blocks) ? blocks.map(normalizeLegacyBlock) : [];
+  }
+
+  function renderLegacyBlockView(block) {
+    if (block.type === 'image') {
+      if (!isValidLegacyImageSrc(block.url)) {
+        return '<div class="legacy-doc-placeholder">Image block is empty.</div>';
+      }
+      const altText = block.alt || block.caption || 'Legacy image';
+      const caption = block.caption ? '<figcaption style="margin-top:8px;color:var(--wht-f);font-size:.78rem;text-transform:uppercase;letter-spacing:1px">' + esc(block.caption) + '</figcaption>' : '';
+      return '<figure style="margin:0"><img class="legacy-doc-preview" src="' + escapeAttr(block.url) + '" alt="' + escapeAttr(altText) + '" loading="lazy" decoding="async" />' + caption + '</figure>';
+    }
+    if (block.type === 'quote') {
+      const source = block.source ? '<footer>— ' + esc(block.source) + '</footer>' : '';
+      return '<blockquote class="legacy-doc-quote"><div>' + esc(block.text || '') + '</div>' + source + '</blockquote>';
+    }
+    if (block.type === 'divider') {
+      return '<hr class="legacy-doc-divider" />';
+    }
+    return '<p style="margin:0;color:var(--wht-m);line-height:1.8;font-size:.86rem;white-space:pre-wrap">' + esc(block.text || '') + '</p>';
+  }
+
+  function renderLegacyBlocksEditor() {
+    const holder = document.getElementById('legacy-blocks');
+    if (!holder) return;
+
+    if (!legacyBlocks.length) {
+      holder.innerHTML = '<div class="legacy-doc-empty">No studio blocks yet. Add a text, image, quote, or divider block.</div>';
+      return;
+    }
+
+    holder.innerHTML = legacyBlocks.map((block, index) => {
+      const label = block.type.charAt(0).toUpperCase() + block.type.slice(1) + ' Block';
+      const actions = '<div class="legacy-doc-actions">' +
+        '<button class="btn btn-sm btn-s" type="button" data-legacy-action="up" data-legacy-index="' + index + '">↑</button>' +
+        '<button class="btn btn-sm btn-s" type="button" data-legacy-action="down" data-legacy-index="' + index + '">↓</button>' +
+        '<button class="btn btn-sm btn-s" type="button" data-legacy-action="clone" data-legacy-index="' + index + '">Clone</button>' +
+        '<button class="btn btn-sm btn-d" type="button" data-legacy-action="delete" data-legacy-index="' + index + '">Delete</button>' +
+      '</div>';
+
+      let body = '';
+      if (block.type === 'image') {
+        body = '<div class="legacy-doc-grid">' +
+          '<div class="fg"><label class="fl">Image URL</label><input class="fi" type="text" data-legacy-field="url" data-legacy-index="' + index + '" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
+          '<div class="fg"><label class="fl">Upload Image</label><input class="fi" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-legacy-upload="' + index + '" /></div>' +
+          '<div class="fg"><label class="fl">Alt Text</label><input class="fi" type="text" data-legacy-field="alt" data-legacy-index="' + index + '" value="' + escapeAttr(block.alt || '') + '" placeholder="Describe the image" /></div>' +
+          '<div class="fg"><label class="fl">Caption</label><input class="fi" type="text" data-legacy-field="caption" data-legacy-index="' + index + '" value="' + escapeAttr(block.caption || '') + '" placeholder="Optional caption" /></div>' +
+        '</div>' +
+        (isValidLegacyImageSrc(block.url)
+          ? '<img class="legacy-doc-preview" src="' + escapeAttr(block.url) + '" alt="Preview" />'
+          : '<div class="legacy-doc-placeholder">No image selected.</div>');
+      } else if (block.type === 'quote') {
+        body = '<div class="fg"><label class="fl">Quote</label><textarea class="fta" data-legacy-field="text" data-legacy-index="' + index + '" placeholder="Add a quote or excerpt">' + esc(block.text || '') + '</textarea></div>' +
+          '<div class="fg"><label class="fl">Source</label><input class="fi" type="text" data-legacy-field="source" data-legacy-index="' + index + '" value="' + escapeAttr(block.source || '') + '" placeholder="Optional source" /></div>';
+      } else if (block.type === 'divider') {
+        body = '<div class="legacy-doc-placeholder">Divider block</div>';
+      } else {
+        body = '<div class="fg"><label class="fl">Text</label><textarea class="fta" data-legacy-field="text" data-legacy-index="' + index + '" placeholder="Write block text">' + esc(block.text || '') + '</textarea></div>';
+      }
+
+      return '<div class="legacy-doc-card" data-legacy-index="' + index + '">' +
+        '<div class="legacy-doc-head"><div class="legacy-doc-label">' + label + '</div>' + actions + '</div>' +
+        '<div class="legacy-doc-body">' + body + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function updateLegacyImagePreview(card, url) {
+    if (!card) return;
+    const preview = card.querySelector('.legacy-doc-preview');
+    const placeholder = card.querySelector('.legacy-doc-placeholder');
+    if (isValidLegacyImageSrc(url)) {
+      if (placeholder) placeholder.remove();
+      if (preview) {
+        preview.src = url;
+      } else {
+        const img = document.createElement('img');
+        img.className = 'legacy-doc-preview';
+        img.alt = 'Preview';
+        img.src = url;
+        card.querySelector('.legacy-doc-body').appendChild(img);
+      }
+    } else if (preview) {
+      preview.remove();
+      if (!card.querySelector('.legacy-doc-placeholder')) {
+        const empty = document.createElement('div');
+        empty.className = 'legacy-doc-placeholder';
+        empty.textContent = 'No image selected.';
+        card.querySelector('.legacy-doc-body').appendChild(empty);
+      }
+    }
+  }
+
+  function addLegacyBlock(type) {
+    legacyBlocks.push(createLegacyBlock(type));
+    renderLegacyBlocksEditor();
+    renderLegacySheet();
+  }
+
+  function moveLegacyBlock(index, delta) {
+    const next = index + delta;
+    if (next < 0 || next >= legacyBlocks.length) return;
+    const temp = legacyBlocks[index];
+    legacyBlocks[index] = legacyBlocks[next];
+    legacyBlocks[next] = temp;
+    renderLegacyBlocksEditor();
+    renderLegacySheet();
+  }
+
+  function cloneLegacyBlock(index) {
+    if (index < 0 || index >= legacyBlocks.length) return;
+    legacyBlocks.splice(index + 1, 0, normalizeLegacyBlock(legacyBlocks[index]));
+    renderLegacyBlocksEditor();
+    renderLegacySheet();
+  }
+
+  function deleteLegacyBlock(index) {
+    if (index < 0 || index >= legacyBlocks.length) return;
+    legacyBlocks.splice(index, 1);
+    renderLegacyBlocksEditor();
+    renderLegacySheet();
+  }
+
+  async function uploadLegacyImage(file, index) {
+    if (!ownerCanEdit || !auth.currentUser) return;
+    if (!file) return;
+    if (!LEGACY_IMAGE_TYPES.has(file.type)) {
+      alert('Only PNG, JPG, GIF, and WebP images can be uploaded.');
+      return;
+    }
+    if (file.size > LEGACY_IMAGE_MAX_BYTES) {
+      alert('Images must be 2 MB or smaller.');
+      return;
+    }
+
+    const block = legacyBlocks[index];
+    if (!block || block.type !== 'image') return;
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = 'uploads/' + auth.currentUser.uid + '/legacy_' + Date.now() + '_' + safeName;
+    document.getElementById('legacy-status').textContent = 'Uploading image...';
+
+    try {
+      const snapshot = await storage.ref(path).put(file, { contentType: file.type });
+      const url = await snapshot.ref.getDownloadURL();
+      legacyBlocks[index].url = url;
+      if (!legacyBlocks[index].alt) {
+        legacyBlocks[index].alt = file.name.replace(/\.[^.]+$/, '');
+      }
+      renderLegacyBlocksEditor();
+      renderLegacySheet();
+      document.getElementById('legacy-status').textContent = 'Image uploaded for block ' + (index + 1) + '.';
+    } catch (err) {
+      alert('Could not upload image: ' + err.message);
+      document.getElementById('legacy-status').textContent = 'Image upload failed.';
+    }
+  }
+
   function renderLegacySheet() {
     const host = document.getElementById('legacy-sheet-view');
+    const studioMarkup = legacyBlocks.length
+      ? '<div class="legacy-block-line"><h3>Document Studio</h3>' + legacyBlocks.map(renderLegacyBlockView).join('') + '</div>'
+      : '';
     host.innerHTML =
       '<h1>' + esc(legacySheet.title) + '</h1>' +
       '<div class="legacy-sub">' + esc(legacySheet.subtitle) + '</div>' +
       '<div class="legacy-block-line"><h3>Foundational Era</h3><p>' + esc(legacySheet.foundation) + '</p></div>' +
       '<div class="legacy-block-line"><h3>Prior Owners</h3><p>' + esc(legacySheet.priorOwners) + '</p></div>' +
-      '<div class="legacy-block-line"><h3>Current Owner Mandate</h3><p>' + esc(legacySheet.currentOwner) + '</p></div>';
+      '<div class="legacy-block-line"><h3>Current Owner Mandate</h3><p>' + esc(legacySheet.currentOwner) + '</p></div>' +
+      studioMarkup;
   }
 
   function toggleLegacyEditor(open) {
@@ -192,6 +515,7 @@
       document.getElementById('legacy-prior').value = legacySheet.priorOwners || '';
       document.getElementById('legacy-current').value = legacySheet.currentOwner || '';
       editor.classList.add('open');
+      renderLegacyBlocksEditor();
     } else {
       editor.classList.remove('open');
     }
@@ -206,6 +530,7 @@
       foundation: document.getElementById('legacy-foundation').value.trim() || LEGACY_DEFAULT.foundation,
       priorOwners: document.getElementById('legacy-prior').value.trim() || LEGACY_DEFAULT.priorOwners,
       currentOwner: document.getElementById('legacy-current').value.trim() || LEGACY_DEFAULT.currentOwner,
+      blocks: legacyBlocks.map(normalizeLegacyBlock),
       updatedBy: auth.currentUser.displayName || auth.currentUser.email || 'Owner',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -230,12 +555,58 @@
       } else {
         legacySheet = { ...LEGACY_DEFAULT };
       }
+      legacyBlocks = normalizeLegacyBlocks(legacySheet.blocks);
     } catch (_err) {
       legacySheet = { ...LEGACY_DEFAULT };
+      legacyBlocks = [];
     }
 
     renderLegacySheet();
   }
+
+  const legacyEditor = document.getElementById('legacy-editor');
+  legacyEditor.addEventListener('click', event => {
+    const button = event.target.closest('[data-legacy-action], [data-legacy-add-block]');
+    if (!button) return;
+
+    const addType = button.getAttribute('data-legacy-add-block');
+    if (addType) {
+      addLegacyBlock(addType);
+      return;
+    }
+
+    const index = Number(button.getAttribute('data-legacy-index'));
+    const action = button.getAttribute('data-legacy-action');
+    if (!Number.isFinite(index)) return;
+    if (action === 'up') moveLegacyBlock(index, -1);
+    if (action === 'down') moveLegacyBlock(index, 1);
+    if (action === 'clone') cloneLegacyBlock(index);
+    if (action === 'delete') deleteLegacyBlock(index);
+  });
+
+  legacyEditor.addEventListener('input', event => {
+    const field = event.target.getAttribute('data-legacy-field');
+    if (!field) return;
+    const index = Number(event.target.getAttribute('data-legacy-index'));
+    if (!Number.isFinite(index) || !legacyBlocks[index]) return;
+
+    legacyBlocks[index][field] = event.target.value;
+    if (field === 'url') {
+      updateLegacyImagePreview(event.target.closest('.legacy-doc-card'), event.target.value);
+    }
+    renderLegacySheet();
+  });
+
+  legacyEditor.addEventListener('change', event => {
+    const uploadIndex = event.target.getAttribute('data-legacy-upload');
+    if (uploadIndex === null) return;
+    const index = Number(uploadIndex);
+    const file = event.target.files && event.target.files[0];
+    if (Number.isFinite(index)) {
+      uploadLegacyImage(file, index);
+    }
+    event.target.value = '';
+  });
 
   auth.onAuthStateChanged(async user => {
     await loadLegacySheet();
