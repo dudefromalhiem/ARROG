@@ -257,10 +257,40 @@ async function loadConfig() {
       document.getElementById('cfg-tags').value = (data.tags || []).join(', ');
       document.getElementById('st-db').textContent = 'CONNECTED';
       document.getElementById('st-db').className = 'tag';
+      updateESDStatus(data);
+    } else {
+      updateESDStatus({});
     }
+    const ownerOnlyControls = [document.getElementById('esd-on-btn'), document.getElementById('esd-off-btn')];
+    ownerOnlyControls.forEach(btn => {
+      if (!btn) return;
+      btn.classList.toggle('hidden', !isOwner(auth.currentUser?.email));
+    });
   } catch (err) {
     console.warn('Config load failed:', err);
   }
+}
+
+function applyConfigPreset(preset) {
+  const presets = {
+    'archive-core': {
+      categories: ['Anomaly', 'Tale', 'Artwork', 'Hub', 'Guide'],
+      tags: ['object', 'animal', 'humanoid', 'plant', 'artifact', 'document', 'digital', 'memetic', 'cognitohazard', 'spatial', 'temporal', 'biological', 'dangerous', 'archive', 'field-report']
+    },
+    'research-mode': {
+      categories: ['Anomaly', 'Guide', 'Tale'],
+      tags: ['document', 'digital', 'memetic', 'cognitohazard', 'spatial', 'temporal', 'biological', 'dangerous', 'archive', 'field-report']
+    },
+    'publication-light': {
+      categories: ['Anomaly', 'Artwork', 'Tale'],
+      tags: ['object', 'artifact', 'document', 'archive', 'field-report']
+    }
+  };
+
+  const selected = presets[preset];
+  if (!selected) return;
+  document.getElementById('cfg-categories').value = selected.categories.join(', ');
+  document.getElementById('cfg-tags').value = selected.tags.join(', ');
 }
 
 async function saveConfig() {
@@ -268,10 +298,45 @@ async function saveConfig() {
   const tags = document.getElementById('cfg-tags').value.split(',').map(s => s.trim()).filter(Boolean);
   
   try {
-    await db.collection('config').doc('site').set({ categories, tags });
+    await db.collection('config').doc('site').set({ categories, tags }, { merge: true });
     alert('System configuration updated successfully.');
   } catch (err) {
     alert('Failed to save config: ' + err.message);
+  }
+}
+
+async function toggleESD(enabled) {
+  if (!isOwner(auth.currentUser?.email)) {
+    alert('Only the Owner can activate or deactivate ESD.');
+    return;
+  }
+
+  const ok = confirm(enabled
+    ? 'Activate Emergency Shutdown Protocol? Visitors without moderator clearance will be locked out.'
+    : 'Deactivate Emergency Shutdown Protocol and restore normal access?');
+  if (!ok) return;
+
+  try {
+    await db.collection('config').doc('site').set({
+      esdLocked: !!enabled,
+      esdActivatedBy: enabled ? (auth.currentUser.displayName || auth.currentUser.email || 'Owner') : '',
+      esdActivatedAt: enabled ? firebase.firestore.FieldValue.serverTimestamp() : null
+    }, { merge: true });
+    await loadConfig();
+    alert(enabled ? 'ESD activated.' : 'ESD deactivated.');
+  } catch (err) {
+    alert('Failed to update ESD: ' + err.message);
+  }
+}
+
+function updateESDStatus(data) {
+  const statusEl = document.getElementById('esd-status');
+  if (!statusEl) return;
+  if (data && data.esdLocked) {
+    const by = data.esdActivatedBy || 'Owner';
+    statusEl.textContent = 'ESD status: ACTIVE by ' + by + '. Non-moderator visitors are locked out.';
+  } else {
+    statusEl.textContent = 'ESD status: INACTIVE.';
   }
 }
 
@@ -372,32 +437,13 @@ async function changeUsername() {
 async function loadPages(container) {
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Pages Management</h3>
-    <form id="page-form" style="margin-bottom:24px">
-      <div class="g2 mb-md">
-        <div class="fg"><label class="fl">Title</label><input class="fi" id="pf-title" required /></div>
-        <div class="fg"><label class="fl">Type</label>
-          <select class="fi" id="pf-type"><option>Anomaly</option><option>Tale</option><option>Artwork</option><option>Hub</option><option>Guide</option></select>
-        </div>
-      </div>
-      <div class="fg"><label class="fl">Tags (comma-separated)</label><input class="fi" id="pf-tags" /></div>
-      <div class="fg" style="margin-bottom:10px">
-        <label style="font-size:.8rem;color:var(--wht-d);cursor:pointer">
-          <input type="checkbox" id="pf-featured" style="margin-right:8px" />
-          Feature in home "Featured Anomalies" section
-        </label>
-      </div>
-      <div class="g2 mb-md">
-        <div class="fg"><label class="fl">HTML Content</label><textarea class="fta" id="pf-html" style="min-height:150px; font-family:monospace;"></textarea></div>
-        <div class="fg"><label class="fl">CSS Content (Optional)</label><textarea class="fta" id="pf-css" style="min-height:150px; font-family:monospace;"></textarea></div>
-      </div>
-      <input type="hidden" id="pf-id" />
-      <button type="submit" class="btn btn-p" id="pf-btn">&gt;&gt; Save Page</button>
-      <button type="button" class="btn btn-s hidden" id="pf-cancel" onclick="resetPageForm()" style="margin-left:8px">Cancel</button>
-    </form>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+      <button class="btn btn-p" type="button" onclick="location.href='submit.html'">>> Create in Submit Editor</button>
+      <a class="btn btn-s" href="submit.html" style="text-decoration:none;display:inline-flex;align-items:center">Open Unified Editor</a>
+    </div>
+    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">All page creation and editing now uses the same submission editor. This panel only handles review, delete, and featured-state controls.</p>
     <table class="adm-tbl"><thead><tr><th>Title</th><th>Type</th><th>Featured</th><th>Actions</th></tr></thead><tbody id="pages-tbody"></tbody></table>
   `;
-  document.getElementById('page-form').addEventListener('submit', submitPage);
-  resetPageForm();
   await refreshPages();
 }
 
@@ -409,7 +455,8 @@ async function refreshPages() {
       tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No pages found. Create one above.</td></tr>';
       return;
     }
-    tbody.innerHTML = snap.docs.map(d => {
+      const liveRole = u.email ? resolveRole(u.email) : (u.role || 'user');
+      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${liveRole}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
       const p = d.data();
       const guideLocked = isGuideType(p.type) && !canManageGuidePages();
       const editBtn = guideLocked
@@ -1284,13 +1331,14 @@ async function refreshUsers() {
   const tbody = document.getElementById('users-tbody');
   try {
     const snap = await db.collection('users').get();
-    if (snap.empty) { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>'; return; }
+    if (snap.empty) { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>'; return; }
     tbody.innerHTML = snap.docs.map(d => {
       const u = d.data();
       const showEmail = isOwner(auth.currentUser?.email) ? (u.email || '[Not Set]') : '[Redacted]';
-      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${u.role}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
+      const liveRole = u.email ? resolveRole(u.email) : (u.role || 'user');
+      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${liveRole}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
     }).join('');
-  } catch { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
+  } catch { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
 }
 
 // ═════════════════════════════════════════════════════════════

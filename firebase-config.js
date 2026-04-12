@@ -98,6 +98,18 @@ document.addEventListener('click', event => {
 // Bootstrap — only used if Firestore config/roles doesn't exist yet
 const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
 let ROLE_DATA = { owners: [], admins: [], mods: [] };
+let SITE_STATE = { esdLocked: false, esdActivatedBy: '', esdActivatedAt: null };
+
+const siteStateReady = (async () => {
+  try {
+    const doc = await db.collection('config').doc('site').get();
+    if (doc.exists) {
+      SITE_STATE = { ...SITE_STATE, ...(doc.data() || {}) };
+    }
+  } catch (e) {
+    console.warn('[RBAC] Could not fetch site config from Firestore.');
+  }
+})();
 
 const rolesReady = (async () => {
   try {
@@ -137,7 +149,7 @@ function clearanceLevelForRole(role) {
   if (role === "admin") return 5;
   if (role === "mod") return 4;
   if (role === "user") return 2;
-  return 1;
+  return 2;
 }
 
 function syncSharedNav(user) {
@@ -158,7 +170,43 @@ function syncSharedNav(user) {
   }
 }
 
+function applySiteAccessGate(user) {
+  const locked = !!SITE_STATE.esdLocked;
+  const privileged = !!user && isModerator(user.email);
+  const gateId = 'site-access-gate';
+  const pageRoots = Array.from(document.querySelectorAll('main, footer'));
+
+  if (locked && !privileged) {
+    pageRoots.forEach(el => {
+      if (!el.dataset.esdHidden) {
+        el.dataset.esdHidden = '1';
+        el.classList.add('hidden');
+      }
+    });
+    if (!document.getElementById(gateId)) {
+      const gate = document.createElement('div');
+      gate.id = gateId;
+      gate.className = 'section tc';
+      gate.style.cssText = 'max-width:640px;margin:64px auto;padding:28px;border:1px solid var(--red-b);background:rgba(0,0,0,.92)';
+      gate.innerHTML = '<div class="section-hd">Emergency Shutdown Active</div><p style="font-size:.85rem;color:var(--wht-d);line-height:1.7">The Guild archive is temporarily locked. Only moderators, admins, and owners may access site content right now.</p>';
+      document.body.appendChild(gate);
+    }
+  } else {
+    const gate = document.getElementById(gateId);
+    if (gate) gate.remove();
+    pageRoots.forEach(el => {
+      if (el.dataset.esdHidden) {
+        el.classList.remove('hidden');
+        delete el.dataset.esdHidden;
+      }
+    });
+  }
+}
+
 auth.onAuthStateChanged(async user => {
   await rolesReady;
+  await siteStateReady;
+  SITE_STATE.esdLocked = !!SITE_STATE.esdLocked;
   syncSharedNav(user);
+  applySiteAccessGate(user);
 });

@@ -243,7 +243,7 @@ function showError() {
 
 function buildPageDocument(html, css, imageUrls) {
   const raw = (html || '').trim();
-  const htmlWithUploads = embedUploadedImagesIfMissing(raw, imageUrls || []).replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
+  const htmlWithUploads = sanitizePageImages(embedUploadedImagesIfMissing(raw, imageUrls || [])).replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
   const wrapped = htmlWithUploads.includes('class="page-shell"')
     ? htmlWithUploads
     : '<div class="page-shell"><section class="page-section">' + htmlWithUploads + '</section></div>';
@@ -288,6 +288,18 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
   '</div>';
 
   return raw + gallery;
+}
+
+function sanitizePageImages(html) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = String(html || '');
+  wrapper.querySelectorAll('img').forEach(img => {
+    const src = (img.getAttribute('src') || '').trim();
+    if (!src || !/^(data:image\/(png|jpeg|gif|webp|bmp|svg\+xml);base64,|https?:\/\/|\/)/i.test(src)) {
+      img.remove();
+    }
+  });
+  return wrapper.innerHTML;
 }
 </script>
 </body>

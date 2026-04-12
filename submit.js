@@ -487,6 +487,12 @@ function stripTags(html) {
   return (el.textContent || '').trim();
 }
 
+function isValidImageSrc(src) {
+  const value = String(src || '').trim();
+  if (!value) return false;
+  return /^(data:image\/(png|jpeg|gif|webp|bmp|svg\+xml);base64,|https?:\/\/|\/)/i.test(value);
+}
+
 function htmlBlockToPlainText(html) {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = String(html || '');
@@ -772,10 +778,11 @@ function buildDocumentModeHTML() {
       parts.push('<div class="doc-rich">' + (block.html || '') + '</div>');
       return;
     }
-    if (block.type === 'image' && block.url) {
+    if (block.type === 'image' && isValidImageSrc(block.url)) {
       const align = (block.align === 'left' || block.align === 'right') ? block.align : 'center';
+      const captionText = (block.caption || 'Document image').trim();
       const caption = block.caption ? '<figcaption>' + escapeHtml(block.caption) + '</figcaption>' : '';
-      parts.push('<figure class="doc-image-wrap align-' + align + '"><img src="' + escapeAttr(block.url) + '" alt="Document image" loading="lazy" decoding="async" />' + caption + '</figure>');
+      parts.push('<figure class="doc-image-wrap align-' + align + '"><img src="' + escapeAttr(block.url) + '" alt="' + escapeAttr(captionText) + '" loading="lazy" decoding="async" />' + caption + '</figure>');
       return;
     }
     if (block.type === 'quote' && (block.text || '').trim()) {
@@ -809,7 +816,7 @@ function hasDocumentContent() {
   return docBlocks.some(block => {
     if (block.type === 'title') return !!String(block.text || '').trim();
     if (block.type === 'text') return !!stripTags(block.html || '');
-    if (block.type === 'image') return !!String(block.url || '').trim();
+    if (block.type === 'image') return isValidImageSrc(block.url);
     if (block.type === 'quote') return !!String(block.text || '').trim();
     if (block.type === 'list') return String(block.items || '').split(/\n+/).map(s => s.trim()).filter(Boolean).length > 0;
     if (block.type === 'code') return !!String(block.code || '').trim();
@@ -2047,12 +2054,11 @@ function resetSubmitForm() {
 async function loadMySubmissions() {
   if (!currentUserForSubmit) return;
   const container = document.getElementById('my-submissions');
+  if (!container) return;
 
   try {
     const snap = await db.collection('submissions')
       .where('authorUid', '==', currentUserForSubmit.uid)
-      .orderBy('submittedAt', 'desc')
-      .limit(20)
       .get();
     const submissions = snap.docs
       .map(doc => ({ id: doc.id, data: doc.data() }))

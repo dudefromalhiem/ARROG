@@ -213,7 +213,7 @@ PAGE_SEED.push({
     'The bowl is kept within an opaque, lead-lined vault. Cameras inside the vault must be heavily distorted artificially to prevent the cognitohazard from affecting surveillance teams.')
 });
 PAGE_SEED.push({
-  title: 'ROS-0005: Wax Man', slug: 'ros-0005', type: 'Anomaly', tags: ['humanoid', 'neutralized'],
+  title: 'ROS-0005: Wax Man', slug: 'ros-0005', type: 'Anomaly', tags: ['humanoid'],
   htmlContent: createAnomaly('ROS-0005', 'Alona (Neutralized)', 
     'Formerly a humanoid entity composed entirely of congealed blood and commercial candle wax. It required ambient temperatures of approximately 45°C to maintain mobility. Due to a containment failure involving a breached HVAC unit in 1993, the entity underwent a rapid thermodynamic shift, completely melting into an inert puddle. It has been classified as deceased.',
     'The remains are sealed in a cryogenic bio-drum. No further interactions are recorded.')

@@ -80,13 +80,31 @@
             </div>
             <div class="fg">
               <label class="fl">Official Tags (comma-separated)</label>
-              <input class="fi" id="cfg-tags" placeholder="safe, euclid, keter, humanoid..." />
+              <input class="fi" id="cfg-tags" placeholder="object, animal, humanoid, plant..." />
+            </div>
+            <div class="fg">
+              <label class="fl">Presets</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-s" type="button" onclick="applyConfigPreset('archive-core')">Archive Core</button>
+                <button class="btn btn-s" type="button" onclick="applyConfigPreset('research-mode')">Research Mode</button>
+                <button class="btn btn-s" type="button" onclick="applyConfigPreset('publication-light')">Publication Light</button>
+              </div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
               <button class="btn btn-p" onclick="saveConfig()">Save Configuration</button>
               <button class="btn btn-s" id="btn-normalize-pages" onclick="normalizeAllStoredPageStyles()">Normalize Existing Page Colors</button>
             </div>
             <p id="normalize-status" style="font-size:.75rem;color:var(--wht-f);margin-top:10px">Updates low-contrast legacy CSS in Firestore pages collection.</p>
+          </div>
+
+          <div class="card">
+            <div class="card-t">Emergency Shutdown Protocol</div>
+            <p style="font-size:.8rem;color:var(--wht-d);margin-top:12px;line-height:1.6">Owner-only control. When active, the site stays open only for moderators, admins, and owners. All other visitors are blocked from browsing content.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+              <button class="btn btn-d" type="button" id="esd-on-btn" onclick="toggleESD(true)">Activate ESD</button>
+              <button class="btn btn-s" type="button" id="esd-off-btn" onclick="toggleESD(false)">Deactivate ESD</button>
+            </div>
+            <p id="esd-status" style="font-size:.75rem;color:var(--wht-f);margin-top:10px">ESD status: checking...</p>
           </div>
           
           <div class="card">
