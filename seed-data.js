@@ -123,12 +123,12 @@ PAGE_SEED.push({
 
 // --- CLEARANCE LEVELS ---
 const clearances = [
-  ['Level 1', 'Front-facing operations. No anomaly access. Personnel manage civilian fronts and logistics.'],
-  ['Level 2', 'Low-level personnel. Granted restricted access to inert Alona or predictable Delphi class anomalies under supervision.'],
-  ['Level 3', 'Mid-level containment specialists. Granted Soros access. Tasked with maintaining high-risk containment grids and performing direct testing.'],
-  ['Level 4', 'High-level command and senior researchers. Granted Vega access. Responsible for drafting existential containment protocols and executing cross-site actions.'],
-  ['Level 5', 'Executive Board. Site Executives, Head of Site, and the Archon. Absolute oversight of multiple regional facilities.'],
-  ['Level 6', 'Absolute. Apophis-level access. Highest authority, overriding all standing orders. Reserved exclusively for the Owner/Supreme Archon.']
+  ['Level 1', 'Public-facing or unregistered access. No write privileges.'],
+  ['Level 2', 'Regular personnel. Restricted access to Alona and Delphi materials.'],
+  ['Level 3', 'Moderators and containment specialists. Granted Soros access for review and enforcement.'],
+  ['Level 4', 'Senior staff reserve level. Cross-site coordination and special operations.'],
+  ['Level 5', 'Administrators. Executive board authority and publication control.'],
+  ['Level 6', 'Owners. Absolute override status across the Guild.']
 ];
 clearances.forEach( c => {
   PAGE_SEED.push({

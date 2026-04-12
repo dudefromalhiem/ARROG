@@ -1307,14 +1307,14 @@ async function loadRolesManager(container) {
   }
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Roles Management (Owner Only)</h3>
-    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:24px">Assign Moderator or Admin access. Changes take effect on next login. Roles are stored in Firebase config.</p>
+    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:24px">Assign Moderator or Admin access. Changes take effect on next login. Roles are stored in Firebase config as email lists for moderators, admins, and owners.</p>
     <div style="margin-bottom:24px;border:1px solid var(--wht-f);padding:16px">
       <h4 style="margin-bottom:12px;color:var(--red-b)">Add Staff Role</h4>
       <div style="display:flex;gap:8px;align-items:center">
         <input class="fi" id="role-email" placeholder="email@example.com" style="flex:1" />
         <select class="fi" id="role-kind" style="max-width:180px">
-          <option value="mod">Moderator (Level 5)</option>
-          <option value="admin">Admin (Level 6)</option>
+          <option value="mod">Moderator (Level 3)</option>
+          <option value="admin">Admin (Level 5)</option>
         </select>
         <button class="btn btn-p" onclick="addStaffRole()">+ Add Role</button>
       </div>

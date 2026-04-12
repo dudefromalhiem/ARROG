@@ -133,8 +133,9 @@ function isModerator(email) {
 function isAdmin(email) { const r = resolveRole(email); return r === "admin" || r === "owner"; }
 function isOwner(email) { return resolveRole(email) === "owner"; }
 function clearanceLevelForRole(role) {
-  if (role === "owner" || role === "admin") return 6;
-  if (role === "mod") return 5;
-  if (role === "user") return 4;
-  return 3;
+  if (role === "owner") return 6;
+  if (role === "admin") return 5;
+  if (role === "mod") return 3;
+  if (role === "user") return 2;
+  return 1;
 }
