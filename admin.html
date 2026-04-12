@@ -93,8 +93,10 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
               <button class="btn btn-p" onclick="saveConfig()">Save Configuration</button>
               <button class="btn btn-s" id="btn-normalize-pages" onclick="normalizeAllStoredPageStyles()">Normalize Existing Page Colors</button>
+              <button class="btn btn-s" id="btn-migrate-seed" onclick="migrateSeededPagesToFirestore()">Migrate Seeded Pages to Firestore</button>
             </div>
             <p id="normalize-status" style="font-size:.75rem;color:var(--wht-f);margin-top:10px">Updates low-contrast legacy CSS in Firestore pages collection.</p>
+            <p id="seed-migrate-status" style="font-size:.75rem;color:var(--wht-f);margin-top:6px">Seed migration status: idle.</p>
           </div>
 
           <div class="card">
@@ -133,6 +135,7 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="seed-data.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

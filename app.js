@@ -296,18 +296,7 @@ async function updateAuthUI(user) {
 // PLACEHOLDER DATA (used when Firestore isn't configured yet)
 // ═════════════════════════════════════════════════════════════
 
-const FALLBACK_ANOMALIES = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.filter(p => p.type === 'Anomaly').slice(0, 4).map(p => {
-  const parts = p.title.split(': ');
-  return {
-    id: parts[0],
-    title: p.title,
-    type: p.type,
-    slug: p.slug,
-    tags: p.tags,
-    htmlContent: p.htmlContent,
-    excerpt: (p.htmlContent.match(/<p>(.*?)<\/p>/) || [])[1]?.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...' || ''
-  };
-}) : [];
+const FALLBACK_ANOMALIES = [];
 
 const FALLBACK_NEWS = [
   { title: 'Guild Archives v2.4 Deployed', body: 'The archive indexing system has been upgraded. All anomaly classifications now support multi-tag filtering.', date: '2026-04-08', imageUrl: 'logo.png' },
@@ -321,14 +310,7 @@ const FALLBACK_ART = [
   { id: '3', title: 'Containment Echo', imageUrl: 'logo.png' },
 ];
 
-const FALLBACK_NEWEST = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.slice().reverse().slice(0, 5).map((p, i) => ({
-  id: p.slug || ('p' + i),
-  title: p.title,
-  type: p.type,
-  slug: p.slug,
-  htmlContent: p.htmlContent,
-  updatedAt: new Date().toLocaleDateString()
-})) : [];
+const FALLBACK_NEWEST = [];
 
 // ═════════════════════════════════════════════════════════════
 // RENDER FUNCTIONS

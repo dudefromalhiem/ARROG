@@ -163,39 +163,11 @@ auth.onAuthStateChanged(async user => {
   const editId = params.get('editId');
   const editSlug = params.get('editSlug');
   if (editId && !isModOnlyRole()) {
-    activeTab = 'pages';
-    document.querySelectorAll('#adm-tabs a').forEach(a => a.classList.remove('on'));
-    const pageTabEl = Array.from(document.querySelectorAll('#adm-tabs a')).find(a => a.textContent.includes('Pages'));
-    if (pageTabEl) pageTabEl.classList.add('on');
-    
-    loadTab();
-    setTimeout(() => { editPage(editId); }, 300);
+    window.location.href = 'submit.html?editId=' + encodeURIComponent(editId);
+    return;
   } else if (editSlug && !isModOnlyRole()) {
-    activeTab = 'pages';
-    document.querySelectorAll('#adm-tabs a').forEach(a => a.classList.remove('on'));
-    const pageTabEl = Array.from(document.querySelectorAll('#adm-tabs a')).find(a => a.textContent.includes('Pages'));
-    if (pageTabEl) pageTabEl.classList.add('on');
-
-    loadTab();
-    setTimeout(async () => {
-      const snap = await db.collection('pages').where('slug', '==', editSlug).limit(1).get();
-      if (!snap.empty) {
-        editPage(snap.docs[0].id);
-        return;
-      }
-
-      resetPageForm();
-      const titleEl = document.getElementById('pf-title');
-      const slugEl = document.getElementById('pf-slug');
-      const typeEl = document.getElementById('pf-type');
-      if (titleEl) titleEl.value = editSlug.replace(/-/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
-      if (slugEl) slugEl.value = editSlug;
-      if (typeEl) typeEl.value = editSlug.toLowerCase() === 'guide' ? 'Guide' : 'Hub';
-      document.getElementById('pf-html').value = editSlug.toLowerCase() === 'guide'
-        ? '<div class="page-shell">\n  <header class="page-header">\n    <h1 class="page-title">New Guide</h1>\n    <p class="page-subtitle">Owner Editable Guide</p>\n  </header>\n  <section class="page-section">\n    <h2>Overview</h2>\n    <p>Start editing this guide here.</p>\n  </section>\n</div>'
-        : defaultSchemaHTML();
-      document.getElementById('pf-css').value = defaultSchemaCSS();
-    }, 300);
+    window.location.href = 'submit.html?editSlug=' + encodeURIComponent(editSlug);
+    return;
   } else {
     loadTab();
   }
@@ -265,9 +237,70 @@ async function loadConfig() {
       if (!btn) return;
       btn.classList.toggle('hidden', !isOwner(auth.currentUser?.email));
     });
+    const migrateBtn = document.getElementById('btn-migrate-seed');
+    if (migrateBtn) migrateBtn.classList.toggle('hidden', !isOwner(auth.currentUser?.email));
   } catch (err) {
     console.warn('Config load failed:', err);
   }
+}
+
+async function migrateSeededPagesToFirestore() {
+  const statusEl = document.getElementById('seed-migrate-status');
+  if (!isOwner(auth.currentUser?.email)) {
+    alert('Only the Owner can run seeded page migration.');
+    return;
+  }
+  if (typeof PAGE_SEED === 'undefined' || !Array.isArray(PAGE_SEED) || PAGE_SEED.length === 0) {
+    if (statusEl) statusEl.textContent = 'Seed migration status: no PAGE_SEED data found.';
+    alert('No seeded pages were found to migrate.');
+    return;
+  }
+
+  const ok = confirm('Migrate seeded pages into Firestore pages collection? Existing slug matches will be skipped.');
+  if (!ok) return;
+
+  if (statusEl) statusEl.textContent = 'Seed migration status: scanning existing pages...';
+  const existingSnap = await db.collection('pages').get();
+  const existingSlugs = new Set(existingSnap.docs.map(doc => String((doc.data() || {}).slug || '').trim()).filter(Boolean));
+
+  let inserted = 0;
+  let skipped = 0;
+  let failed = 0;
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+
+  for (const item of PAGE_SEED) {
+    const slug = String(item.slug || '').trim();
+    if (!slug || existingSlugs.has(slug)) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      await db.collection('pages').add({
+        title: item.title || 'Untitled',
+        slug: slug,
+        type: item.type || 'Page',
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        htmlContent: item.htmlContent || '',
+        cssContent: item.cssContent || '',
+        authorName: 'Seed Migration',
+        approvedBy: 'Seed Migration',
+        approvedAt: now,
+        createdAt: now,
+        migratedFromSeed: true,
+        featured: false
+      });
+      existingSlugs.add(slug);
+      inserted++;
+    } catch (_err) {
+      failed++;
+    }
+  }
+
+  const msg = 'Seed migration complete. Added: ' + inserted + ', skipped: ' + skipped + ', failed: ' + failed + '.';
+  if (statusEl) statusEl.textContent = 'Seed migration status: ' + msg;
+  alert(msg);
+  if (activeTab === 'pages') refreshPages();
 }
 
 function applyConfigPreset(preset) {
@@ -448,14 +481,14 @@ async function loadPages(container) {
 
 async function refreshPages() {
   const tbody = document.getElementById('pages-tbody');
+  if (!tbody) return;
   try {
     const snap = await db.collection('pages').orderBy('createdAt', 'desc').limit(50).get();
     if (snap.empty) {
       tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No pages found. Create one above.</td></tr>';
       return;
     }
-      const liveRole = u.email ? resolveRole(u.email) : (u.role || 'user');
-      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${liveRole}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
+    tbody.innerHTML = snap.docs.map(d => {
       const p = d.data();
       const guideLocked = isGuideType(p.type) && !canManageGuidePages();
       const editBtn = guideLocked
@@ -481,64 +514,6 @@ async function refreshPages() {
   } catch { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase to manage pages.</td></tr>'; }
 }
 
-async function submitPage(e) {
-  e.preventDefault();
-  const id = document.getElementById('pf-id').value;
-  const data = {
-    title: document.getElementById('pf-title').value,
-    type: document.getElementById('pf-type').value,
-    tags: document.getElementById('pf-tags').value.split(',').map(t => t.trim()).filter(Boolean),
-    featured: document.getElementById('pf-featured').checked,
-    htmlContent: wrapWithDefaultSchema(document.getElementById('pf-html').value),
-    cssContent: mergeWithDefaultSchemaCSS(document.getElementById('pf-css').value),
-  };
-  try {
-    if (!id && isGuideType(data.type) && !canManageGuidePages()) {
-      alert('Only the Owner can create Guide pages.');
-      return;
-    }
-
-    if (id) {
-      const existingDoc = await db.collection('pages').doc(id).get();
-      if (!existingDoc.exists) {
-        alert('Page no longer exists.');
-        return;
-      }
-
-      const existingType = existingDoc.data().type;
-      if ((isGuideType(existingType) || isGuideType(data.type)) && !canManageGuidePages()) {
-        alert('Only the Owner can edit Guide pages.');
-        return;
-      }
-
-      await db.collection('pages').doc(id).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-    } else {
-      await db.collection('pages').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    }
-    resetPageForm();
-    await refreshPages();
-  } catch (err) { alert('Error: ' + err.message); }
-}
-
-async function editPage(id) {
-  const doc = await db.collection('pages').doc(id).get();
-  if (!doc.exists) return;
-  const p = doc.data();
-  if (isGuideType(p.type) && !canManageGuidePages()) {
-    alert('Only the Owner can edit Guide pages.');
-    return;
-  }
-  document.getElementById('pf-id').value = id;
-  document.getElementById('pf-title').value = p.title || '';
-  document.getElementById('pf-type').value = p.type || 'Anomaly';
-  document.getElementById('pf-tags').value = (p.tags || []).join(', ');
-  document.getElementById('pf-featured').checked = !!p.featured;
-  document.getElementById('pf-html').value = p.htmlContent || p.content || '';
-  document.getElementById('pf-css').value = p.cssContent || '';
-  document.getElementById('pf-btn').textContent = '>> Update Page';
-  document.getElementById('pf-cancel').classList.remove('hidden');
-}
-
 async function deletePage(id) {
   if (!canDeleteManagedContent()) {
     alert('Only Admins and Owners can delete pages.');
@@ -556,16 +531,6 @@ async function deletePage(id) {
   if (!confirm('Delete this page permanently?')) return;
   try { await db.collection('pages').doc(id).delete(); await refreshPages(); }
   catch (err) { alert('Delete failed: ' + err.message); }
-}
-
-function resetPageForm() {
-  document.getElementById('page-form').reset();
-  document.getElementById('pf-id').value = '';
-  document.getElementById('pf-html').value = defaultSchemaHTML();
-  document.getElementById('pf-css').value = defaultSchemaCSS();
-  document.getElementById('pf-featured').checked = false;
-  document.getElementById('pf-btn').textContent = '>> Save Page';
-  document.getElementById('pf-cancel').classList.add('hidden');
 }
 
 async function toggleFeaturedPage(id, nextState) {

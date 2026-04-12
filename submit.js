@@ -1867,24 +1867,18 @@ async function submitPage() {
 
   if (type === 'Anomaly' && anomalyId) {
     try {
-      let found = false;
-      if (typeof PAGE_SEED !== 'undefined') {
-        found = PAGE_SEED.some(p => p.type === 'Anomaly' && String(p.title || '').toUpperCase().startsWith(anomalyId));
-      }
-      if (!found) {
-        const existingPages = await db.collection('pages')
-          .where('type', '==', 'Anomaly')
-          .where('anomalyId', '==', anomalyId)
-          .limit(1)
-          .get();
-        const existingSubs = await db.collection('submissions')
-          .where('type', '==', 'Anomaly')
-          .where('anomalyId', '==', anomalyId)
-          .where('status', '==', 'pending')
-          .limit(1)
-          .get();
-        found = !existingPages.empty || !existingSubs.empty;
-      }
+      const existingPages = await db.collection('pages')
+        .where('type', '==', 'Anomaly')
+        .where('anomalyId', '==', anomalyId)
+        .limit(1)
+        .get();
+      const existingSubs = await db.collection('submissions')
+        .where('type', '==', 'Anomaly')
+        .where('anomalyId', '==', anomalyId)
+        .where('status', '==', 'pending')
+        .limit(1)
+        .get();
+      const found = !existingPages.empty || !existingSubs.empty;
 
       if (found) {
         alert('An Anomaly entry for ID "' + anomalyId + '" already exists or is pending review. You cannot create a duplicate Anomaly designation, though you may submit Tales or Art for it.');
