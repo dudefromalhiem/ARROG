@@ -180,11 +180,26 @@ function syncSharedNav(user) {
     const displayLabel = user.displayName || 'Agent';
     navAuth.innerHTML = renderUserMenuHTML(displayLabel);
     if (submitLink) submitLink.classList.remove('hidden');
-    if (adminLink) adminLink.classList.toggle('hidden', !isModerator(user.email));
+    if (adminLink) adminLink.classList.toggle('hidden', !isAdmin(user.email));
   } else {
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     if (submitLink) submitLink.classList.add('hidden');
     if (adminLink) adminLink.classList.add('hidden');
+  }
+}
+
+async function syncServerAuthCookie(user) {
+  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  if (!user) {
+    document.cookie = 'rog_id_token=; Max-Age=0; Path=/; SameSite=Lax' + secure;
+    return;
+  }
+  try {
+    const token = await user.getIdToken(false);
+    // Keep short-lived token in a first-party cookie so Vercel middleware can gate /admin.
+    document.cookie = 'rog_id_token=' + token + '; Max-Age=3600; Path=/; SameSite=Lax' + secure;
+  } catch (_err) {
+    document.cookie = 'rog_id_token=; Max-Age=0; Path=/; SameSite=Lax' + secure;
   }
 }
 
@@ -222,6 +237,7 @@ function applySiteAccessGate(user) {
 }
 
 auth.onAuthStateChanged(async user => {
+  syncServerAuthCookie(user);
   syncSharedNav(user);
   applySiteAccessGate(user);
   document.documentElement.classList.remove('auth-pending');

@@ -42,7 +42,7 @@
   </div>
 
   <!-- Access Denied (hidden by default) -->
-  <div class="section tc hidden" id="admin-denied" style="max-width:500px;margin:60px auto">
+  <div class="section tc hidden" id="admin-denied" style="max-width:500px;margin:60px auto;display:none">
     <div class="section-hd">Access Denied</div>
     <p style="font-size:.85rem;color:var(--wht-d)">
       Authentication required. Sign in with an authorized account on the
@@ -51,7 +51,7 @@
   </div>
 
   <!-- Admin Panel (hidden until auth) -->
-  <div class="hidden" id="admin-panel">
+  <div class="hidden" id="admin-panel" style="display:none">
     <div class="adm">
       <div class="adm-side" id="adm-tabs">
         <a class="on" id="tab-pages" onclick="switchTab('pages')">Pages</a>
@@ -109,14 +109,6 @@
             <p id="esd-status" style="font-size:.75rem;color:var(--wht-f);margin-top:10px">ESD status: checking...</p>
           </div>
           
-          <div class="card">
-            <div class="card-t">System Status</div>
-            <p style="font-size: .8rem; color: var(--wht-d); margin-top: 12px">
-              Firestore Connection: <span id="st-db" class="tag">ACTIVE</span><br>
-              Auth Provider: <span id="st-auth" class="tag">FIREBASE</span><br>
-              Admin Session: <span id="st-adm" class="tag">AUTHENTICATED</span>
-            </p>
-          </div>
         </div>
       </div>
     </div>

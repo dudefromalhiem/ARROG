@@ -874,7 +874,7 @@ function wrapWithDefaultSchema(html, title) {
 }
 
 function mergeWithDefaultSchemaCSS(css) {
-  return normalizePageCss(css || '').trim();
+  return normalizePageCss(sanitizeCSS(css || '')).trim();
 }
 
 function normalizePageCss(css) {
@@ -889,9 +889,36 @@ function normalizePageCss(css) {
     .replace(/#eee\b/gi, '#2f2f2f');
 }
 
+function sanitizeCSS(css) {
+  let safe = String(css || '').replace(/<\/?style\b[^>]*>/gi, '');
+
+  // Do not allow remote stylesheet inclusion.
+  safe = safe.replace(/@import\s+[^;]+;?/gi, '');
+
+  // Drop custom property declarations to prevent variable-based style injection.
+  safe = safe.replace(/--[a-z0-9_-]+\s*:\s*[^;{}]+;?/gi, '');
+
+  // Block legacy executable CSS vectors.
+  safe = safe.replace(/expression\s*\(/gi, 'blocked(');
+  safe = safe.replace(/behavior\s*:/gi, 'blocked-behavior:');
+
+  // Remove external URL fetches from CSS values.
+  safe = safe.replace(/url\(([^)]+)\)/gi, (_match, rawValue) => {
+    const value = String(rawValue || '').trim().replace(/^['"]|['"]$/g, '');
+    if (!value) return 'url("")';
+    if (value.startsWith('/') || value.startsWith('#')) return 'url("' + value + '")';
+    if (/^data:image\//i.test(value)) return 'url("' + value + '")';
+    return 'url("")';
+  });
+
+  return safe;
+}
+
 function buildSandboxDocument(html, css) {
   const htmlWithLazyImages = String(html || '').replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
-  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' +
+    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data: https: http:; style-src \'unsafe-inline\'; font-src data:; media-src data:; connect-src \'none\'; frame-src \'none\'">' +
+    '<style>' +
     ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--wht-d:#999;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
     '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +

@@ -138,25 +138,31 @@ function renderAdminBootstrap(user) {
   if (!user) {
     adminLoading.classList.add('hidden');
     adminDenied.classList.remove('hidden');
+    adminDenied.style.display = 'block';
     adminPanel.classList.add('hidden');
+    adminPanel.style.display = 'none';
     adminInfo.textContent = '';
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     return;
   }
 
   const role = resolveRole(user.email);
-  if (!isModerator(user.email)) {
+  if (!isAdmin(user.email)) {
     adminLoading.classList.add('hidden');
     adminDenied.classList.remove('hidden');
+    adminDenied.style.display = 'block';
     adminDenied.querySelector('.section-hd').textContent = 'Insufficient Clearance';
-    adminDenied.querySelector('p').innerHTML = `Your account does not have moderation privileges. Contact the Guild Owner.`;
+    adminDenied.querySelector('p').innerHTML = `Your account does not have admin privileges. Contact the Guild Owner.`;
     adminPanel.classList.add('hidden');
+    adminPanel.style.display = 'none';
     navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
     return;
   }
 
   adminDenied.classList.add('hidden');
+  adminDenied.style.display = 'none';
   adminPanel.classList.remove('hidden');
+  adminPanel.style.display = 'block';
   adminLoading.classList.add('hidden');
   const displayLabel = user.displayName || 'Agent';
   const clearanceLevel = clearanceLevelForRole(role);
@@ -245,8 +251,6 @@ async function loadConfig() {
       const data = doc.data();
       document.getElementById('cfg-categories').value = (data.categories || []).join(', ');
       document.getElementById('cfg-tags').value = (data.tags || []).join(', ');
-      document.getElementById('st-db').textContent = 'CONNECTED';
-      document.getElementById('st-db').className = 'tag';
       updateESDStatus(data);
     } else {
       updateESDStatus({});

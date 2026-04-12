@@ -264,7 +264,7 @@ async function updateAuthUI(user) {
     const displayLabel = user.displayName || 'Agent';
       navAuth.innerHTML = renderUserMenuHTML(displayLabel);
     if (submitLink) submitLink.classList.remove('hidden');
-    if (isModerator(user.email)) adminLink.classList.remove('hidden');
+    if (isAdmin(user.email)) adminLink.classList.remove('hidden');
     else adminLink.classList.add('hidden');
     // upsert user doc
     db.collection('users').doc(user.uid).set({
