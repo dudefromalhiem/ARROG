@@ -143,6 +143,52 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
   .intro-cl{font-size:.6rem;letter-spacing:4px}
 }
 
+/* Legacy Block */
+.legacy-block{
+  margin: 0 0 48px;
+  padding: 30px 24px;
+  border: 1px solid var(--red-d);
+  background:
+    radial-gradient(circle at top right, rgba(204,0,0,.12), transparent 35%),
+    linear-gradient(180deg, rgba(139,0,0,.08), rgba(0,0,0,.55));
+  position: relative;
+}
+.legacy-block::before{
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed rgba(139,0,0,.35);
+  pointer-events: none;
+}
+.legacy-kicker{
+  font-family: var(--font-m);
+  font-size: .7rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red-m);
+  margin-bottom: 8px;
+}
+.legacy-title{
+  border: none;
+  margin-bottom: 14px;
+  padding: 0;
+  font-size: 1.5rem;
+  letter-spacing: 3px;
+}
+.legacy-copy{
+  color: var(--wht-m);
+  font-size: .85rem;
+  line-height: 1.8;
+  margin-bottom: 12px;
+  max-width: 900px;
+}
+.legacy-actions{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
 /* Carousel */
 .carousel{position:relative;overflow:hidden;border:1px solid var(--red-d);background:var(--blk-c);height:320px}
 .carousel-track{display:flex;height:100%;transition:transform .6s ease}
@@ -346,6 +392,9 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
   .intro-hero { padding: 40px 12px 24px; }
   .intro-logo { width: 140px; height: 140px; }
   .intro-t { font-size: 1.35rem; letter-spacing: 3px; }
+  .legacy-block { padding: 22px 14px; margin-bottom: 34px; }
+  .legacy-title { font-size: 1.16rem; letter-spacing: 2px; }
+  .legacy-copy { font-size: .82rem; }
   .warn { padding: 28px 16px; margin-bottom: 40px; }
   .warn h2 { font-size: 1.15rem; letter-spacing: 2px; }
   .carousel { height: 220px; }

@@ -3,28 +3,74 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Anomaly Registry — Red Oaker Guild</title>
-  <meta name="description" content="Searchable database of classified anomalies." />
+  <title>Red Oaker Logs — Red Oaker Guild</title>
+  <meta name="description" content="Hierarchical Red Oaker Logs with numbered ranges, encrypted placeholders, and reconstruction routing." />
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .reg-wrap { max-width: 1000px; margin: 40px auto; }
-    .reg-ctrl { background: var(--blk-b); border: 1px solid var(--blk-m); padding: 20px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap; }
-    .reg-ctrl .fi { flex: 1; min-width: 200px; }
-    .reg-table { width: 100%; border-collapse: collapse; font-family: var(--font-m); }
-    .reg-table th { background: var(--red-d); color: var(--wht-b); text-align: left; padding: 12px; font-weight: bold; text-transform: uppercase; font-size: .8rem; letter-spacing: 1px; }
-    .reg-table td { background: var(--blk-b); padding: 12px; border-bottom: 1px solid var(--blk-m); font-size: .9rem; color: var(--wht-m); }
-    .reg-table tr:hover td { background: var(--blk-m); color: var(--wht-b); cursor: pointer; }
-    .badge { display: inline-block; padding: 4px 8px; border-radius: 2px; font-size: .7rem; text-transform: uppercase; font-weight: bold; }
-    .badge-Alona { background: #2ca02c; color: #fff; }
-    .badge-Delphi { background: #ff7f0e; color: #fff; }
-    .badge-Soros { background: #d62728; color: #fff; }
-    .badge-Vega { background: #1f77b4; color: #fff; }
-    .badge-Apophis { background: #7f7f7f; color: #fff; }
-    /* Generic fallback for unknown classes */
-    .badge-unknown { background: #444; color: #fff; }
-    
-    .loading-tbl { text-align: center; padding: 40px; color: var(--wht-d); font-style: italic; }
+    .logs-wrap { max-width: 1120px; margin: 40px auto; }
+    .logs-head { margin-bottom: 24px; }
+    .logs-head p { color: var(--wht-d); font-size: .86rem; max-width: 920px; }
+
+    .logs-level { margin-bottom: 20px; padding: 16px; border: 1px solid var(--red-d); background: var(--blk-c); }
+    .logs-level .ttl { color: var(--red-b); text-transform: uppercase; letter-spacing: 2px; font-size: .72rem; margin-bottom: 10px; }
+
+    .logs-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .logs-options.subcats { grid-template-columns: repeat(4, 1fr); }
+    .logs-option {
+      border: 1px solid var(--red-d);
+      background: var(--blk-s);
+      color: var(--wht-m);
+      font-family: var(--font-d);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s, color .15s;
+      min-height: 44px;
+    }
+    .logs-option:hover { border-color: var(--red-b); color: var(--wht); }
+    .logs-option.active { border-color: var(--red-b); background: rgba(139, 0, 0, .12); color: var(--wht); }
+
+    .range-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .range-chip {
+      border: 1px solid var(--blk-d);
+      background: var(--blk-s);
+      color: var(--wht-d);
+      font-size: .72rem;
+      font-family: var(--font-m);
+      padding: 8px 10px;
+      cursor: pointer;
+      min-height: 44px;
+    }
+    .range-chip.active,
+    .range-chip:hover { border-color: var(--red-b); color: var(--wht); background: rgba(139, 0, 0, .12); }
+
+    .entry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .entry-card { border: 1px solid var(--red-d); background: var(--blk-c); padding: 14px; }
+    .entry-code { color: var(--red-b); font-family: var(--font-d); letter-spacing: 1px; font-size: .9rem; margin-bottom: 6px; }
+    .entry-title { color: var(--wht); font-size: .84rem; font-weight: 700; margin-bottom: 8px; }
+    .entry-status { font-size: .7rem; color: var(--wht-f); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .entry-status.live { color: #44cf6c; }
+    .entry-status.enc { color: var(--red-m); }
+    .entry-copy { font-size: .76rem; color: var(--wht-m); line-height: 1.6; margin-bottom: 10px; }
+    .entry-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .empty-note {
+      border: 1px dashed var(--red-d);
+      color: var(--wht-f);
+      font-size: .78rem;
+      padding: 14px;
+      text-align: center;
+      background: rgba(0, 0, 0, .25);
+    }
+
+    @media (max-width: 960px) {
+      .logs-options { grid-template-columns: 1fr; }
+      .logs-options.subcats { grid-template-columns: 1fr; }
+      .range-grid { grid-template-columns: repeat(3, 1fr); }
+      .entry-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -47,45 +93,40 @@
   </div>
 </header>
 
-<main class="wrap reg-wrap">
-  <div class="section-hd" style="border-bottom:none">Anomaly Registry</div>
-  <p style="color:var(--wht-d); margin-bottom:24px; font-size:.9rem;">
-    Accessing the primary database. All interactions are logged. Use the filters below to isolate specific documentation.
-  </p>
-
-  <div class="reg-ctrl">
-    <input class="fi" type="text" id="filter-text" placeholder="Search ID or Keyword (e.g. ROS-0001)..." />
-    <select class="fi" id="filter-subtype" style="max-width:230px">
-      <option value="">All Submission Types</option>
-      <option value="ROS">ROS</option>
-      <option value="SLOA">SLOA</option>
-      <option value="SOA">SOA</option>
-      <option value="SCTOR">SCTOR</option>
-      <option value="TL">TL</option>
-    </select>
-    <select class="fi" id="filter-class" style="max-width:200px">
-      <option value="">All Object Classes</option>
-      <option value="Alona">Alona</option>
-      <option value="Delphi">Delphi</option>
-      <option value="Soros">Soros</option>
-      <option value="Vega">Vega</option>
-      <option value="Apophis">Apophis</option>
-    </select>
+<main class="wrap logs-wrap">
+  <div class="logs-head">
+    <div class="section-hd" style="border-bottom:none">Red Oaker Logs</div>
+    <p>
+      Select a branch, then a compartment, then a numbered range. Unedited entries remain encrypted by default. If you are authorized,
+      choose an entry and use Enter to reconstruct it through the editor workflow.
+    </p>
   </div>
 
-  <table class="reg-table" id="reg-table">
-    <thead>
-      <tr>
-        <th>Designation & Title</th>
-        <th style="width:120px">Class</th>
-        <th>Excerpt / Description</th>
-      </tr>
-    </thead>
-    <tbody id="reg-body">
-      <tr><td colspan="3" class="loading-tbl">Accessing databanks...</td></tr>
-    </tbody>
-  </table>
+  <section class="logs-level">
+    <div class="ttl">Level 1 // Root</div>
+    <div class="logs-options" id="top-level-options"></div>
+  </section>
 
+  <section class="logs-level">
+    <div class="ttl">Level 2 // Compartments</div>
+    <div class="logs-options subcats" id="subcategory-options">
+      <div class="empty-note">Choose Reports, Anomalies, or Tests.</div>
+    </div>
+  </section>
+
+  <section class="logs-level">
+    <div class="ttl">Level 3 // Number Ranges</div>
+    <div class="range-grid" id="range-options">
+      <div class="empty-note">Choose a compartment to load ranges.</div>
+    </div>
+  </section>
+
+  <section class="logs-level">
+    <div class="ttl" id="entries-title">Level 4 // Entries</div>
+    <div class="entry-grid" id="entries-grid">
+      <div class="empty-note">Choose a range to load entries.</div>
+    </div>
+  </section>
 </main>
 
 <footer class="ftr" style="margin-top:60px;">
@@ -101,116 +142,251 @@
 <script src="seed-data.js"></script>
 
 <script>
-  let allAnomalies = [];
+  const ENCRYPTED_COPY =
+    'The data on this page is inaccessible due to outdated encryption systems implemented prior to Archon Mikolov\'s reconstruction, anomalous interference, or may have never existed in the first place.';
 
-  function inferListKeyFromId(id) {
-    const raw = String(id || '').toUpperCase();
-    if (raw.startsWith('ROS-')) return 'ROS';
-    if (raw.startsWith('SLOA-')) return 'SLOA';
-    if (raw.startsWith('SOA-')) return 'SOA';
-    if (raw.startsWith('SCTOR:')) return 'SCTOR';
-    if (raw.startsWith('TL:')) return 'TL';
-    return '';
+  const ENCRYPTED_COPY_FOLLOWUP =
+    'If you are authorized, you may enter new data to reconstruct this page.';
+
+  const LOG_TREE = {
+    reports: {
+      label: 'Reports',
+      children: [
+        { id: 'narratives', label: 'Narratives', code: 'NAR', format: 'dash', digits: 4, start: 1, end: 800, group: 100, type: 'Tale', listKey: 'NAR' },
+        { id: 'field-reports', label: 'Field Reports', code: 'FR', format: 'dash', digits: 4, start: 1, end: 1200, group: 100, type: 'Tale', listKey: 'FR' }
+      ]
+    },
+    anomalies: {
+      label: 'Anomalies',
+      children: [
+        { id: 'soa', label: 'Sentient or Accursed Objects', code: 'SOA', format: 'dash', digits: 4, start: 1, end: 6000, group: 100, type: 'Anomaly', listKey: 'SOA' },
+        { id: 'ros', label: 'Red Oaker Specimen', code: 'ROS', format: 'dash', digits: 4, start: 1, end: 6000, group: 100, type: 'Anomaly', listKey: 'ROS' },
+        { id: 'sloa', label: 'Specimen Linked Anomalous Objects', code: 'SLOA', format: 'dash', digits: 4, start: 1, end: 6000, group: 100, type: 'Anomaly', listKey: 'SLOA' }
+      ]
+    },
+    tests: {
+      label: 'Tests',
+      children: [
+        { id: 'tl', label: 'Termination List', code: 'TL', format: 'colon', digits: 2, start: 1, end: 999, group: 100, type: 'Anomaly', listKey: 'TL' },
+        { id: 'sctor', label: 'Standard Cross Test Operation Reports', code: 'SCTOR', format: 'colon', digits: 2, start: 1, end: 999, group: 100, type: 'Anomaly', listKey: 'SCTOR' }
+      ]
+    }
+  };
+
+  let selectedTop = null;
+  let selectedSubcat = null;
+  let selectedRange = null;
+  let livePagesByDesignation = new Map();
+
+  function padNumber(value, digits) {
+    return String(value).padStart(digits, '0');
   }
 
-  async function loadRegistry() {
-    let combined = [];
-
-    // Seed fallback keeps the registry populated while Firestore pages are being migrated.
-    if (typeof PAGE_SEED !== 'undefined') {
-      combined = PAGE_SEED.filter(p => p.type === 'Anomaly').map(p => {
-        let objClass = 'unknown';
-        ['Alona', 'Delphi', 'Soros', 'Vega', 'Apophis', 'Erebus'].forEach(c => {
-          if (p.htmlContent && p.htmlContent.includes('Class:</span> ' + c)) {
-            objClass = c;
-          } else if (p.tags && p.tags.includes(c.toLowerCase())) {
-            objClass = c;
-          }
-        });
-        if (objClass === 'unknown') objClass = 'Alona';
-
-        const idMatch = p.title.match(/^([A-Z]{2,6}-\d+[A-Z]?)/i);
-        const anomalyId = idMatch ? idMatch[1].toUpperCase() : p.slug;
-
-        return {
-          id: p.id || p.slug,
-          slug: p.slug,
-          title: p.title,
-          anomalyId: anomalyId,
-          anomalyListKey: inferListKeyFromId(anomalyId),
-          objClass: objClass,
-          excerpt: (p.htmlContent.match(/<p>(.*?)<\/p>/) || [])[1]?.replace(/<[^>]*>?/gm, '').substring(0, 100) + '...' || ''
-        };
-      });
-    }
-
-    // Fetch live data from Firestore
-    try {
-      const snap = await db.collection('pages').where('type', '==', 'Anomaly').get();
-      snap.docs.forEach(doc => {
-        const data = doc.data();
-        if (combined.some(c => c.slug === data.slug)) return;
-
-        let objClass = 'unknown';
-        if (data.htmlContent) {
-            ['Alona', 'Delphi', 'Soros', 'Vega', 'Apophis'].forEach(c => {
-             if (data.htmlContent.includes(c)) objClass = c;
-           });
-        }
-        
-        combined.push({
-          id: doc.id,
-          slug: data.slug,
-          title: data.title,
-          anomalyId: data.anomalyId || '',
-          anomalyListKey: data.anomalyListKey || inferListKeyFromId(data.anomalyId || ''),
-          objClass: objClass,
-          excerpt: data.htmlContent ? data.htmlContent.replace(/<[^>]*>?/gm, '').substring(0, 100) + '...' : ''
-        });
-      });
-    } catch(e) {
-      console.warn("Could not fetch remote anomalies.", e);
-    }
-
-    allAnomalies = combined;
-    renderTable();
+  function buildDesignation(config, index) {
+    const num = padNumber(index, config.digits);
+    if (config.format === 'colon') return config.code + ': ' + num;
+    return config.code + '-' + num;
   }
 
-  function renderTable() {
-    const txtFilter = document.getElementById('filter-text').value.toLowerCase();
-    const clsFilter = document.getElementById('filter-class').value;
-    const subtypeFilter = document.getElementById('filter-subtype').value;
-    const body = document.getElementById('reg-body');
+  function normalizeDesignation(text) {
+    return String(text || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
 
-    const filtered = allAnomalies.filter(item => {
-      if (clsFilter && item.objClass !== clsFilter) return false;
-      if (subtypeFilter && item.anomalyListKey !== subtypeFilter) return false;
-      if (txtFilter && !item.title.toLowerCase().includes(txtFilter) && !item.anomalyId.toLowerCase().includes(txtFilter)) return false;
-      return true;
-    });
+  function extractDesignationFromPage(page) {
+    if (!page) return '';
+    if (page.anomalyId) return String(page.anomalyId).toUpperCase();
+    const title = String(page.title || '');
+    const match = title.match(/^(ROS-\d{1,4}|SOA-\d{1,4}|SLOA-\d{1,4}[A-Z]?|TL:\s*\d+|SCTOR:\s*\d+|FR-\d{1,4}|NAR-\d{1,4})/i);
+    return match ? String(match[1]).toUpperCase() : '';
+  }
 
-    if (filtered.length === 0) {
-      body.innerHTML = '<tr><td colspan="3" class="loading-tbl">No records found matching criteria.</td></tr>';
-      return;
+  function buildRangeBuckets(config) {
+    const ranges = [];
+    for (let start = config.start; start <= config.end; start += config.group) {
+      const end = Math.min(config.end, start + config.group - 1);
+      ranges.push({ start: start, end: end, label: padNumber(start, config.digits) + '-' + padNumber(end, config.digits) });
     }
+    return ranges;
+  }
 
-    body.innerHTML = filtered.map(item => {
-      const clsBadge = 'badge-' + (item.objClass || 'unknown');
-      const href = item.slug ? 'page.html?slug=' + item.slug : 'page.html?id=' + item.id;
-      const listTag = item.anomalyListKey ? `<span class="tag" style="margin-left:8px">${item.anomalyListKey}</span>` : '';
-      return `<tr onclick="window.location.href='${href}'">
-        <td><div style="font-weight:bold;color:var(--wht-b); margin-bottom:4px;">${item.anomalyId || item.title.split(': ')[0]}</div><div style="font-size:.8rem;">${item.title}</div></td>
-        <td><span class="badge ${clsBadge}">${item.objClass || 'Unknown'}</span></td>
-        <td>${item.excerpt}${listTag}</td>
-      </tr>`;
+  function buildEntryTitle(config, designation) {
+    if (config.id === 'narratives') return designation + ': [TITLE]';
+    if (config.id === 'field-reports') return 'Field Report ' + designation.replace(/^FR-/, '') + ' [ENCRYPTED INFORMATION]';
+    return designation + ': [ENCRYPTED INFORMATION]';
+  }
+
+  function buildPrefillLink(config, designation) {
+    const url = new URL('submit.html', window.location.href);
+    const seededTitle = buildEntryTitle(config, designation);
+    url.searchParams.set('reconstruct', '1');
+    url.searchParams.set('designation', designation);
+    url.searchParams.set('listKey', config.listKey);
+    url.searchParams.set('entryType', config.type);
+    url.searchParams.set('title', seededTitle);
+    url.searchParams.set('slug', (designation + '-' + config.id).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''));
+    return url.pathname + url.search;
+  }
+
+  function renderTopLevel() {
+    const container = document.getElementById('top-level-options');
+    container.innerHTML = Object.entries(LOG_TREE).map(([id, node]) => {
+      const active = selectedTop === id ? 'active' : '';
+      return '<button class="logs-option ' + active + '" type="button" onclick="selectTopLevel(\'' + id + '\')">' + node.label + '</button>';
     }).join('');
   }
 
-  document.getElementById('filter-text').addEventListener('input', renderTable);
-  document.getElementById('filter-class').addEventListener('change', renderTable);
-  document.getElementById('filter-subtype').addEventListener('change', renderTable);
+  function selectTopLevel(id) {
+    selectedTop = id;
+    selectedSubcat = null;
+    selectedRange = null;
+    renderTopLevel();
+    renderSubcategories();
+    renderRanges();
+    renderEntries();
+  }
 
-  document.addEventListener('DOMContentLoaded', loadRegistry);
+  function renderSubcategories() {
+    const container = document.getElementById('subcategory-options');
+    if (!selectedTop || !LOG_TREE[selectedTop]) {
+      container.innerHTML = '<div class="empty-note">Choose Reports, Anomalies, or Tests.</div>';
+      return;
+    }
+
+    const node = LOG_TREE[selectedTop];
+    container.innerHTML = node.children.map(child => {
+      const active = selectedSubcat && selectedSubcat.id === child.id ? 'active' : '';
+      return '<button class="logs-option ' + active + '" type="button" onclick="selectSubcategory(\'' + child.id + '\')">' + child.label + '</button>';
+    }).join('');
+  }
+
+  function selectSubcategory(childId) {
+    const node = LOG_TREE[selectedTop];
+    selectedSubcat = node.children.find(child => child.id === childId) || null;
+    selectedRange = null;
+    renderSubcategories();
+    renderRanges();
+    renderEntries();
+  }
+
+  function renderRanges() {
+    const container = document.getElementById('range-options');
+    if (!selectedSubcat) {
+      container.innerHTML = '<div class="empty-note">Choose a compartment to load ranges.</div>';
+      return;
+    }
+
+    const ranges = buildRangeBuckets(selectedSubcat);
+    container.innerHTML = ranges.map(range => {
+      const key = range.start + '-' + range.end;
+      const active = selectedRange && selectedRange.start === range.start && selectedRange.end === range.end ? 'active' : '';
+      return '<button class="range-chip ' + active + '" type="button" onclick="selectRange(' + range.start + ', ' + range.end + ')">' + range.label + '</button>';
+    }).join('');
+  }
+
+  function selectRange(start, end) {
+    selectedRange = { start: Number(start), end: Number(end) };
+    renderRanges();
+    renderEntries();
+  }
+
+  function renderEntries() {
+    const grid = document.getElementById('entries-grid');
+    const title = document.getElementById('entries-title');
+    if (!selectedSubcat || !selectedRange) {
+      title.textContent = 'Level 4 // Entries';
+      grid.innerHTML = '<div class="empty-note">Choose a range to load entries.</div>';
+      return;
+    }
+
+    title.textContent = 'Level 4 // Entries // ' + selectedSubcat.label + ' // ' + padNumber(selectedRange.start, selectedSubcat.digits) + '-' + padNumber(selectedRange.end, selectedSubcat.digits);
+
+    const cards = [];
+    for (let idx = selectedRange.start; idx <= selectedRange.end; idx++) {
+      const designation = buildDesignation(selectedSubcat, idx);
+      const normalized = normalizeDesignation(designation);
+      const existing = livePagesByDesignation.get(normalized);
+      const listTag = '<span class="tag">' + selectedSubcat.listKey + '</span>';
+
+      if (existing) {
+        const href = existing.slug ? ('page.html?slug=' + encodeURIComponent(existing.slug)) : ('page.html?id=' + encodeURIComponent(existing.id));
+        cards.push(
+          '<article class="entry-card">' +
+            '<div class="entry-code">' + designation + ' ' + listTag + '</div>' +
+            '<div class="entry-title">' + escapeHtml(existing.title || designation) + '</div>' +
+            '<div class="entry-status live">Approved Entry</div>' +
+            '<div class="entry-copy">This page has been reconstructed and approved by Guild administration.</div>' +
+            '<div class="entry-actions">' +
+              '<a class="btn btn-sm btn-s" href="' + href + '">Open</a>' +
+              '<a class="btn btn-sm btn-p" href="submit.html?editId=' + encodeURIComponent(existing.id) + '">Edit</a>' +
+            '</div>' +
+          '</article>'
+        );
+      } else {
+        cards.push(
+          '<article class="entry-card">' +
+            '<div class="entry-code">' + designation + ' ' + listTag + '</div>' +
+            '<div class="entry-title">[ENCRYPTED INFORMATION]</div>' +
+            '<div class="entry-status enc">Encrypted / Unreconstructed</div>' +
+            '<div class="entry-copy">' + escapeHtml(ENCRYPTED_COPY) + '</div>' +
+            '<div class="entry-copy">' + escapeHtml(ENCRYPTED_COPY_FOLLOWUP) + '</div>' +
+            '<div class="entry-actions">' +
+              '<a class="btn btn-sm btn-p" href="' + buildPrefillLink(selectedSubcat, designation) + '">Enter</a>' +
+            '</div>' +
+          '</article>'
+        );
+      }
+    }
+
+    grid.innerHTML = cards.join('');
+  }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function buildLiveDesignationIndex() {
+    const pages = [];
+
+    if (typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)) {
+      PAGE_SEED.forEach(seed => pages.push({ id: seed.id || '', ...seed }));
+    }
+
+    try {
+      const snap = await db.collection('pages').get();
+      snap.docs.forEach(doc => pages.push({ id: doc.id, ...doc.data() }));
+    } catch (_err) {
+      // Keep seed-only fallback if Firestore is unavailable.
+    }
+
+    livePagesByDesignation = new Map();
+    pages.forEach(page => {
+      const designation = extractDesignationFromPage(page);
+      if (!designation) return;
+      const normalized = normalizeDesignation(designation);
+      if (!livePagesByDesignation.has(normalized)) {
+        livePagesByDesignation.set(normalized, page);
+      }
+    });
+  }
+
+  async function bootLogs() {
+    renderTopLevel();
+    renderSubcategories();
+    renderRanges();
+    renderEntries();
+    await buildLiveDesignationIndex();
+    selectTopLevel('anomalies');
+    if (selectedTop && LOG_TREE[selectedTop] && LOG_TREE[selectedTop].children[0]) {
+      selectSubcategory(LOG_TREE[selectedTop].children[0].id);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', bootLogs);
 </script>
 </body>
 </html>

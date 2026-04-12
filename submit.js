@@ -136,6 +136,7 @@ auth.onAuthStateChanged(user => {
     setDraftStatus('Draft autosave is idle.');
     loadMySubmissions();
     initializeSubmitEditModeFromUrl();
+    initializeReconstructionPrefillFromUrl();
   } else {
     currentUserForSubmit = null;
     activeDraftId = null;
@@ -443,6 +444,53 @@ async function openRejectedSubmissionPreview(id) {
 function closeRejectedSubmissionPreview() {
   const modal = document.getElementById('my-reject-modal');
   if (modal) modal.remove();
+}
+
+function initializeReconstructionPrefillFromUrl() {
+  if (!currentUserForSubmit || submitEditTarget) return;
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('reconstruct') !== '1') return;
+
+  const designation = String(params.get('designation') || '').trim();
+  const listKey = String(params.get('listKey') || '').trim().toUpperCase();
+  const entryType = String(params.get('entryType') || '').trim();
+  const title = String(params.get('title') || '').trim();
+  const slug = String(params.get('slug') || '').trim();
+
+  if (!designation) return;
+
+  const typeInput = document.getElementById('sf-type');
+  const titleInput = document.getElementById('sf-title');
+  const slugInput = document.getElementById('sf-slug');
+  const subtypeInput = document.getElementById('sf-anomaly-subtype');
+  const codeInput = document.getElementById('sf-anomaly-code');
+
+  if (entryType && Array.from(typeInput.options).some(opt => opt.value === entryType)) {
+    typeInput.value = entryType;
+  }
+  onTypeChange();
+
+  if (typeInput.value === 'Anomaly' && listKey && ANOMALY_SUBTYPE_RULES[listKey]) {
+    subtypeInput.value = listKey;
+    codeInput.value = designation;
+    onAnomalySubtypeChange();
+  }
+
+  titleInput.value = title || (designation + ': [TITLE]');
+  slugInput.value = slug || generateSlug(designation);
+
+  switchMode('code');
+  if (!document.getElementById('sf-html').value.trim() || document.getElementById('sf-html').value.trim() === DEFAULT_NEW_PAGE_HTML.trim()) {
+    document.getElementById('sf-html').value = `<div class="page-shell">\n  <header class="page-header">\n    <h1 class="page-title">${designation}: [TITLE]</h1>\n    <p class="page-subtitle">Reconstructed Archive Entry</p>\n  </header>\n  <section class="page-section">\n    <h2>Summary</h2>\n    <p>Enter reconstructed data for this designation.</p>\n  </section>\n</div>`;
+  }
+
+  updateTypeSpecificUI();
+  updateSlugPreview();
+  updatePreview();
+  setDraftStatus('Reconstruction target loaded for ' + designation + '.');
+
+  window.history.replaceState({}, document.title, window.location.pathname);
 }
 
 async function initializeSubmitEditModeFromUrl() {
