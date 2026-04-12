@@ -623,8 +623,31 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
   return raw + gallery;
 }
 
+function repairDocumentImagesWithUploads(html, imageUrls) {
+  const urls = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+  if (!urls.length) return String(html || '');
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = String(html || '');
+  const docImages = Array.from(wrapper.querySelectorAll('figure.doc-image-wrap img'));
+  let uploadIndex = 0;
+
+  docImages.forEach(img => {
+    const src = String(img.getAttribute('src') || '').trim();
+    const alt = String(img.getAttribute('alt') || '').trim();
+    const valid = /^(data:image\/(png|jpeg|gif|webp|bmp|svg\+xml);base64,|https?:\/\/|\/)/i.test(src);
+    const referencesKnownUpload = urls.some(url => src === url);
+    if ((!valid || /document image/i.test(alt)) && !referencesKnownUpload) {
+      img.setAttribute('src', urls[Math.min(uploadIndex, urls.length - 1)]);
+      uploadIndex++;
+    }
+  });
+
+  return wrapper.innerHTML;
+}
+
 function buildPageDocument(html, css, imageUrls) {
-  const raw = (html || '').trim();
+  const raw = repairDocumentImagesWithUploads((html || '').trim(), imageUrls || []);
   const htmlWithUploads = embedUploadedImagesIfMissing(raw, imageUrls || []);
   const wrapped = htmlWithUploads.includes('class="page-shell"')
     ? htmlWithUploads

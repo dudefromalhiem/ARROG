@@ -1772,7 +1772,7 @@ function updatePreview() {
 
   const frame = document.getElementById('preview-frame');
   const sanitized = sanitizeHTML(html);
-  const htmlWithUploads = embedUploadedImagesIfMissing(sanitized, uploadedImages.map(img => img.url));
+  const htmlWithUploads = embedUploadedImagesIfMissing(sanitized, uploadedImages.map(img => img.remoteUrl || img.url));
   const wrappedHtml = wrapWithDefaultSchema(htmlWithUploads, document.getElementById('sf-title').value || 'New Classified Document');
   const doc = buildSandboxDocument(wrappedHtml, mergeWithDefaultSchemaCSS(css));
   frame.srcdoc = doc;
