@@ -88,9 +88,9 @@
         <tbody>
           <tr><td style="color:#2ca02c;font-weight:bold;">Alona</td><td>Level 1</td><td>Minimal threat. Object exhibits passive anomalous traits. Public-facing awareness only.</td></tr>
           <tr><td style="color:#ff7f0e;font-weight:bold;">Delphi</td><td>Level 2</td><td>Moderate threat. Restricted access for standard personnel.</td></tr>
-          <tr><td style="color:#d62728;font-weight:bold;">Soros</td><td>Level 3</td><td>High threat. Moderators and containment teams only.</td></tr>
-          <tr><td style="color:#9467bd;font-weight:bold;">Vega</td><td>Level 4</td><td>Senior operational authority. Cross-site command access.</td></tr>
-          <tr><td style="color:#7f7f7f;font-weight:bold;">Apophis</td><td>Level 5+</td><td>Executive and owner-level authority. Override control.</td></tr>
+          <tr><td style="color:#d62728;font-weight:bold;">Soros</td><td>Level 4</td><td>High threat. Moderators and containment teams only.</td></tr>
+          <tr><td style="color:#9467bd;font-weight:bold;">Vega</td><td>Level 5</td><td>Senior operational authority. Cross-site command access.</td></tr>
+          <tr><td style="color:#7f7f7f;font-weight:bold;">Apophis</td><td>Level 6</td><td>Executive and owner-level authority. Override control.</td></tr>
         </tbody>
       </table>
     </div>
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ownerActions = document.getElementById('guide-owner-actions');
     if (user && isOwner(user.email)) {
       ownerActions.classList.remove('hidden');
-      document.getElementById('guide-edit-btn').onclick = () => location.href = 'admin.html?editSlug=guide';
+      document.getElementById('guide-edit-btn').onclick = () => location.href = 'submit.html?editSlug=guide';
     }
   });
 

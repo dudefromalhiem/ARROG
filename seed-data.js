@@ -125,8 +125,7 @@ PAGE_SEED.push({
 const clearances = [
   ['Level 1', 'Public-facing or unregistered access. No write privileges.'],
   ['Level 2', 'Regular personnel. Restricted access to Alona and Delphi materials.'],
-  ['Level 3', 'Moderators and containment specialists. Granted Soros access for review and enforcement.'],
-  ['Level 4', 'Senior staff reserve level. Cross-site coordination and special operations.'],
+  ['Level 4', 'Moderators and containment specialists. Granted Soros access for review and enforcement.'],
   ['Level 5', 'Administrators. Executive board authority and publication control.'],
   ['Level 6', 'Owners. Absolute override status across the Guild.']
 ];

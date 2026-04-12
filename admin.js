@@ -414,9 +414,7 @@ async function refreshPages() {
       const guideLocked = isGuideType(p.type) && !canManageGuidePages();
       const editBtn = guideLocked
         ? '<span style="font-size:.7rem;color:var(--wht-f)">Owner-only guide</span>'
-        : (isGuideType(p.type)
-          ? '<button class="btn btn-sm btn-s" onclick="location.href=\'submit.html?editId=' + d.id + '\'">Edit</button>'
-          : '<button class="btn btn-sm btn-s" onclick="editPage(\'' + d.id + '\')">Edit</button>');
+        : '<button class="btn btn-sm btn-s" onclick="location.href=\'submit.html?editId=' + d.id + '\'">Edit</button>';
       const deleteBtn = canDeleteManagedContent() && !guideLocked
         ? '<button class="btn btn-sm btn-d" onclick="deletePage(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
         : '';
@@ -1313,7 +1311,7 @@ async function loadRolesManager(container) {
       <div style="display:flex;gap:8px;align-items:center">
         <input class="fi" id="role-email" placeholder="email@example.com" style="flex:1" />
         <select class="fi" id="role-kind" style="max-width:180px">
-          <option value="mod">Moderator (Level 3)</option>
+          <option value="mod">Moderator (Level 4)</option>
           <option value="admin">Admin (Level 5)</option>
         </select>
         <button class="btn btn-p" onclick="addStaffRole()">+ Add Role</button>

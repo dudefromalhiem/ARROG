@@ -42,9 +42,13 @@
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
-      <li><a href="index.html#resources">Archives</a></li>
+      <li><a href="guide.html">Guide</a></li>
+      <li><a href="registry.html">Registry</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Submit</a></li>
+      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
     </ul>
   </div>
@@ -140,8 +144,7 @@
   const clearance = [
     ['Level 1', 'Unregistered or public-facing access only. No archive write privileges.'],
     ['Level 2', 'Regular personnel. Restricted access to Alona/Delphi material.'],
-    ['Level 3', 'Moderators and containment specialists. Full Soros access.'],
-    ['Level 4', 'Senior personnel reserve level. Cross-site command and special operations.'],
+    ['Level 4', 'Moderators and containment specialists. Full Soros access.'],
     ['Level 5', 'Admins. Executive Board authority and archive review control.'],
     ['Level 6', 'Owners. Supreme override status across the Guild.']
   ];

@@ -135,7 +135,30 @@ function isOwner(email) { return resolveRole(email) === "owner"; }
 function clearanceLevelForRole(role) {
   if (role === "owner") return 6;
   if (role === "admin") return 5;
-  if (role === "mod") return 3;
+  if (role === "mod") return 4;
   if (role === "user") return 2;
   return 1;
 }
+
+function syncSharedNav(user) {
+  const navAuth = document.getElementById('nav-auth');
+  const submitLink = document.getElementById('submit-link');
+  const adminLink = document.getElementById('admin-link');
+  if (!navAuth) return;
+
+  if (user) {
+    const displayLabel = user.displayName || 'Agent';
+    navAuth.innerHTML = renderUserMenuHTML(displayLabel);
+    if (submitLink) submitLink.classList.remove('hidden');
+    if (adminLink) adminLink.classList.toggle('hidden', !isModerator(user.email));
+  } else {
+    navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    if (submitLink) submitLink.classList.add('hidden');
+    if (adminLink) adminLink.classList.add('hidden');
+  }
+}
+
+auth.onAuthStateChanged(async user => {
+  await rolesReady;
+  syncSharedNav(user);
+});

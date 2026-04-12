@@ -141,7 +141,7 @@ function skipTerminal() {
 }
 
 // ═════════════════════════════════════════════════════════════
-// CLEARANCE WELCOME SCREEN (Guest=3, User=4, Mod=5, Admin/Owner=6)
+// CLEARANCE WELCOME SCREEN (Guest=1, User=2, Mod=4, Admin=5, Owner=6)
 // ═════════════════════════════════════════════════════════════
 
 function showClearanceWelcome(role) {
