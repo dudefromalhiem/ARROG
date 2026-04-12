@@ -67,13 +67,17 @@ service cloud.firestore {
       // Any authenticated user can create a submission
       allow create: if isSignedIn() &&
         request.resource.data.authorUid == request.auth.uid &&
-        request.resource.data.status == 'pending';
-      // Moderators can update (approve/reject)
-      allow update: if isModerator();
+        (request.resource.data.status == 'pending' || request.resource.data.status == 'draft');
+      // Moderators can update (approve/reject); authors can update their own draft
+      allow update: if isModerator() ||
+        (isSignedIn() &&
+         resource.data.authorUid == request.auth.uid &&
+         request.resource.data.authorUid == request.auth.uid &&
+         request.resource.data.status == 'draft');
       // Admins can delete; authors can delete their own pending submissions
       allow delete: if isAdmin() ||
         (isSignedIn() && resource.data.authorUid == request.auth.uid &&
-         resource.data.status == 'pending');
+         (resource.data.status == 'pending' || resource.data.status == 'draft'));
     }
 
     // ── Artworks ──────────────────────────────────────────

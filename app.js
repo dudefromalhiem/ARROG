@@ -137,7 +137,17 @@ function runTerminal() {
 
 function skipTerminal() {
   clearInterval(terminalInterval);
-  document.getElementById('terminal').classList.add('hidden');
+  const terminal = document.getElementById('terminal');
+  if (terminal) terminal.classList.add('hidden');
+  try { localStorage.setItem('rog_terminal_seen', '1'); } catch (_e) { }
+}
+
+function shouldShowTerminal() {
+  try {
+    return localStorage.getItem('rog_terminal_seen') !== '1';
+  } catch (_e) {
+    return true;
+  }
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -450,7 +460,8 @@ function loadData() {
 // ═════════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
-  runTerminal();
+  if (shouldShowTerminal()) runTerminal();
+  else skipTerminal();
   auth.onAuthStateChanged(updateAuthUI);
   loadData();
 });

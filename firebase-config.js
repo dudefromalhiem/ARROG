@@ -105,6 +105,98 @@ document.addEventListener('click', event => {
   if (!event.target.closest('[data-user-menu]')) closeUserMenus();
 });
 
+function closeMobileNav() {
+  const nav = document.getElementById('nav');
+  if (nav) nav.classList.remove('open');
+}
+
+function markActiveNavLink() {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  const current = location.pathname.split('/').pop() || 'index.html';
+  nav.querySelectorAll('a[href]').forEach(link => {
+    const href = (link.getAttribute('href') || '').split('?')[0];
+    link.classList.toggle('active', href === current);
+  });
+}
+
+function ensureSkipLink() {
+  if (document.querySelector('.skip-link')) return;
+  const main = document.querySelector('main');
+  if (!main) return;
+  if (!main.id) main.id = 'main-content';
+  const skip = document.createElement('a');
+  skip.className = 'skip-link';
+  skip.href = '#' + main.id;
+  skip.textContent = 'Skip to content';
+  document.body.prepend(skip);
+}
+
+function ensureBackToTop() {
+  if (document.getElementById('back-to-top')) return;
+  const btn = document.createElement('button');
+  btn.id = 'back-to-top';
+  btn.className = 'back-to-top';
+  btn.type = 'button';
+  btn.setAttribute('aria-label', 'Back to top');
+  btn.textContent = '↑';
+  btn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  document.body.appendChild(btn);
+
+  const toggle = () => {
+    btn.classList.toggle('show', window.scrollY > 460);
+  };
+  window.addEventListener('scroll', toggle, { passive: true });
+  toggle();
+}
+
+function bindGlobalNavUX() {
+  const nav = document.getElementById('nav');
+  const toggle = document.querySelector('.nav-toggle');
+  if (!nav || !toggle) return;
+
+  toggle.setAttribute('aria-label', 'Toggle navigation');
+  toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
+  toggle.setAttribute('aria-controls', 'nav');
+
+  nav.addEventListener('click', e => {
+    const target = e.target;
+    if (target && target.closest('a,button')) closeMobileNav();
+  });
+
+  document.addEventListener('click', e => {
+    if (!nav.classList.contains('open')) return;
+    if (!e.target.closest('.hdr')) closeMobileNav();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeUserMenus();
+      closeMobileNav();
+    }
+  });
+
+  const observer = new MutationObserver(() => {
+    toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
+  });
+  observer.observe(nav, { attributes: true, attributeFilter: ['class'] });
+}
+
+function initializeGlobalUX() {
+  ensureSkipLink();
+  ensureBackToTop();
+  bindGlobalNavUX();
+  markActiveNavLink();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeGlobalUX);
+} else {
+  initializeGlobalUX();
+}
+
 /* ═══════════════════════════════════════════════════════════════
  *  RBAC — Dynamic role resolution via Firestore (config/roles)
  *  Admin emails are managed by the Owner via the Admin Terminal.

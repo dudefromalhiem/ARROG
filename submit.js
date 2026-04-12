@@ -13,12 +13,22 @@ let docBlocks = [];
 let activeDocEditable = null;
 let docDragIndex = -1;
 let submitEditTarget = null;
+let activeDraftId = null;
+let draftAutoSaveTimer = null;
+let draftSaveInFlight = false;
+let suppressDraftAutoSave = false;
 const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
 const FIRESTORE_IMAGE_MAX_BYTES = 250 * 1024;
 const FIRESTORE_IMAGE_MAX_DIMENSION = 1280;
 const FIRESTORE_IMAGE_LIMIT = 3;
+const TAG_OPTIONS = [
+  'object', 'animal', 'humanoid', 'plant', 'artifact', 'document', 'digital',
+  'memetic', 'cognitohazard', 'spatial', 'temporal', 'biological', 'dangerous',
+  'archive', 'field-report'
+];
+let selectedTagsState = new Set();
 
 const ANOMALY_SUBTYPE_RULES = {
   ROS: {
@@ -122,15 +132,288 @@ auth.onAuthStateChanged(user => {
         '<button class="nav-btn" onclick="changeUsername()" title="Click to change your username">' + (user.displayName || 'Agent') + '</button>' +
         '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
       '</div>';
+    setDraftStatus('Draft autosave is idle.');
     loadMySubmissions();
     initializeSubmitEditModeFromUrl();
   } else {
     currentUserForSubmit = null;
+    activeDraftId = null;
     document.getElementById('submit-denied').classList.remove('hidden');
     document.getElementById('submit-panel').classList.add('hidden');
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
   }
 });
+
+window.addEventListener('beforeunload', () => {
+  if (currentUserForSubmit) {
+    saveDraft({ silent: true, trigger: 'leave' });
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && currentUserForSubmit) {
+    saveDraft({ silent: true, trigger: 'hidden' });
+  }
+});
+
+function setDraftStatus(message, isError = false) {
+  const el = document.getElementById('draft-status');
+  if (!el) return;
+  el.textContent = message;
+  el.style.color = isError ? 'var(--red-b)' : 'var(--wht-f)';
+}
+
+function scheduleDraftAutoSave() {
+  if (suppressDraftAutoSave || !currentUserForSubmit || submitEditTarget) return;
+  clearTimeout(draftAutoSaveTimer);
+  setDraftStatus('Draft changes detected. Autosaving...');
+  draftAutoSaveTimer = setTimeout(() => {
+    saveDraft({ silent: true, trigger: 'autosave' });
+  }, 2500);
+}
+
+function buildCurrentEditorContent(requireContent) {
+  let htmlContent = '';
+  let cssContent = '';
+
+  if (currentMode === 'template') {
+    const result = buildTemplateHTML();
+    htmlContent = result.html;
+    cssContent = result.css;
+    if (requireContent && !htmlContent.trim()) {
+      throw new Error('Please fill in at least some template fields.');
+    }
+  } else if (currentMode === 'doc') {
+    const result = buildDocumentModeHTML();
+    htmlContent = result.html;
+    cssContent = result.css;
+    if (requireContent && !hasDocumentContent()) {
+      throw new Error('Please add at least one content block in Document Studio.');
+    }
+  } else {
+    htmlContent = document.getElementById('sf-html').value;
+    cssContent = document.getElementById('sf-css').value;
+    if (requireContent && !htmlContent.trim()) {
+      throw new Error('Please enter some HTML content.');
+    }
+  }
+
+  return {
+    htmlContent: htmlContent,
+    cssContent: cssContent
+  };
+}
+
+function removeClientOnlySubmissionFields(data) {
+  const cleaned = { ...(data || {}) };
+  delete cleaned.submittedAt;
+  delete cleaned.reviewedAt;
+  delete cleaned.approvedPageId;
+  delete cleaned.reviewedBy;
+  delete cleaned.autoApproved;
+  return cleaned;
+}
+
+async function saveDraft(options = {}) {
+  if (!currentUserForSubmit || submitEditTarget) return null;
+  if (draftSaveInFlight) return activeDraftId;
+
+  const silent = !!options.silent;
+  const trigger = options.trigger || 'manual';
+
+  const title = document.getElementById('sf-title').value.trim();
+  const type = document.getElementById('sf-type').value;
+  const manualSlug = document.getElementById('sf-slug').value.trim();
+  const slug = manualSlug || generateSlug(title);
+  const tags = getSelectedTags();
+  const anomalySubtype = document.getElementById('sf-anomaly-subtype').value;
+  const anomalyCodeInput = document.getElementById('sf-anomaly-code').value;
+
+  let anomalyId = '';
+  let anomalyListKey = '';
+  let anomalySubtypeLabel = '';
+  if (type === 'Anomaly') {
+    const validation = validateAnomalyDesignation(anomalySubtype, anomalyCodeInput);
+    if (validation.valid) {
+      anomalyId = validation.code;
+      anomalyListKey = validation.rule.listKey;
+      anomalySubtypeLabel = validation.rule.label;
+    }
+  }
+
+  let content;
+  try {
+    content = buildCurrentEditorContent(false);
+  } catch (_err) {
+    content = {
+      htmlContent: document.getElementById('sf-html').value || '',
+      cssContent: document.getElementById('sf-css').value || ''
+    };
+  }
+
+  const isEmpty = !title && !slug && !tags.length && !content.htmlContent.trim() && !content.cssContent.trim();
+  if (isEmpty) {
+    if (!silent) setDraftStatus('Draft not saved because the editor is empty.');
+    return null;
+  }
+
+  const uploadedUrls = uploadedImages.filter(img => !img.removed && img.remoteUrl).map(img => img.remoteUrl);
+  const sanitizedHTML = sanitizeHTML(content.htmlContent || '');
+  const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title || 'Untitled Draft');
+  const mergedCSS = mergeWithDefaultSchemaCSS(content.cssContent || '');
+
+  const draftPayload = {
+    title: title || 'Untitled Draft',
+    anomalyId: anomalyId,
+    anomalySubtype: anomalySubtype || '',
+    anomalySubtypeLabel: anomalySubtypeLabel || '',
+    anomalyListKey: anomalyListKey || '',
+    type: type,
+    tags: tags,
+    slug: slug || '',
+    htmlContent: wrappedHTML,
+    cssContent: mergedCSS,
+    imageUrls: uploadedUrls,
+    authorUid: currentUserForSubmit.uid,
+    authorEmail: currentUserForSubmit.email,
+    authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
+    status: 'draft',
+    currentMode: currentMode,
+    draftTrigger: trigger,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  draftSaveInFlight = true;
+  try {
+    if (activeDraftId) {
+      await db.collection('submissions').doc(activeDraftId).set(removeClientOnlySubmissionFields(draftPayload), { merge: true });
+    } else {
+      const ref = await db.collection('submissions').add(draftPayload);
+      activeDraftId = ref.id;
+    }
+    if (!silent) {
+      setDraftStatus('Draft saved at ' + new Date().toLocaleTimeString() + '.');
+    } else {
+      setDraftStatus('Draft autosaved at ' + new Date().toLocaleTimeString() + '.');
+    }
+    return activeDraftId;
+  } catch (err) {
+    setDraftStatus('Draft save failed: ' + err.message, true);
+    return null;
+  } finally {
+    draftSaveInFlight = false;
+  }
+}
+
+function manualSaveDraft() {
+  saveDraft({ silent: false, trigger: 'manual' });
+}
+
+async function continueDraftSubmission(id) {
+  if (!currentUserForSubmit) return;
+  try {
+    const doc = await db.collection('submissions').doc(id).get();
+    if (!doc.exists) {
+      alert('Draft not found.');
+      return;
+    }
+    const draft = doc.data() || {};
+    if (draft.authorUid !== currentUserForSubmit.uid) {
+      alert('You can only open your own draft.');
+      return;
+    }
+
+    suppressDraftAutoSave = true;
+    activeDraftId = id;
+    document.getElementById('sf-title').value = draft.title || '';
+    document.getElementById('sf-type').value = draft.type || 'Anomaly';
+    document.getElementById('sf-slug').value = draft.slug || '';
+    document.getElementById('sf-anomaly-subtype').value = draft.anomalySubtype || '';
+    document.getElementById('sf-anomaly-code').value = draft.anomalyId || '';
+
+    const tags = Array.isArray(draft.tags) ? draft.tags : [];
+    setSelectedTags(tags);
+
+    // Drafts are re-opened in code mode to preserve exact authored markup.
+    switchMode('code');
+    document.getElementById('sf-html').value = draft.htmlContent || DEFAULT_NEW_PAGE_HTML;
+    document.getElementById('sf-css').value = draft.cssContent || '';
+
+    uploadedImages = (Array.isArray(draft.imageUrls) ? draft.imageUrls : []).map((url, idx) => ({
+      id: 'draft_' + idx + '_' + Date.now(),
+      name: 'Draft image ' + (idx + 1),
+      url: url,
+      localUrl: url,
+      remoteUrl: url,
+      status: 'ready',
+      removed: false,
+      file: null,
+      fingerprint: 'draft-' + idx
+    }));
+    renderImageList();
+    refreshImageSelectors();
+
+    updateTypeSpecificUI();
+    updateSlugPreview();
+    updatePreview();
+    setDraftStatus('Loaded draft for editing.');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    alert('Could not load draft: ' + err.message);
+  } finally {
+    suppressDraftAutoSave = false;
+  }
+}
+
+async function openRejectedSubmissionPreview(id) {
+  try {
+    const doc = await db.collection('submissions').doc(id).get();
+    if (!doc.exists) {
+      alert('Submission not found.');
+      return;
+    }
+    const s = doc.data() || {};
+    if (s.authorUid !== currentUserForSubmit.uid) {
+      alert('You can only view your own submission details.');
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'review-modal';
+    modal.id = 'my-reject-modal';
+    modal.innerHTML = '<div class="review-modal-header">' +
+      '<h3>' + (s.title || 'Rejected Submission') + '</h3>' +
+      '<button class="btn btn-sm btn-s" type="button" onclick="closeRejectedSubmissionPreview()">Close</button>' +
+    '</div>' +
+    '<div class="review-modal-body">' +
+      '<iframe class="review-modal-preview" sandbox="allow-same-origin" title="Rejected submission preview"></iframe>' +
+      '<div class="review-modal-meta">' +
+        '<dl>' +
+          '<dt>Status</dt><dd><span class="status status-rejected">rejected</span></dd>' +
+          '<dt>Reason</dt><dd>' + escapeHtml(s.rejectionReason || 'No rejection reason provided.') + '</dd>' +
+          '<dt>Type</dt><dd>' + escapeHtml(s.type || 'Unknown') + '</dd>' +
+          '<dt>Slug</dt><dd>' + escapeHtml(s.slug || '[none]') + '</dd>' +
+        '</dl>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+
+    const frame = modal.querySelector('iframe');
+    const uploaded = Array.isArray(s.imageUrls) ? s.imageUrls.filter(Boolean) : [];
+    frame.srcdoc = buildSandboxDocument(
+      wrapWithDefaultSchema(String(s.htmlContent || ''), s.title || 'Rejected Submission'),
+      mergeWithDefaultSchemaCSS(s.cssContent || '')
+    );
+  } catch (err) {
+    alert('Could not open rejection preview: ' + err.message);
+  }
+}
+
+function closeRejectedSubmissionPreview() {
+  const modal = document.getElementById('my-reject-modal');
+  if (modal) modal.remove();
+}
 
 async function initializeSubmitEditModeFromUrl() {
   if (!currentUserForSubmit) return;
@@ -176,10 +459,7 @@ async function initializeSubmitEditModeFromUrl() {
     document.getElementById('sf-slug').value = page.slug || '';
 
     const tags = Array.isArray(page.tags) ? page.tags : [];
-    document.querySelectorAll('#sf-tags-list input[type="checkbox"]').forEach(input => {
-      input.checked = tags.includes(input.value);
-    });
-    updateTagSummary();
+    setSelectedTags(tags);
 
     if (page.type === 'Anomaly') {
       const subtype = page.anomalySubtype || '';
@@ -257,16 +537,105 @@ function updateSlugPreview() {
 }
 
 function getSelectedTags() {
-  return Array.from(document.querySelectorAll('#sf-tags-list input[type="checkbox"]:checked'))
-    .map(el => el.value)
-    .filter(Boolean);
+  return Array.from(selectedTagsState);
 }
 
 function updateTagSummary() {
   const selected = getSelectedTags();
   const summary = document.getElementById('sf-tags-summary');
+  const selectedWrap = document.getElementById('sf-tag-selected');
   if (!summary) return;
-  summary.textContent = selected.length ? (selected.length + ' tag(s) selected') : 'Select tags';
+  summary.textContent = selected.length
+    ? (selected.length + ' tag(s) selected: ' + selected.join(', '))
+    : 'No tags selected.';
+
+  if (!selectedWrap) return;
+  if (!selected.length) {
+    selectedWrap.innerHTML = '<span class="tag-empty">Selected tags will appear here.</span>';
+    return;
+  }
+  selectedWrap.innerHTML = selected.map(tag => {
+    return '<span class="tag-chip">' + escapeHtml(tag) +
+      '<button type="button" aria-label="Remove ' + escapeAttr(tag) + '" onclick="removeSelectedTag(\'' + escapeAttr(tag) + '\')">x</button>' +
+    '</span>';
+  }).join('');
+}
+
+function renderTagOptions(filterText) {
+  const holder = document.getElementById('sf-tags-list');
+  if (!holder) return;
+  const normalizedFilter = String(filterText || '').toLowerCase().trim();
+  const visible = TAG_OPTIONS.filter(tag => !normalizedFilter || tag.includes(normalizedFilter));
+
+  holder.innerHTML = visible.map(tag => {
+    const active = selectedTagsState.has(tag);
+    return '<button type="button" class="tag-option' + (active ? ' active' : '') + '" data-tag="' + escapeAttr(tag) + '">' +
+      escapeHtml(tag) +
+    '</button>';
+  }).join('');
+}
+
+function setSelectedTags(tags) {
+  const incoming = Array.isArray(tags) ? tags : [];
+  selectedTagsState = new Set(incoming.filter(tag => TAG_OPTIONS.includes(tag)));
+  const searchEl = document.getElementById('sf-tag-search');
+  renderTagOptions(searchEl ? searchEl.value : '');
+  updateTagSummary();
+}
+
+function removeSelectedTag(tag) {
+  if (!selectedTagsState.has(tag)) return;
+  selectedTagsState.delete(tag);
+  const searchEl = document.getElementById('sf-tag-search');
+  renderTagOptions(searchEl ? searchEl.value : '');
+  updateTagSummary();
+  schedulePreview();
+}
+
+function toggleTagSelection(tag) {
+  if (!TAG_OPTIONS.includes(tag)) return;
+  if (selectedTagsState.has(tag)) selectedTagsState.delete(tag);
+  else selectedTagsState.add(tag);
+  const searchEl = document.getElementById('sf-tag-search');
+  renderTagOptions(searchEl ? searchEl.value : '');
+  updateTagSummary();
+  schedulePreview();
+}
+
+function initTagPicker() {
+  const searchEl = document.getElementById('sf-tag-search');
+  const allBtn = document.getElementById('sf-tag-all');
+  const clearBtn = document.getElementById('sf-tag-clear');
+  const listEl = document.getElementById('sf-tags-list');
+  if (!searchEl || !allBtn || !clearBtn || !listEl) return;
+
+  searchEl.addEventListener('input', () => {
+    renderTagOptions(searchEl.value);
+  });
+
+  allBtn.addEventListener('click', () => {
+    selectedTagsState = new Set(TAG_OPTIONS);
+    renderTagOptions(searchEl.value);
+    updateTagSummary();
+    schedulePreview();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    selectedTagsState.clear();
+    renderTagOptions(searchEl.value);
+    updateTagSummary();
+    schedulePreview();
+  });
+
+  listEl.addEventListener('click', e => {
+    const btn = e.target.closest('.tag-option');
+    if (!btn) return;
+    const tag = btn.getAttribute('data-tag') || '';
+    toggleTagSelection(tag);
+  });
+
+  renderTagOptions('');
+  updateTagSummary();
 }
 
 function setGuideSectionsFixedStructure() {
@@ -1292,12 +1661,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sf-anomaly-subtype').addEventListener('change', schedulePreview);
   document.getElementById('sf-anomaly-code').addEventListener('input', schedulePreview);
 
-  document.querySelectorAll('#sf-tags-list input[type="checkbox"]').forEach(el => {
-    el.addEventListener('change', () => {
-      updateTagSummary();
-      schedulePreview();
-    });
-  });
+  initTagPicker();
 
   // Bind all template fields to preview
   document.querySelectorAll('#template-mode input, #template-mode textarea, #template-mode select').forEach(el => {
@@ -1779,6 +2143,7 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
 function schedulePreview() {
   clearTimeout(previewDebounce);
   previewDebounce = setTimeout(updatePreview, 300);
+  scheduleDraftAutoSave();
 }
 
 function updatePreview() {
@@ -1878,21 +2243,13 @@ async function submitPage() {
   }
 
   let htmlContent, cssContent;
-
-  if (currentMode === 'template') {
-    const result = buildTemplateHTML();
-    htmlContent = result.html;
-    cssContent = result.css;
-    if (!htmlContent.trim()) { alert('Please fill in at least some template fields.'); return; }
-  } else if (currentMode === 'doc') {
-    const result = buildDocumentModeHTML();
-    htmlContent = result.html;
-    cssContent = result.css;
-    if (!hasDocumentContent()) { alert('Please add at least one content block in Document Studio.'); return; }
-  } else {
-    htmlContent = document.getElementById('sf-html').value;
-    cssContent = document.getElementById('sf-css').value;
-    if (!htmlContent.trim()) { alert('Please enter some HTML content.'); return; }
+  try {
+    const content = buildCurrentEditorContent(true);
+    htmlContent = content.htmlContent;
+    cssContent = content.cssContent;
+  } catch (err) {
+    alert(err.message || 'Could not build submission content.');
+    return;
   }
 
   const btn = document.getElementById('submit-btn');
@@ -2029,6 +2386,10 @@ async function submitPage() {
         featured: false
       };
       const pageRef = await db.collection('pages').add(pageDoc);
+      if (activeDraftId) {
+        await db.collection('submissions').doc(activeDraftId).delete().catch(() => {});
+        activeDraftId = null;
+      }
       await db.collection('submissions').add({
         ...submission,
         status: 'approved',
@@ -2039,6 +2400,10 @@ async function submitPage() {
       });
       alert('Published directly (moderator/authorized clearance).\nLive at: /pages/' + slug);
     } else {
+      if (activeDraftId) {
+        await db.collection('submissions').doc(activeDraftId).delete().catch(() => {});
+        activeDraftId = null;
+      }
       await db.collection('submissions').add(submission);
       alert('Submission received! Your page will be reviewed by Guild admins.\nOnce approved, it will be live at: /pages/' + slug);
     }
@@ -2053,10 +2418,12 @@ async function submitPage() {
 }
 
 function resetSubmitForm() {
+  suppressDraftAutoSave = true;
   submitEditTarget = null;
+  activeDraftId = null;
   document.getElementById('sf-title').value = '';
   document.getElementById('sf-type').value = 'Anomaly';
-  document.querySelectorAll('#sf-tags-list input[type="checkbox"]').forEach(opt => { opt.checked = false; });
+  setSelectedTags([]);
   document.getElementById('sf-anomaly-subtype').value = '';
   document.getElementById('sf-anomaly-code').value = '';
   document.getElementById('sf-slug').value = '';
@@ -2100,6 +2467,8 @@ function resetSubmitForm() {
   updateSlugPreview();
   updatePreview();
   document.getElementById('submit-btn').textContent = '>> Submit for Review';
+  setDraftStatus('Draft autosave is idle.');
+  suppressDraftAutoSave = false;
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -2117,7 +2486,11 @@ async function loadMySubmissions() {
       .get();
     const submissions = snap.docs
       .map(doc => ({ id: doc.id, data: doc.data() }))
-      .sort((a, b) => (b.data.submittedAt?.seconds || 0) - (a.data.submittedAt?.seconds || 0));
+      .sort((a, b) => {
+        const aTime = a.data.updatedAt?.seconds || a.data.submittedAt?.seconds || 0;
+        const bTime = b.data.updatedAt?.seconds || b.data.submittedAt?.seconds || 0;
+        return bTime - aTime;
+      });
 
     if (submissions.length === 0) {
       container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">No submissions yet. Create your first page above!</p>';
@@ -2128,11 +2501,13 @@ async function loadMySubmissions() {
       const d = entry;
       const s = entry.data;
       const statusClass = 'status status-' + s.status;
-      const date = s.submittedAt ? new Date(s.submittedAt.seconds * 1000).toLocaleDateString() : '—';
+      const ts = s.updatedAt || s.submittedAt;
+      const date = ts ? new Date(ts.seconds * 1000).toLocaleDateString() : '—';
       const slug = s.slug || '';
       let extra = '';
       if (s.status === 'rejected' && s.rejectionReason) {
-        extra = '<div style="font-size:.75rem;color:var(--red-b);margin-top:4px">Reason: ' + s.rejectionReason + '</div>';
+        extra = '<div style="font-size:.75rem;color:var(--red-b);margin-top:4px">Reason: ' + s.rejectionReason + '</div>' +
+          '<div style="margin-top:6px"><button class="btn btn-sm btn-s" type="button" onclick="openRejectedSubmissionPreview(\'' + d.id + '\')" style="font-size:.65rem">Preview Rejected Page</button></div>';
       }
       if (s.status === 'approved') {
         const pageUrl = slug ? 'pages/' + slug : 'page.html?id=' + (s.approvedPageId || d.id);
@@ -2141,6 +2516,10 @@ async function loadMySubmissions() {
       let deleteBtn = '';
       if (s.status === 'pending') {
         deleteBtn = '<button class="btn btn-sm btn-d" onclick="deleteMySubmission(\'' + d.id + '\')" style="margin-left:8px">Withdraw</button>';
+      }
+      if (s.status === 'draft') {
+        deleteBtn = '<button class="btn btn-sm btn-s" type="button" onclick="continueDraftSubmission(\'' + d.id + '\')" style="margin-left:8px">Continue Draft</button>' +
+          '<button class="btn btn-sm btn-d" onclick="deleteMySubmission(\'' + d.id + '\')" style="margin-left:8px">Delete Draft</button>';
       }
       const slugInfo = slug ? '<span style="font-size:.65rem;color:var(--wht-f);margin-left:8px">/pages/' + slug + '</span>' : '';
       return '<div class="my-sub-row"><div class="my-sub-info"><div><div class="my-sub-title">' + s.title + slugInfo + '</div><div class="my-sub-meta">' + s.type + ' · ' + date + '</div>' + extra + '</div></div><div style="display:flex;align-items:center"><span class="' + statusClass + '">' + s.status + '</span>' + deleteBtn + '</div></div>';

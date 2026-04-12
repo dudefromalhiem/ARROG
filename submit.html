@@ -31,32 +31,79 @@
     .doc-block:focus-within { border-color: var(--red-b); }
     .doc-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .doc-image-preview { max-width:100%; height:auto; display:block; margin-top:8px; border:1px solid var(--blk-m); }
-    .tag-dropdown {
+    .tag-picker {
       border: 1px solid var(--blk-m);
       background: var(--blk-b);
-      border-radius: 4px;
-      padding: 8px 10px;
+      border-radius: 6px;
+      padding: 10px;
     }
-    .tag-dropdown summary {
-      cursor: pointer;
-      list-style: none;
-      font-size: .8rem;
-      color: var(--wht-m);
-      user-select: none;
+    .tag-picker-tools {
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:10px;
     }
-    .tag-dropdown summary::-webkit-details-marker { display: none; }
-    .tag-dropdown-list {
-      margin-top: 10px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
+    .tag-picker-tools .fi { flex:1; min-width:220px; }
+    .tag-picker-options {
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-bottom:10px;
     }
-    .tag-dropdown-list label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: .78rem;
-      color: var(--wht-d);
+    .tag-option {
+      border:1px solid var(--blk-m);
+      background:var(--blk-c);
+      color:var(--wht-m);
+      font-size:.74rem;
+      text-transform:lowercase;
+      letter-spacing:.4px;
+      border-radius:999px;
+      padding:6px 12px;
+      cursor:pointer;
+      transition:border-color .15s, background .15s, color .15s;
+    }
+    .tag-option:hover { border-color: var(--red-d); color: var(--wht); }
+    .tag-option.active {
+      border-color: var(--red-b);
+      background: rgba(204,0,0,.16);
+      color: var(--wht);
+    }
+    .tag-selected {
+      min-height:36px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      padding:6px;
+      border:1px dashed var(--blk-m);
+      border-radius:6px;
+      background:rgba(0,0,0,.2);
+    }
+    .tag-chip {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      border:1px solid var(--red-d);
+      background: rgba(139,0,0,.15);
+      color: var(--wht);
+      border-radius:999px;
+      font-size:.72rem;
+      padding:5px 10px;
+    }
+    .tag-chip button {
+      border:none;
+      background:transparent;
+      color:var(--wht-m);
+      cursor:pointer;
+      font-size:.8rem;
+      line-height:1;
+      padding:0;
+    }
+    .tag-chip button:hover { color: var(--wht); }
+    .tag-empty {
+      font-size:.75rem;
+      color:var(--wht-f);
+      padding:4px;
     }
     @media (max-width: 760px) { .doc-grid-2 { grid-template-columns:1fr; } }
   </style>
@@ -165,27 +212,17 @@
       </div>
       <div class="fg">
         <label class="fl">Tags</label>
-        <details class="tag-dropdown" id="sf-tag-dropdown">
-          <summary id="sf-tags-summary">Select tags</summary>
-          <div class="tag-dropdown-list" id="sf-tags-list">
-            <label><input type="checkbox" value="object" />object</label>
-            <label><input type="checkbox" value="animal" />animal</label>
-            <label><input type="checkbox" value="humanoid" />humanoid</label>
-            <label><input type="checkbox" value="plant" />plant</label>
-            <label><input type="checkbox" value="artifact" />artifact</label>
-            <label><input type="checkbox" value="document" />document</label>
-            <label><input type="checkbox" value="digital" />digital</label>
-            <label><input type="checkbox" value="memetic" />memetic</label>
-            <label><input type="checkbox" value="cognitohazard" />cognitohazard</label>
-            <label><input type="checkbox" value="spatial" />spatial</label>
-            <label><input type="checkbox" value="temporal" />temporal</label>
-            <label><input type="checkbox" value="biological" />biological</label>
-            <label><input type="checkbox" value="dangerous" />dangerous</label>
-            <label><input type="checkbox" value="archive" />archive</label>
-            <label><input type="checkbox" value="field-report" />field-report</label>
+        <div class="tag-picker" id="sf-tag-picker">
+          <div class="tag-picker-tools">
+            <input class="fi" id="sf-tag-search" type="text" placeholder="Search tags..." aria-label="Search tags" />
+            <button class="btn btn-sm btn-s" type="button" id="sf-tag-all">Select All</button>
+            <button class="btn btn-sm btn-s" type="button" id="sf-tag-clear">Clear</button>
           </div>
-        </details>
-        <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px;">Click to open and select one or more tags.</span>
+          <div id="sf-tags-summary" style="font-size:.75rem;color:var(--wht-f);margin-bottom:8px">No tags selected.</div>
+          <div class="tag-picker-options" id="sf-tags-list" role="listbox" aria-label="Available tags"></div>
+          <div class="tag-selected" id="sf-tag-selected" aria-live="polite"></div>
+        </div>
+        <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px;">Select multiple tags. Use search to filter quickly.</span>
       </div>
       <div class="fg">
         <label class="fl">Page URL Slug</label>
@@ -429,9 +466,11 @@
       <div>
         <span style="font-size:.75rem;color:var(--wht-f)">Your page will appear at: </span>
         <span style="font-size:.8rem;color:var(--red-b);font-family:var(--font-m)" id="slug-preview">/pages/...</span>
+        <div id="draft-status" style="font-size:.72rem;color:var(--wht-f);margin-top:6px">Draft autosave is idle.</div>
       </div>
       <div style="display:flex;gap:12px">
         <button class="btn btn-s" onclick="resetSubmitForm()">Clear All</button>
+        <button class="btn btn-s" id="draft-btn" type="button" onclick="manualSaveDraft()">Save Draft</button>
         <button class="btn btn-p" id="submit-btn" onclick="submitPage()">>> Submit for Review</button>
       </div>
     </div>
