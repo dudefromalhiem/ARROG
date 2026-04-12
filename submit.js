@@ -2333,6 +2333,15 @@ async function submitPage() {
     }
   }
 
+  // Anomaly-specific validation
+  if (type === 'Anomaly' && currentMode === 'template') {
+    const description = document.getElementById('tf-description').value.trim();
+    if (!description) {
+      alert('Description is mandatory for Anomaly submissions. Please provide a detailed description of the anomaly.');
+      return;
+    }
+  }
+
   let htmlContent, cssContent;
   try {
     const content = buildCurrentEditorContent(true);
@@ -2346,6 +2355,33 @@ async function submitPage() {
   const btn = document.getElementById('submit-btn');
   btn.textContent = 'Verifying ID constraints...';
   btn.disabled = true;
+
+  // Check for duplicate title
+  if (type === 'Anomaly') {
+    try {
+      const existingPagesByTitle = await db.collection('pages')
+        .where('type', '==', 'Anomaly')
+        .where('title', '==', title)
+        .limit(1)
+        .get();
+      const existingSubsByTitle = await db.collection('submissions')
+        .where('type', '==', 'Anomaly')
+        .where('title', '==', title)
+        .where('status', 'in', ['pending', 'approved'])
+        .limit(1)
+        .get();
+      const titleExists = !existingPagesByTitle.empty || !existingSubsByTitle.empty;
+
+      if (titleExists && (!submitEditTarget || submitEditTarget.id === null)) {
+        alert('An Anomaly with the title "' + title + '" already exists. Anomaly titles must be unique.');
+        btn.textContent = '>> Submit for Review';
+        btn.disabled = false;
+        return;
+      }
+    } catch(e) {
+      console.warn("Title uniqueness check skipped:", e);
+    }
+  }
 
   if (type === 'Anomaly' && anomalyId) {
     try {

@@ -812,6 +812,50 @@ function closeReviewModal() {
   if (modal) modal.remove();
 }
 
+function extractDescriptionFromHTML(html) {
+  if (!html) return '';
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = String(html || '');
+  
+  // Look for a section with h2 containing "Description"
+  const sections = wrapper.querySelectorAll('.rog-section, section, div[class*="section"]');
+  for (const section of sections) {
+    const heading = section.querySelector('h2, h3');
+    if (heading && /^description$/i.test((heading.textContent || '').trim())) {
+      // Get the text content after the heading, excluding the heading itself
+      const textParts = [];
+      let foundHeading = false;
+      for (const node of section.childNodes) {
+        if (node.nodeType === 1) { // Element node
+          if (heading.contains(node) || heading === node) {
+            foundHeading = true;
+            continue;
+          }
+          if (foundHeading) {
+            const text = (node.textContent || '').trim();
+            if (text) textParts.push(text);
+          }
+        }
+      }
+      if (textParts.length) return textParts.join(' ').substring(0, 500);
+      
+      // Fallback: get all text after heading
+      const allText = Array.from(section.childNodes)
+        .slice(Array.from(section.childNodes).indexOf(heading.parentElement || heading) + 1)
+        .map(node => (node.textContent || '').trim())
+        .filter(Boolean)
+        .join(' ');
+      if (allText) return allText.substring(0, 500);
+    }
+  }
+  
+  // Fallback: extract first paragraph or first text content
+  const firstP = wrapper.querySelector('p');
+  if (firstP) return (firstP.textContent || '').trim().substring(0, 500);
+  
+  return '';
+}
+
 async function approveSubmission(id) {
   if (!canModerateSubmissions()) {
     alert('Moderator access is required to approve submissions.');
@@ -833,13 +877,14 @@ async function approveSubmission(id) {
     const slug = s.slug || s.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 80);
 
     // Create page from submission
+    const wrappedHtml = wrapWithDefaultSchema(s.htmlContent);
     const pageData = {
       title: s.title,
       type: s.type,
       tags: s.tags || [],
       slug: slug,
       content: s.title, // basic content field for backward compat
-      htmlContent: wrapWithDefaultSchema(s.htmlContent),
+      htmlContent: wrappedHtml,
       cssContent: mergeWithDefaultSchemaCSS(s.cssContent || ''),
       imageUrls: s.imageUrls || [],
       authorUid: s.authorUid,
@@ -849,6 +894,12 @@ async function approveSubmission(id) {
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdAt: s.submittedAt || firebase.firestore.FieldValue.serverTimestamp(),
       featured: false,
+      // Add anomaly-specific fields
+      anomalyId: s.anomalyId || '',
+      anomalySubtype: s.anomalySubtype || '',
+      anomalySubtypeLabel: s.anomalySubtypeLabel || '',
+      anomalyListKey: s.anomalyListKey || '',
+      anomalyDescription: s.type === 'Anomaly' ? extractDescriptionFromHTML(wrappedHtml) : ''
     };
 
     const pageRef = await db.collection('pages').add(pageData);

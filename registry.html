@@ -309,12 +309,13 @@
 
       if (existing) {
         const href = existing.slug ? ('page.html?slug=' + encodeURIComponent(existing.slug)) : ('page.html?id=' + encodeURIComponent(existing.id));
+        const descriptionText = existing.anomalyDescription ? escapeHtml(existing.anomalyDescription) : 'This page has been reconstructed and approved by Guild administration.';
         cards.push(
           '<article class="entry-card">' +
             '<div class="entry-code">' + designation + ' ' + listTag + '</div>' +
             '<div class="entry-title">' + escapeHtml(existing.title || designation) + '</div>' +
             '<div class="entry-status live">Approved Entry</div>' +
-            '<div class="entry-copy">This page has been reconstructed and approved by Guild administration.</div>' +
+            '<div class="entry-copy">' + descriptionText + '</div>' +
             '<div class="entry-actions">' +
               '<a class="btn btn-sm btn-s" href="' + href + '">Open</a>' +
               '<a class="btn btn-sm btn-p" href="submit.html?editId=' + encodeURIComponent(existing.id) + '">Edit</a>' +

@@ -144,7 +144,7 @@
           slug: p.slug,
           title: p.title,
           type: p.type,
-          excerpt: buildSnippet(p.htmlContent),
+          excerpt: p.anomalyDescription ? p.anomalyDescription : buildSnippet(p.htmlContent),
           img: getImgSrc(p.htmlContent)
         });
       });
@@ -158,12 +158,16 @@
         if (!universeData[d.type]) return;
         if (universeData[d.type].some(u => u.slug === d.slug)) return;
         
+        const displayExcerpt = d.type === 'Anomaly' && d.anomalyDescription 
+          ? d.anomalyDescription 
+          : buildSnippet(d.htmlContent);
+        
         universeData[d.type].push({
           id: doc.id,
           slug: d.slug,
           title: d.title,
           type: d.type,
-          excerpt: buildSnippet(d.htmlContent),
+          excerpt: displayExcerpt,
           img: getImgSrc(d.htmlContent)
         });
       });
