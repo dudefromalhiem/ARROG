@@ -422,16 +422,12 @@ function loadData() {
 
   // Then try to overlay with live Firestore data (non-blocking)
   try {
-    db.collection('pages').where('type', '==', 'Anomaly').where('featured', '==', true).orderBy('createdAt', 'desc').limit(4).get()
+    db.collection('pages').where('featured', '==', true).orderBy('createdAt', 'desc').limit(4).get()
       .then(function (snap) {
         if (!snap.empty) {
           renderFeatured(snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }));
           return;
         }
-        return db.collection('pages').where('type', '==', 'Anomaly').orderBy('createdAt', 'desc').limit(4).get()
-          .then(function (fallbackSnap) {
-            if (!fallbackSnap.empty) renderFeatured(fallbackSnap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }));
-          });
       })
       .catch(function (_e) { });
 

@@ -516,9 +516,7 @@ async function refreshPages() {
       const deleteBtn = canDeleteManagedContent() && !guideLocked
         ? '<button class="btn btn-sm btn-d" onclick="deletePage(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
         : '';
-      const featureBtn = p.type === 'Anomaly'
-        ? '<button class="btn btn-sm btn-s" onclick="toggleFeaturedPage(\'' + d.id + '\',' + (p.featured ? 'false' : 'true') + ')" style="margin-left:4px">' + (p.featured ? 'Unfeature' : 'Feature') + '</button>'
-        : '<span style="font-size:.7rem;color:var(--wht-f)">Anomaly only</span>';
+      const featureBtn = '<button class="btn btn-sm btn-s" onclick="toggleFeaturedPage(\'' + d.id + '\',' + (p.featured ? 'false' : 'true') + ')" style="margin-left:4px">' + (p.featured ? 'Unfeature' : 'Feature') + '</button>';
       return `<tr>
         <td>${p.title}</td>
         <td><span class="tag">${p.type}</span></td>
