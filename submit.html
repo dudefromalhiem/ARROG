@@ -8,6 +8,77 @@
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
   <style>
+    .file-explorer {
+      border: 1px solid var(--red-d);
+      background: linear-gradient(180deg, rgba(14, 14, 14, 0.95), rgba(6, 6, 6, 0.98));
+      margin-bottom: 20px;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+    .file-explorer-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--blk-d);
+      background: rgba(0, 0, 0, 0.35);
+      font-size: .75rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--wht-f);
+      font-family: var(--font-m);
+    }
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      padding: 14px;
+    }
+    .file-tile {
+      border: 1px solid var(--blk-m);
+      background: var(--blk-b);
+      min-height: 112px;
+      padding: 12px;
+      text-decoration: none;
+      color: var(--wht-m);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color .16s, transform .16s, background .16s;
+      cursor: pointer;
+    }
+    .file-tile:hover,
+    .file-tile:focus-visible {
+      border-color: var(--red-b);
+      background: rgba(139, 0, 0, .12);
+      color: var(--wht);
+      transform: translateY(-2px);
+      outline: none;
+    }
+    .file-name {
+      font-family: var(--font-m);
+      font-size: .78rem;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: var(--wht);
+    }
+    .file-copy {
+      font-size: .72rem;
+      color: var(--wht-f);
+      line-height: 1.45;
+    }
+    .editor-shell-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .muted-file-note {
+      font-size: .72rem;
+      color: var(--wht-f);
+    }
     .doc-toolbar {
       display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;
       position: sticky; top: 8px; z-index: 4; padding: 10px;
@@ -152,6 +223,56 @@
   <!-- Create Panel (hidden until auth) -->
   <div class="hidden" id="submit-panel">
 
+    <div class="file-explorer" id="submit-file-explorer">
+      <div class="file-explorer-head">
+        <span>Archive Workstation // Select File</span>
+        <span>Submission Terminal</span>
+      </div>
+      <div class="file-grid">
+        <button class="file-tile" type="button" data-entry-profile="ros">
+          <span class="file-name">ROS Format</span>
+          <span class="file-copy">Specimen records with shelterization workflow.</span>
+        </button>
+        <button class="file-tile" type="button" data-entry-profile="soa">
+          <span class="file-name">SOA Format</span>
+          <span class="file-copy">Accursed object entry creation terminal.</span>
+        </button>
+        <button class="file-tile" type="button" data-entry-profile="sloa">
+          <span class="file-name">SLOA Format</span>
+          <span class="file-copy">Linked specimen-object behavior records.</span>
+        </button>
+        <button class="file-tile" type="button" data-entry-profile="sctor">
+          <span class="file-name">Cross Test Format</span>
+          <span class="file-copy">Cross-testing operation reports (SCTOR).</span>
+        </button>
+        <button class="file-tile" type="button" data-entry-profile="tl">
+          <span class="file-name">Termination Log Format</span>
+          <span class="file-copy">Termination trial logs and outcomes.</span>
+        </button>
+        <button class="file-tile" type="button" data-entry-profile="tale">
+          <span class="file-name">Narrative / Field Report</span>
+          <span class="file-copy">First-person storytelling only.</span>
+        </button>
+        <button class="file-tile" type="button" data-entry-profile="artwork">
+          <span class="file-name">Artwork Upload</span>
+          <span class="file-copy">Visual gallery asset submission flow.</span>
+        </button>
+        <button class="file-tile" type="button" data-open-history="1">
+          <span class="file-name">History</span>
+          <span class="file-copy">View your full submission archive.</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="hidden" id="submit-editor-shell">
+      <div class="editor-shell-head">
+        <div class="muted-file-note" id="entry-profile-banner">Mode: General Submission</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-s" type="button" onclick="openSubmitFileExplorer()">Back to Files</button>
+          <button class="btn btn-s" type="button" onclick="openSubmissionHistoryView()">History</button>
+        </div>
+      </div>
+
     <!-- ═══ PAGE HERO ═══ -->
     <div class="create-hero">
       <h1>Create a Page</h1>
@@ -208,6 +329,7 @@
           <label class="fl">Anomaly Designation</label>
           <input class="fi" id="sf-anomaly-code" placeholder="e.g. ROS-0001" oninput="onAnomalyCodeInput()" />
           <span id="sf-anomaly-hint" style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px">Format hint will appear after selecting a submission type.</span>
+          <span id="sf-anomaly-lock-note" class="hidden" style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px">Designation is fixed for this record.</span>
         </div>
       </div>
       <div class="fg">
@@ -215,6 +337,8 @@
         <div class="tag-picker" id="sf-tag-picker">
           <div class="tag-picker-tools">
             <input class="fi" id="sf-tag-search" type="text" placeholder="Search tags..." aria-label="Search tags" />
+            <input class="fi" id="sf-tag-custom" type="text" placeholder="Add custom tag" aria-label="Add custom tag" />
+            <button class="btn btn-sm btn-s" type="button" id="sf-tag-add">Add Tag</button>
             <button class="btn btn-sm btn-s" type="button" id="sf-tag-all">Select All</button>
             <button class="btn btn-sm btn-s" type="button" id="sf-tag-clear">Clear</button>
           </div>
@@ -293,7 +417,7 @@
       <div class="section" style="margin-bottom:24px" id="tpl-fields-anomaly">
         <div class="section-hd">Anomaly Details</div>
         <div class="g2 mb-md">
-          <div class="fg"><label class="fl">Object Class</label>
+            <div class="fg"><label class="fl" id="tf-class-label">Object Class</label>
             <select class="fi" id="tf-object-class">
               <option>Alona</option><option>Delphi</option><option>Soros</option><option>Vega</option><option>Apophis</option>
             </select>
@@ -306,7 +430,7 @@
           </select>
           <span style="font-size:.7rem;color:var(--wht-f)">Upload images above, then select one here.</span>
         </div>
-        <div class="fg"><label class="fl">Containment Procedures</label>
+        <div class="fg"><label class="fl" id="tf-containment-label">Containment Procedures</label>
           <textarea class="fta" id="tf-containment" placeholder="Describe how this anomaly is contained..."></textarea>
         </div>
         <div class="fg"><label class="fl">Description <span style="color: var(--red-b);">*</span></label>
@@ -482,6 +606,7 @@
       <div id="my-submissions">
         <p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">Loading...</p>
       </div>
+    </div>
     </div>
   </div>
 

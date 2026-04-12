@@ -99,7 +99,7 @@
 
   <div class="exp-section" id="sec-art">
     <div class="exp-section-hd">
-      <h2>Artwork & Visual Assets</h2>
+      <h2>Artwork Gallery</h2>
     </div>
     <div class="exp-grid" id="grid-art">
       <div class="no-results">Accessing databanks...</div>
@@ -187,8 +187,8 @@
       const q = filterTxt.toLowerCase();
       items = items.filter(i => (i.title && i.title.toLowerCase().includes(q)) || (i.slug && i.slug.toLowerCase().includes(q)));
     } else {
-      // By default show up to 6 per category
-      items = items.slice(0, 8);
+      // Default: show all artworks as a gallery, while keeping other categories concise.
+      if (type !== 'Artwork') items = items.slice(0, 8);
     }
 
     if (items.length === 0) {
