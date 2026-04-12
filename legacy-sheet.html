@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Legacy Sheet — Red Oaker Guild</title>
+  <meta name="description" content="Historical record of prior and current Guild ownership." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .legacy-sheet-wrap { max-width: 980px; margin: 40px auto; }
+    .legacy-meta {
+      border: 1px solid var(--red-d);
+      background: var(--blk-c);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: .76rem;
+      color: var(--wht-d);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .legacy-sheet {
+      border: 1px solid var(--red-d);
+      background: linear-gradient(180deg, rgba(139,0,0,.08), rgba(0,0,0,.5));
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .legacy-sheet h1 {
+      margin-bottom: 10px;
+      letter-spacing: 3px;
+    }
+    .legacy-sub {
+      color: var(--wht-d);
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 18px;
+    }
+    .legacy-block-line {
+      border-left: 2px solid var(--red-d);
+      padding-left: 12px;
+      margin-bottom: 14px;
+    }
+    .legacy-block-line h3 {
+      border: none;
+      margin-bottom: 6px;
+      color: var(--red-b);
+      font-size: .92rem;
+      letter-spacing: 1px;
+    }
+    .legacy-block-line p {
+      margin: 0;
+      color: var(--wht-m);
+      line-height: 1.8;
+      font-size: .86rem;
+      white-space: pre-wrap;
+    }
+    .legacy-editor {
+      border: 1px solid var(--red-d);
+      background: var(--blk-c);
+      padding: 16px;
+      display: none;
+    }
+    .legacy-editor.open { display: block; }
+    .legacy-editor .fg { margin-bottom: 12px; }
+    .legacy-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    @media (max-width: 768px) {
+      .legacy-sheet-wrap { margin: 24px auto; }
+      .legacy-sheet { padding: 18px 14px; }
+      .legacy-meta { font-size: .72rem; }
+    }
+  </style>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="explore.html">Explore</a></li>
+      <li><a href="registry.html">Registry</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Submit</a></li>
+      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap legacy-sheet-wrap">
+  <div class="section-hd" style="border-bottom:none">Legacy Sheet</div>
+
+  <div class="legacy-meta">
+    <span>Document: Guild Legacy Register</span>
+    <span id="legacy-status">Loading archival sheet...</span>
+  </div>
+
+  <article class="legacy-sheet" id="legacy-sheet-view"></article>
+
+  <section class="legacy-editor" id="legacy-editor">
+    <div class="section-hd" style="font-size:1rem">Owner Edit Mode</div>
+    <div class="fg">
+      <label class="fl" for="legacy-title">Sheet Title</label>
+      <input class="fi" id="legacy-title" type="text" />
+    </div>
+    <div class="fg">
+      <label class="fl" for="legacy-subtitle">Subtitle</label>
+      <input class="fi" id="legacy-subtitle" type="text" />
+    </div>
+    <div class="fg">
+      <label class="fl" for="legacy-foundation">Foundational Era</label>
+      <textarea class="fta" id="legacy-foundation"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl" for="legacy-prior">Prior Owners</label>
+      <textarea class="fta" id="legacy-prior"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl" for="legacy-current">Current Owner Mandate</label>
+      <textarea class="fta" id="legacy-current"></textarea>
+    </div>
+    <div class="legacy-actions">
+      <button class="btn btn-p" type="button" onclick="saveLegacySheet()">Save Legacy Sheet</button>
+      <button class="btn btn-s" type="button" onclick="toggleLegacyEditor(false)">Cancel</button>
+    </div>
+  </section>
+
+  <div class="legacy-actions" id="legacy-owner-actions" style="margin-top:12px; display:none">
+    <button class="btn btn-p" type="button" onclick="toggleLegacyEditor(true)">Edit Legacy Sheet</button>
+  </div>
+</main>
+
+<footer class="ftr">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Legacy Archive</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const LEGACY_SHEET_ID = 'main';
+  const LEGACY_DEFAULT = {
+    title: 'Red Oaker Legacy',
+    subtitle: 'Compiled ownership record and historical continuity log',
+    foundation: 'The Guild emerged from fragmented wardenship circles that protected anomaly folklore, unindexed field artifacts, and containment rituals from erasure. The founding custodians formalized those fragments into a single oath-bound archive.',
+    priorOwners: 'Prior custodians preserved doctrine through collapse cycles, each rebuilding from partial ledgers and damaged sectors. Their continuity work established the designation standards that still govern archive naming and reconstruction today.',
+    currentOwner: 'The current Owner maintains the archive as a living continuity system: recover missing entries, enforce designation integrity, and keep every active branch accountable to canonical record discipline.',
+    updatedBy: 'System Seed'
+  };
+
+  let legacySheet = { ...LEGACY_DEFAULT };
+  let ownerCanEdit = false;
+
+  function esc(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderLegacySheet() {
+    const host = document.getElementById('legacy-sheet-view');
+    host.innerHTML =
+      '<h1>' + esc(legacySheet.title) + '</h1>' +
+      '<div class="legacy-sub">' + esc(legacySheet.subtitle) + '</div>' +
+      '<div class="legacy-block-line"><h3>Foundational Era</h3><p>' + esc(legacySheet.foundation) + '</p></div>' +
+      '<div class="legacy-block-line"><h3>Prior Owners</h3><p>' + esc(legacySheet.priorOwners) + '</p></div>' +
+      '<div class="legacy-block-line"><h3>Current Owner Mandate</h3><p>' + esc(legacySheet.currentOwner) + '</p></div>';
+  }
+
+  function toggleLegacyEditor(open) {
+    const editor = document.getElementById('legacy-editor');
+    if (!ownerCanEdit) return;
+
+    if (open) {
+      document.getElementById('legacy-title').value = legacySheet.title || '';
+      document.getElementById('legacy-subtitle').value = legacySheet.subtitle || '';
+      document.getElementById('legacy-foundation').value = legacySheet.foundation || '';
+      document.getElementById('legacy-prior').value = legacySheet.priorOwners || '';
+      document.getElementById('legacy-current').value = legacySheet.currentOwner || '';
+      editor.classList.add('open');
+    } else {
+      editor.classList.remove('open');
+    }
+  }
+
+  async function saveLegacySheet() {
+    if (!ownerCanEdit || !auth.currentUser) return;
+
+    const payload = {
+      title: document.getElementById('legacy-title').value.trim() || LEGACY_DEFAULT.title,
+      subtitle: document.getElementById('legacy-subtitle').value.trim() || LEGACY_DEFAULT.subtitle,
+      foundation: document.getElementById('legacy-foundation').value.trim() || LEGACY_DEFAULT.foundation,
+      priorOwners: document.getElementById('legacy-prior').value.trim() || LEGACY_DEFAULT.priorOwners,
+      currentOwner: document.getElementById('legacy-current').value.trim() || LEGACY_DEFAULT.currentOwner,
+      updatedBy: auth.currentUser.displayName || auth.currentUser.email || 'Owner',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+      await db.collection('legacySheets').doc(LEGACY_SHEET_ID).set(payload, { merge: true });
+      legacySheet = { ...legacySheet, ...payload };
+      renderLegacySheet();
+      toggleLegacyEditor(false);
+      document.getElementById('legacy-status').textContent = 'Legacy sheet updated by owner.';
+      alert('Legacy Sheet saved.');
+    } catch (err) {
+      alert('Could not save Legacy Sheet: ' + err.message);
+    }
+  }
+
+  async function loadLegacySheet() {
+    try {
+      const doc = await db.collection('legacySheets').doc(LEGACY_SHEET_ID).get();
+      if (doc.exists) {
+        legacySheet = { ...LEGACY_DEFAULT, ...(doc.data() || {}) };
+      } else {
+        legacySheet = { ...LEGACY_DEFAULT };
+      }
+    } catch (_err) {
+      legacySheet = { ...LEGACY_DEFAULT };
+    }
+
+    renderLegacySheet();
+  }
+
+  auth.onAuthStateChanged(async user => {
+    await loadLegacySheet();
+
+    if (!user) {
+      ownerCanEdit = false;
+      document.getElementById('legacy-owner-actions').style.display = 'none';
+      document.getElementById('legacy-status').textContent = 'Read-only mode. Owner sign-in required for edits.';
+      return;
+    }
+
+    await rolesReady;
+    ownerCanEdit = isOwner(user.email);
+    document.getElementById('legacy-owner-actions').style.display = ownerCanEdit ? 'flex' : 'none';
+
+    if (ownerCanEdit) {
+      document.getElementById('legacy-status').textContent = 'Owner verified. Edit mode available.';
+    } else {
+      document.getElementById('legacy-status').textContent = 'Read-only mode. Owner account required for edits.';
+    }
+  });
+</script>
+</body>
+</html>

@@ -20,6 +20,10 @@ service cloud.firestore {
         request.auth.token.email in get(/databases/$(database)/documents/config/roles).data.owners;
     }
 
+    function isOwnerUser() {
+      return isSignedIn() && (isBootstrapOwner() || isOwnerFromRolesDoc());
+    }
+
     function isAdminUser() {
       return isSignedIn() && (
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -68,6 +72,11 @@ service cloud.firestore {
 
     match /submissions_meta/{uid} {
       allow read, write: if isAdminUser();
+    }
+
+    match /legacySheets/{sheetId} {
+      allow read: if true;
+      allow create, update, delete: if isOwnerUser();
     }
   }
 }
