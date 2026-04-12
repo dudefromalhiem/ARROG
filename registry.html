@@ -16,11 +16,11 @@
     .reg-table td { background: var(--blk-b); padding: 12px; border-bottom: 1px solid var(--blk-m); font-size: .9rem; color: var(--wht-m); }
     .reg-table tr:hover td { background: var(--blk-m); color: var(--wht-b); cursor: pointer; }
     .badge { display: inline-block; padding: 4px 8px; border-radius: 2px; font-size: .7rem; text-transform: uppercase; font-weight: bold; }
-    .badge-Safe { background: #2ca02c; color: #fff; }
-    .badge-Euclid { background: #ff7f0e; color: #fff; }
-    .badge-Keter { background: #d62728; color: #fff; }
-    .badge-Thaumiel { background: #1f77b4; color: #fff; }
-    .badge-Neutralized { background: #7f7f7f; color: #fff; }
+    .badge-Alona { background: #2ca02c; color: #fff; }
+    .badge-Delphi { background: #ff7f0e; color: #fff; }
+    .badge-Soros { background: #d62728; color: #fff; }
+    .badge-Vega { background: #1f77b4; color: #fff; }
+    .badge-Apophis { background: #7f7f7f; color: #fff; }
     /* Generic fallback for unknown classes */
     .badge-unknown { background: #444; color: #fff; }
     
@@ -52,13 +52,21 @@
 
   <div class="reg-ctrl">
     <input class="fi" type="text" id="filter-text" placeholder="Search ID or Keyword (e.g. ROS-0001)..." />
+    <select class="fi" id="filter-subtype" style="max-width:230px">
+      <option value="">All Submission Types</option>
+      <option value="ROS">ROS</option>
+      <option value="SLOA">SLOA</option>
+      <option value="SOA">SOA</option>
+      <option value="SCTOR">SCTOR</option>
+      <option value="TL">TL</option>
+    </select>
     <select class="fi" id="filter-class" style="max-width:200px">
       <option value="">All Object Classes</option>
-      <option value="Safe">Safe</option>
-      <option value="Euclid">Euclid</option>
-      <option value="Keter">Keter</option>
-      <option value="Thaumiel">Thaumiel</option>
-      <option value="Neutralized">Neutralized</option>
+      <option value="Alona">Alona</option>
+      <option value="Delphi">Delphi</option>
+      <option value="Soros">Soros</option>
+      <option value="Vega">Vega</option>
+      <option value="Apophis">Apophis</option>
     </select>
   </div>
 
@@ -92,6 +100,16 @@
 <script>
   let allAnomalies = [];
 
+  function inferListKeyFromId(id) {
+    const raw = String(id || '').toUpperCase();
+    if (raw.startsWith('ROS-')) return 'ROS';
+    if (raw.startsWith('SLOA-')) return 'SLOA';
+    if (raw.startsWith('SOA-')) return 'SOA';
+    if (raw.startsWith('SCTOR:')) return 'SCTOR';
+    if (raw.startsWith('TL:')) return 'TL';
+    return '';
+  }
+
   async function loadRegistry() {
     let combined = [];
 
@@ -100,16 +118,14 @@
       combined = PAGE_SEED.filter(p => p.type === 'Anomaly').map(p => {
         // Try to extact class from tags or assume Euclid
         let objClass = 'unknown';
-        ['Safe', 'Euclid', 'Keter', 'Thaumiel', 'Neutralized'].forEach(c => {
+        ['Alona', 'Delphi', 'Soros', 'Vega', 'Apophis'].forEach(c => {
           if (p.htmlContent && p.htmlContent.includes('Class:</span> ' + c)) {
             objClass = c;
           } else if (p.tags && p.tags.includes(c.toLowerCase())) {
             objClass = c;
           }
         });
-        // If still unknown, look for Euclid in text
-        if (objClass === 'unknown' && p.htmlContent && p.htmlContent.includes('Euclid')) objClass = 'Euclid';
-        if (objClass === 'unknown') objClass = 'Safe';
+        if (objClass === 'unknown') objClass = 'Alona';
 
         const idMatch = p.title.match(/^([A-Z]{2,4}-\d+)/i);
         const anomalyId = idMatch ? idMatch[1].toUpperCase() : p.slug;
@@ -119,6 +135,7 @@
           slug: p.slug,
           title: p.title,
           anomalyId: anomalyId,
+          anomalyListKey: inferListKeyFromId(anomalyId),
           objClass: objClass,
           excerpt: (p.htmlContent.match(/<p>(.*?)<\/p>/) || [])[1]?.replace(/<[^>]*>?/gm, '').substring(0, 100) + '...' || ''
         };
@@ -136,7 +153,7 @@
 
         let objClass = 'unknown';
         if (data.htmlContent) {
-           ['Safe', 'Euclid', 'Keter', 'Thaumiel', 'Neutralized'].forEach(c => {
+            ['Alona', 'Delphi', 'Soros', 'Vega', 'Apophis'].forEach(c => {
              if (data.htmlContent.includes(c)) objClass = c;
            });
         }
@@ -146,6 +163,7 @@
           slug: data.slug,
           title: data.title,
           anomalyId: data.anomalyId || '',
+          anomalyListKey: data.anomalyListKey || inferListKeyFromId(data.anomalyId || ''),
           objClass: objClass,
           excerpt: data.htmlContent ? data.htmlContent.replace(/<[^>]*>?/gm, '').substring(0, 100) + '...' : ''
         });
@@ -161,10 +179,12 @@
   function renderTable() {
     const txtFilter = document.getElementById('filter-text').value.toLowerCase();
     const clsFilter = document.getElementById('filter-class').value;
+    const subtypeFilter = document.getElementById('filter-subtype').value;
     const body = document.getElementById('reg-body');
 
     const filtered = allAnomalies.filter(item => {
       if (clsFilter && item.objClass !== clsFilter) return false;
+      if (subtypeFilter && item.anomalyListKey !== subtypeFilter) return false;
       if (txtFilter && !item.title.toLowerCase().includes(txtFilter) && !item.anomalyId.toLowerCase().includes(txtFilter)) return false;
       return true;
     });
@@ -177,16 +197,18 @@
     body.innerHTML = filtered.map(item => {
       const clsBadge = 'badge-' + (item.objClass || 'unknown');
       const href = item.slug ? 'page.html?slug=' + item.slug : 'page.html?id=' + item.id;
+      const listTag = item.anomalyListKey ? `<span class="tag" style="margin-left:8px">${item.anomalyListKey}</span>` : '';
       return `<tr onclick="window.location.href='${href}'">
         <td><div style="font-weight:bold;color:var(--wht-b); margin-bottom:4px;">${item.anomalyId || item.title.split(': ')[0]}</div><div style="font-size:.8rem;">${item.title}</div></td>
         <td><span class="badge ${clsBadge}">${item.objClass || 'Unknown'}</span></td>
-        <td>${item.excerpt}</td>
+        <td>${item.excerpt}${listTag}</td>
       </tr>`;
     }).join('');
   }
 
   document.getElementById('filter-text').addEventListener('input', renderTable);
   document.getElementById('filter-class').addEventListener('change', renderTable);
+  document.getElementById('filter-subtype').addEventListener('change', renderTable);
 
   document.addEventListener('DOMContentLoaded', loadRegistry);
 </script>

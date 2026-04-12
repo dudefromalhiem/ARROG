@@ -31,6 +31,33 @@
     .doc-block:focus-within { border-color: var(--red-b); }
     .doc-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .doc-image-preview { max-width:100%; max-height:220px; display:block; margin-top:8px; border:1px solid var(--blk-m); }
+    .tag-dropdown {
+      border: 1px solid var(--blk-m);
+      background: var(--blk-b);
+      border-radius: 4px;
+      padding: 8px 10px;
+    }
+    .tag-dropdown summary {
+      cursor: pointer;
+      list-style: none;
+      font-size: .8rem;
+      color: var(--wht-m);
+      user-select: none;
+    }
+    .tag-dropdown summary::-webkit-details-marker { display: none; }
+    .tag-dropdown-list {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+    .tag-dropdown-list label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .78rem;
+      color: var(--wht-d);
+    }
     @media (max-width: 760px) { .doc-grid-2 { grid-template-columns:1fr; } }
   </style>
 </head>
@@ -107,7 +134,7 @@
         <div class="fg">
           <label class="fl" id="lbl-title">Title (MUST begin with Anomaly ID)</label>
           <input class="fi" id="sf-title" placeholder="e.g. ROG-007: The Hollow Mirror" required />
-          <span style="font-size: 0.7rem; color: var(--wht-f); display:block; margin-top:4px;">Every submission MUST start with its primary Anomaly ID designation (e.g. ROS-0001, ROG-1024).</span>
+          <span style="font-size: 0.7rem; color: var(--wht-f); display:block; margin-top:4px;">For Anomaly submissions, the title must begin with the generated anomaly designation.</span>
         </div>
         <div class="fg"><label class="fl">Type</label>
           <select class="fi" id="sf-type" onchange="onTypeChange()">
@@ -115,31 +142,52 @@
           </select>
         </div>
       </div>
+      <div class="g2 mb-md" id="anomaly-meta-row">
+        <div class="fg">
+          <label class="fl">Anomaly Submission Type</label>
+          <select class="fi" id="sf-anomaly-subtype" onchange="onAnomalySubtypeChange()">
+            <option value="">Select one...</option>
+            <option value="ROS">Red Oaker Specimen (ROS list)</option>
+            <option value="SLOA">Specimen Linked Anomalous Object (SLOA list)</option>
+            <option value="SOA">Sentient or Accursed Object (SOA list)</option>
+            <option value="SCTOR">Standard Cross Testing Operations Report (SCTOR list)</option>
+            <option value="TL">Termination Logs (TL list)</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">Anomaly Designation</label>
+          <input class="fi" id="sf-anomaly-code" placeholder="e.g. ROS-0001" oninput="onAnomalyCodeInput()" />
+          <span id="sf-anomaly-hint" style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px">Format hint will appear after selecting a submission type.</span>
+        </div>
+      </div>
       <div class="fg">
         <label class="fl">Tags</label>
-        <select class="fi" id="sf-tags" multiple size="6" aria-label="Choose one or more tags">
-          <option value="object">object</option>
-          <option value="animal">animal</option>
-          <option value="humanoid">humanoid</option>
-          <option value="plant">plant</option>
-          <option value="artifact">artifact</option>
-          <option value="document">document</option>
-          <option value="digital">digital</option>
-          <option value="memetic">memetic</option>
-          <option value="cognitohazard">cognitohazard</option>
-          <option value="spatial">spatial</option>
-          <option value="temporal">temporal</option>
-          <option value="biological">biological</option>
-          <option value="dangerous">dangerous</option>
-          <option value="neutralized">neutralized</option>
-          <option value="safe">safe</option>
-          <option value="euclid">euclid</option>
-          <option value="keter">keter</option>
-          <option value="thaumiel">thaumiel</option>
-          <option value="archive">archive</option>
-          <option value="field-report">field-report</option>
-        </select>
-        <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px;">Hold Ctrl or Shift to select multiple tags.</span>
+        <details class="tag-dropdown" id="sf-tag-dropdown">
+          <summary id="sf-tags-summary">Select tags</summary>
+          <div class="tag-dropdown-list" id="sf-tags-list">
+            <label><input type="checkbox" value="object" />object</label>
+            <label><input type="checkbox" value="animal" />animal</label>
+            <label><input type="checkbox" value="humanoid" />humanoid</label>
+            <label><input type="checkbox" value="plant" />plant</label>
+            <label><input type="checkbox" value="artifact" />artifact</label>
+            <label><input type="checkbox" value="document" />document</label>
+            <label><input type="checkbox" value="digital" />digital</label>
+            <label><input type="checkbox" value="memetic" />memetic</label>
+            <label><input type="checkbox" value="cognitohazard" />cognitohazard</label>
+            <label><input type="checkbox" value="spatial" />spatial</label>
+            <label><input type="checkbox" value="temporal" />temporal</label>
+            <label><input type="checkbox" value="biological" />biological</label>
+            <label><input type="checkbox" value="dangerous" />dangerous</label>
+            <label><input type="checkbox" value="neutralized" />neutralized</label>
+            <label><input type="checkbox" value="safe" />safe</label>
+            <label><input type="checkbox" value="euclid" />euclid</label>
+            <label><input type="checkbox" value="keter" />keter</label>
+            <label><input type="checkbox" value="thaumiel" />thaumiel</label>
+            <label><input type="checkbox" value="archive" />archive</label>
+            <label><input type="checkbox" value="field-report" />field-report</label>
+          </div>
+        </details>
+        <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px;">Click to open and select one or more tags.</span>
       </div>
       <div class="fg">
         <label class="fl">Page URL Slug</label>
@@ -212,7 +260,7 @@
         <div class="g2 mb-md">
           <div class="fg"><label class="fl">Object Class</label>
             <select class="fi" id="tf-object-class">
-              <option>Safe</option><option>Euclid</option><option>Keter</option><option>Thaumiel</option><option>Neutralized</option>
+              <option>Alona</option><option>Delphi</option><option>Soros</option><option>Vega</option><option>Apophis</option>
             </select>
           </div>
         </div>
@@ -282,7 +330,7 @@
         </div>
 
         <div id="tf-guide-sections"></div>
-        <button class="btn btn-s" onclick="addSubsection('guide')" style="margin-top:12px">+ Add Section</button>
+        <span style="font-size:.72rem;color:var(--wht-f);display:block;margin-top:8px">Guide structure is fixed for consistency. Edit section text and add images only.</span>
       </div>
 
     </div>

@@ -12,12 +12,51 @@ let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
 let docBlocks = [];
 let activeDocEditable = null;
 let docDragIndex = -1;
+let submitEditTarget = null;
 const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
 const FIRESTORE_IMAGE_MAX_BYTES = 250 * 1024;
 const FIRESTORE_IMAGE_MAX_DIMENSION = 1280;
 const FIRESTORE_IMAGE_LIMIT = 3;
+
+const ANOMALY_SUBTYPE_RULES = {
+  ROS: {
+    label: 'Red Oaker Specimen',
+    listKey: 'ROS',
+    placeholder: 'ROS-0001',
+    hint: 'ROS format: ROS-0001 (digits only after ROS-).',
+    pattern: /^ROS-\d{1,4}$/
+  },
+  SLOA: {
+    label: 'Specimen Linked Anomalous Object',
+    listKey: 'SLOA',
+    placeholder: 'SLOA-001A',
+    hint: 'SLOA format: SLOA-001A (1-3 digits + trailing letter).',
+    pattern: /^SLOA-\d{1,3}[A-Z]$/
+  },
+  SOA: {
+    label: 'Sentient or Accursed Object',
+    listKey: 'SOA',
+    placeholder: 'SOA-0001',
+    hint: 'SOA format: SOA-0001 (digits only after SOA-).',
+    pattern: /^SOA-\d{1,4}$/
+  },
+  SCTOR: {
+    label: 'Standard Cross Testing Operations Report',
+    listKey: 'SCTOR',
+    placeholder: 'SCTOR: 01',
+    hint: 'SCTOR format: SCTOR: 01',
+    pattern: /^SCTOR:\s*\d{2,}$/
+  },
+  TL: {
+    label: 'Termination Logs',
+    listKey: 'TL',
+    placeholder: 'TL: 01',
+    hint: 'TL format: TL: 01',
+    pattern: /^TL:\s*\d{2,}$/
+  }
+};
 
 const DEFAULT_NEW_PAGE_HTML = `<div class="page-shell">
   <header class="page-header">
@@ -84,6 +123,7 @@ auth.onAuthStateChanged(user => {
         '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
       '</div>';
     loadMySubmissions();
+    initializeSubmitEditModeFromUrl();
   } else {
     currentUserForSubmit = null;
     document.getElementById('submit-denied').classList.remove('hidden');
@@ -91,6 +131,102 @@ auth.onAuthStateChanged(user => {
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
   }
 });
+
+async function initializeSubmitEditModeFromUrl() {
+  if (!currentUserForSubmit) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const editId = params.get('editId');
+  const editSlug = params.get('editSlug');
+  if (!editId && !editSlug) return;
+
+  await rolesReady;
+  if (!isAdmin(currentUserForSubmit.email)) {
+    alert('Only Admin or Owner accounts can edit existing pages.');
+    return;
+  }
+
+  try {
+    let pageDoc = null;
+    if (editId) {
+      const doc = await db.collection('pages').doc(editId).get();
+      if (doc.exists) pageDoc = doc;
+    } else if (editSlug) {
+      const snap = await db.collection('pages').where('slug', '==', editSlug).limit(1).get();
+      if (!snap.empty) pageDoc = snap.docs[0];
+    }
+
+    if (!pageDoc) {
+      alert('Requested page was not found.');
+      return;
+    }
+
+    const page = pageDoc.data() || {};
+    submitEditTarget = { id: pageDoc.id };
+
+    document.getElementById('sf-title').value = page.title || '';
+    document.getElementById('sf-type').value = page.type || 'Anomaly';
+    document.getElementById('sf-slug').value = page.slug || '';
+
+    const tags = Array.isArray(page.tags) ? page.tags : [];
+    document.querySelectorAll('#sf-tags-list input[type="checkbox"]').forEach(input => {
+      input.checked = tags.includes(input.value);
+    });
+    updateTagSummary();
+
+    if (page.type === 'Anomaly') {
+      const subtype = page.anomalySubtype || '';
+      const code = page.anomalyId || '';
+      document.getElementById('sf-anomaly-subtype').value = subtype;
+      document.getElementById('sf-anomaly-code').value = code;
+      onAnomalySubtypeChange();
+    }
+
+    document.getElementById('sf-html').value = page.htmlContent || DEFAULT_NEW_PAGE_HTML;
+    document.getElementById('sf-css').value = page.cssContent || '';
+
+    const content = String(page.htmlContent || '');
+    const isGuide = String(page.type || '') === 'Guide';
+    if (isGuide) {
+      switchMode('template');
+      selectTemplate('guide');
+      setGuideSectionsFixedStructure();
+      const parsed = new DOMParser().parseFromString(content, 'text/html');
+      const sections = Array.from(parsed.querySelectorAll('.guide-section'));
+      let fixedIndex = 1;
+      sections.forEach(section => {
+        const heading = (section.querySelector('h2')?.textContent || '').trim();
+        const bodyPieces = Array.from(section.children)
+          .filter(node => node.tagName !== 'H2')
+          .map(node => node.outerHTML)
+          .join('');
+        const bodyText = htmlBlockToPlainText(bodyPieces);
+
+        if (/^introduction$/i.test(heading)) {
+          document.getElementById('tf-guide-intro').value = bodyText;
+          return;
+        }
+
+        const titleField = document.getElementById('sub-title-guide-' + fixedIndex);
+        const bodyField = document.getElementById('sub-body-guide-' + fixedIndex);
+        if (titleField) titleField.value = heading || titleField.value;
+        if (bodyField) bodyField.value = bodyText;
+        fixedIndex++;
+      });
+    } else {
+      switchMode('code');
+    }
+
+    updateTypeSpecificUI();
+    updateSlugPreview();
+    updatePreview();
+
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.textContent = '>> Save Page Changes';
+  } catch (err) {
+    alert('Could not load page for editing: ' + err.message);
+  }
+}
 
 // ═════════════════════════════════════════════════════════════
 // SLUG GENERATION
@@ -113,11 +249,116 @@ function updateSlugPreview() {
   document.getElementById('slug-preview').textContent = '/pages/' + slug;
 }
 
+function getSelectedTags() {
+  return Array.from(document.querySelectorAll('#sf-tags-list input[type="checkbox"]:checked'))
+    .map(el => el.value)
+    .filter(Boolean);
+}
+
+function updateTagSummary() {
+  const selected = getSelectedTags();
+  const summary = document.getElementById('sf-tags-summary');
+  if (!summary) return;
+  summary.textContent = selected.length ? (selected.length + ' tag(s) selected') : 'Select tags';
+}
+
+function setGuideSectionsFixedStructure() {
+  const holder = document.getElementById('tf-guide-sections');
+  if (!holder) return;
+
+  if (holder.children.length > 0) return;
+
+  const sectionTitles = [
+    'Purpose',
+    'Scope',
+    'Procedure',
+    'Field Notes',
+    'References'
+  ];
+
+  holder.innerHTML = sectionTitles.map((title, idx) => {
+    const n = idx + 1;
+    return '<div class="subsection-block" id="guide-fixed-' + n + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;margin-bottom:8px">' +
+        '<label class="fl" style="margin:0">Section ' + n + ' Title</label>' +
+      '</div>' +
+      '<div class="fg"><input class="fi" id="sub-title-guide-' + n + '" value="' + escapeAttr(title) + '" /></div>' +
+      '<div class="fg"><label class="fl">Section ' + n + ' Content</label>' +
+        '<textarea class="fta" id="sub-body-guide-' + n + '" placeholder="Write this section..."></textarea>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  holder.querySelectorAll('input,textarea').forEach(el => {
+    el.addEventListener('input', schedulePreview);
+  });
+}
+
+function updateTypeSpecificUI() {
+  const type = document.getElementById('sf-type').value;
+  const anomalyRow = document.getElementById('anomaly-meta-row');
+  if (anomalyRow) anomalyRow.classList.toggle('hidden', type !== 'Anomaly');
+
+  const isGuide = type === 'Guide';
+  const modeDoc = document.getElementById('mode-doc');
+  const modeCode = document.getElementById('mode-code');
+
+  if (modeDoc) modeDoc.disabled = isGuide;
+  if (modeCode) modeCode.disabled = isGuide;
+
+  if (isGuide) {
+    switchMode('template');
+    selectTemplate('guide');
+    setGuideSectionsFixedStructure();
+  }
+}
+
+function onAnomalySubtypeChange() {
+  const subtype = document.getElementById('sf-anomaly-subtype').value;
+  const hintEl = document.getElementById('sf-anomaly-hint');
+  const codeEl = document.getElementById('sf-anomaly-code');
+  const rule = ANOMALY_SUBTYPE_RULES[subtype];
+
+  if (!rule) {
+    if (hintEl) hintEl.textContent = 'Format hint will appear after selecting a submission type.';
+    if (codeEl) codeEl.placeholder = 'e.g. ROS-0001';
+    return;
+  }
+
+  if (hintEl) hintEl.textContent = rule.hint;
+  if (codeEl) codeEl.placeholder = rule.placeholder;
+
+  if (!codeEl.value.trim()) {
+    codeEl.value = rule.placeholder;
+    onAnomalyCodeInput();
+  }
+}
+
+function onAnomalyCodeInput() {
+  const codeEl = document.getElementById('sf-anomaly-code');
+  if (!codeEl) return;
+  const subtype = document.getElementById('sf-anomaly-subtype').value;
+  const rule = ANOMALY_SUBTYPE_RULES[subtype];
+  const normalized = String(codeEl.value || '').toUpperCase().trim();
+  codeEl.value = normalized;
+
+  const titleEl = document.getElementById('sf-title');
+  if (!titleEl || !normalized || !rule) return;
+  if (!titleEl.value.trim() || !titleEl.value.trim().includes(' ')) {
+    titleEl.value = normalized;
+    updateSlugPreview();
+  }
+}
+
 // ═════════════════════════════════════════════════════════════
 // MODE SWITCHING
 // ═════════════════════════════════════════════════════════════
 
 function switchMode(mode) {
+  const type = document.getElementById('sf-type').value;
+  if (type === 'Guide' && mode !== 'template') {
+    mode = 'template';
+  }
   currentMode = mode;
   document.getElementById('mode-template').classList.toggle('active', mode === 'template');
   document.getElementById('mode-doc').classList.toggle('active', mode === 'doc');
@@ -147,12 +388,16 @@ function selectTemplate(tpl) {
   const titleLabel = document.getElementById('lbl-title');
   const titleInput = document.getElementById('sf-title');
   if (tpl === 'anomaly') {
-    titleLabel.textContent = 'Anomaly Number (Title)';
-    titleInput.placeholder = 'e.g. ROG-007';
+    titleLabel.textContent = 'Title (must begin with anomaly designation)';
+    titleInput.placeholder = 'e.g. ROS-0001: Sample Title';
   } else {
     titleLabel.textContent = 'Title';
     const placeholders = { tale: 'e.g. The Hollow Mirror', artwork: 'e.g. Sketch of ROG-088', guide: 'e.g. Containment Protocols' };
     titleInput.placeholder = placeholders[tpl] || 'Enter a title';
+  }
+
+  if (tpl === 'guide') {
+    setGuideSectionsFixedStructure();
   }
 
   schedulePreview();
@@ -164,9 +409,13 @@ function onTypeChange() {
   if (currentMode === 'template' && tplMap[type]) {
     selectTemplate(tplMap[type]);
   }
+  updateTypeSpecificUI();
 }
 
 function addSubsection(type) {
+  if (type === 'guide') {
+    return;
+  }
   subsectionCounters[type] = (subsectionCounters[type] || 0) + 1;
   const n = subsectionCounters[type];
   const containerId = type === 'anomaly' ? 'tf-subsections' :
@@ -236,6 +485,18 @@ function stripTags(html) {
   const el = document.createElement('div');
   el.innerHTML = String(html || '');
   return (el.textContent || '').trim();
+}
+
+function htmlBlockToPlainText(html) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = String(html || '');
+  const chunks = [];
+  wrapper.querySelectorAll('p,li').forEach(node => {
+    const text = (node.textContent || '').trim();
+    if (text) chunks.push(text);
+  });
+  if (chunks.length) return chunks.join('\n\n');
+  return (wrapper.textContent || '').trim();
 }
 
 function getUploadedImageOptions(selected) {
@@ -960,6 +1221,15 @@ document.addEventListener('DOMContentLoaded', () => {
     schedulePreview();
   });
   document.getElementById('sf-slug').addEventListener('input', updateSlugPreview);
+  document.getElementById('sf-anomaly-subtype').addEventListener('change', schedulePreview);
+  document.getElementById('sf-anomaly-code').addEventListener('input', schedulePreview);
+
+  document.querySelectorAll('#sf-tags-list input[type="checkbox"]').forEach(el => {
+    el.addEventListener('change', () => {
+      updateTagSummary();
+      schedulePreview();
+    });
+  });
 
   // Bind all template fields to preview
   document.querySelectorAll('#template-mode input, #template-mode textarea, #template-mode select').forEach(el => {
@@ -971,6 +1241,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
   document.getElementById('sf-css').value = '';
+  setGuideSectionsFixedStructure();
+  onAnomalySubtypeChange();
+  updateTagSummary();
+  updateTypeSpecificUI();
   updateSlugPreview();
   updatePreview();
 });
@@ -1463,6 +1737,36 @@ function updatePreview() {
   frame.srcdoc = doc;
 }
 
+function validateAnomalyDesignation(subtype, rawCode) {
+  const rule = ANOMALY_SUBTYPE_RULES[subtype];
+  const code = String(rawCode || '').toUpperCase().trim();
+  if (!rule) {
+    return { valid: false, code: '', error: 'Please select an anomaly submission type.' };
+  }
+  if (!rule.pattern.test(code)) {
+    return { valid: false, code: '', error: rule.hint };
+  }
+  return { valid: true, code: code, rule: rule };
+}
+
+async function shouldBypassSubmissionReview() {
+  const user = currentUserForSubmit;
+  if (!user) return false;
+
+  await rolesReady;
+  if (isModerator(user.email)) return true;
+
+  try {
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    if (!userDoc.exists) return false;
+    const userData = userDoc.data() || {};
+    if (userData.authorizedMember === true) return true;
+    return String(userData.role || '').toLowerCase() === 'authorized';
+  } catch (_err) {
+    return false;
+  }
+}
+
 // ═════════════════════════════════════════════════════════════
 // SUBMIT PAGE
 // ═════════════════════════════════════════════════════════════
@@ -1471,22 +1775,39 @@ async function submitPage() {
   if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
 
   let title = document.getElementById('sf-title').value.trim();
-  if (document.getElementById('sf-type').value === 'Anomaly') {
-    title = title.toUpperCase(); // Ensure uppercase for anomaly numbers
-  }
   const type = document.getElementById('sf-type').value;
-  const tags = Array.from(document.getElementById('sf-tags').selectedOptions).map(opt => opt.value).filter(Boolean);
+  const tags = getSelectedTags();
   const manualSlug = document.getElementById('sf-slug').value.trim();
   const slug = manualSlug || generateSlug(title);
+  const anomalySubtype = document.getElementById('sf-anomaly-subtype').value;
+  const anomalyCodeInput = document.getElementById('sf-anomaly-code').value;
+
+  if (type === 'Anomaly') {
+    title = title.toUpperCase();
+    document.getElementById('sf-title').value = title;
+  }
 
   if (!title) { alert('Please enter a title.'); return; }
   if (!slug) { alert('Please enter a valid slug.'); return; }
-  const idMatch = title.match(/^([A-Z]{2,4}-\d+)/i) || title.match(/^([A-Za-z]+-\d+)/i);
-  if (!idMatch) {
-    alert("The submission Title MUST begin with an Anomaly ID designation (e.g. ROG-001, ROS-0050). This is compulsory for search indexing.");
-    return;
+
+  let anomalyId = '';
+  let anomalyListKey = '';
+  let anomalySubtypeLabel = '';
+  if (type === 'Anomaly') {
+    const validation = validateAnomalyDesignation(anomalySubtype, anomalyCodeInput);
+    if (!validation.valid) {
+      alert(validation.error);
+      return;
+    }
+
+    anomalyId = validation.code;
+    anomalyListKey = validation.rule.listKey;
+    anomalySubtypeLabel = validation.rule.label;
+    if (!title.startsWith(anomalyId)) {
+      alert('Anomaly titles must begin with the exact designation. Example: ' + anomalyId + ': Entry Title');
+      return;
+    }
   }
-  const anomalyId = idMatch[1].toUpperCase();
 
   let htmlContent, cssContent;
 
@@ -1510,15 +1831,24 @@ async function submitPage() {
   btn.textContent = 'Verifying ID constraints...';
   btn.disabled = true;
 
-  if (type === 'Anomaly') {
+  if (type === 'Anomaly' && anomalyId) {
     try {
       let found = false;
       if (typeof PAGE_SEED !== 'undefined') {
-        found = PAGE_SEED.some(p => p.type === 'Anomaly' && p.title.toUpperCase().startsWith(anomalyId));
+        found = PAGE_SEED.some(p => p.type === 'Anomaly' && String(p.title || '').toUpperCase().startsWith(anomalyId));
       }
       if (!found) {
-        const existingPages = await db.collection('pages').where('type', '==', 'Anomaly').where('anomalyId', '==', anomalyId).limit(1).get();
-        const existingSubs = await db.collection('submissions').where('type', '==', 'Anomaly').where('anomalyId', '==', anomalyId).where('status', '==', 'pending').limit(1).get();
+        const existingPages = await db.collection('pages')
+          .where('type', '==', 'Anomaly')
+          .where('anomalyId', '==', anomalyId)
+          .limit(1)
+          .get();
+        const existingSubs = await db.collection('submissions')
+          .where('type', '==', 'Anomaly')
+          .where('anomalyId', '==', anomalyId)
+          .where('status', '==', 'pending')
+          .limit(1)
+          .get();
         found = !existingPages.empty || !existingSubs.empty;
       }
 
@@ -1539,7 +1869,8 @@ async function submitPage() {
   try {
     const existingPages = await db.collection('pages').where('slug', '==', slug).limit(1).get();
     const existingSubs = await db.collection('submissions').where('slug', '==', slug).where('status', '==', 'pending').limit(1).get();
-    if (!existingPages.empty || !existingSubs.empty) {
+    const slugUsedByOtherPage = !existingPages.empty && existingPages.docs.some(doc => doc.id !== (submitEditTarget && submitEditTarget.id));
+    if (slugUsedByOtherPage || (!submitEditTarget && !existingSubs.empty)) {
       alert('The URL slug "' + slug + '" is already in use. Please choose a different slug.');
       btn.textContent = '>> Submit for Review';
       btn.disabled = false;
@@ -1575,6 +1906,9 @@ async function submitPage() {
   const submission = {
     title: title,
     anomalyId: anomalyId,
+    anomalySubtype: anomalySubtype || '',
+    anomalySubtypeLabel: anomalySubtypeLabel || '',
+    anomalyListKey: anomalyListKey || '',
     type: type,
     tags: tags,
     slug: slug,
@@ -1589,22 +1923,80 @@ async function submitPage() {
   };
 
   try {
-    await db.collection('submissions').add(submission);
-    alert('Submission received! Your page will be reviewed by Guild admins.\nOnce approved, it will be live at: /pages/' + slug);
+    if (submitEditTarget && submitEditTarget.id) {
+      await db.collection('pages').doc(submitEditTarget.id).update({
+        title: submission.title,
+        anomalyId: submission.anomalyId || '',
+        anomalySubtype: submission.anomalySubtype || '',
+        anomalySubtypeLabel: submission.anomalySubtypeLabel || '',
+        anomalyListKey: submission.anomalyListKey || '',
+        type: submission.type,
+        tags: submission.tags,
+        slug: submission.slug,
+        htmlContent: submission.htmlContent,
+        cssContent: submission.cssContent,
+        imageUrls: submission.imageUrls,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert('Page updated successfully.');
+      window.location.href = slug ? ('page.html?slug=' + encodeURIComponent(slug)) : ('page.html?id=' + encodeURIComponent(submitEditTarget.id));
+      return;
+    }
+
+    const bypassReview = await shouldBypassSubmissionReview();
+    if (bypassReview) {
+      const reviewerName = currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0] || 'Moderator';
+      const pageDoc = {
+        title: submission.title,
+        anomalyId: submission.anomalyId || '',
+        anomalySubtype: submission.anomalySubtype || '',
+        anomalySubtypeLabel: submission.anomalySubtypeLabel || '',
+        anomalyListKey: submission.anomalyListKey || '',
+        type: submission.type,
+        tags: submission.tags,
+        slug: submission.slug,
+        htmlContent: submission.htmlContent,
+        cssContent: submission.cssContent,
+        imageUrls: submission.imageUrls,
+        authorUid: submission.authorUid,
+        authorEmail: submission.authorEmail,
+        authorName: submission.authorName,
+        approvedBy: reviewerName,
+        approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        featured: false
+      };
+      const pageRef = await db.collection('pages').add(pageDoc);
+      await db.collection('submissions').add({
+        ...submission,
+        status: 'approved',
+        approvedPageId: pageRef.id,
+        reviewedBy: reviewerName,
+        reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        autoApproved: true
+      });
+      alert('Published directly (moderator/authorized clearance).\nLive at: /pages/' + slug);
+    } else {
+      await db.collection('submissions').add(submission);
+      alert('Submission received! Your page will be reviewed by Guild admins.\nOnce approved, it will be live at: /pages/' + slug);
+    }
     resetSubmitForm();
     loadMySubmissions();
   } catch (err) {
     alert('Submission failed: ' + err.message);
   } finally {
-    btn.textContent = '>> Submit for Review';
+    btn.textContent = submitEditTarget ? '>> Save Page Changes' : '>> Submit for Review';
     btn.disabled = false;
   }
 }
 
 function resetSubmitForm() {
+  submitEditTarget = null;
   document.getElementById('sf-title').value = '';
   document.getElementById('sf-type').value = 'Anomaly';
-  Array.from(document.getElementById('sf-tags').options).forEach(opt => { opt.selected = false; });
+  document.querySelectorAll('#sf-tags-list input[type="checkbox"]').forEach(opt => { opt.checked = false; });
+  document.getElementById('sf-anomaly-subtype').value = '';
+  document.getElementById('sf-anomaly-code').value = '';
   document.getElementById('sf-slug').value = '';
   document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
   document.getElementById('sf-css').value = '';
@@ -1617,7 +2009,7 @@ function resetSubmitForm() {
   });
   ['tf-object-class'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.value = 'Safe';
+    if (el) el.value = 'Alona';
   });
   ['tf-hero-img', 'tf-tale-hero', 'tf-art-img', 'tf-guide-hero'].forEach(id => {
     const el = document.getElementById(id);
@@ -1640,8 +2032,12 @@ function resetSubmitForm() {
   uploadedImages = [];
   renderImageList();
   refreshImageSelectors();
+  updateTagSummary();
+  onAnomalySubtypeChange();
+  updateTypeSpecificUI();
   updateSlugPreview();
   updatePreview();
+  document.getElementById('submit-btn').textContent = '>> Submit for Review';
 }
 
 // ═════════════════════════════════════════════════════════════

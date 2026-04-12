@@ -339,10 +339,11 @@ function renderFeatured(items) {
   grid.innerHTML = items.map(item => {
     const hasPage = item.htmlContent || item.slug;
     const href = hasPage ? (item.slug ? 'page.html?slug=' + item.slug : 'page.html?id=' + item.id) : '#';
+    const primaryId = item.anomalyId || item.id || 'N/A';
     return `
     <a href="${href}" style="text-decoration:none">
       <div class="card">
-        <div class="card-m">${item.id} — ${item.type}</div>
+        <div class="card-m">${primaryId} — ${item.type}</div>
         <div class="card-t">${item.title}</div>
         <div class="card-b">${item.excerpt || ''}</div>
         <div class="mt-md">${(item.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}</div>
@@ -421,8 +422,17 @@ function loadData() {
 
   // Then try to overlay with live Firestore data (non-blocking)
   try {
-    db.collection('pages').where('type', '==', 'Anomaly').orderBy('createdAt', 'desc').limit(4).get()
-      .then(function (snap) { if (!snap.empty) renderFeatured(snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })); })
+    db.collection('pages').where('type', '==', 'Anomaly').where('featured', '==', true).orderBy('createdAt', 'desc').limit(4).get()
+      .then(function (snap) {
+        if (!snap.empty) {
+          renderFeatured(snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }));
+          return;
+        }
+        return db.collection('pages').where('type', '==', 'Anomaly').orderBy('createdAt', 'desc').limit(4).get()
+          .then(function (fallbackSnap) {
+            if (!fallbackSnap.empty) renderFeatured(fallbackSnap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }));
+          });
+      })
       .catch(function (_e) { });
 
     db.collection('news').orderBy('date', 'desc').limit(10).get()

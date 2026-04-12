@@ -380,6 +380,12 @@ async function loadPages(container) {
         </div>
       </div>
       <div class="fg"><label class="fl">Tags (comma-separated)</label><input class="fi" id="pf-tags" /></div>
+      <div class="fg" style="margin-bottom:10px">
+        <label style="font-size:.8rem;color:var(--wht-d);cursor:pointer">
+          <input type="checkbox" id="pf-featured" style="margin-right:8px" />
+          Feature in home "Featured Anomalies" section
+        </label>
+      </div>
       <div class="g2 mb-md">
         <div class="fg"><label class="fl">HTML Content</label><textarea class="fta" id="pf-html" style="min-height:150px; font-family:monospace;"></textarea></div>
         <div class="fg"><label class="fl">CSS Content (Optional)</label><textarea class="fta" id="pf-css" style="min-height:150px; font-family:monospace;"></textarea></div>
@@ -388,7 +394,7 @@ async function loadPages(container) {
       <button type="submit" class="btn btn-p" id="pf-btn">&gt;&gt; Save Page</button>
       <button type="button" class="btn btn-s hidden" id="pf-cancel" onclick="resetPageForm()" style="margin-left:8px">Cancel</button>
     </form>
-    <table class="adm-tbl"><thead><tr><th>Title</th><th>Type</th><th>Actions</th></tr></thead><tbody id="pages-tbody"></tbody></table>
+    <table class="adm-tbl"><thead><tr><th>Title</th><th>Type</th><th>Featured</th><th>Actions</th></tr></thead><tbody id="pages-tbody"></tbody></table>
   `;
   document.getElementById('page-form').addEventListener('submit', submitPage);
   resetPageForm();
@@ -400,7 +406,7 @@ async function refreshPages() {
   try {
     const snap = await db.collection('pages').orderBy('createdAt', 'desc').limit(50).get();
     if (snap.empty) {
-      tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">No pages found. Create one above.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No pages found. Create one above.</td></tr>';
       return;
     }
     tbody.innerHTML = snap.docs.map(d => {
@@ -408,20 +414,27 @@ async function refreshPages() {
       const guideLocked = isGuideType(p.type) && !canManageGuidePages();
       const editBtn = guideLocked
         ? '<span style="font-size:.7rem;color:var(--wht-f)">Owner-only guide</span>'
-        : '<button class="btn btn-sm btn-s" onclick="editPage(\'' + d.id + '\')">Edit</button>';
+        : (isGuideType(p.type)
+          ? '<button class="btn btn-sm btn-s" onclick="location.href=\'submit.html?editId=' + d.id + '\'">Edit</button>'
+          : '<button class="btn btn-sm btn-s" onclick="editPage(\'' + d.id + '\')">Edit</button>');
       const deleteBtn = canDeleteManagedContent() && !guideLocked
         ? '<button class="btn btn-sm btn-d" onclick="deletePage(\'' + d.id + '\')" style="margin-left:4px">Delete</button>'
         : '';
+      const featureBtn = p.type === 'Anomaly'
+        ? '<button class="btn btn-sm btn-s" onclick="toggleFeaturedPage(\'' + d.id + '\',' + (p.featured ? 'false' : 'true') + ')" style="margin-left:4px">' + (p.featured ? 'Unfeature' : 'Feature') + '</button>'
+        : '<span style="font-size:.7rem;color:var(--wht-f)">Anomaly only</span>';
       return `<tr>
         <td>${p.title}</td>
         <td><span class="tag">${p.type}</span></td>
+        <td>${p.featured ? '<span class="status status-approved">Yes</span>' : '<span class="status status-pending">No</span>'}</td>
         <td>
           ${editBtn}
+          ${featureBtn}
           ${deleteBtn}
         </td>
       </tr>`;
     }).join('');
-  } catch { tbody.innerHTML = '<tr><td colspan="3" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase to manage pages.</td></tr>'; }
+  } catch { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase to manage pages.</td></tr>'; }
 }
 
 async function submitPage(e) {
@@ -431,6 +444,7 @@ async function submitPage(e) {
     title: document.getElementById('pf-title').value,
     type: document.getElementById('pf-type').value,
     tags: document.getElementById('pf-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+    featured: document.getElementById('pf-featured').checked,
     htmlContent: wrapWithDefaultSchema(document.getElementById('pf-html').value),
     cssContent: mergeWithDefaultSchemaCSS(document.getElementById('pf-css').value),
   };
@@ -474,6 +488,7 @@ async function editPage(id) {
   document.getElementById('pf-title').value = p.title || '';
   document.getElementById('pf-type').value = p.type || 'Anomaly';
   document.getElementById('pf-tags').value = (p.tags || []).join(', ');
+  document.getElementById('pf-featured').checked = !!p.featured;
   document.getElementById('pf-html').value = p.htmlContent || p.content || '';
   document.getElementById('pf-css').value = p.cssContent || '';
   document.getElementById('pf-btn').textContent = '>> Update Page';
@@ -504,8 +519,21 @@ function resetPageForm() {
   document.getElementById('pf-id').value = '';
   document.getElementById('pf-html').value = defaultSchemaHTML();
   document.getElementById('pf-css').value = defaultSchemaCSS();
+  document.getElementById('pf-featured').checked = false;
   document.getElementById('pf-btn').textContent = '>> Save Page';
   document.getElementById('pf-cancel').classList.add('hidden');
+}
+
+async function toggleFeaturedPage(id, nextState) {
+  try {
+    await db.collection('pages').doc(id).update({
+      featured: !!nextState,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await refreshPages();
+  } catch (err) {
+    alert('Could not update featured status: ' + err.message);
+  }
 }
 
 function defaultSchemaHTML() {
@@ -764,6 +792,7 @@ async function approveSubmission(id) {
       approvedBy: reviewer ? (reviewer.displayName || 'Admin') : 'Admin',
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdAt: s.submittedAt || firebase.firestore.FieldValue.serverTimestamp(),
+      featured: false,
     };
 
     const pageRef = await db.collection('pages').add(pageData);

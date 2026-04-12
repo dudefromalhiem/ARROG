@@ -199,13 +199,40 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (isAdmin(user.email)) {
         actionsDiv.classList.remove('hidden');
         const editHref = window.__pageDocId
-          ? `admin.html?editId=${window.__pageDocId}`
-          : `admin.html?editSlug=${encodeURIComponent(window.__pageSlug || '')}`;
-        actionsDiv.innerHTML = `<button class="btn btn-s" onclick="location.href='${editHref}'">>> Edit Document [Owner]</button>`;
+          ? `submit.html?editId=${window.__pageDocId}`
+          : `submit.html?editSlug=${encodeURIComponent(window.__pageSlug || '')}`;
+        actionsDiv.innerHTML = `
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-s" onclick="confirmEditDocument('${editHref}')">>> Edit Document</button>
+            <button class="btn btn-d" onclick="confirmDeleteDocument()">Delete Document</button>
+          </div>`;
       }
     }
   });
 });
+
+function confirmEditDocument(editHref) {
+  const ok = confirm('Open this document in the unified submit editor?');
+  if (!ok) return;
+  location.href = editHref;
+}
+
+async function confirmDeleteDocument() {
+  if (!window.__pageDocId) {
+    alert('This page is seeded/local and cannot be deleted from Firestore.');
+    return;
+  }
+  const ok = confirm('Delete this document permanently? This action cannot be undone.');
+  if (!ok) return;
+
+  try {
+    await db.collection('pages').doc(window.__pageDocId).delete();
+    alert('Document deleted.');
+    location.href = 'index.html';
+  } catch (err) {
+    alert('Delete failed: ' + err.message);
+  }
+}
 
 function showError() {
   document.getElementById('page-loading').classList.add('hidden');
