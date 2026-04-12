@@ -18,6 +18,22 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+if (!document.getElementById('auth-pending-style')) {
+  const style = document.createElement('style');
+  style.id = 'auth-pending-style';
+  style.textContent = `html.auth-pending .hdr { visibility: hidden; }`;
+  document.head.appendChild(style);
+}
+
+document.documentElement.classList.add('auth-pending');
+
+function waitForReady(promise, timeoutMs = 1200) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(resolve, timeoutMs))
+  ]);
+}
+
 async function changeUsername() {
   const user = auth.currentUser;
   if (!user) {
@@ -209,4 +225,5 @@ auth.onAuthStateChanged(async user => {
   SITE_STATE.esdLocked = !!SITE_STATE.esdLocked;
   syncSharedNav(user);
   applySiteAccessGate(user);
+  setTimeout(() => document.documentElement.classList.remove('auth-pending'), 150);
 });
