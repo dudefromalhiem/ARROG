@@ -110,10 +110,56 @@ function closeMobileNav() {
   if (nav) nav.classList.remove('open');
 }
 
+function normalizeNavIA() {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+
+  const submitLi = nav.querySelector('#submit-link');
+  const adminLi = nav.querySelector('#admin-link');
+  const authLi = nav.querySelector('#nav-auth');
+
+  const primary = [
+    { href: 'index.html', label: 'Home' },
+    { href: 'explore.html', label: 'Explore' },
+    { href: 'registry.html', label: 'Registry' },
+    { href: 'guide.html', label: 'Guide' },
+    { href: 'archives.html', label: 'Archives' }
+  ];
+
+  nav.innerHTML = '';
+  primary.forEach(item => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = item.href;
+    a.textContent = item.label;
+    li.appendChild(a);
+    nav.appendChild(li);
+  });
+
+  if (submitLi) nav.appendChild(submitLi);
+  if (adminLi) nav.appendChild(adminLi);
+  if (authLi) nav.appendChild(authLi);
+}
+
+function normalizedCurrentPath() {
+  const raw = location.pathname.replace(/\/+$/, '').split('/').pop() || 'index.html';
+  const aliases = {
+    '': 'index.html',
+    'index': 'index.html',
+    'explore': 'explore.html',
+    'registry': 'registry.html',
+    'guide': 'guide.html',
+    'archives': 'archives.html',
+    'submit': 'submit.html',
+    'admin': 'admin.html'
+  };
+  return aliases[raw] || raw;
+}
+
 function markActiveNavLink() {
   const nav = document.getElementById('nav');
   if (!nav) return;
-  const current = location.pathname.split('/').pop() || 'index.html';
+  const current = normalizedCurrentPath();
   nav.querySelectorAll('a[href]').forEach(link => {
     const href = (link.getAttribute('href') || '').split('?')[0];
     link.classList.toggle('active', href === current);
@@ -185,6 +231,7 @@ function bindGlobalNavUX() {
 }
 
 function initializeGlobalUX() {
+  normalizeNavIA();
   ensureSkipLink();
   ensureBackToTop();
   bindGlobalNavUX();
@@ -274,7 +321,10 @@ function syncSharedNav(user) {
     if (submitLink) submitLink.classList.remove('hidden');
     if (adminLink) adminLink.classList.toggle('hidden', !isAdmin(user.email));
   } else {
-    navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    const onHome = normalizedCurrentPath() === 'index.html' && typeof openAuth === 'function';
+    navAuth.innerHTML = onHome
+      ? '<button class="nav-btn" onclick="openAuth()">Sign In</button>'
+      : '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     if (submitLink) submitLink.classList.add('hidden');
     if (adminLink) adminLink.classList.add('hidden');
   }
