@@ -17,12 +17,13 @@ let activeDraftId = null;
 let draftAutoSaveTimer = null;
 let draftSaveInFlight = false;
 let suppressDraftAutoSave = false;
-const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
 const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
 const FIRESTORE_IMAGE_MAX_BYTES = 250 * 1024;
 const FIRESTORE_IMAGE_MAX_DIMENSION = 1280;
 const FIRESTORE_IMAGE_LIMIT = 3;
+const ALLOWED_STORAGE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 const TAG_OPTIONS = [
   'object', 'animal', 'humanoid', 'plant', 'artifact', 'document', 'digital',
   'memetic', 'cognitohazard', 'spatial', 'temporal', 'biological', 'dangerous',
@@ -214,6 +215,35 @@ function removeClientOnlySubmissionFields(data) {
   return cleaned;
 }
 
+async function getSubmissionApiHeaders() {
+  const user = currentUserForSubmit || auth.currentUser;
+  if (!user) {
+    throw new Error('Please sign in first.');
+  }
+  const token = await user.getIdToken();
+  return {
+    Authorization: 'Bearer ' + token,
+    'Content-Type': 'application/json'
+  };
+}
+
+async function callSubmissionApi(method, payload = {}, query = '') {
+  const response = await fetch('/api/submit' + query, {
+    method: method,
+    headers: await getSubmissionApiHeaders(),
+    body: method === 'GET' ? undefined : JSON.stringify(payload)
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data && data.error ? data.error : ('Request failed with status ' + response.status);
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+  return data;
+}
+
 async function saveDraft(options = {}) {
   if (!currentUserForSubmit || submitEditTarget) return null;
   if (draftSaveInFlight) return activeDraftId;
@@ -286,12 +316,12 @@ async function saveDraft(options = {}) {
 
   draftSaveInFlight = true;
   try {
-    if (activeDraftId) {
-      await db.collection('submissions').doc(activeDraftId).set(removeClientOnlySubmissionFields(draftPayload), { merge: true });
-    } else {
-      const ref = await db.collection('submissions').add(draftPayload);
-      activeDraftId = ref.id;
-    }
+    const result = await callSubmissionApi('POST', {
+      action: 'draft',
+      submissionId: activeDraftId || '',
+      submission: removeClientOnlySubmissionFields(draftPayload)
+    });
+    activeDraftId = result.id || activeDraftId;
     if (!silent) {
       setDraftStatus('Draft saved at ' + new Date().toLocaleTimeString() + '.');
     } else {
@@ -313,12 +343,12 @@ function manualSaveDraft() {
 async function continueDraftSubmission(id) {
   if (!currentUserForSubmit) return;
   try {
-    const doc = await db.collection('submissions').doc(id).get();
-    if (!doc.exists) {
+    const result = await callSubmissionApi('GET', {}, '?id=' + encodeURIComponent(id));
+    if (!result || !result.data) {
       alert('Draft not found.');
       return;
     }
-    const draft = doc.data() || {};
+    const draft = result.data || {};
     if (draft.authorUid !== currentUserForSubmit.uid) {
       alert('You can only open your own draft.');
       return;
@@ -368,12 +398,12 @@ async function continueDraftSubmission(id) {
 
 async function openRejectedSubmissionPreview(id) {
   try {
-    const doc = await db.collection('submissions').doc(id).get();
-    if (!doc.exists) {
+    const result = await callSubmissionApi('GET', {}, '?id=' + encodeURIComponent(id));
+    if (!result || !result.data) {
       alert('Submission not found.');
       return;
     }
-    const s = doc.data() || {};
+    const s = result.data || {};
     if (s.authorUid !== currentUserForSubmit.uid) {
       alert('You can only view your own submission details.');
       return;
@@ -387,7 +417,7 @@ async function openRejectedSubmissionPreview(id) {
       '<button class="btn btn-sm btn-s" type="button" onclick="closeRejectedSubmissionPreview()">Close</button>' +
     '</div>' +
     '<div class="review-modal-body">' +
-      '<iframe class="review-modal-preview" sandbox="allow-same-origin" title="Rejected submission preview"></iframe>' +
+      '<iframe class="review-modal-preview" sandbox="allow-same-origin allow-scripts" csp="default-src \'none\'; style-src \'unsafe-inline\'" title="Rejected submission preview"></iframe>' +
       '<div class="review-modal-meta">' +
         '<dl>' +
           '<dt>Status</dt><dd><span class="status status-rejected">rejected</span></dd>' +
@@ -424,7 +454,8 @@ async function initializeSubmitEditModeFromUrl() {
   if (!editId && !editSlug) return;
 
   await rolesReady;
-  if (!isAdmin(currentUserForSubmit.email)) {
+  const isAdminUser = await getUserAdminFlag(currentUserForSubmit);
+  if (!isAdminUser) {
     alert('Only Admin or Owner accounts can edit existing pages.');
     return;
   }
@@ -1286,7 +1317,7 @@ function sanitizeCSS(css) {
 function buildSandboxDocument(html, css) {
   const htmlWithLazyImages = String(html || '').replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' +
-    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data: https: http:; style-src \'unsafe-inline\'; font-src data:; media-src data:; connect-src \'none\'; frame-src \'none\'">' +
+    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'">' +
     '<style>' +
     ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--wht-d:#999;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
     '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
@@ -1691,16 +1722,24 @@ function handleFiles(files) {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
+    if (!isAllowedStorageImage(file)) {
       alert('Only image files are allowed: ' + file.name);
       return;
     }
     if (file.size > UPLOAD_MAX_BYTES) {
-      alert('File too large (max 5MB): ' + file.name);
+      alert('File too large (max 2MB): ' + file.name);
       return;
     }
     uploadImage(file);
   });
+}
+
+function isAllowedStorageImage(file) {
+  const mimeType = String(file && file.type ? file.type : '').toLowerCase();
+  if (ALLOWED_STORAGE_IMAGE_TYPES.has(mimeType)) return true;
+
+  const extension = String(file && file.name ? file.name : '').toLowerCase().split('.').pop();
+  return extension === 'png' || extension === 'jpg' || extension === 'jpeg' || extension === 'gif' || extension === 'webp';
 }
 
 function fileToDataUrl(file) {
@@ -1791,27 +1830,21 @@ function getStorageBucketCandidates() {
 }
 
 function getImageMimeType(file) {
-  // If browser detected the MIME type, use it
-  if (file.type && file.type.startsWith('image/')) {
-    return file.type;
+  const mimeType = String(file && file.type ? file.type : '').toLowerCase();
+  if (ALLOWED_STORAGE_IMAGE_TYPES.has(mimeType)) {
+    return mimeType;
   }
 
-  // Otherwise, detect from file extension
   const ext = (file.name || '').toLowerCase().split('.').pop();
   const mimeMap = {
     'jpg': 'image/jpeg',
     'jpeg': 'image/jpeg',
     'png': 'image/png',
     'gif': 'image/gif',
-    'webp': 'image/webp',
-    'heic': 'image/heic',
-    'heif': 'image/heif',
-    'bmp': 'image/bmp',
-    'tiff': 'image/tiff',
-    'svg': 'image/svg+xml'
+    'webp': 'image/webp'
   };
 
-  return mimeMap[ext] || 'application/octet-stream';
+  return mimeMap[ext] || '';
 }
 
 function createUploadTask(ref, file, onProgress) {
@@ -1948,9 +1981,15 @@ async function uploadImage(file) {
     return;
   }
 
+  if (!isAllowedStorageImage(file)) {
+    progressWrap.style.display = 'none';
+    alert('Only PNG, JPG, GIF, and WebP images can be uploaded.');
+    return;
+  }
+
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = 'submissions/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
+  const path = 'uploads/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
   const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
   const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
   const localUrl = await fileToDataUrl(file);
@@ -1986,21 +2025,25 @@ async function uploadImage(file) {
   try {
     uploadRecord.status = 'uploading';
     renderImageList();
-    if (uploadStatus) uploadStatus.textContent = 'Optimizing ' + file.name + ' for Firestore...';
+    if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + ' to Storage...';
     progressBar.style.width = '20%';
 
-    const optimized = await optimizeImageForFirestore(file);
+    const remoteUrl = await uploadWithBucketFallback(path, file, uploadRecord, snap => {
+      const pct = snap && snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 20;
+      progressBar.style.width = Math.max(20, Math.min(100, pct)) + '%';
+      if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '... ' + Math.max(20, Math.min(100, pct)) + '%';
+    });
     progressBar.style.width = '100%';
-    finalizeSuccess(optimized.dataUrl);
-    uploadRecord.sizeBytes = optimized.bytes;
-    uploadRecord.storageMode = 'firestore-embedded';
+    finalizeSuccess(remoteUrl);
+    uploadRecord.sizeBytes = file.size;
+    uploadRecord.storageMode = 'storage-download-url';
     if (uploadStatus) {
-      uploadStatus.textContent = 'Prepared ' + file.name + ' (' + Math.round(optimized.bytes / 1024) + ' KB)';
+      uploadStatus.textContent = 'Uploaded ' + file.name + ' to Storage.';
     }
   } catch (err) {
     const code = err && err.code ? err.code : '';
     if (code === 'storage/canceled' && uploadRecord.removed) return;
-    finalizeFailure('Image processing failed: ' + (err.message || code || 'Unknown error'));
+    finalizeFailure('Image upload failed: ' + (err.message || code || 'Unknown error'));
   }
 }
 
@@ -2321,6 +2364,7 @@ async function submitPage() {
   const sanitizedHTML = sanitizeHTML(htmlContent);
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title);
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
+  const isAdminUser = await getUserAdminFlag(currentUserForSubmit);
 
   const submission = {
     title: title,
@@ -2343,68 +2387,36 @@ async function submitPage() {
 
   try {
     if (submitEditTarget && submitEditTarget.id) {
-      await db.collection('pages').doc(submitEditTarget.id).update({
-        title: submission.title,
-        anomalyId: submission.anomalyId || '',
-        anomalySubtype: submission.anomalySubtype || '',
-        anomalySubtypeLabel: submission.anomalySubtypeLabel || '',
-        anomalyListKey: submission.anomalyListKey || '',
-        type: submission.type,
-        tags: submission.tags,
-        slug: submission.slug,
-        htmlContent: submission.htmlContent,
-        cssContent: submission.cssContent,
-        imageUrls: submission.imageUrls,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      if (!isAdminUser) {
+        alert('Only Admin or Owner accounts can edit existing pages.');
+        return;
+      }
+
+      const result = await callSubmissionApi('POST', {
+        action: 'publish',
+        pageId: submitEditTarget.id,
+        submissionId: activeDraftId || '',
+        submission: submission,
+        reviewerName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0] || 'Admin',
+        removeDraft: !!activeDraftId
       });
       alert('Page updated successfully.');
-      window.location.href = slug ? ('page.html?slug=' + encodeURIComponent(slug)) : ('page.html?id=' + encodeURIComponent(submitEditTarget.id));
+      const publishedPageId = result.pageId || submitEditTarget.id;
+      window.location.href = slug ? ('page.html?slug=' + encodeURIComponent(slug)) : ('page.html?id=' + encodeURIComponent(publishedPageId));
       return;
     }
 
-    const bypassReview = await shouldBypassSubmissionReview();
-    if (bypassReview) {
-      const reviewerName = currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0] || 'Moderator';
-      const pageDoc = {
-        title: submission.title,
-        anomalyId: submission.anomalyId || '',
-        anomalySubtype: submission.anomalySubtype || '',
-        anomalySubtypeLabel: submission.anomalySubtypeLabel || '',
-        anomalyListKey: submission.anomalyListKey || '',
-        type: submission.type,
-        tags: submission.tags,
-        slug: submission.slug,
-        htmlContent: submission.htmlContent,
-        cssContent: submission.cssContent,
-        imageUrls: submission.imageUrls,
-        authorUid: submission.authorUid,
-        authorEmail: submission.authorEmail,
-        authorName: submission.authorName,
-        approvedBy: reviewerName,
-        approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        featured: false
-      };
-      const pageRef = await db.collection('pages').add(pageDoc);
-      if (activeDraftId) {
-        await db.collection('submissions').doc(activeDraftId).delete().catch(() => {});
-        activeDraftId = null;
-      }
-      await db.collection('submissions').add({
-        ...submission,
-        status: 'approved',
-        approvedPageId: pageRef.id,
-        reviewedBy: reviewerName,
-        reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        autoApproved: true
-      });
-      alert('Published directly (moderator/authorized clearance).\nLive at: /pages/' + slug);
+    const result = await callSubmissionApi('POST', {
+      action: isAdminUser ? 'publish' : 'submit',
+      submissionId: activeDraftId || '',
+      submission: submission,
+      reviewerName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0] || 'Admin',
+      removeDraft: !!activeDraftId
+    });
+    activeDraftId = null;
+    if (isAdminUser) {
+      alert('Published directly by admin clearance.\nLive at: /pages/' + slug);
     } else {
-      if (activeDraftId) {
-        await db.collection('submissions').doc(activeDraftId).delete().catch(() => {});
-        activeDraftId = null;
-      }
-      await db.collection('submissions').add(submission);
       alert('Submission received! Your page will be reviewed by Guild admins.\nOnce approved, it will be live at: /pages/' + slug);
     }
     resetSubmitForm();
@@ -2481,16 +2493,8 @@ async function loadMySubmissions() {
   if (!container) return;
 
   try {
-    const snap = await db.collection('submissions')
-      .where('authorUid', '==', currentUserForSubmit.uid)
-      .get();
-    const submissions = snap.docs
-      .map(doc => ({ id: doc.id, data: doc.data() }))
-      .sort((a, b) => {
-        const aTime = a.data.updatedAt?.seconds || a.data.submittedAt?.seconds || 0;
-        const bTime = b.data.updatedAt?.seconds || b.data.submittedAt?.seconds || 0;
-        return bTime - aTime;
-      });
+    const result = await callSubmissionApi('GET');
+    const submissions = Array.isArray(result.submissions) ? result.submissions : [];
 
     if (submissions.length === 0) {
       container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">No submissions yet. Create your first page above!</p>';
@@ -2502,7 +2506,7 @@ async function loadMySubmissions() {
       const s = entry.data;
       const statusClass = 'status status-' + s.status;
       const ts = s.updatedAt || s.submittedAt;
-      const date = ts ? new Date(ts.seconds * 1000).toLocaleDateString() : '—';
+      const date = ts && ts.seconds ? new Date(ts.seconds * 1000).toLocaleDateString() : '—';
       const slug = s.slug || '';
       let extra = '';
       if (s.status === 'rejected' && s.rejectionReason) {
@@ -2533,7 +2537,8 @@ async function loadMySubmissions() {
 async function deleteMySubmission(id) {
   if (!confirm('Withdraw this submission? This cannot be undone.')) return;
   try {
-    await db.collection('submissions').doc(id).delete();
+    await callSubmissionApi('DELETE', { id: id });
+    if (activeDraftId === id) activeDraftId = null;
     loadMySubmissions();
   } catch (err) {
     alert('Error: ' + err.message);

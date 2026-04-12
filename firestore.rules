@@ -2,100 +2,55 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helper functions ──────────────────────────────────
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner() {
-      return isSignedIn() && (
-        request.auth.token.email == 'jaimejoselaureano@gmail.com' ||
-        request.auth.token.email == 'dudefromalhiem@gmail.com' ||
-        (exists(/databases/$(database)/documents/config/roles) && 
-         ('owners' in get(/databases/$(database)/documents/config/roles).data) &&
-         request.auth.token.email in get(/databases/$(database)/documents/config/roles).data.owners)
-      );
+    function isAdminUser() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    function isAdmin() {
-      return isSignedIn() && (
-        isOwner() ||
-        (exists(/databases/$(database)/documents/config/roles) && 
-         ('admins' in get(/databases/$(database)/documents/config/roles).data) &&
-         request.auth.token.email in get(/databases/$(database)/documents/config/roles).data.admins)
-      );
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isModerator() {
-      return isSignedIn() && (
-        isAdmin() ||
-        (exists(/databases/$(database)/documents/config/roles) &&
-         ('mods' in get(/databases/$(database)/documents/config/roles).data) &&
-         request.auth.token.email in get(/databases/$(database)/documents/config/roles).data.mods)
-      );
-    }
-
-    // ── Users collection ──────────────────────────────────
     match /users/{userId} {
-      // Anyone signed in can read user profiles
-      allow read: if isSignedIn();
-      // Users can create their own profile on first login
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      // Only owner can update roles; users can update own non-role fields
-      allow update: if isOwner() ||
-        (isSignedIn() && request.auth.uid == userId &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
-      allow delete: if isOwner();
+      allow read: if isAdminUser() || isSelf(userId);
+      allow create: if (isAdminUser() || isSelf(userId)) && !request.resource.data.keys().hasAny(['isAdmin']);
+      allow update: if isAdminUser() || (isSelf(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']));
+      allow delete: if isAdminUser();
     }
 
-    // ── Pages (Anomalies, Tales, etc.) ────────────────────
     match /pages/{pageId} {
-      allow read: if true; // Public wiki
-      allow create: if isOwner() ||
-        (isModerator() && request.resource.data.type != 'Guide');
-      allow update: if isOwner() ||
-        (isModerator() && resource.data.type != 'Guide' && request.resource.data.type != 'Guide');
-      allow delete: if isOwner() ||
-        (isAdmin() && resource.data.type != 'Guide');
+      allow read: if isAdminUser() || (resource.data.status == 'approved');
+      allow create, update, delete: if isAdminUser();
     }
 
-    // ── Submissions (User-created pages pending review) ───
     match /submissions/{subId} {
-      // Moderators can read all; users can read their own
-      allow read: if isModerator() ||
-        (isSignedIn() && resource.data.authorUid == request.auth.uid);
-      // Any authenticated user can create a submission
       allow create: if isSignedIn() &&
         request.resource.data.authorUid == request.auth.uid &&
         (request.resource.data.status == 'pending' || request.resource.data.status == 'draft');
-      // Moderators can update (approve/reject); authors can update their own draft
-      allow update: if isModerator() ||
-        (isSignedIn() &&
-         resource.data.authorUid == request.auth.uid &&
-         request.resource.data.authorUid == request.auth.uid &&
-         request.resource.data.status == 'draft');
-      // Admins can delete; authors can delete their own pending submissions
-      allow delete: if isAdmin() ||
-        (isSignedIn() && resource.data.authorUid == request.auth.uid &&
-         (resource.data.status == 'pending' || resource.data.status == 'draft'));
+      allow read, update, delete: if isAdminUser();
     }
 
-    // ── Artworks ──────────────────────────────────────────
     match /artworks/{artworkId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isAdminUser();
     }
 
-    // ── News ──────────────────────────────────────────────
     match /news/{newsId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isAdminUser();
     }
 
-    // ── Configuration (Including Roles) ───────────────────
     match /config/{docId} {
-      allow read: if true; // Roles must be public so the app can resolve permissions
-      allow write: if isOwner(); // Only the owner can modify roles
+      allow read, write: if isAdminUser();
+    }
+
+    match /submissions_meta/{uid} {
+      allow read, write: if isAdminUser();
     }
   }
 }

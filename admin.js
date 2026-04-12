@@ -6,6 +6,7 @@
 let activeTab = 'pages';
 let adminArtworkUploadUrl = '';
 let adminNewsImageUrl = '';
+let currentUserIsAdminFlag = false;
 
 function getCurrentRole() {
   return resolveRole(auth.currentUser?.email || '');
@@ -16,11 +17,11 @@ function isModOnlyRole() {
 }
 
 function canModerateSubmissions() {
-  return isModerator(auth.currentUser?.email);
+  return currentUserIsAdminFlag;
 }
 
 function canDeleteManagedContent() {
-  return isAdmin(auth.currentUser?.email);
+  return currentUserIsAdminFlag;
 }
 
 function isGuideType(type) {
@@ -100,7 +101,7 @@ async function optimizeImageToDataUrl(file, maxDim = 1280, maxBytes = 250 * 1024
   return dataUrl;
 }
 
-function applyTabVisibilityForRole(role) {
+function applyTabVisibilityForRole(role, hasAdminAccess = false) {
   const pagesTab = document.getElementById('tab-pages');
   const submissionsTab = document.getElementById('tab-submissions');
   const artworksTab = document.getElementById('tab-artworks');
@@ -117,7 +118,7 @@ function applyTabVisibilityForRole(role) {
   if (newsTab) newsTab.classList.toggle('hidden', isModOnly);
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
-  if (usersTab) usersTab.classList.toggle('hidden', !isAdmin(auth.currentUser?.email));
+  if (usersTab) usersTab.classList.toggle('hidden', !hasAdminAccess);
   if (rolesTab) rolesTab.classList.toggle('hidden', !isOwner(auth.currentUser?.email));
 
   if (isModOnly && activeTab !== 'submissions') {
@@ -147,7 +148,9 @@ function renderAdminBootstrap(user) {
   }
 
   const role = resolveRole(user.email);
-  if (!isAdmin(user.email)) {
+  const isAdminUser = await getUserAdminFlag(user);
+  currentUserIsAdminFlag = isAdminUser;
+  if (!isAdminUser) {
     adminLoading.classList.add('hidden');
     adminDenied.classList.remove('hidden');
     adminDenied.style.display = 'block';
@@ -170,7 +173,7 @@ function renderAdminBootstrap(user) {
     `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Clearance: <span style="color:var(--red-b);text-transform:uppercase">${role}</span> (Level ${clearanceLevel})
      <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
   navAuth.innerHTML = renderUserMenuHTML(displayLabel);
-  applyTabVisibilityForRole(role);
+  applyTabVisibilityForRole(role, isAdminUser);
 
   const params = new URLSearchParams(window.location.search);
   const editId = params.get('editId');

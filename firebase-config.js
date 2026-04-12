@@ -66,6 +66,16 @@ async function changeUsername() {
   }
 }
 
+async function getUserAdminFlag(user) {
+  if (!user) return false;
+  try {
+    const doc = await db.collection('users').doc(user.uid).get();
+    return !!(doc.exists && doc.data() && doc.data().isAdmin === true);
+  } catch (_err) {
+    return false;
+  }
+}
+
 function renderUserMenuHTML(displayLabel) {
   const safeLabel = String(displayLabel || 'Agent').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `
@@ -306,7 +316,7 @@ function clearanceLevelForRole(role) {
   return 2;
 }
 
-function syncSharedNav(user) {
+async function syncSharedNav(user) {
   const navAuth = document.getElementById('nav-auth');
   const submitLink = document.getElementById('submit-link');
   const adminLink = document.getElementById('admin-link');
@@ -314,9 +324,10 @@ function syncSharedNav(user) {
 
   if (user) {
     const displayLabel = user.displayName || 'Agent';
+    const isAdminUser = await getUserAdminFlag(user);
     navAuth.innerHTML = renderUserMenuHTML(displayLabel);
     if (submitLink) submitLink.classList.remove('hidden');
-    if (adminLink) adminLink.classList.toggle('hidden', !isAdmin(user.email));
+    if (adminLink) adminLink.classList.toggle('hidden', !isAdminUser);
   } else {
     const onHome = normalizedCurrentPath() === 'index.html' && typeof openAuth === 'function';
     navAuth.innerHTML = onHome
@@ -377,7 +388,7 @@ function applySiteAccessGate(user) {
 
 auth.onAuthStateChanged(async user => {
   syncServerAuthCookie(user);
-  syncSharedNav(user);
+  await syncSharedNav(user);
   applySiteAccessGate(user);
   document.documentElement.classList.remove('auth-pending');
 

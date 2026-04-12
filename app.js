@@ -272,16 +272,14 @@ async function updateAuthUI(user) {
     currentUser = user;
     currentRole = resolveRole(user.email);
     const displayLabel = user.displayName || 'Agent';
-      navAuth.innerHTML = renderUserMenuHTML(displayLabel);
+    const isAdminUser = await getUserAdminFlag(user);
+    navAuth.innerHTML = renderUserMenuHTML(displayLabel);
     if (submitLink) submitLink.classList.remove('hidden');
-    if (isAdmin(user.email)) adminLink.classList.remove('hidden');
-    else adminLink.classList.add('hidden');
+    if (adminLink) adminLink.classList.toggle('hidden', !isAdminUser);
     // upsert user doc
     db.collection('users').doc(user.uid).set({
       uid: user.uid, email: user.email,
       displayName: user.displayName || '',
-      role: currentRole,
-      clearanceLevel: clearanceLevelForRole(currentRole),
       lastLogin: new Date().toISOString()
     }, { merge: true }).catch(() => { });
 
