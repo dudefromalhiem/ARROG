@@ -39,24 +39,29 @@
     <p class="load-copy">
       Establishing secure connection to Guild servers.
     </p>
-    <div class="load-seq" aria-hidden="true">
-      <div class="load-seq-head">rog-auth.bootstrap</div>
-      <pre class="load-codeblock">
-<span class="code-row"><span class="ln">01</span>const profile = await auth.handshake(agentId);</span>
-<span class="code-row"><span class="ln">02</span>if (!profile.ok) throw new Error('session refused');</span>
-<span class="code-row"><span class="ln">03</span>const clearance = matrix.resolve(profile.role);</span>
-<span class="code-row"><span class="ln">04</span>const token = await vault.issue(clearance, profile.uid);</span>
-<span class="code-row"><span class="ln">05</span>channel.attach('guild-core', token);</span>
-<span class="code-row"><span class="ln">06</span>stream.sync('/archives/active');</span>
-<span class="code-row"><span class="ln">07</span>stream.sync('/submissions/recent');</span>
-<span class="code-row"><span class="ln">08</span>audit.log('AUTH_OK', profile.email);</span>
-<span class="code-row"><span class="ln">09</span>ui.setStatus('secure channel established');</span>
-<span class="code-row"><span class="ln">10</span>ui.mount('admin-terminal');</span>
-<span class="code-row"><span class="ln">11</span>observer.watch(clearance, 'live');</span>
-<span class="code-row"><span class="ln">12</span>return clearance;</span>
-      </pre>
-      <div class="code-caret"></div>
-    </div>
+    <pre class="load-monocode" aria-hidden="true">// ROG AUTH HANDSHAKE
+const session = await gateway.open('admin-terminal');
+const profile = await session.identify(agentFingerprint);
+const role = acl.resolve(profile.email);
+const clearance = level.map(role);
+
+if (!session.secure || !profile.valid) {
+  throw new SecurityError('AUTHENTICATION BLOCKED');
+}
+
+await vault.bind(profile.uid, clearance);
+await stream.prime('/admin/panels');
+await stream.prime('/moderation/queue');
+await stream.prime('/audit/live');
+
+log.info('AUTHORIZED', {
+  uid: profile.uid,
+  role,
+  clearance,
+  channel: 'guild-core'
+});
+
+render.mount('admin-terminal');</pre>
   </div>
 
   <!-- Access Denied (hidden by default) -->

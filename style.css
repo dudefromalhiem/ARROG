@@ -390,38 +390,29 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .load-state{max-width:980px;margin:34px auto 52px}
 .load-title{margin-bottom:10px}
 .load-copy{font-size:.85rem;color:var(--wht-d);margin-bottom:14px}
-.load-seq{position:relative;height:clamp(320px,62vh,600px);border:1px solid var(--red-d);background:linear-gradient(180deg,rgba(139,0,0,.18),rgba(0,0,0,.92) 24%),var(--blk-c);box-shadow:inset 0 0 0 1px rgba(204,0,0,.14),0 0 32px rgba(204,0,0,.14);overflow:hidden;text-align:left}
-.load-seq-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(204,0,0,.28);font-family:var(--font-m);font-size:.7rem;letter-spacing:2px;text-transform:uppercase;color:var(--wht-f);background:rgba(0,0,0,.32)}
-.load-seq-head::after{content:'link: stable';color:var(--red-m)}
-.load-codeblock{position:relative;height:calc(100% - 42px);padding:14px 14px 16px;margin:0;font-family:var(--font-m);font-size:clamp(.66rem,.86vw,.8rem);line-height:1.56;overflow:hidden}
-.load-codeblock::before{content:'';position:absolute;inset:0 auto 0 -40%;width:40%;background:linear-gradient(90deg,transparent,rgba(255,26,26,.18),transparent);mix-blend-mode:screen;animation:seqSweep 4.1s ease-in-out infinite}
-.load-codeblock::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(255,255,255,.02) 0 1px,transparent 1px 24px);pointer-events:none}
-.code-row{display:block;white-space:nowrap;transform-origin:left center;color:rgba(230,230,230,.72);opacity:.72;animation:rowPulse 2.8s ease-in-out infinite}
-.code-row .ln{display:inline-block;width:32px;color:rgba(255,77,77,.72)}
-.code-row:nth-child(2n){animation-duration:2.25s}
-.code-row:nth-child(3n){animation-duration:3.35s}
-.code-row:nth-child(4n){animation-delay:.2s}
-.code-row:nth-child(5n){animation-delay:.5s}
-.code-row:nth-child(7n){animation-name:rowPulse,rowBlink;animation-duration:2.5s,6.8s;animation-iteration-count:infinite,infinite}
-.code-caret{position:absolute;left:46px;right:18px;height:1px;background:linear-gradient(90deg,var(--red-g),rgba(255,26,26,0));box-shadow:0 0 10px rgba(255,26,26,.5);animation:caretWalk 6.4s steps(14,end) infinite}
+.load-monocode{position:relative;height:clamp(310px,60vh,560px);margin:0;padding:18px 20px;border:1px solid var(--red-d);background:
+  radial-gradient(circle at 12% 8%, rgba(255,26,26,.16), transparent 34%),
+  radial-gradient(circle at 92% 90%, rgba(255,26,26,.1), transparent 36%),
+  linear-gradient(180deg,#0c0c0c,#030303 70%);
+  box-shadow:inset 0 0 0 1px rgba(255,26,26,.14),0 0 36px rgba(139,0,0,.22);
+  overflow:hidden;font-family:var(--font-m);font-size:clamp(.66rem,.9vw,.83rem);line-height:1.58;color:rgba(255,245,245,.82);text-align:left;white-space:pre-wrap;word-break:break-word;
+  animation:monoDrift 8.2s ease-in-out infinite, monoGlow 3.4s ease-in-out infinite;
+}
+.load-monocode::before{content:'';position:absolute;inset:-30% -20% auto -20%;height:44%;background:conic-gradient(from 180deg at 50% 50%, rgba(255,26,26,.05), rgba(255,26,26,.28), rgba(255,26,26,.05));filter:blur(12px);animation:monoAura 5.8s ease-in-out infinite;pointer-events:none}
+.load-monocode::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 22%,transparent 78%,rgba(255,255,255,.02));mix-blend-mode:screen;opacity:.72;pointer-events:none}
 
-@keyframes seqSweep{0%{transform:translateX(0)}48%{transform:translateX(355%)}52%{transform:translateX(370%)}100%{transform:translateX(0)}}
-@keyframes rowPulse{0%,100%{opacity:.58;transform:scaleX(.985)}50%{opacity:.9;transform:scaleX(1)}}
-@keyframes rowBlink{0%,88%,100%{opacity:.75}90%{opacity:.25}94%{opacity:.88}}
-@keyframes caretWalk{0%{transform:translateY(10px)}100%{transform:translateY(calc(100% - 18px))}}
+@keyframes monoDrift{0%,100%{transform:translateY(0)}35%{transform:translateY(-6px)}65%{transform:translateY(4px)}}
+@keyframes monoGlow{0%,100%{text-shadow:0 0 0 rgba(255,26,26,0)}45%{text-shadow:0 0 7px rgba(255,26,26,.4)}}
+@keyframes monoAura{0%,100%{transform:translateX(-4%) rotate(-2deg);opacity:.42}50%{transform:translateX(6%) rotate(2deg);opacity:.85}}
 
 @media (max-width: 768px) {
   .load-state { margin: 20px auto 34px; }
   .load-copy { margin-bottom: 10px; line-height: 1.75; }
-  .load-seq { height: clamp(260px, 52vh, 460px); }
-  .load-seq-head { padding: 8px 10px; letter-spacing: 1.5px; }
-  .load-codeblock { padding: 12px 10px 12px; font-size: .66rem; line-height: 1.5; }
-  .code-row .ln { width: 28px; }
-  .code-caret { left: 40px; right: 12px; }
+  .load-monocode { height: clamp(250px, 50vh, 420px); padding: 14px 12px; font-size: .68rem; line-height: 1.5; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .load-codeblock::before, .code-row, .code-caret { animation: none !important; }
+  .load-monocode, .load-monocode::before { animation: none !important; }
 }
 
 /* Utility */
