@@ -22,7 +22,7 @@ const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
 const FIRESTORE_IMAGE_MAX_BYTES = 250 * 1024;
 const FIRESTORE_IMAGE_MAX_DIMENSION = 1280;
-const FIRESTORE_IMAGE_LIMIT = 3;
+const FIRESTORE_IMAGE_LIMIT = 5;
 const ALLOWED_STORAGE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 const BASE_TAG_OPTIONS = [
   'object', 'animal', 'humanoid', 'plant', 'artifact', 'document', 'digital',
