@@ -204,11 +204,12 @@
 <main class="wrap">
 
   <!-- Loading State -->
-  <div class="section tc" id="submit-loading" style="max-width:500px;margin:60px auto">
-    <div class="section-hd">Establishing secure link...</div>
-    <p style="font-size:.85rem;color:var(--wht-d)">
+  <div class="section tc load-state" id="submit-loading">
+    <div class="section-hd load-title">Establishing secure link...</div>
+    <p class="load-copy">
       Verifying credentials with the Guild central server.
     </p>
+    <div class="load-runner" aria-hidden="true"></div>
   </div>
 
   <!-- Auth Gate (hidden by default) -->
