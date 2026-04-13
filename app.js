@@ -140,15 +140,15 @@ function runTerminal() {
       return;
     }
     skipTerminal();
+  };
+
   const initialLines = Math.max(140, Math.floor(window.innerHeight / 2.8));
   const maxLines = initialLines + 60;
-  const initialLinesPerColumn = Math.max(120, Math.floor(window.innerHeight / 8) + 40);
-  const maxLinesPerColumn = initialLinesPerColumn + 40;
+  let idx = 0;
+
   body.innerHTML = '<div class="term-stream"><div class="term-code" id="term-code"></div></div>';
   const stream = document.getElementById('term-code');
   if (!stream) return;
-
-  const seedRows = ['[BOOT] initializing secure terminal...'];
 
   const appendTerminalLine = line => {
     const isEgg = EGG_LINES.includes(line);
@@ -166,7 +166,7 @@ function runTerminal() {
     return line;
   };
 
-  seedRows.forEach(appendTerminalLine);
+  appendTerminalLine('[BOOT] initializing secure terminal...');
   for (let seed = 0; seed < initialLines; seed++) appendTerminalLine(getNextLine());
 
   const tickMs = 42 + Math.floor(Math.random() * 38);
