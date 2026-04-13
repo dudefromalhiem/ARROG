@@ -233,7 +233,6 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .term-body{-ms-overflow-style:none;scrollbar-width:none}
 .term-body::-webkit-scrollbar{width:0;height:0;display:none}
 .term-stream{height:100%;width:100%;position:relative;overflow:hidden;border:1px solid rgba(204,0,0,.26);background:linear-gradient(180deg,rgba(204,0,0,.08),rgba(0,0,0,.22) 10%,rgba(0,0,0,.45));box-shadow:inset 0 0 0 1px rgba(204,0,0,.12)}
-.term-stream::before{content:'';position:absolute;top:0;bottom:0;left:-34%;width:34%;background:linear-gradient(90deg,transparent,rgba(255,26,26,.2),transparent);animation:termSweep 2.9s linear infinite;pointer-events:none}
 .term-stream::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(255,255,255,.02) 0 1px,transparent 1px 21px);pointer-events:none}
 .term-code{position:absolute;inset:0;padding:10px 12px;display:flex;flex-direction:column;gap:3px;overflow:hidden}
 .term-row{opacity:0;animation:termRowIn .24s ease-out forwards;min-height:1.25em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;filter:drop-shadow(0 0 2px rgba(255,26,26,.1));transform-origin:left center}
@@ -241,7 +240,6 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .term-row.wht{color:#ececec}
 .term-row.hl{color:#ff2a2a;font-weight:700;text-shadow:0 0 14px rgba(255,26,26,.9)}
 @keyframes termRowIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
-@keyframes termSweep{from{transform:translateX(0)}to{transform:translateX(420%)}}
 @keyframes fadeOut{from{opacity:1};to{opacity:0}}
 .term-skip{position:fixed;bottom:20px;right:20px;z-index:10020;background:rgba(0,0,0,.88);padding:10px 14px;border:1px solid var(--red-d);backdrop-filter:blur(1px);pointer-events:auto}
 .term-skip .btn{pointer-events:auto}

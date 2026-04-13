@@ -63,6 +63,41 @@ const CODE_LINES = [
   '',
   '  return <div className="hud">STATUS: {status}</div>;',
   '}',
+  '',
+  'namespace rog::archive {',
+  '  struct ClearanceMap {',
+  '    int owner = 6;',
+  '    int admin = 5;',
+  '    int mod = 4;',
+  '    int user = 2;',
+  '  };',
+  '',
+  '  bool verify_signature(const string& payload, const string& sig) {',
+  '    return crypto::ed25519::verify(payload, sig, KEYRING.primary());',
+  '  }',
+  '}',
+  '',
+  'async function hydratePanels(api) {',
+  '  const [pages, queue, art] = await Promise.all([',
+  '    api.get("/pages/featured"),',
+  '    api.get("/submissions/pending"),',
+  '    api.get("/artworks/spotlight")',
+  '  ]);',
+  '  ui.paint("featured", pages);',
+  '  ui.paint("queue", queue);',
+  '  ui.paint("spotlight", art);',
+  '}',
+  '',
+  'SELECT id, title, type FROM pages',
+  'WHERE approvalStatus = "approved"',
+  'ORDER BY createdAt DESC LIMIT 10;',
+  '',
+  'fn recompute_vector_field(grid: &mut Grid) {',
+  '  for cell in grid.iter_mut() {',
+  '    cell.flux = (cell.variance * 0.618) + cell.drift;',
+  '    cell.safe = cell.flux < THRESHOLD;',
+  '  }',
+  '}',
 ];
 
 const SYS_LOGS = [
@@ -130,7 +165,7 @@ function runTerminal() {
     }
   }
   while (eggIdx < EGG_LINES.length) all.push(EGG_LINES[eggIdx++]);
-  const minHoldMs = 12000;
+  const minHoldMs = 4000;
   const endAt = () => {
     const elapsed = Date.now() - terminalStartedAt;
     if (elapsed < minHoldMs) {
