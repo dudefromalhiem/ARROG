@@ -163,6 +163,7 @@ function shouldShowTerminal() {
 // ═════════════════════════════════════════════════════════════
 
 function showClearanceWelcome(role) {
+  if (document.body.classList.contains('terminal-active')) return;
   if (document.getElementById('clearance-welcome')) return;
   const level = clearanceLevelForRole(role);
 
