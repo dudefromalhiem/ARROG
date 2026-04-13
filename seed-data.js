@@ -126,6 +126,44 @@ PAGE_SEED.push({
   htmlContent: createClass('ROSED', 'Red Oaker Shelter and Execution Department', 'The central command authority of the Red Oaker Guild. Operating under a strict dual-mandate: Shelter first, Execution/Kill if necessary. ROSED dictates that containment and study are the primary objectives for any anomaly, but authorizes immediate, absolute lethal force if an entity poses an uncontainable existential threat.')
 });
 
+PAGE_SEED.push({
+  title: 'Hostile Faction: Order of the Ten Truths (OTT)',
+  slug: 'order-of-ten-truths',
+  type: 'Lore (Threat Faction)',
+  tags: ['lore', 'faction', 'threat', 'cult'],
+  htmlContent: `
+<div class="page-shell">
+  <header class="page-header">
+    <h1 class="page-title">Order of the Ten Truths (OTT)</h1>
+    <p class="page-subtitle">Threat Faction Dossier // Level 4 Access</p>
+  </header>
+
+  <section class="page-section">
+    <h2>Summary</h2>
+    <p>Order of the Ten Truths (OTT) is a hostile, cult-like organization that worships anomalies as divine beings and seeks their release from Guild containment. The Order operates under a doctrine known as the Ten Truths, of which only five are confirmed to ARROG while the remaining doctrines remain intentionally concealed.</p>
+    <p>Members exhibit extreme devotion, often engaging in sacrificial actions and violent operations against Guild personnel, viewing containment as blasphemy and liberation as a sacred duty.</p>
+  </section>
+
+  <section class="page-section">
+    <h2>Confirmed Truths (5/10)</h2>
+    <h3>Truth I</h3>
+    <blockquote><p>Anomalies are not oddities, they are perfect gods amongst human filth.</p></blockquote>
+
+    <h3>Truth II</h3>
+    <blockquote><p>Those who wish to imprison them will be met with suffering and loss.</p></blockquote>
+
+    <h3>Truth III</h3>
+    <blockquote><p>Without the anomalies, life itself is nothing but rotten suffering.</p></blockquote>
+
+    <h3>Truth IV</h3>
+    <blockquote><p>Blasphemy against the anomalies is to be met with death.</p></blockquote>
+
+    <h3>Truth V</h3>
+    <blockquote><p>We serve as a sacrifice and guides to the gods that have allowed themselves to be among us.</p></blockquote>
+  </section>
+</div>`
+});
+
 // --- ARCHONS ---
 PAGE_SEED.push({
   title: 'Archon: Dr. Mateo Hoffman', slug: 'archon-mateo-hoffman', type: 'Lore (Archon)', tags: ['archon', 'lore'],

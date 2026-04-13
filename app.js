@@ -139,13 +139,13 @@ function runTerminal() {
     const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('const ') || line.startsWith('function ') || line.startsWith('  ') || line.startsWith('    '));
     const div = document.createElement('div');
     div.className = 'term-line ' + (isEgg ? 'hl' : isCode ? 'wht' : 'red');
-    div.textContent = line || '\u00A0';
+    div.textContent = String(line || '\u00A0').replace(/\s+/g, ' ').trim() || '\u00A0';
     body.appendChild(div);
     // keep last 100+ lines visible
     while (body.children.length > 150) body.removeChild(body.firstChild);
     body.scrollTop = body.scrollHeight;
     idx++;
-  }, 70);
+  }, 45);
 }
 
 function skipTerminal() {

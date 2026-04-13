@@ -449,6 +449,27 @@
           { id: 'staff_3', designation: 'Staff File', label: 'Unassigned', clearanceLevel: 'REQUIRED', notes: 'Reserved for future personnel entry.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
           { id: 'staff_4', designation: 'Staff File', label: 'Unassigned', clearanceLevel: 'REQUIRED', notes: 'Reserved for future personnel entry.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' }
         ]
+      },
+      {
+        id: 'hostile-orders',
+        title: 'Hostile Orders',
+        branch: 'Threat Intelligence',
+        compartment: 'Cult Activity',
+        rangeStart: '0301A',
+        rangeEnd: '0400A',
+        files: [
+          {
+            id: 'ott_1',
+            designation: 'Hostile Group Dossier',
+            label: 'Order of the Ten Truths (OTT)',
+            clearanceLevel: 'LEVEL 4',
+            notes: 'Cult-like hostile organization worshipping anomalies as divine beings. Seeks release of anomalies from Guild containment and frames containment as blasphemy.',
+            pageSlug: 'order-of-ten-truths',
+            imageUrl: '',
+            imageAlt: 'Order of the Ten Truths dossier image',
+            hoverCaption: 'Order of the Ten Truths - Confirmed Doctrines'
+          }
+        ]
       }
     ]
   };
@@ -456,6 +477,9 @@
   let legacyData = { ...LEGACY_DEFAULT };
   let ownerCanEdit = false;
   const storage = firebase.storage();
+  const authRef = (typeof auth !== 'undefined' && auth && typeof auth.onAuthStateChanged === 'function')
+    ? auth
+    : (firebase && typeof firebase.auth === 'function' ? firebase.auth() : null);
 
   function esc(value) {
     return String(value || '')
@@ -512,6 +536,25 @@
       currentOwner: String(base.currentOwner || ''),
       chapters: Array.isArray(base.chapters) ? base.chapters.map(normalizeChapter) : []
     };
+  }
+
+  function ensureLegacyAdditions(data) {
+    const normalized = normalizeLegacyData(data);
+    const defaultOttChapter = LEGACY_DEFAULT.chapters.find(ch => ch.id === 'hostile-orders');
+    if (!defaultOttChapter) return normalized;
+
+    let chapter = normalized.chapters.find(ch => ch.id === 'hostile-orders');
+    if (!chapter) {
+      normalized.chapters.push(normalizeChapter(defaultOttChapter));
+      return normalized;
+    }
+
+    const defaultOttFile = (defaultOttChapter.files || []).find(file => file.id === 'ott_1');
+    if (defaultOttFile && !chapter.files.some(file => file.id === 'ott_1')) {
+      chapter.files.push(normalizeFile(defaultOttFile));
+    }
+
+    return normalized;
   }
 
   function createChapter() {
@@ -593,7 +636,7 @@
   }
 
   async function uploadFileImage(fileBlob, chapterId, fileId) {
-    if (!ownerCanEdit || !auth.currentUser || !fileBlob) return;
+    if (!ownerCanEdit || !authRef || !authRef.currentUser || !fileBlob) return;
     if (!LEGACY_IMAGE_TYPES.has(fileBlob.type)) {
       alert('Only PNG, JPG, GIF, and WebP images are allowed.');
       return;
@@ -607,7 +650,7 @@
     if (!entry) return;
 
     const safeName = fileBlob.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = 'uploads/' + auth.currentUser.uid + '/legacy_file_' + Date.now() + '_' + safeName;
+    const path = 'uploads/' + authRef.currentUser.uid + '/legacy_file_' + Date.now() + '_' + safeName;
     const statusEl = document.getElementById('legacy-status');
     statusEl.textContent = 'Uploading image...';
 
@@ -783,18 +826,18 @@
   }
 
   async function saveLegacySheet() {
-    if (!ownerCanEdit || !auth.currentUser) return;
+    if (!ownerCanEdit || !authRef || !authRef.currentUser) return;
     collectEditorValues();
 
     const payload = {
-      ...normalizeLegacyData(legacyData),
-      updatedBy: auth.currentUser.displayName || auth.currentUser.email || 'Owner',
+      ...ensureLegacyAdditions(legacyData),
+      updatedBy: authRef.currentUser.displayName || authRef.currentUser.email || 'Owner',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
     try {
       await db.collection('legacySheets').doc(LEGACY_SHEET_ID).set(payload, { merge: true });
-      legacyData = normalizeLegacyData(payload);
+      legacyData = ensureLegacyAdditions(payload);
       renderLegacySheet();
       toggleLegacyEditor(false);
       document.getElementById('legacy-status').textContent = 'Legacy sheet updated.';
@@ -808,12 +851,12 @@
     try {
       const doc = await db.collection('legacySheets').doc(LEGACY_SHEET_ID).get();
       if (doc.exists) {
-        legacyData = normalizeLegacyData(doc.data() || {});
+        legacyData = ensureLegacyAdditions(doc.data() || {});
       } else {
-        legacyData = normalizeLegacyData(LEGACY_DEFAULT);
+        legacyData = ensureLegacyAdditions(LEGACY_DEFAULT);
       }
     } catch (_err) {
-      legacyData = normalizeLegacyData(LEGACY_DEFAULT);
+      legacyData = ensureLegacyAdditions(LEGACY_DEFAULT);
     }
 
     renderLegacySheet();
@@ -828,7 +871,7 @@
     return FALLBACK_OWNER_EMAILS.has(email);
   }
 
-  auth.onAuthStateChanged(async user => {
+  async function hydrateLegacyForUser(user) {
     await loadLegacySheet();
 
     const navAuth = document.getElementById('nav-auth');
@@ -852,7 +895,13 @@
     document.getElementById('legacy-status').textContent = ownerCanEdit
       ? 'Owner verified. Edit mode available.'
       : 'Read-only mode. Owner sign-in required for edits.';
-  });
+  }
+
+  if (authRef && typeof authRef.onAuthStateChanged === 'function') {
+    authRef.onAuthStateChanged(hydrateLegacyForUser);
+  } else {
+    hydrateLegacyForUser(null);
+  }
 </script>
 </body>
 </html>
