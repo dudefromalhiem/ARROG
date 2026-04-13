@@ -132,7 +132,7 @@ function runTerminal() {
     while (body.children.length > 150) body.removeChild(body.firstChild);
     body.scrollTop = body.scrollHeight;
     idx++;
-  }, 50);
+  }, 150);
 }
 
 function skipTerminal() {
@@ -144,12 +144,13 @@ function skipTerminal() {
       terminal.classList.add('hidden');
     }, 600);
   }
-  try { localStorage.setItem('rog_terminal_seen', '1'); } catch (_e) { }
+  try { sessionStorage.setItem('rog_terminal_seen', '1'); } catch (_e) { }
 }
 
 function shouldShowTerminal() {
   try {
-    return localStorage.getItem('rog_terminal_seen') !== '1';
+    // Check sessionStorage so terminal shows once per session
+    return sessionStorage.getItem('rog_terminal_seen') !== '1';
   } catch (_e) {
     return true;
   }
@@ -290,7 +291,12 @@ async function updateAuthUI(user) {
     }, { merge: true }).catch(() => { });
 
     if (shownRole !== currentRole) {
-      showClearanceWelcome(currentRole);
+      // Show clearance welcome after terminal ends (delay by 5 secs to let terminal show)
+      if (shouldShowTerminal()) {
+        setTimeout(() => showClearanceWelcome(currentRole), 8000);
+      } else {
+        showClearanceWelcome(currentRole);
+      }
       sessionStorage.setItem('clearanceWelcomedRole', currentRole);
     }
   } else {
@@ -300,7 +306,12 @@ async function updateAuthUI(user) {
     adminLink.classList.add('hidden');
     if (submitLink) submitLink.classList.add('hidden');
     if (shownRole !== 'guest') {
-      showClearanceWelcome('guest');
+      // Show clearance welcome after terminal ends (delay by 5 secs to let terminal show)
+      if (shouldShowTerminal()) {
+        setTimeout(() => showClearanceWelcome('guest'), 8000);
+      } else {
+        showClearanceWelcome('guest');
+      }
       sessionStorage.setItem('clearanceWelcomedRole', 'guest');
     }
   }
