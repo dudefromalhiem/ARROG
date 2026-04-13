@@ -123,22 +123,27 @@ function runTerminal() {
     if (idx >= all.length) { skipTerminal(); return; }
     const line = all[idx];
     const isEgg = EGG_LINES.includes(line);
-    const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('function ') || line.startsWith('  '));
+    const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('const ') || line.startsWith('function ') || line.startsWith('  ') || line.startsWith('    '));
     const div = document.createElement('div');
     div.className = 'term-line ' + (isEgg ? 'hl' : isCode ? 'wht' : 'red');
     div.textContent = line || '\u00A0';
     body.appendChild(div);
-    // keep only last 80 lines
-    while (body.children.length > 80) body.removeChild(body.firstChild);
+    // keep last 100+ lines visible
+    while (body.children.length > 150) body.removeChild(body.firstChild);
     body.scrollTop = body.scrollHeight;
     idx++;
-  }, 65);
+  }, 50);
 }
 
 function skipTerminal() {
   clearInterval(terminalInterval);
   const terminal = document.getElementById('terminal');
-  if (terminal) terminal.classList.add('hidden');
+  if (terminal) {
+    terminal.style.animation = 'fadeOut 0.6s ease-out forwards';
+    setTimeout(() => {
+      terminal.classList.add('hidden');
+    }, 600);
+  }
   try { localStorage.setItem('rog_terminal_seen', '1'); } catch (_e) { }
 }
 

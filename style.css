@@ -211,12 +211,14 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .newest-row:last-child{border-bottom:none}
 
 /* Terminal overlay */
-.term{position:fixed;inset:0;z-index:9999;background:var(--blk);display:flex;flex-direction:column;overflow:hidden;font-family:'Courier New',monospace}
-.term-body{flex:1;overflow:hidden;padding:16px;font-size:.75rem;line-height:1.4;white-space:pre}
-.term-line{opacity:0;animation:tfade .08s forwards}
-.term-line.red{color:var(--red-b)}.term-line.wht{color:var(--wht-d)}.term-line.hl{color:var(--red-g);font-weight:700;text-shadow:0 0 8px rgba(255,26,26,.6)}
-@keyframes tfade{to{opacity:1}}
-.term-skip{position:fixed;bottom:24px;right:24px;z-index:10000}
+.term{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:9999;background:var(--blk);display:flex;flex-direction:column;overflow:hidden;font-family:'Courier New',monospace;color:var(--wht-m);background:#000}
+.term-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:24px 32px;font-size:clamp(11px,1.4vw,14px);line-height:1.5;white-space:pre-wrap;word-wrap:break-word;font-weight:500}
+.term-line{opacity:0;animation:tfade .12s ease-out forwards}
+.term-line.red{color:#ff4d4d;text-shadow:0 0 10px rgba(204,0,0,.5)}
+.term-line.wht{color:#999}.term-line.hl{color:#ff1a1a;font-weight:700;text-shadow:0 0 15px rgba(255,26,26,.8)}
+@keyframes tfade{from{opacity:0;transform:translateY(-2px)};to{opacity:1;transform:translateY(0)}}
+@keyframes fadeOut{from{opacity:1};to{opacity:0}}
+.term-skip{position:fixed;bottom:32px;right:32px;z-index:10000;background:rgba(0,0,0,.8);padding:12px 18px;border:1px solid var(--red-d)}
 .term.hidden{display:none}
 
 /* Auth modal */
