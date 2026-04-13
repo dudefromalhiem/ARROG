@@ -9,6 +9,9 @@ let currentUser = null;
 let currentRole = "user";
 let authMode = "login"; // login | register
 let terminalInterval = null;
+let terminalStartedAt = 0;
+let terminalColumnTimers = [];
+let terminalEndTimer = null;
 
 // ═════════════════════════════════════════════════════════════
 // TERMINAL EASTER EGG
@@ -100,10 +103,18 @@ const EGG_LINES = [
 ];
 
 function runTerminal() {
+  stopTerminalAnimation();
   document.body.classList.add('terminal-active');
   document.documentElement.classList.add('terminal-active');
+  const terminal = document.getElementById('terminal');
   const body = document.getElementById('term-body');
+  if (!terminal || !body) return;
+  terminal.classList.remove('hidden');
+  terminal.style.animation = '';
+
+  terminalStartedAt = Date.now();
   const corpus = [...CODE_LINES, ...SYS_LOGS];
+
   // shuffle
   for (let i = corpus.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -119,38 +130,85 @@ function runTerminal() {
     }
   }
   while (eggIdx < EGG_LINES.length) all.push(EGG_LINES[eggIdx++]);
+  const minHoldMs = 12000;
+  const endAt = () => {
+    const elapsed = Date.now() - terminalStartedAt;
+    if (elapsed < minHoldMs) {
+      terminalEndTimer = setTimeout(() => {
+        if (!document.getElementById('terminal')?.classList.contains('hidden')) skipTerminal();
+      }, minHoldMs - elapsed);
+      return;
+    }
+    skipTerminal();
+  };
 
+  const columns = [];
+  const colCount = Math.max(8, Math.floor(window.innerWidth / 165));
+  const initialLinesPerColumn = Math.max(120, Math.floor(window.innerHeight / 8) + 40);
+  const maxLinesPerColumn = initialLinesPerColumn + 40;
   let idx = 0;
-  const burstSize = 4;
 
-  function appendTerminalLine(line) {
+  body.innerHTML = '<div class="term-stream" id="term-stream"></div>';
+  const stream = document.getElementById('term-stream');
+  if (!stream) return;
+
+  function getNextLine() {
+    const line = all[idx % all.length];
+    idx += 1;
+    return line;
+  }
+
+  function appendTerminalLine(colEl, line) {
     const isEgg = EGG_LINES.includes(line);
-    const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('const ') || line.startsWith('function ') || line.startsWith('  ') || line.startsWith('    '));
+    const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('const ') || line.startsWith('function ') || line.startsWith('int ') || line.startsWith('auto ') || line.startsWith('  ') || line.startsWith('    '));
     const div = document.createElement('div');
     div.className = 'term-line ' + (isEgg ? 'hl' : isCode ? 'wht' : 'red');
     div.textContent = String(line || '\u00A0').replace(/\s+/g, ' ').trim() || '\u00A0';
-    body.appendChild(div);
+    colEl.appendChild(div);
+    while (colEl.children.length > maxLinesPerColumn) colEl.removeChild(colEl.firstChild);
   }
 
-  if (all.length) {
-    appendTerminalLine(all[0]);
-    idx = 1;
+  for (let i = 0; i < colCount; i++) {
+    const col = document.createElement('div');
+    col.className = 'term-col';
+    stream.appendChild(col);
+    columns.push(col);
+
+    // Front-load each column so animation is visible immediately.
+    for (let seed = 0; seed < initialLinesPerColumn; seed++) {
+      appendTerminalLine(col, getNextLine());
+    }
+
+    const tickMs = 60 + Math.floor(Math.random() * 90);
+    const timer = setInterval(() => {
+      appendTerminalLine(col, getNextLine());
+      if (Math.random() > 0.66) appendTerminalLine(col, getNextLine());
+    }, tickMs);
+    terminalColumnTimers.push(timer);
   }
 
   terminalInterval = setInterval(() => {
-    if (idx >= all.length) { skipTerminal(); return; }
-    for (let burst = 0; burst < burstSize && idx < all.length; burst++) {
-      appendTerminalLine(all[idx]);
-      idx++;
+    if (Date.now() - terminalStartedAt >= minHoldMs) {
+      clearInterval(terminalInterval);
+      terminalInterval = null;
+      endAt();
     }
-    // keep last 100+ lines visible
-    while (body.children.length > 220) body.removeChild(body.firstChild);
-    body.scrollTop = body.scrollHeight;
-  }, 45);
+  }, 200);
+}
+
+function stopTerminalAnimation() {
+  clearInterval(terminalInterval);
+  terminalInterval = null;
+  if (terminalEndTimer) {
+    clearTimeout(terminalEndTimer);
+    terminalEndTimer = null;
+  }
+  terminalColumnTimers.forEach(timer => clearInterval(timer));
+  terminalColumnTimers = [];
 }
 
 function skipTerminal() {
-  clearInterval(terminalInterval);
+  stopTerminalAnimation();
   const terminal = document.getElementById('terminal');
   if (terminal) {
     terminal.style.animation = 'fadeOut 0.6s ease-out forwards';
@@ -161,6 +219,12 @@ function skipTerminal() {
     }, 600);
   }
 }
+
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !document.getElementById('terminal')?.classList.contains('hidden')) {
+    skipTerminal();
+  }
+});
 
 function shouldShowTerminal() {
   // Always show the terminal intro on page load.

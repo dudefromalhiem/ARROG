@@ -303,11 +303,11 @@
       <div class="section-hd">Page Details</div>
       <div class="g2 mb-md">
         <div class="fg">
-          <label class="fl" id="lbl-title">Title (MUST begin with Anomaly ID)</label>
+          <label class="fl" id="lbl-title" for="sf-title">Title (MUST begin with Anomaly ID)</label>
           <input class="fi" id="sf-title" placeholder="e.g. ROG-007: The Hollow Mirror" required />
           <span style="font-size: 0.7rem; color: var(--wht-f); display:block; margin-top:4px;">For Anomaly submissions, the title must begin with the generated anomaly designation.</span>
         </div>
-        <div class="fg"><label class="fl">Type</label>
+        <div class="fg"><label class="fl" for="sf-type">Type</label>
           <select class="fi" id="sf-type" onchange="onTypeChange()">
             <option>Anomaly</option><option>Tale</option><option>Artwork</option><option>Hub</option><option>Guide</option>
           </select>
@@ -315,7 +315,7 @@
       </div>
       <div class="g2 mb-md" id="anomaly-meta-row">
         <div class="fg">
-          <label class="fl">Anomaly Submission Type</label>
+          <label class="fl" for="sf-anomaly-subtype">Anomaly Submission Type</label>
           <select class="fi" id="sf-anomaly-subtype" onchange="onAnomalySubtypeChange()">
             <option value="">Select one...</option>
             <option value="ROS">Red Oaker Specimen (ROS list)</option>
@@ -326,14 +326,14 @@
           </select>
         </div>
         <div class="fg">
-          <label class="fl">Anomaly Designation</label>
+          <label class="fl" for="sf-anomaly-code">Anomaly Designation</label>
           <input class="fi" id="sf-anomaly-code" placeholder="e.g. ROS-0001" oninput="onAnomalyCodeInput()" />
           <span id="sf-anomaly-hint" style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px">Format hint will appear after selecting a submission type.</span>
           <span id="sf-anomaly-lock-note" class="hidden" style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px">Designation is fixed for this record.</span>
         </div>
       </div>
       <div class="fg">
-        <label class="fl">Tags</label>
+        <label class="fl" for="sf-tag-search">Tags</label>
         <div class="tag-picker" id="sf-tag-picker">
           <div class="tag-picker-tools">
             <input class="fi" id="sf-tag-search" type="text" placeholder="Search tags..." aria-label="Search tags" />
@@ -349,7 +349,7 @@
         <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px;">Select multiple tags. Use search to filter quickly.</span>
       </div>
       <div class="fg">
-        <label class="fl">Page URL Slug</label>
+        <label class="fl" for="sf-slug">Page URL Slug</label>
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:.8rem;color:var(--wht-f);white-space:nowrap">/pages/</span>
           <input class="fi" id="sf-slug" placeholder="auto-generated from title" style="font-family:var(--font-m);font-size:.8rem" />
