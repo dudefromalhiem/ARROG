@@ -142,7 +142,7 @@ function runTerminal() {
     skipTerminal();
   };
 
-  const initialLines = Math.max(140, Math.floor(window.innerHeight / 2.8));
+  const initialLines = Math.max(52, Math.floor(window.innerHeight / 6));
   const maxLines = initialLines + 60;
   let idx = 0;
 
@@ -203,6 +203,8 @@ function skipTerminal() {
     }, 600);
   }
 }
+
+window.skipTerminal = skipTerminal;
 
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !document.getElementById('terminal')?.classList.contains('hidden')) {
@@ -300,7 +302,9 @@ function showClearanceWelcomeWhenReady(role) {
       return;
     }
     if (Date.now() - startedAt >= maxWaitMs) {
-      showClearanceWelcome(role);
+      // Force-close a stuck intro so the clearance flash can still display.
+      skipTerminal();
+      setTimeout(() => showClearanceWelcome(role), 80);
       return;
     }
     setTimeout(tryShow, 250);
@@ -558,6 +562,8 @@ function loadData() {
 // ═════════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
+  const skipBtn = document.querySelector('.term-skip button');
+  if (skipBtn) skipBtn.addEventListener('click', skipTerminal);
   if (shouldShowTerminal()) runTerminal();
   else skipTerminal();
   auth.onAuthStateChanged(updateAuthUI);
