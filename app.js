@@ -304,6 +304,27 @@ function showClearanceWelcome(role) {
   }, 3000);
 }
 
+function showClearanceWelcomeWhenReady(role) {
+  const maxWaitMs = 18000;
+  const startedAt = Date.now();
+
+  const tryShow = () => {
+    const terminalActive = document.body.classList.contains('terminal-active');
+    const terminalVisible = !document.getElementById('terminal')?.classList.contains('hidden');
+    if (!terminalActive && !terminalVisible) {
+      showClearanceWelcome(role);
+      return;
+    }
+    if (Date.now() - startedAt >= maxWaitMs) {
+      showClearanceWelcome(role);
+      return;
+    }
+    setTimeout(tryShow, 250);
+  };
+
+  tryShow();
+}
+
 // ═════════════════════════════════════════════════════════════
 // AUTH UI
 // ═════════════════════════════════════════════════════════════
@@ -370,9 +391,9 @@ async function updateAuthUI(user) {
     }, { merge: true }).catch(() => { });
 
     if (shownRole !== currentRole) {
-      // Show clearance welcome after terminal ends (delay by 5 secs to let terminal show)
+      // Wait for the terminal intro to finish so the welcome is not skipped.
       if (shouldShowTerminal()) {
-        setTimeout(() => showClearanceWelcome(currentRole), 8000);
+        showClearanceWelcomeWhenReady(currentRole);
       } else {
         showClearanceWelcome(currentRole);
       }
@@ -385,9 +406,9 @@ async function updateAuthUI(user) {
     adminLink.classList.add('hidden');
     if (submitLink) submitLink.classList.add('hidden');
     if (shownRole !== 'guest') {
-      // Show clearance welcome after terminal ends (delay by 5 secs to let terminal show)
+      // Wait for the terminal intro to finish so the welcome is not skipped.
       if (shouldShowTerminal()) {
-        setTimeout(() => showClearanceWelcome('guest'), 8000);
+        showClearanceWelcomeWhenReady('guest');
       } else {
         showClearanceWelcome('guest');
       }

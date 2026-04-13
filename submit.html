@@ -209,19 +209,23 @@
     <p class="load-copy">
       Verifying credentials with the Guild central server.
     </p>
-    <div class="load-code" aria-hidden="true">
-      <span class="load-line w92"></span>
-      <span class="load-line w88"></span>
-      <span class="load-line w66"></span>
-      <span class="load-line w84"></span>
-      <span class="load-line w72"></span>
-      <span class="load-line w60"></span>
-      <span class="load-line w92"></span>
-      <span class="load-line w54"></span>
-      <span class="load-line w78"></span>
-      <span class="load-line w88"></span>
-      <span class="load-line w66"></span>
-      <span class="load-line w84"></span>
+    <div class="load-seq" aria-hidden="true">
+      <div class="load-seq-head">rog-submit.bootstrap</div>
+      <pre class="load-codeblock">
+<span class="code-row"><span class="ln">01</span>const profile = await auth.handshake(agentId);</span>
+<span class="code-row"><span class="ln">02</span>if (!profile.ok) throw new Error('session refused');</span>
+<span class="code-row"><span class="ln">03</span>const clearance = matrix.resolve(profile.role);</span>
+<span class="code-row"><span class="ln">04</span>const token = await vault.issue(clearance, profile.uid);</span>
+<span class="code-row"><span class="ln">05</span>channel.attach('guild-core', token);</span>
+<span class="code-row"><span class="ln">06</span>stream.sync('/workstation/templates');</span>
+<span class="code-row"><span class="ln">07</span>stream.sync('/uploads/live');</span>
+<span class="code-row"><span class="ln">08</span>audit.log('AUTH_OK', profile.email);</span>
+<span class="code-row"><span class="ln">09</span>ui.setStatus('secure channel established');</span>
+<span class="code-row"><span class="ln">10</span>ui.mount('submission-terminal');</span>
+<span class="code-row"><span class="ln">11</span>observer.watch(clearance, 'live');</span>
+<span class="code-row"><span class="ln">12</span>return clearance;</span>
+      </pre>
+      <div class="code-caret"></div>
     </div>
   </div>
 
