@@ -276,7 +276,7 @@
     <!-- ═══ PAGE HERO ═══ -->
     <div class="create-hero">
       <h1>Create a Page</h1>
-      <p>Document an anomaly, write a tale, or showcase art. Choose a template or write your own code — your creation will be reviewed by Guild admins before going live.</p>
+      <p>Document an anomaly, write a tale, or showcase art. Template fields are selected automatically based on the file/workstation you choose.</p>
     </div>
 
     <!-- ═══ MODE SELECTOR ═══ -->
@@ -386,31 +386,9 @@
     <!-- ════════════════════════════════════════════════════════ -->
     <div id="template-mode">
 
-      <!-- Template Chooser -->
       <div class="section" style="margin-bottom:24px">
-        <div class="section-hd">Choose a Template</div>
-        <div class="tpl-grid">
-          <button class="tpl-card active" onclick="selectTemplate('anomaly')" id="tpl-anomaly">
-            <div class="tpl-icon">◈</div>
-            <div class="tpl-name">Anomaly Report</div>
-            <div class="tpl-desc">Standard ROG classification format with containment procedures</div>
-          </button>
-          <button class="tpl-card" onclick="selectTemplate('tale')" id="tpl-tale">
-            <div class="tpl-icon">◇</div>
-            <div class="tpl-name">Tale / Story</div>
-            <div class="tpl-desc">Narrative format with chapters and atmospheric prose</div>
-          </button>
-          <button class="tpl-card" onclick="selectTemplate('artwork')" id="tpl-artwork">
-            <div class="tpl-icon">▣</div>
-            <div class="tpl-name">Artwork Showcase</div>
-            <div class="tpl-desc">Image-focused layout with description and artist info</div>
-          </button>
-          <button class="tpl-card" onclick="selectTemplate('guide')" id="tpl-guide">
-            <div class="tpl-icon">▤</div>
-            <div class="tpl-name">Guide / Document</div>
-            <div class="tpl-desc">Structured document with table of contents</div>
-          </button>
-        </div>
+        <div class="section-hd">Template Source</div>
+        <p style="font-size:.8rem;color:var(--wht-d)">Template fields below are auto-assigned from your selected workstation file profile.</p>
       </div>
 
       <!-- Anomaly Template Fields -->

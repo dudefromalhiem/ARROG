@@ -247,6 +247,7 @@ function applyEntryProfile(profileKey) {
   if (banner) banner.textContent = 'Mode: ' + profile.label;
 
   showSubmitEditor(true);
+  switchMode('template');
   document.getElementById('sf-type').value = profile.type;
   if (profile.template) selectTemplate(profile.template);
 
@@ -1078,8 +1079,10 @@ function switchMode(mode) {
 function selectTemplate(tpl) {
   currentTemplate = tpl;
   ['anomaly', 'tale', 'artwork', 'guide'].forEach(t => {
-    document.getElementById('tpl-' + t).classList.toggle('active', t === tpl);
-    document.getElementById('tpl-fields-' + t).classList.toggle('hidden', t !== tpl);
+    const card = document.getElementById('tpl-' + t);
+    const fields = document.getElementById('tpl-fields-' + t);
+    if (card) card.classList.toggle('active', t === tpl);
+    if (fields) fields.classList.toggle('hidden', t !== tpl);
   });
 
   // Auto-set the type dropdown
@@ -1108,7 +1111,7 @@ function selectTemplate(tpl) {
 function onTypeChange() {
   const type = document.getElementById('sf-type').value;
   const tplMap = { Anomaly: 'anomaly', Tale: 'tale', Artwork: 'artwork', Guide: 'guide', Hub: 'guide' };
-  if (currentMode === 'template' && tplMap[type]) {
+  if (tplMap[type]) {
     selectTemplate(tplMap[type]);
   }
   updateTypeSpecificUI();

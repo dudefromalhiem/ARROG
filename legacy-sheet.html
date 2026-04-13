@@ -3,367 +3,294 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Legacy Sheet — Red Oaker Guild</title>
-  <meta name="description" content="Historical record of prior and current Guild ownership." />
+  <title>Legacy Sheet - Red Oaker Guild</title>
+  <meta name="description" content="Guild legacy registry with chapter files, hover previews, and workshop-linked entries." />
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .legacy-sheet-wrap { max-width: 1020px; margin: 40px auto; }
+    .legacy-wrap { max-width: 1120px; margin: 34px auto; }
     .legacy-meta {
       border: 2px solid var(--red-d);
-      background: linear-gradient(135deg, rgba(139,0,0,.08), rgba(0,0,0,.3));
-      padding: 14px 16px;
-      margin-bottom: 24px;
-      font-size: .75rem;
+      background: linear-gradient(135deg, rgba(139, 0, 0, 0.1), rgba(0, 0, 0, 0.45));
+      padding: 12px 14px;
       color: var(--wht-d);
       text-transform: uppercase;
       letter-spacing: 1px;
+      font-size: 0.75rem;
       display: flex;
+      justify-content: space-between;
+      align-items: center;
       gap: 12px;
       flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
+      margin-bottom: 18px;
     }
-    .legacy-sheet { padding: 0; margin-bottom: 24px; }
-    .legacy-sheet-header {
+    .legacy-sheet {
       border: 2px solid var(--red-d);
-      background: linear-gradient(135deg, rgba(139,0,0,.12), rgba(0,0,0,.4));
-      padding: 28px;
-      margin-bottom: 24px;
-      border-radius: 2px;
+      background: linear-gradient(180deg, rgba(35, 0, 0, 0.22), rgba(0, 0, 0, 0.55));
+      padding: 24px;
+      margin-bottom: 18px;
     }
-    .legacy-sheet h1 { margin-bottom: 8px; letter-spacing: 3px; font-size: 2.2rem; }
-    .legacy-sub {
+    .legacy-title {
+      font-size: clamp(2rem, 4.4vw, 3.2rem);
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+    }
+    .legacy-subtitle {
       color: var(--wht-d);
-      font-size: .8rem;
       text-transform: uppercase;
       letter-spacing: 2px;
-      margin-bottom: 20px;
+      font-size: 0.82rem;
+      margin-bottom: 14px;
     }
-    .legacy-description-section {
-      border-top: 1px solid rgba(204,0,0,.3);
-      padding-top: 16px;
-      margin-top: 16px;
-    }
-    .legacy-description-section p {
+    .legacy-description {
       color: var(--wht-m);
-      font-size: .9rem;
-      line-height: 1.7;
-      margin: 0;
-    }
-    .legacy-block-line {
-      border-left: 3px solid var(--red-d);
-      padding-left: 16px;
+      font-size: 0.93rem;
+      line-height: 1.75;
+      border-top: 1px solid rgba(204, 0, 0, 0.35);
+      padding-top: 12px;
       margin-bottom: 20px;
-    }
-    .legacy-block-line h3 {
-      border: none;
-      margin-bottom: 8px;
-      color: var(--red-b);
-      font-size: 1rem;
-      letter-spacing: 2px;
-    }
-    .legacy-block-line p {
-      margin: 0;
-      color: var(--wht-m);
-      line-height: 1.8;
-      font-size: .88rem;
       white-space: pre-wrap;
     }
-    .legacy-chapters { display: grid; gap: 20px; margin-bottom: 24px; }
-    .legacy-chapter {
-      border: 2px solid var(--red-d);
-      background: linear-gradient(135deg, rgba(0,0,0,.4), rgba(0,0,0,.2));
-      border-radius: 2px;
-      overflow: hidden;
+    .legacy-core {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 22px;
     }
-    .legacy-chapter-header {
-      background: linear-gradient(90deg, rgba(139,0,0,.2), rgba(0,0,0,.3));
-      padding: 14px 18px;
-      border-bottom: 2px solid var(--red-d);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+    .legacy-core-item {
+      border-left: 3px solid var(--red-d);
+      padding-left: 12px;
     }
-    .legacy-chapter-title {
+    .legacy-core-item h3 {
+      border: none;
+      margin: 0 0 6px;
       color: var(--red-b);
-      font-size: .95rem;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
+      font-size: 0.95rem;
       text-transform: uppercase;
     }
-    .legacy-chapter-body { padding: 16px; }
-    .legacy-entries {
-      display: grid;
-      gap: 0;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    .legacy-core-item p {
+      margin: 0;
+      color: var(--wht-m);
+      line-height: 1.7;
+      white-space: pre-wrap;
+      font-size: 0.87rem;
+    }
+    .chapter {
       border: 1px solid var(--red-d);
+      background: rgba(0, 0, 0, 0.34);
+      margin-top: 18px;
     }
-    .legacy-entry {
-      border: 2px solid var(--red-b);
-      background: #050505;
-      min-height: 188px;
-      padding: 12px;
-      transition: border-color var(--tr), box-shadow var(--tr), transform var(--tr);
+    .chapter-head {
+      border-bottom: 1px solid var(--red-d);
+      background: linear-gradient(90deg, rgba(139, 0, 0, 0.26), rgba(0, 0, 0, 0.15));
+      padding: 12px 14px;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .chapter-title {
+      font-size: 1.05rem;
+      letter-spacing: 1px;
+      color: var(--wht);
+      text-transform: uppercase;
+      margin: 0;
+    }
+    .chapter-meta {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      color: var(--wht-f);
+      letter-spacing: 1px;
+    }
+    .chapter-chip {
+      border: 1px solid var(--red-d);
+      background: rgba(0, 0, 0, 0.34);
+      padding: 3px 7px;
+    }
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0;
+      border-top: 1px solid var(--red-d);
+      border-left: 1px solid var(--red-d);
+    }
+    .file-card {
       position: relative;
+      min-height: 192px;
+      background: #050505;
+      border-right: 1px solid var(--red-d);
+      border-bottom: 1px solid var(--red-d);
       overflow: hidden;
-      isolation: isolate;
+      text-decoration: none;
+      color: inherit;
+      display: block;
     }
-    .legacy-entry:hover {
-      border-color: var(--red-g);
-      box-shadow: 0 0 18px rgba(204, 0, 0, 0.35);
-      transform: translateY(-1px);
+    .file-card:hover,
+    .file-card:focus-visible {
+      outline: none;
+      box-shadow: inset 0 0 0 2px var(--red-b);
     }
-    .legacy-entry-front {
+    .file-front {
       position: relative;
       z-index: 2;
+      height: 100%;
+      padding: 12px;
       display: grid;
       gap: 8px;
-      opacity: 1;
-      transition: opacity .18s ease;
+      align-content: start;
+      transition: opacity 0.16s ease;
     }
-    .legacy-entry:hover .legacy-entry-front {
-      opacity: 0.06;
+    .file-card:hover .file-front,
+    .file-card:focus-visible .file-front {
+      opacity: 0.1;
     }
-    .legacy-entry-head {
+    .file-top {
       display: flex;
-      align-items: flex-start;
       justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 6px;
+      gap: 8px;
+      align-items: flex-start;
     }
-    .legacy-entry-designation {
+    .file-designation {
       color: var(--red-b);
-      font-size: .72rem;
+      font-size: 0.72rem;
       letter-spacing: 1px;
       text-transform: uppercase;
-      font-weight: 700;
       line-height: 1.4;
+      font-weight: 700;
     }
-    .legacy-entry-label {
-      color: var(--wht-m);
-      font-size: .8rem;
-      line-height: 1.45;
-      text-transform: uppercase;
-      letter-spacing: .6px;
-    }
-    .legacy-entry-clearance {
-      background: rgba(139,0,0,.2);
+    .file-clearance {
+      border: 1px solid var(--red-d);
+      background: rgba(139, 0, 0, 0.2);
       color: var(--red-b);
-      padding: 3px 6px;
-      font-size: .64rem;
+      font-size: 0.62rem;
       letter-spacing: 1px;
       text-transform: uppercase;
-      border: 1px solid var(--red-d);
-      border-radius: 2px;
+      padding: 3px 6px;
       white-space: nowrap;
     }
-    .legacy-entry-meta {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      font-size: .7rem;
+    .file-label {
+      color: var(--wht-m);
+      font-size: 0.8rem;
+      line-height: 1.45;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .file-notes {
       color: var(--wht-f);
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .legacy-entry-meta-item {
-      padding: 2px 6px;
-      border: 1px solid var(--red-d);
-      background: rgba(0,0,0,.3);
-      border-radius: 2px;
-    }
-    .legacy-entry-image-container {
-      position: absolute;
-      inset: 0;
-      border: 0;
-      background: #000;
-      overflow: hidden;
-      z-index: 3;
-      opacity: 0;
-      transition: opacity .18s ease;
-    }
-    .legacy-entry:hover .legacy-entry-image-container {
-      opacity: 1;
-    }
-    .legacy-entry-image {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transition: transform .26s ease;
-    }
-    .legacy-entry:hover .legacy-entry-image {
-      transform: scale(1.03);
-    }
-    .legacy-entry-image-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,.6);
-      opacity: 0;
-      transition: opacity var(--tr);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 12px;
-      text-align: center;
-    }
-    .legacy-entry:hover .legacy-entry-image-overlay {
-      opacity: 1;
-    }
-    .legacy-entry-image-text {
-      color: var(--wht-m);
-      font-size: .8rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-    .legacy-entry-description {
-      color: var(--wht-m);
-      font-size: .72rem;
-      line-height: 1.5;
+      font-size: 0.72rem;
+      line-height: 1.45;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .legacy-entry-open {
+    .file-link-note {
       margin-top: auto;
-      display: inline-block;
-      font-size: .65rem;
+      color: var(--wht-d);
+      font-size: 0.62rem;
       letter-spacing: 1px;
       text-transform: uppercase;
       border: 1px solid var(--red-d);
-      padding: 4px 8px;
-      color: var(--wht-d);
-      text-decoration: none;
-      background: rgba(0,0,0,.35);
+      padding: 4px 7px;
+      width: fit-content;
+      background: rgba(0, 0, 0, 0.35);
     }
-    .legacy-entry-open:hover,
-    .legacy-entry-open:focus-visible {
-      color: var(--wht);
-      border-color: var(--red-b);
-      outline: none;
+    .file-hover {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      z-index: 3;
+      transition: opacity 0.16s ease;
+      background: #000;
     }
-    .legacy-studio {
-      border-top: 2px solid var(--red-d);
-      margin-top: 20px;
-      padding-top: 16px;
+    .file-card:hover .file-hover,
+    .file-card:focus-visible .file-hover {
+      opacity: 1;
     }
-    .legacy-studio-head {
+    .file-hover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transform: scale(1);
+      transition: transform 0.2s ease;
+    }
+    .file-card:hover .file-hover img,
+    .file-card:focus-visible .file-hover img {
+      transform: scale(1.03);
+    }
+    .file-hover-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.52);
       display: flex;
-      gap: 8px;
-      align-items: baseline;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      margin-bottom: 14px;
-    }
-    .legacy-studio-copy {
-      color: var(--wht-f);
-      font-size: .72rem;
-      letter-spacing: 1px;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: var(--wht-m);
+      font-size: 0.8rem;
       text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1.45;
+      padding: 10px;
     }
-    .legacy-studio-actions { margin-top: 0; }
-    .legacy-blocks { display: grid; gap: 12px; margin-top: 12px; }
+    .legacy-editor {
+      border: 2px solid var(--red-d);
+      background: rgba(0, 0, 0, 0.35);
+      padding: 16px;
+      display: none;
+      margin-top: 14px;
+    }
+    .legacy-editor.open { display: block; }
+    .legacy-editor .fg { margin-bottom: 12px; }
+    .legacy-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .legacy-owner-actions { display: none; margin-top: 12px; }
     .legacy-doc-card {
       border: 1px solid var(--red-d);
-      background: rgba(0, 0, 0, .32);
-      padding: 12px;
-      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.28);
+      padding: 10px;
+      margin-bottom: 12px;
     }
     .legacy-doc-head {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      align-items: center;
+      gap: 8px;
       flex-wrap: wrap;
       margin-bottom: 10px;
     }
     .legacy-doc-label {
       color: var(--red-b);
-      font-size: .8rem;
-      letter-spacing: 1px;
       text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 0.78rem;
     }
-    .legacy-doc-body { display: grid; gap: 10px; }
     .legacy-doc-grid {
       display: grid;
       gap: 10px;
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .legacy-doc-grid .fg { margin-bottom: 0; }
-    .legacy-doc-preview {
-      width: 100%;
-      max-height: 260px;
-      object-fit: cover;
-      border: 1px solid var(--red-d);
-      background: #111;
-      border-radius: 2px;
-    }
-    .legacy-doc-placeholder {
-      font-size: .78rem;
-      color: var(--wht-f);
-      border: 1px dashed var(--red-d);
-      padding: 10px 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      border-radius: 2px;
-    }
-    .legacy-doc-divider {
-      border: none;
-      border-top: 1px dashed var(--red-d);
-      margin: 4px 0;
-    }
-    .legacy-doc-quote {
-      margin: 0;
-      padding: 14px 16px;
-      border-left: 2px solid var(--red-d);
-      background: rgba(0, 0, 0, .26);
-      color: var(--wht-m);
-      line-height: 1.8;
-      font-size: .86rem;
-      border-radius: 2px;
-    }
-    .legacy-doc-quote footer {
-      margin-top: 8px;
-      color: var(--wht-f);
-      font-size: .78rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .legacy-doc-empty {
+    .legacy-empty {
       border: 1px dashed var(--red-d);
       color: var(--wht-f);
-      font-size: .76rem;
+      font-size: 0.76rem;
       letter-spacing: 1px;
       text-transform: uppercase;
       padding: 12px;
-      border-radius: 2px;
     }
-    .legacy-editor {
-      border: 2px solid var(--red-d);
-      background: linear-gradient(135deg, rgba(0,0,0,.4), rgba(0,0,0,.2));
-      padding: 20px;
-      display: none;
-      border-radius: 2px;
-      margin-bottom: 24px;
-    }
-    .legacy-editor.open { display: block; }
-    .legacy-editor .fg { margin-bottom: 14px; }
-    .legacy-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-    .legacy-doc-actions { display: flex; gap: 6px; }
     @media (max-width: 768px) {
-      .legacy-sheet-wrap { margin: 24px auto; padding: 12px; }
-      .legacy-sheet-header { padding: 20px; }
-      .legacy-sheet h1 { font-size: 1.8rem; }
-      .legacy-meta { font-size: .7rem; }
+      .legacy-wrap { margin: 20px auto; padding: 0 10px; }
+      .legacy-sheet { padding: 16px; }
+      .legacy-title { font-size: 1.8rem; }
       .legacy-doc-grid { grid-template-columns: 1fr; }
-      .legacy-entry-head { flex-direction: column; }
-      .legacy-entry-image-container { height: 140px; }
+      .file-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .file-card { min-height: 170px; }
     }
   </style>
 </head>
@@ -386,8 +313,8 @@
   </div>
 </header>
 
-<main class="wrap legacy-sheet-wrap">
-  <div class="section-hd" style="border-bottom:none">Legacy Sheet</div>
+<main class="wrap legacy-wrap">
+  <div class="section-hd" style="border-bottom:none">Guild Legacy</div>
 
   <div class="legacy-meta">
     <span>Document: Guild Legacy Register</span>
@@ -398,69 +325,60 @@
 
   <section class="legacy-editor" id="legacy-editor">
     <div class="section-hd" style="font-size:1rem">Owner Edit Mode</div>
+
     <div class="fg">
       <label class="fl" for="legacy-title">Sheet Title</label>
       <input class="fi" id="legacy-title" type="text" />
     </div>
+
     <div class="fg">
       <label class="fl" for="legacy-subtitle">Subtitle</label>
       <input class="fi" id="legacy-subtitle" type="text" />
     </div>
+
     <div class="fg">
-      <label class="fl" for="legacy-description">Description <span style="color:var(--wht-f); font-size:.75rem">(under 200 words)</span></label>
-      <textarea class="fta" id="legacy-description" placeholder="Brief overview of the legacy sheet content and purpose" maxlength="1200"></textarea>
+      <label class="fl" for="legacy-description">Description</label>
+      <textarea class="fta" id="legacy-description" maxlength="1200" placeholder="Under 200 words recommended"></textarea>
     </div>
-    <div class="fg">
-      <label class="fl" for="legacy-foundation">Foundational Era</label>
-      <textarea class="fta" id="legacy-foundation"></textarea>
+
+    <div class="legacy-doc-grid">
+      <div class="fg">
+        <label class="fl" for="legacy-foundation">Foundational Era</label>
+        <textarea class="fta" id="legacy-foundation"></textarea>
+      </div>
+      <div class="fg">
+        <label class="fl" for="legacy-prior">Prior Owners</label>
+        <textarea class="fta" id="legacy-prior"></textarea>
+      </div>
     </div>
-    <div class="fg">
-      <label class="fl" for="legacy-prior">Prior Owners</label>
-      <textarea class="fta" id="legacy-prior"></textarea>
-    </div>
+
     <div class="fg">
       <label class="fl" for="legacy-current">Current Owner Mandate</label>
       <textarea class="fta" id="legacy-current"></textarea>
     </div>
-    
-    <div class="legacy-studio">
-      <div class="legacy-studio-head">
-        <div class="section-hd" style="font-size:1rem">Entry Chapters</div>
-        <span class="legacy-studio-copy">Designate Branch, Compartment, and Registered Numerical Range. Entries not present within the registry are considered unavailable.</span>
+
+    <div style="border-top:1px solid var(--red-d);margin-top:10px;padding-top:12px">
+      <div class="section-hd" style="font-size:1rem">Chapters And Files</div>
+      <div class="legacy-actions">
+        <button class="btn btn-p" type="button" onclick="addChapter()">+ New Chapter</button>
       </div>
-      <div class="legacy-actions legacy-studio-actions">
-        <button class="btn btn-p" type="button" id="legacy-add-chapter">+ New Chapter</button>
-      </div>
-      <div class="legacy-chapters-editor" id="legacy-chapters-editor"></div>
+      <div id="legacy-chapters-editor"></div>
     </div>
 
-    <div class="legacy-studio">
-      <div class="legacy-studio-head">
-        <div class="section-hd" style="font-size:1rem">Document Studio</div>
-        <span class="legacy-studio-copy">Add text, image, quote, or divider blocks below the core record.</span>
-      </div>
-      <div class="legacy-actions legacy-studio-actions">
-        <button class="btn btn-p" type="button" data-legacy-add-block="text">+ Text Block</button>
-        <button class="btn btn-p" type="button" data-legacy-add-block="image">+ Image Block</button>
-        <button class="btn btn-p" type="button" data-legacy-add-block="quote">+ Quote Block</button>
-        <button class="btn btn-p" type="button" data-legacy-add-block="divider">+ Divider</button>
-      </div>
-      <div class="legacy-blocks" id="legacy-blocks"></div>
-    </div>
     <div class="legacy-actions">
       <button class="btn btn-p" type="button" onclick="saveLegacySheet()">Save Legacy Sheet</button>
       <button class="btn btn-s" type="button" onclick="toggleLegacyEditor(false)">Cancel</button>
     </div>
   </section>
 
-  <div class="legacy-actions" id="legacy-owner-actions" style="margin-top:12px; display:none">
+  <div class="legacy-owner-actions" id="legacy-owner-actions">
     <button class="btn btn-p" type="button" onclick="toggleLegacyEditor(true)">Edit Legacy Sheet</button>
   </div>
 </main>
 
 <footer class="ftr">
   <div class="ftr-in">
-    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Legacy Archive</p>
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild - Legacy Archive</p>
   </div>
 </footer>
 
@@ -473,20 +391,69 @@
   const LEGACY_SHEET_ID = 'main';
   const LEGACY_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
   const LEGACY_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+  const FALLBACK_OWNER_EMAILS = new Set([
+    'jaimejoselaureano@gmail.com',
+    'dudefromalhiem@gmail.com'
+  ]);
+
   const LEGACY_DEFAULT = {
-    title: 'Red Oaker Legacy',
-    subtitle: 'Compiled ownership record and historical continuity log',
+    title: 'Guild Legacy',
+    subtitle: 'Designation archive of leadership, departments, and notable personnel',
     description: '',
-    foundation: 'The Guild emerged from fragmented wardenship circles that protected anomaly folklore, unindexed field artifacts, and containment rituals from erasure. The founding custodians formalized those fragments into a single oath-bound archive.',
-    priorOwners: 'Prior custodians preserved doctrine through collapse cycles, each rebuilding from partial ledgers and damaged sectors. Their continuity work established the designation standards that still govern archive naming and reconstruction today.',
-    currentOwner: 'The current Owner maintains the archive as a living continuity system: recover missing entries, enforce designation integrity, and keep every active branch accountable to canonical record discipline.',
-    chapters: [],
-    blocks: []
+    foundation: 'Origins and preservation directives are maintained here.',
+    priorOwners: 'Historical owner transitions are logged here.',
+    currentOwner: 'Current continuity directives are logged here.',
+    chapters: [
+      {
+        id: 'leadership',
+        title: 'Leadership',
+        branch: 'Executive',
+        compartment: 'Council',
+        rangeStart: '0001A',
+        rangeEnd: '0100A',
+        files: [
+          { id: 'leader_1', designation: 'Chief of Research', label: 'Dr. Mateo Hoffman', clearanceLevel: 'LEVEL 5', notes: 'Primary scientific oversight and anomaly audit lead.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'leader_2', designation: 'Director', label: 'Dr. Hans Schroeder', clearanceLevel: 'LEVEL 5', notes: 'Protocol continuity and emergency command.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'leader_3', designation: 'Director', label: 'Praskovya Sidorov', clearanceLevel: 'LEVEL 5', notes: 'Strategic operations and doctrine enforcement.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'leader_4', designation: 'Instability Period', label: 'Interim Governance Dossier', clearanceLevel: 'RESTRICTED', notes: 'Unstable command period and disputed directives.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' }
+        ]
+      },
+      {
+        id: 'departments',
+        title: 'Departments',
+        branch: 'Guild Internal',
+        compartment: 'Operational',
+        rangeStart: '0101A',
+        rangeEnd: '0200A',
+        files: [
+          { id: 'dept_1', designation: 'Red Oaker Shelter And Execution', label: 'Department File', clearanceLevel: 'LEVEL 4', notes: 'Containment-ready housing and termination protocols.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'dept_2', designation: 'Red Oaker Watchmen', label: 'Department File', clearanceLevel: 'LEVEL 3', notes: 'Perimeter security and movement control.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'dept_3', designation: 'Red Oaker Medical', label: 'Department File', clearanceLevel: 'LEVEL 3', notes: 'Clinical response and contamination treatment.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'dept_4', designation: 'Red Oaker Intelligence', label: 'Department File', clearanceLevel: 'LEVEL 4', notes: 'Analysis, infiltration watch, and countermeasure planning.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'dept_5', designation: 'Red Oaker Research', label: 'Department File', clearanceLevel: 'LEVEL 4', notes: 'Controlled experiment lanes and anomaly testing.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'dept_6', designation: 'Red Oaker Executive', label: 'Department File', clearanceLevel: 'LEVEL 5', notes: 'Executive mandate and final authority tracks.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'dept_7', designation: 'Engineering', label: 'Department File', clearanceLevel: 'LEVEL 3', notes: 'Systems maintenance and secure infrastructure.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'dept_8', designation: 'Patient Ward', label: 'Department File', clearanceLevel: 'LEVEL 2', notes: 'Recovery wing and observational intake.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' }
+        ]
+      },
+      {
+        id: 'staff',
+        title: 'Memorable Staff',
+        branch: 'Personnel',
+        compartment: 'Archive',
+        rangeStart: '0201A',
+        rangeEnd: '0300A',
+        files: [
+          { id: 'staff_1', designation: 'Staff File', label: 'Dr. Kane', clearanceLevel: 'LEVEL 3', notes: 'Subject matter specialist assigned to risk doctrine.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'staff_2', designation: 'Staff File', label: 'Unassigned', clearanceLevel: 'REQUIRED', notes: 'Reserved for future personnel entry.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'staff_3', designation: 'Staff File', label: 'Unassigned', clearanceLevel: 'REQUIRED', notes: 'Reserved for future personnel entry.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'staff_4', designation: 'Staff File', label: 'Unassigned', clearanceLevel: 'REQUIRED', notes: 'Reserved for future personnel entry.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' }
+        ]
+      }
+    ]
   };
 
-  let legacySheet = { ...LEGACY_DEFAULT };
-  let legacyChapters = [];
-  let legacyBlocks = [];
+  let legacyData = { ...LEGACY_DEFAULT };
   let ownerCanEdit = false;
   const storage = firebase.storage();
 
@@ -503,34 +470,22 @@
     return esc(value);
   }
 
-  function isValidLegacyImageSrc(url) {
+  function isValidImageSrc(url) {
     const src = String(url || '').trim();
     return /^https?:\/\//i.test(src) || /^data:image\//i.test(src);
   }
 
-  function createLegacyChapter() {
+  function normalizeFile(file) {
     return {
-      id: 'chapter_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      title: 'New Chapter',
-      branch: '',
-      compartment: '',
-      rangeStart: '0001A',
-      rangeEnd: '0100A',
-      entries: []
-    };
-  }
-
-  function createLegacyEntry() {
-    return {
-      id: 'entry_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      designation: '',
-      label: '',
-      clearanceLevel: 'REQUIRED',
-      imageUrl: '',
-      imageAlt: '',
-      imageCaption: '',
-      pageSlug: '',
-      description: ''
+      id: String(file && file.id || ''),
+      label: String(file && file.label || ''),
+      designation: String(file && file.designation || ''),
+      clearanceLevel: String(file && file.clearanceLevel || 'REQUIRED'),
+      notes: String(file && file.notes || ''),
+      pageSlug: String(file && file.pageSlug || ''),
+      imageUrl: String(file && file.imageUrl || ''),
+      imageAlt: String(file && file.imageAlt || ''),
+      hoverCaption: String(file && file.hoverCaption || '')
     };
   }
 
@@ -540,451 +495,312 @@
       title: String(chapter && chapter.title || 'Chapter'),
       branch: String(chapter && chapter.branch || ''),
       compartment: String(chapter && chapter.compartment || ''),
-      rangeStart: String(chapter && chapter.rangeStart || '0001A'),
-      rangeEnd: String(chapter && chapter.rangeEnd || '0100A'),
-      entries: Array.isArray(chapter && chapter.entries) ? chapter.entries.map(normalizeEntry) : []
+      rangeStart: String(chapter && chapter.rangeStart || ''),
+      rangeEnd: String(chapter && chapter.rangeEnd || ''),
+      files: Array.isArray(chapter && chapter.files) ? chapter.files.map(normalizeFile) : []
     };
   }
 
-  function normalizeEntry(entry) {
+  function normalizeLegacyData(raw) {
+    const base = { ...LEGACY_DEFAULT, ...(raw || {}) };
     return {
-      id: String(entry && entry.id || ''),
-      designation: String(entry && entry.designation || ''),
-      label: String(entry && entry.label || ''),
-      clearanceLevel: String(entry && entry.clearanceLevel || 'REQUIRED'),
-      imageUrl: String(entry && entry.imageUrl || ''),
-      imageAlt: String(entry && entry.imageAlt || ''),
-      imageCaption: String(entry && entry.imageCaption || ''),
-      pageSlug: String(entry && entry.pageSlug || ''),
-      description: String(entry && entry.description || '')
+      title: String(base.title || LEGACY_DEFAULT.title),
+      subtitle: String(base.subtitle || LEGACY_DEFAULT.subtitle),
+      description: String(base.description || ''),
+      foundation: String(base.foundation || ''),
+      priorOwners: String(base.priorOwners || ''),
+      currentOwner: String(base.currentOwner || ''),
+      chapters: Array.isArray(base.chapters) ? base.chapters.map(normalizeChapter) : []
     };
   }
 
-  function normalizeChapters(chapters) {
-    return Array.isArray(chapters) ? chapters.map(normalizeChapter) : [];
+  function createChapter() {
+    return {
+      id: 'chapter_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      title: 'New Chapter',
+      branch: '',
+      compartment: '',
+      rangeStart: '',
+      rangeEnd: '',
+      files: []
+    };
   }
 
-  function addLegacyChapter() {
-    legacyChapters.push(createLegacyChapter());
-    renderLegacyChaptersEditor();
+  function createFileEntry() {
+    return {
+      id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      label: '',
+      designation: '',
+      clearanceLevel: 'REQUIRED',
+      notes: '',
+      pageSlug: '',
+      imageUrl: '',
+      imageAlt: '',
+      hoverCaption: ''
+    };
+  }
+
+  function getChapterById(chapterId) {
+    return legacyData.chapters.find(ch => ch.id === chapterId) || null;
+  }
+
+  function getFileById(chapterId, fileId) {
+    const chapter = getChapterById(chapterId);
+    if (!chapter) return null;
+    return chapter.files.find(file => file.id === fileId) || null;
+  }
+
+  function addChapter() {
+    legacyData.chapters.push(createChapter());
+    renderLegacySheet();
+    renderEditorChapters();
+  }
+
+  function removeChapter(chapterId) {
+    legacyData.chapters = legacyData.chapters.filter(ch => ch.id !== chapterId);
+    renderLegacySheet();
+    renderEditorChapters();
+  }
+
+  function addFileToChapter(chapterId) {
+    const chapter = getChapterById(chapterId);
+    if (!chapter) return;
+    chapter.files.push(createFileEntry());
+    renderLegacySheet();
+    renderEditorChapters();
+  }
+
+  function removeFileFromChapter(chapterId, fileId) {
+    const chapter = getChapterById(chapterId);
+    if (!chapter) return;
+    chapter.files = chapter.files.filter(file => file.id !== fileId);
+    renderLegacySheet();
+    renderEditorChapters();
+  }
+
+  function updateChapterField(chapterId, field, value) {
+    const chapter = getChapterById(chapterId);
+    if (!chapter) return;
+    chapter[field] = value;
     renderLegacySheet();
   }
 
-  function deleteChapter(chapterId) {
-    legacyChapters = legacyChapters.filter(ch => ch.id !== chapterId);
-    renderLegacyChaptersEditor();
-    renderLegacySheet();
-  }
-
-  function deleteEntry(chapterId, entryId) {
-    const chapter = legacyChapters.find(ch => ch.id === chapterId);
-    if (chapter) {
-      chapter.entries = chapter.entries.filter(e => e.id !== entryId);
-      renderLegacyChaptersEditor();
-      renderLegacySheet();
-    }
-  }
-
-  function addEntryToChapter(chapterId) {
-    const chapter = legacyChapters.find(ch => ch.id === chapterId);
-    if (chapter) {
-      chapter.entries.push(createLegacyEntry());
-      renderLegacyChaptersEditor();
-      renderLegacySheet();
-    }
-  }
-
-  function renderLegacyChaptersEditor() {
-    const holder = document.getElementById('legacy-chapters-editor');
-    if (!holder) return;
-
-    if (!legacyChapters.length) {
-      holder.innerHTML = '<div class="legacy-doc-empty">No chapters yet. Add a chapter to create entry sections.</div>';
-      return;
-    }
-
-    holder.innerHTML = legacyChapters.map((chapter, chIdx) => {
-      const entriesHtml = chapter.entries.map((entry, entIdx) => {
-        return '<div class="legacy-doc-card" style="margin-top:12px">' +
-          '<div class="legacy-doc-head"><div class="legacy-doc-label">File ' + (entIdx + 1) + '</div><button class="btn btn-sm btn-d" type="button" onclick="deleteEntry(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\')">Delete</button></div>' +
-          '<div class="legacy-doc-body">' +
-            '<div class="fg"><label class="fl">Designation</label><input class="fi" type="text" onchange="updateChapterField(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\', \'designation\', this.value)" value="' + escapeAttr(entry.designation) + '" placeholder="e.g., ROS-0001" maxlength="50" /></div>' +
-            '<div class="fg"><label class="fl">Label / Name</label><input class="fi" type="text" onchange="updateChapterField(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\', \'label\', this.value)" value="' + escapeAttr(entry.label) + '" placeholder="Entry name or title" maxlength="200" /></div>' +
-            '<div class="fg"><label class="fl">Linked Page Slug</label><input class="fi" type="text" onchange="updateChapterField(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\', \'pageSlug\', this.value)" value="' + escapeAttr(entry.pageSlug) + '" placeholder="slug used in page.html?slug=..." maxlength="200" /></div>' +
-            '<div class="fg"><label class="fl">Clearance Level</label><select class="fi" onchange="updateChapterField(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\', \'clearanceLevel\', this.value)">' +
-              '<option ' + (entry.clearanceLevel === 'REQUIRED' ? 'selected' : '') + '>REQUIRED</option>' +
-              '<option ' + (entry.clearanceLevel === 'LEVEL 1' ? 'selected' : '') + '>LEVEL 1</option>' +
-              '<option ' + (entry.clearanceLevel === 'LEVEL 2' ? 'selected' : '') + '>LEVEL 2</option>' +
-              '<option ' + (entry.clearanceLevel === 'LEVEL 3' ? 'selected' : '') + '>LEVEL 3</option>' +
-              '<option ' + (entry.clearanceLevel === 'LEVEL 4' ? 'selected' : '') + '>LEVEL 4</option>' +
-              '<option ' + (entry.clearanceLevel === 'LEVEL 5' ? 'selected' : '') + '>LEVEL 5</option>' +
-            '</select></div>' +
-            '<div class="fg"><label class="fl">Image URL</label><input class="fi" type="text" onchange="updateChapterField(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\', \'imageUrl\', this.value)" value="' + escapeAttr(entry.imageUrl) + '" placeholder="https://..." /></div>' +
-            '<div class="fg"><label class="fl">Upload Image</label><input class="fi" type="file" accept="image/png,image/jpeg,image/gif,image/webp" onchange="uploadLegacyEntryImage(this.files[0], \'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\')" /></div>' +
-            '<div class="fg"><label class="fl">Image Alt Text</label><input class="fi" type="text" onchange="updateChapterField(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\', \'imageAlt\', this.value)" value="' + escapeAttr(entry.imageAlt) + '" placeholder="Describe the image" /></div>' +
-            '<div class="fg"><label class="fl">Hover Caption</label><input class="fi" type="text" onchange="updateChapterField(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\', \'imageCaption\', this.value)" value="' + escapeAttr(entry.imageCaption) + '" placeholder="Caption shown when hovering the file" maxlength="180" /></div>' +
-            '<div class="fg"><label class="fl">Description</label><textarea class="fta" onchange="updateChapterField(\'' + escapeAttr(chapter.id) + '\', \'' + escapeAttr(entry.id) + '\', \'description\', this.value)" placeholder="Entry description or notes">' + esc(entry.description) + '</textarea></div>' +
-          '</div>' +
-        '</div>';
-      }).join('');
-
-      return '<div class="legacy-doc-card">' +
-        '<div class="legacy-doc-head"><div class="legacy-doc-label">Chapter ' + (chIdx + 1) + '</div><button class="btn btn-sm btn-d" type="button" onclick="deleteChapter(\'' + escapeAttr(chapter.id) + '\')">Delete</button></div>' +
-        '<div class="legacy-doc-body">' +
-          '<div class="fg"><label class="fl">Chapter Title</label><input class="fi" type="text" onchange="updateChapterMeta(\'' + escapeAttr(chapter.id) + '\', \'title\', this.value)" value="' + escapeAttr(chapter.title) + '" placeholder="Chapter title" maxlength="100" /></div>' +
-          '<div class="legacy-doc-grid">' +
-            '<div class="fg"><label class="fl">Branch</label><input class="fi" type="text" onchange="updateChapterMeta(\'' + escapeAttr(chapter.id) + '\', \'branch\', this.value)" value="' + escapeAttr(chapter.branch) + '" placeholder="e.g., North Sector" maxlength="100" /></div>' +
-            '<div class="fg"><label class="fl">Compartment</label><input class="fi" type="text" onchange="updateChapterMeta(\'' + escapeAttr(chapter.id) + '\', \'compartment\', this.value)" value="' + escapeAttr(chapter.compartment) + '" placeholder="e.g., Archives" maxlength="100" /></div>' +
-            '<div class="fg"><label class="fl">Range Start</label><input class="fi" type="text" onchange="updateChapterMeta(\'' + escapeAttr(chapter.id) + '\', \'rangeStart\', this.value)" value="' + escapeAttr(chapter.rangeStart) + '" placeholder="0001A" maxlength="10" /></div>' +
-            '<div class="fg"><label class="fl">Range End</label><input class="fi" type="text" onchange="updateChapterMeta(\'' + escapeAttr(chapter.id) + '\', \'rangeEnd\', this.value)" value="' + escapeAttr(chapter.rangeEnd) + '" placeholder="0100A" maxlength="10" /></div>' +
-          '</div>' +
-          '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--red-d)">' +
-            '<button class="btn btn-sm btn-p" type="button" onclick="addEntryToChapter(\'' + escapeAttr(chapter.id) + '\')">+ Add Entry</button>' +
-          '</div>' +
-          '<div style="margin-top:12px">' + entriesHtml + '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  }
-
-  function updateChapterMeta(chapterId, field, value) {
-    const chapter = legacyChapters.find(ch => ch.id === chapterId);
-    if (chapter) {
-      chapter[field] = value;
-      renderLegacySheet();
-    }
-  }
-
-  function updateChapterField(chapterId, entryId, field, value) {
-    const chapter = legacyChapters.find(ch => ch.id === chapterId);
-    if (chapter) {
-      const entry = chapter.entries.find(e => e.id === entryId);
-      if (entry) {
-        entry[field] = value;
-        renderLegacySheet();
-      }
-    }
-  }
-
-  async function uploadLegacyEntryImage(file, chapterId, entryId) {
-    if (!ownerCanEdit || !auth.currentUser) return;
+  function updateFileField(chapterId, fileId, field, value) {
+    const file = getFileById(chapterId, fileId);
     if (!file) return;
-    if (!LEGACY_IMAGE_TYPES.has(file.type)) {
-      alert('Only PNG, JPG, GIF, and WebP images can be uploaded.');
+    file[field] = value;
+    renderLegacySheet();
+  }
+
+  async function uploadFileImage(fileBlob, chapterId, fileId) {
+    if (!ownerCanEdit || !auth.currentUser || !fileBlob) return;
+    if (!LEGACY_IMAGE_TYPES.has(fileBlob.type)) {
+      alert('Only PNG, JPG, GIF, and WebP images are allowed.');
       return;
     }
-    if (file.size > LEGACY_IMAGE_MAX_BYTES) {
-      alert('Images must be 2 MB or smaller.');
+    if (fileBlob.size > LEGACY_IMAGE_MAX_BYTES) {
+      alert('Image must be 2 MB or smaller.');
       return;
     }
 
-    const chapter = legacyChapters.find(ch => ch.id === chapterId);
-    const entry = chapter && chapter.entries.find(e => e.id === entryId);
-    if (!chapter || !entry) return;
+    const entry = getFileById(chapterId, fileId);
+    if (!entry) return;
 
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = 'uploads/' + auth.currentUser.uid + '/legacy_' + Date.now() + '_' + safeName;
-    document.getElementById('legacy-status').textContent = 'Uploading image...';
+    const safeName = fileBlob.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = 'uploads/' + auth.currentUser.uid + '/legacy_file_' + Date.now() + '_' + safeName;
+    const statusEl = document.getElementById('legacy-status');
+    statusEl.textContent = 'Uploading image...';
 
     try {
-      const snapshot = await storage.ref(path).put(file, { contentType: file.type });
+      const snapshot = await storage.ref(path).put(fileBlob, { contentType: fileBlob.type });
       const url = await snapshot.ref.getDownloadURL();
       entry.imageUrl = url;
       if (!entry.imageAlt) {
-        entry.imageAlt = file.name.replace(/\.[^.]+$/, '');
+        entry.imageAlt = fileBlob.name.replace(/\.[^.]+$/, '');
       }
-      renderLegacyChaptersEditor();
       renderLegacySheet();
-      document.getElementById('legacy-status').textContent = 'Image uploaded for entry.';
+      renderEditorChapters();
+      statusEl.textContent = 'Image uploaded successfully.';
     } catch (err) {
+      statusEl.textContent = 'Image upload failed.';
       alert('Could not upload image: ' + err.message);
-      document.getElementById('legacy-status').textContent = 'Image upload failed.';
     }
   }
 
-  function renderChapters(chapters) {
-    if (!chapters.length) {
-      return '<div class="legacy-doc-empty" style="padding:20px;text-align:center">No chapters registered. Entries not present within the registry are considered unavailable.</div>';
-    }
+  function workshopEditHref(slug) {
+    const s = String(slug || '').trim();
+    if (!s) return '';
+    return 'submit.html?editSlug=' + encodeURIComponent(s);
+  }
 
-    return '<div class="legacy-chapters">' + chapters.map(chapter => {
-      const entriesHtml = chapter.entries.length
-        ? '<div class="legacy-entries">' + chapter.entries.map(entry => {
-          const linkedHref = entry.pageSlug ? ('page.html?slug=' + encodeURIComponent(entry.pageSlug)) : '';
-          const openFileLink = linkedHref
-            ? '<a class="legacy-entry-open" href="' + linkedHref + '">Open File</a>'
-            : '<span class="legacy-entry-open" style="opacity:.65;pointer-events:none">No Linked File</span>';
-          const imageHtml = isValidLegacyImageSrc(entry.imageUrl)
-            ? '<div class="legacy-entry-image-container"><img src="' + escapeAttr(entry.imageUrl) + '" alt="' + escapeAttr(entry.imageAlt || entry.label) + '" class="legacy-entry-image" loading="lazy" decoding="async" /><div class="legacy-entry-image-overlay"><div class="legacy-entry-image-text">' + escapeAttr(entry.imageCaption || entry.imageAlt || entry.label || 'Entry documentation') + '</div></div></div>'
-            : '';
-          return '<div class="legacy-entry">' +
-            '<div class="legacy-entry-front">' +
-              '<div class="legacy-entry-head">' +
-                '<div><div class="legacy-entry-designation">' + esc(entry.designation || 'Unregistered File') + '</div><div class="legacy-entry-label">' + esc(entry.label || 'Unnamed Entry') + '</div></div>' +
-                '<div class="legacy-entry-clearance">' + esc(entry.clearanceLevel || 'REQUIRED') + '</div>' +
-              '</div>' +
-              (entry.description ? '<div class="legacy-entry-description">' + esc(entry.description).replace(/\n/g, '<br>') + '</div>' : '<div class="legacy-entry-description">No operator notes on file.</div>') +
-              openFileLink +
-            '</div>' +
-            (entry.imageUrl ? imageHtml : '') +
-          '</div>';
-        }).join('') + '</div>'
-        : '<div class="legacy-doc-empty">No files in this chapter.</div>';
-
-      return '<div class="legacy-chapter">' +
-        '<div class="legacy-chapter-header">' +
-          '<div class="legacy-chapter-title">' + esc(chapter.title) + '</div>' +
-        '</div>' +
-        '<div class="legacy-chapter-body">' +
-          '<div class="legacy-entry-meta">' +
-            '<div class="legacy-entry-meta-item"><strong>Branch:</strong> ' + (chapter.branch || '—') + '</div>' +
-            '<div class="legacy-entry-meta-item"><strong>Compartment:</strong> ' + (chapter.compartment || '—') + '</div>' +
-            '<div class="legacy-entry-meta-item"><strong>Range:</strong> ' + esc(chapter.rangeStart) + ' – ' + esc(chapter.rangeEnd) + '</div>' +
-          '</div>' +
-          entriesHtml +
-        '</div>' +
-      '</div>';
-    }).join('') + '</div>';
+  function pageOpenHref(slug) {
+    const s = String(slug || '').trim();
+    if (!s) return '';
+    return 'page.html?slug=' + encodeURIComponent(s);
   }
 
   function renderLegacySheet() {
     const host = document.getElementById('legacy-sheet-view');
-   const chaptersHtml = renderChapters(legacyChapters);
-    const studioMarkup = legacyBlocks.length
-      ? '<div class="legacy-block-line"><h3>Document Studio</h3>' + legacyBlocks.map(renderLegacyBlockView).join('') + '</div>'
-      : '';
-    const descriptionHtml = legacySheet.description ? '<div class="legacy-description-section"><p>' + esc(legacySheet.description).replace(/\n/g, '<br>') + '</p></div>' : '';
+    const chaptersHtml = legacyData.chapters.length
+      ? legacyData.chapters.map(chapter => {
+          const fileGrid = chapter.files.length
+            ? '<div class="file-grid">' + chapter.files.map(file => {
+                const openHref = pageOpenHref(file.pageSlug);
+                const hoverCaption = file.hoverCaption || file.imageAlt || file.label || 'Linked archive file';
+                const imageLayer = isValidImageSrc(file.imageUrl)
+                  ? '<div class="file-hover"><img src="' + escapeAttr(file.imageUrl) + '" alt="' + escapeAttr(file.imageAlt || file.label || 'Legacy file image') + '" loading="lazy" decoding="async" /><div class="file-hover-overlay">' + esc(hoverCaption) + '</div></div>'
+                  : '';
+
+                return '<a class="file-card" href="' + (openHref || '#') + '" ' + (openHref ? '' : 'onclick="return false"') + '>' +
+                    '<div class="file-front">' +
+                      '<div class="file-top">' +
+                        '<div class="file-designation">' + esc(file.designation || 'UNREGISTERED FILE') + '</div>' +
+                        '<div class="file-clearance">' + esc(file.clearanceLevel || 'REQUIRED') + '</div>' +
+                      '</div>' +
+                      '<div class="file-label">' + esc(file.label || 'Untitled Entry') + '</div>' +
+                      '<div class="file-notes">' + esc(file.notes || 'No owner notes added yet.') + '</div>' +
+                      '<div class="file-link-note">' + (openHref ? 'Open File' : 'No Linked File') + '</div>' +
+                    '</div>' +
+                    imageLayer +
+                  '</a>';
+              }).join('') + '</div>'
+            : '<div class="legacy-empty">No files in this chapter yet.</div>';
+
+          return '<section class="chapter">' +
+            '<div class="chapter-head">' +
+              '<h2 class="chapter-title">' + esc(chapter.title || 'Untitled Chapter') + '</h2>' +
+              '<div class="chapter-meta">' +
+                '<span class="chapter-chip">Branch: ' + esc(chapter.branch || '-') + '</span>' +
+                '<span class="chapter-chip">Compartment: ' + esc(chapter.compartment || '-') + '</span>' +
+                '<span class="chapter-chip">Range: ' + esc(chapter.rangeStart || '-') + ' - ' + esc(chapter.rangeEnd || '-') + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="chapter-body">' + fileGrid + '</div>' +
+          '</section>';
+        }).join('')
+      : '<div class="legacy-empty">No chapters in this legacy sheet yet.</div>';
 
     host.innerHTML =
-      '<div class="legacy-sheet-header">' +
-        '<h1>' + esc(legacySheet.title) + '</h1>' +
-        '<div class="legacy-sub">' + esc(legacySheet.subtitle) + '</div>' +
-        descriptionHtml +
-      '</div>' +
-      '<div class="legacy-block-line"><h3>Foundational Era</h3><p>' + esc(legacySheet.foundation) + '</p></div>' +
-      '<div class="legacy-block-line"><h3>Prior Owners</h3><p>' + esc(legacySheet.priorOwners) + '</p></div>' +
-      '<div class="legacy-block-line"><h3>Current Owner Mandate</h3><p>' + esc(legacySheet.currentOwner) + '</p></div>' +
-      (legacyChapters.length ? '<div class="legacy-block-line" style="margin-top:24px"><h3>Entry Chapters</h3>' + chaptersHtml + '</div>' : '') +
-      studioMarkup;
+      '<h1 class="legacy-title">' + esc(legacyData.title) + '</h1>' +
+      '<div class="legacy-subtitle">' + esc(legacyData.subtitle) + '</div>' +
+      (legacyData.description ? '<div class="legacy-description">' + esc(legacyData.description) + '</div>' : '') +
+      '<section class="legacy-core">' +
+        '<div class="legacy-core-item"><h3>Foundational Era</h3><p>' + esc(legacyData.foundation) + '</p></div>' +
+        '<div class="legacy-core-item"><h3>Prior Owners</h3><p>' + esc(legacyData.priorOwners) + '</p></div>' +
+        '<div class="legacy-core-item"><h3>Current Owner Mandate</h3><p>' + esc(legacyData.currentOwner) + '</p></div>' +
+      '</section>' +
+      chaptersHtml;
   }
 
-  function createLegacyBlock(type) {
-    if (type === 'image') return { type: 'image', url: '', alt: '', caption: '' };
-    if (type === 'quote') return { type: 'quote', text: '', source: '' };
-    if (type === 'divider') return { type: 'divider' };
-    return { type: 'text', text: '' };
-  }
-
-  function normalizeLegacyBlock(block) {
-    const type = String(block && block.type || 'text').toLowerCase();
-    if (type === 'image') {
-      return {
-        type: 'image',
-        url: String(block.url || ''),
-        alt: String(block.alt || ''),
-        caption: String(block.caption || '')
-      };
-    }
-    if (type === 'quote') {
-      return {
-        type: 'quote',
-        text: String(block.text || ''),
-        source: String(block.source || '')
-      };
-    }
-    if (type === 'divider') {
-      return { type: 'divider' };
-    }
-    return {
-      type: 'text',
-      text: String(block.text || '')
-    };
-  }
-
-  function normalizeLegacyBlocks(blocks) {
-    return Array.isArray(blocks) ? blocks.map(normalizeLegacyBlock) : [];
-  }
-
-  function renderLegacyBlockView(block) {
-    if (block.type === 'image') {
-      if (!isValidLegacyImageSrc(block.url)) {
-        return '<div class="legacy-doc-placeholder">Image block is empty.</div>';
-      }
-      const altText = block.alt || block.caption || 'Legacy image';
-      const caption = block.caption ? '<figcaption style="margin-top:8px;color:var(--wht-f);font-size:.78rem;text-transform:uppercase;letter-spacing:1px">' + esc(block.caption) + '</figcaption>' : '';
-      return '<figure style="margin:0"><img class="legacy-doc-preview" src="' + escapeAttr(block.url) + '" alt="' + escapeAttr(altText) + '" loading="lazy" decoding="async" />' + caption + '</figure>';
-    }
-    if (block.type === 'quote') {
-      const source = block.source ? '<footer>— ' + esc(block.source) + '</footer>' : '';
-      return '<blockquote class="legacy-doc-quote"><div>' + esc(block.text || '') + '</div>' + source + '</blockquote>';
-    }
-    if (block.type === 'divider') {
-      return '<hr class="legacy-doc-divider" />';
-    }
-    return '<p style="margin:0;color:var(--wht-m);line-height:1.8;font-size:.86rem;white-space:pre-wrap">' + esc(block.text || '') + '</p>';
-  }
-
-  function renderLegacyBlocksEditor() {
-    const holder = document.getElementById('legacy-blocks');
+  function renderEditorChapters() {
+    const holder = document.getElementById('legacy-chapters-editor');
     if (!holder) return;
 
-    if (!legacyBlocks.length) {
-      holder.innerHTML = '<div class="legacy-doc-empty">No studio blocks yet. Add a text, image, quote, or divider block.</div>';
+    if (!legacyData.chapters.length) {
+      holder.innerHTML = '<div class="legacy-empty">No chapters yet. Add one to start creating file cards.</div>';
       return;
     }
 
-    holder.innerHTML = legacyBlocks.map((block, index) => {
-      const label = block.type.charAt(0).toUpperCase() + block.type.slice(1) + ' Block';
-      const actions = '<div class="legacy-doc-actions">' +
-        '<button class="btn btn-sm btn-s" type="button" onclick="moveLegacyBlock(' + index + ', -1)">↑</button>' +
-        '<button class="btn btn-sm btn-s" type="button" onclick="moveLegacyBlock(' + index + ', 1)">↓</button>' +
-        '<button class="btn btn-sm btn-s" type="button" onclick="cloneLegacyBlock(' + index + ')">Clone</button>' +
-        '<button class="btn btn-sm btn-d" type="button" onclick="deleteLegacyBlock(' + index + ')">Delete</button>' +
-      '</div>';
+    holder.innerHTML = legacyData.chapters.map((chapter, cIndex) => {
+      const chapterId = chapter.id;
+      const fileCards = chapter.files.map((file, fIndex) => {
+        const fileId = file.id;
+        const workshopHref = workshopEditHref(file.pageSlug);
 
-      let body = '';
-      if (block.type === 'image') {
-        body = '<div class="legacy-doc-grid">' +
-          '<div class="fg"><label class="fl">Image URL</label><input class="fi" type="text" onchange="updateBlockField(' + index + ', \'url\', this.value)" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
-          '<div class="fg"><label class="fl">Upload Image</label><input class="fi" type="file" accept="image/png,image/jpeg,image/gif,image/webp" onchange="uploadLegacyBlockImage(this.files[0], ' + index + ')" /></div>' +
-          '<div class="fg"><label class="fl">Alt Text</label><input class="fi" type="text" onchange="updateBlockField(' + index + ', \'alt\', this.value)" value="' + escapeAttr(block.alt || '') + '" placeholder="Describe the image" /></div>' +
-          '<div class="fg"><label class="fl">Caption</label><input class="fi" type="text" onchange="updateBlockField(' + index + ', \'caption\', this.value)" value="' + escapeAttr(block.caption || '') + '" placeholder="Optional caption" /></div>' +
-        '</div>' +
-        (isValidLegacyImageSrc(block.url)
-          ? '<img class="legacy-doc-preview" src="' + escapeAttr(block.url) + '" alt="Preview" />'
-          : '<div class="legacy-doc-placeholder">No image selected.</div>');
-      } else if (block.type === 'quote') {
-        body = '<div class="fg"><label class="fl">Quote</label><textarea class="fta" onchange="updateBlockField(' + index + ', \'text\', this.value)" placeholder="Add a quote or excerpt">' + esc(block.text || '') + '</textarea></div>' +
-          '<div class="fg"><label class="fl">Source</label><input class="fi" type="text" onchange="updateBlockField(' + index + ', \'source\', this.value)" value="' + escapeAttr(block.source || '') + '" placeholder="Optional source" /></div>';
-      } else if (block.type === 'divider') {
-        body = '<div class="legacy-doc-placeholder">Divider block</div>';
-      } else {
-        body = '<div class="fg"><label class="fl">Text</label><textarea class="fta" onchange="updateBlockField(' + index + ', \'text\', this.value)" placeholder="Write block text">' + esc(block.text || '') + '</textarea></div>';
-      }
+        return `
+          <div class="legacy-doc-card">
+            <div class="legacy-doc-head">
+              <div class="legacy-doc-label">File ${fIndex + 1}</div>
+              <div class="legacy-actions" style="margin-top:0">
+                ${workshopHref ? `<a class="btn btn-sm btn-s" target="_blank" rel="noopener noreferrer" href="${workshopHref}">Edit In Workshop</a>` : ''}
+                <button class="btn btn-sm btn-d" type="button" onclick="removeFileFromChapter('${chapterId}','${fileId}')">Delete</button>
+              </div>
+            </div>
+            <div class="legacy-doc-grid">
+              <div class="fg"><label class="fl">Designation</label><input class="fi" type="text" value="${escapeAttr(file.designation)}" onchange="updateFileField('${chapterId}','${fileId}','designation', this.value)" /></div>
+              <div class="fg"><label class="fl">Name / Label</label><input class="fi" type="text" value="${escapeAttr(file.label)}" onchange="updateFileField('${chapterId}','${fileId}','label', this.value)" /></div>
+              <div class="fg"><label class="fl">Clearance</label><input class="fi" type="text" value="${escapeAttr(file.clearanceLevel)}" onchange="updateFileField('${chapterId}','${fileId}','clearanceLevel', this.value)" /></div>
+              <div class="fg"><label class="fl">Linked Page Slug</label><input class="fi" type="text" value="${escapeAttr(file.pageSlug)}" onchange="updateFileField('${chapterId}','${fileId}','pageSlug', this.value)" placeholder="page slug edited in workshop" /></div>
+              <div class="fg"><label class="fl">Image URL</label><input class="fi" type="text" value="${escapeAttr(file.imageUrl)}" onchange="updateFileField('${chapterId}','${fileId}','imageUrl', this.value)" /></div>
+              <div class="fg"><label class="fl">Upload Image</label><input class="fi" type="file" accept="image/png,image/jpeg,image/gif,image/webp" onchange="uploadFileImage(this.files[0], '${chapterId}', '${fileId}'); this.value=''" /></div>
+              <div class="fg"><label class="fl">Image Alt Text</label><input class="fi" type="text" value="${escapeAttr(file.imageAlt)}" onchange="updateFileField('${chapterId}','${fileId}','imageAlt', this.value)" /></div>
+              <div class="fg"><label class="fl">Hover Caption</label><input class="fi" type="text" value="${escapeAttr(file.hoverCaption)}" onchange="updateFileField('${chapterId}','${fileId}','hoverCaption', this.value)" /></div>
+            </div>
+            <div class="fg" style="margin-top:10px"><label class="fl">Owner Notes</label><textarea class="fta" onchange="updateFileField('${chapterId}','${fileId}','notes', this.value)">${esc(file.notes)}</textarea></div>
+          </div>
+        `;
+      }).join('');
 
-      return '<div class="legacy-doc-card">' +
-        '<div class="legacy-doc-head"><div class="legacy-doc-label">' + label + '</div>' + actions + '</div>' +
-        '<div class="legacy-doc-body">' + body + '</div>' +
-      '</div>';
+      return `
+        <div class="legacy-doc-card">
+          <div class="legacy-doc-head">
+            <div class="legacy-doc-label">Chapter ${cIndex + 1}</div>
+            <div class="legacy-actions" style="margin-top:0">
+              <button class="btn btn-sm btn-p" type="button" onclick="addFileToChapter('${chapterId}')">+ Add File</button>
+              <button class="btn btn-sm btn-d" type="button" onclick="removeChapter('${chapterId}')">Delete Chapter</button>
+            </div>
+          </div>
+          <div class="legacy-doc-grid">
+            <div class="fg"><label class="fl">Chapter Title</label><input class="fi" type="text" value="${escapeAttr(chapter.title)}" onchange="updateChapterField('${chapterId}','title', this.value)" /></div>
+            <div class="fg"><label class="fl">Branch</label><input class="fi" type="text" value="${escapeAttr(chapter.branch)}" onchange="updateChapterField('${chapterId}','branch', this.value)" /></div>
+            <div class="fg"><label class="fl">Compartment</label><input class="fi" type="text" value="${escapeAttr(chapter.compartment)}" onchange="updateChapterField('${chapterId}','compartment', this.value)" /></div>
+            <div class="fg"><label class="fl">Range</label><div class="legacy-doc-grid" style="grid-template-columns:1fr 1fr"><input class="fi" type="text" value="${escapeAttr(chapter.rangeStart)}" onchange="updateChapterField('${chapterId}','rangeStart', this.value)" placeholder="0001A" /><input class="fi" type="text" value="${escapeAttr(chapter.rangeEnd)}" onchange="updateChapterField('${chapterId}','rangeEnd', this.value)" placeholder="0100A" /></div></div>
+          </div>
+          <div style="margin-top:10px">${fileCards || '<div class="legacy-empty">No files in this chapter yet.</div>'}</div>
+        </div>
+      `;
     }).join('');
   }
 
-  function updateBlockField(index, field, value) {
-    if (legacyBlocks[index]) {
-      legacyBlocks[index][field] = value;
-      renderLegacySheet();
-    }
+  function setEditorValues() {
+    document.getElementById('legacy-title').value = legacyData.title || '';
+    document.getElementById('legacy-subtitle').value = legacyData.subtitle || '';
+    document.getElementById('legacy-description').value = legacyData.description || '';
+    document.getElementById('legacy-foundation').value = legacyData.foundation || '';
+    document.getElementById('legacy-prior').value = legacyData.priorOwners || '';
+    document.getElementById('legacy-current').value = legacyData.currentOwner || '';
+    renderEditorChapters();
   }
 
-  function addLegacyBlock(type) {
-    legacyBlocks.push(createLegacyBlock(type));
-    renderLegacyBlocksEditor();
-    renderLegacySheet();
-  }
-
-  function moveLegacyBlock(index, delta) {
-    const next = index + delta;
-    if (next < 0 || next >= legacyBlocks.length) return;
-    const temp = legacyBlocks[index];
-    legacyBlocks[index] = legacyBlocks[next];
-    legacyBlocks[next] = temp;
-    renderLegacyBlocksEditor();
-    renderLegacySheet();
-  }
-
-  function cloneLegacyBlock(index) {
-    if (index < 0 || index >= legacyBlocks.length) return;
-    legacyBlocks.splice(index + 1, 0, normalizeLegacyBlock(legacyBlocks[index]));
-    renderLegacyBlocksEditor();
-    renderLegacySheet();
-  }
-
-  function deleteLegacyBlock(index) {
-    if (index < 0 || index >= legacyBlocks.length) return;
-    legacyBlocks.splice(index, 1);
-    renderLegacyBlocksEditor();
-    renderLegacySheet();
-  }
-
-  async function uploadLegacyBlockImage(file, index) {
-    if (!ownerCanEdit || !auth.currentUser) return;
-    if (!file) return;
-    if (!LEGACY_IMAGE_TYPES.has(file.type)) {
-      alert('Only PNG, JPG, GIF, and WebP images can be uploaded.');
-      return;
-    }
-    if (file.size > LEGACY_IMAGE_MAX_BYTES) {
-      alert('Images must be 2 MB or smaller.');
-      return;
-    }
-
-    const block = legacyBlocks[index];
-    if (!block || block.type !== 'image') return;
-
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = 'uploads/' + auth.currentUser.uid + '/legacy_' + Date.now() + '_' + safeName;
-    document.getElementById('legacy-status').textContent = 'Uploading image...';
-
-    try {
-      const snapshot = await storage.ref(path).put(file, { contentType: file.type });
-      const url = await snapshot.ref.getDownloadURL();
-      legacyBlocks[index].url = url;
-      if (!legacyBlocks[index].alt) {
-        legacyBlocks[index].alt = file.name.replace(/\.[^.]+$/, '');
-      }
-      renderLegacyBlocksEditor();
-      renderLegacySheet();
-      document.getElementById('legacy-status').textContent = 'Image uploaded for block ' + (index + 1) + '.';
-    } catch (err) {
-      alert('Could not upload image: ' + err.message);
-      document.getElementById('legacy-status').textContent = 'Image upload failed.';
-    }
+  function collectEditorValues() {
+    legacyData.title = document.getElementById('legacy-title').value.trim() || LEGACY_DEFAULT.title;
+    legacyData.subtitle = document.getElementById('legacy-subtitle').value.trim() || LEGACY_DEFAULT.subtitle;
+    legacyData.description = document.getElementById('legacy-description').value.trim();
+    legacyData.foundation = document.getElementById('legacy-foundation').value.trim() || LEGACY_DEFAULT.foundation;
+    legacyData.priorOwners = document.getElementById('legacy-prior').value.trim() || LEGACY_DEFAULT.priorOwners;
+    legacyData.currentOwner = document.getElementById('legacy-current').value.trim() || LEGACY_DEFAULT.currentOwner;
   }
 
   function toggleLegacyEditor(open) {
-    const editor = document.getElementById('legacy-editor');
     if (!ownerCanEdit) return;
-
+    const panel = document.getElementById('legacy-editor');
     if (open) {
-      document.getElementById('legacy-title').value = legacySheet.title || '';
-      document.getElementById('legacy-subtitle').value = legacySheet.subtitle || '';
-      document.getElementById('legacy-description').value = legacySheet.description || '';
-      document.getElementById('legacy-foundation').value = legacySheet.foundation || '';
-      document.getElementById('legacy-prior').value = legacySheet.priorOwners || '';
-      document.getElementById('legacy-current').value = legacySheet.currentOwner || '';
-      editor.classList.add('open');
-      renderLegacyChaptersEditor();
-      renderLegacyBlocksEditor();
+      setEditorValues();
+      panel.classList.add('open');
     } else {
-      editor.classList.remove('open');
+      panel.classList.remove('open');
     }
   }
 
   async function saveLegacySheet() {
     if (!ownerCanEdit || !auth.currentUser) return;
+    collectEditorValues();
 
     const payload = {
-      title: document.getElementById('legacy-title').value.trim() || LEGACY_DEFAULT.title,
-      subtitle: document.getElementById('legacy-subtitle').value.trim() || LEGACY_DEFAULT.subtitle,
-      description: document.getElementById('legacy-description').value.trim() || LEGACY_DEFAULT.description,
-      foundation: document.getElementById('legacy-foundation').value.trim() || LEGACY_DEFAULT.foundation,
-      priorOwners: document.getElementById('legacy-prior').value.trim() || LEGACY_DEFAULT.priorOwners,
-      currentOwner: document.getElementById('legacy-current').value.trim() || LEGACY_DEFAULT.currentOwner,
-      chapters: legacyChapters.map(normalizeChapter),
-      blocks: legacyBlocks.map(normalizeLegacyBlock),
+      ...normalizeLegacyData(legacyData),
       updatedBy: auth.currentUser.displayName || auth.currentUser.email || 'Owner',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
     try {
       await db.collection('legacySheets').doc(LEGACY_SHEET_ID).set(payload, { merge: true });
-      legacySheet = { ...legacySheet, ...payload };
+      legacyData = normalizeLegacyData(payload);
       renderLegacySheet();
       toggleLegacyEditor(false);
-      document.getElementById('legacy-status').textContent = 'Legacy sheet updated by owner.';
-      alert('Legacy Sheet saved.');
+      document.getElementById('legacy-status').textContent = 'Legacy sheet updated.';
+      alert('Legacy sheet saved.');
     } catch (err) {
-      alert('Could not save Legacy Sheet: ' + err.message);
+      alert('Could not save legacy sheet: ' + err.message);
     }
   }
 
@@ -992,50 +808,50 @@
     try {
       const doc = await db.collection('legacySheets').doc(LEGACY_SHEET_ID).get();
       if (doc.exists) {
-        legacySheet = { ...LEGACY_DEFAULT, ...(doc.data() || {}) };
+        legacyData = normalizeLegacyData(doc.data() || {});
       } else {
-        legacySheet = { ...LEGACY_DEFAULT };
+        legacyData = normalizeLegacyData(LEGACY_DEFAULT);
       }
-      legacyChapters = normalizeChapters(legacySheet.chapters);
-      legacyBlocks = normalizeLegacyBlocks(legacySheet.blocks);
     } catch (_err) {
-      legacySheet = { ...LEGACY_DEFAULT };
-      legacyChapters = [];
-      legacyBlocks = [];
+      legacyData = normalizeLegacyData(LEGACY_DEFAULT);
     }
 
     renderLegacySheet();
   }
 
-  document.getElementById('legacy-add-chapter').addEventListener('click', addLegacyChapter);
-
-  document.addEventListener('click', event => {
-    const blockBtn = event.target.closest('[data-legacy-add-block]');
-    if (blockBtn) {
-      const type = blockBtn.getAttribute('data-legacy-add-block');
-      addLegacyBlock(type);
+  function canEditLegacy(user) {
+    if (!user || !user.email) return false;
+    const email = String(user.email || '').toLowerCase();
+    if (typeof isOwner === 'function') {
+      try { return !!isOwner(email); } catch (_err) { }
     }
-  });
+    return FALLBACK_OWNER_EMAILS.has(email);
+  }
 
   auth.onAuthStateChanged(async user => {
     await loadLegacySheet();
 
-    if (!user) {
-      ownerCanEdit = false;
-      document.getElementById('legacy-owner-actions').style.display = 'none';
-      document.getElementById('legacy-status').textContent = 'Read-only mode. Owner sign-in required for edits.';
-      return;
-    }
+    const navAuth = document.getElementById('nav-auth');
+    if (user) {
+      const display = user.displayName || 'Agent';
+      if (typeof renderUserMenuHTML === 'function') {
+        navAuth.innerHTML = renderUserMenuHTML(display);
+      } else {
+        navAuth.innerHTML = '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>';
+      }
 
-    await rolesReady;
-    ownerCanEdit = isOwner(user.email);
-    document.getElementById('legacy-owner-actions').style.display = ownerCanEdit ? 'flex' : 'none';
-
-    if (ownerCanEdit) {
-      document.getElementById('legacy-status').textContent = 'Owner verified. Edit mode available.';
+      try { if (typeof rolesReady !== 'undefined') await rolesReady; } catch (_err) { }
+      ownerCanEdit = canEditLegacy(user);
     } else {
-      document.getElementById('legacy-status').textContent = 'Read-only mode. Owner account required for edits.';
+      ownerCanEdit = false;
+      navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     }
+
+    const ownerActions = document.getElementById('legacy-owner-actions');
+    ownerActions.style.display = ownerCanEdit ? 'flex' : 'none';
+    document.getElementById('legacy-status').textContent = ownerCanEdit
+      ? 'Owner verified. Edit mode available.'
+      : 'Read-only mode. Owner sign-in required for edits.';
   });
 </script>
 </body>

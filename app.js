@@ -121,11 +121,19 @@ function runTerminal() {
   while (eggIdx < EGG_LINES.length) all.push(EGG_LINES[eggIdx++]);
 
   let idx = 0;
+  if (all.length) {
+    const firstLine = all[0];
+    const firstIsEgg = EGG_LINES.includes(firstLine);
+    const firstIsCode = firstLine && (firstLine.startsWith('#include') || firstLine.startsWith('import ') || firstLine.startsWith('from ') || firstLine.startsWith('def ') || firstLine.startsWith('class ') || firstLine.startsWith('const ') || firstLine.startsWith('function ') || firstLine.startsWith('  ') || firstLine.startsWith('    '));
+    const firstDiv = document.createElement('div');
+    firstDiv.className = 'term-line ' + (firstIsEgg ? 'hl' : firstIsCode ? 'wht' : 'red');
+    firstDiv.textContent = firstLine || '\u00A0';
+    body.appendChild(firstDiv);
+    idx = 1;
+  }
+
   terminalInterval = setInterval(() => {
-    if (idx >= all.length) {
-      idx = 0;
-      body.innerHTML = '';
-    }
+    if (idx >= all.length) { skipTerminal(); return; }
     const line = all[idx];
     const isEgg = EGG_LINES.includes(line);
     const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('const ') || line.startsWith('function ') || line.startsWith('  ') || line.startsWith('    '));
@@ -137,7 +145,7 @@ function runTerminal() {
     while (body.children.length > 150) body.removeChild(body.firstChild);
     body.scrollTop = body.scrollHeight;
     idx++;
-  }, 150);
+  }, 70);
 }
 
 function skipTerminal() {
