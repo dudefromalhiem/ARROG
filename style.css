@@ -408,6 +408,9 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 @keyframes monoAura{0%,100%{transform:translateX(-4%) rotate(-2deg);opacity:.42}50%{transform:translateX(6%) rotate(2deg);opacity:.85}}
 
 @media (max-width: 768px) {
+  .term-body { padding: 10px 10px 8px; font-size: 11px; }
+  .term-code { padding: 8px 8px; gap: 2px; }
+  .term-row { white-space: pre-wrap; overflow-wrap: anywhere; text-overflow: clip; min-height: 0; line-height: 1.32; }
   .load-state { margin: 20px auto 34px; }
   .load-copy { margin-bottom: 10px; line-height: 1.75; }
   .load-monocode { height: clamp(250px, 50vh, 420px); padding: 14px 12px; font-size: .68rem; line-height: 1.5; }

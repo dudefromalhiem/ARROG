@@ -98,6 +98,16 @@ const CODE_LINES = [
   '    cell.safe = cell.flux < THRESHOLD;',
   '  }',
   '}',
+  '',
+  'const archiveDigest = await api.fetch(`/archive/manifest?scope=featured,registry,artworks,news,stats&lang=en-US&tz=UTC&render=compact&signature=${sessionToken.slice(0,16)}`);',
+  'const permissionVector = ["owner","admin","mod","user"].map(role => ({ role, level: clearanceTable[role], canWrite: acl.can(role, "pages.write"), canReview: acl.can(role, "submissions.review"), canPurge: acl.can(role, "records.delete") }));',
+  'const normalizedPayload = JSON.stringify(payload).replace(/\\s+/g, " ").trim().slice(0, 2048) + " :: checksum=" + crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(payload)));',
+  'db.collection("pages").where("approvalStatus","==","approved").where("type","in",["Anomaly","Tale","Artwork","Guide"]).orderBy("createdAt","desc").limit(25).get();',
+  'router.push(`/page.html?slug=${encodeURIComponent(entry.slug)}&from=registry&compartment=${encodeURIComponent(entry.type)}&clearance=${encodeURIComponent(String(clearance))}`);',
+  'logger.info("stream.sync", { channel: "guild-core", latencyMs: perf.now() - startedAt, retries, cacheHit, viewport: `${window.innerWidth}x${window.innerHeight}`, device: navigator.userAgent });',
+  'if (Array.isArray(records) && records.length > 0 && records.every(r => r && typeof r === "object" && r.approvalStatus === "approved")) ui.renderRows(records.map(r => ({ id: r.id, title: r.title, tags: r.tags?.join(", ") || "none", updated: formatDate(r.updatedAt) })));',
+  'SELECT id, slug, title, type, approvalStatus, createdAt, updatedAt FROM pages WHERE approvalStatus = "approved" AND type IN ("Anomaly","Tale","Artwork","Guide") ORDER BY createdAt DESC, updatedAt DESC LIMIT 50;',
+  'fn validate_request(req: &Request, keyring: &Keyring) -> Result<Session, AuthError> { let token = req.headers.get("Authorization").ok_or(AuthError::MissingToken)?; let session = keyring.verify_and_decode(token)?; if session.expired() || session.clearance < 2 { return Err(AuthError::InsufficientClearance); } Ok(session) }',
 ];
 
 const SYS_LOGS = [
@@ -177,8 +187,11 @@ function runTerminal() {
     skipTerminal();
   };
 
-  const initialLines = Math.max(52, Math.floor(window.innerHeight / 6));
-  const maxLines = initialLines + 60;
+  const isPhoneViewport = window.innerWidth <= 768;
+  const initialLines = isPhoneViewport
+    ? Math.max(28, Math.floor(window.innerHeight / 9))
+    : Math.max(52, Math.floor(window.innerHeight / 6));
+  const maxLines = initialLines + (isPhoneViewport ? 30 : 60);
   let idx = 0;
 
   body.innerHTML = '<div class="term-stream"><div class="term-code" id="term-code"></div></div>';
