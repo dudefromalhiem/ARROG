@@ -250,7 +250,7 @@ PAGE_SEED.push({
 });
 PAGE_SEED.push({
   title: 'MRD: Artemis', slug: 'mrd-artemis', type: 'Lore (MRD)', tags: ['mrd', 'military'],
-  htmlContent: createMRD('Artemis', 'Biological/chemical containment.', 'A heavily armored detachment specializing in bio-hazards, infectious anomalous pathogens, and rapidly mutating flora/fauna. Operatives are permanently housed in sanitized atmospheric suits.')
+  htmlContent: createMRD('Artemis', 'Biological/chemical containment.', 'A heavily armored detachment specializing in bio-hazards, infectious anomalous pathogens, and rapidly mutating flora/fauna. Members are permanently housed in sanitized atmospheric suits.')
 });
 PAGE_SEED.push({
   title: 'MRD: Osiris', slug: 'mrd-osiris', type: 'Lore (MRD)', tags: ['mrd', 'military'],
@@ -278,7 +278,7 @@ PAGE_SEED.push({
 });
 PAGE_SEED.push({
   title: 'MRD: Galen A1', slug: 'mrd-galen-a1', type: 'Lore (MRD)', tags: ['mrd', 'military'],
-  htmlContent: createMRD('Galen A1', 'Memetic and psychological threats.', 'An offshoot of Galen dealing with cognitohazards. Operatives undergo rigorous neural-suppression treatments allowing them to perceive sanity-destroying imagery or paradoxes without succumbing to madness.')
+  htmlContent: createMRD('Galen A1', 'Memetic and psychological threats.', 'An offshoot of Galen dealing with cognitohazards. Members undergo rigorous neural-suppression treatments allowing them to perceive sanity-destroying imagery or paradoxes without succumbing to madness.')
 });
 PAGE_SEED.push({
   title: 'MRD: Ares', slug: 'mrd-ares', type: 'Lore (MRD)', tags: ['mrd', 'military'],

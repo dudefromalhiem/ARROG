@@ -326,10 +326,15 @@ async function syncSharedNav(user) {
   const adminLink = document.getElementById('admin-link');
   if (!navAuth) return;
 
+  const canExitEsd = !!user && isOwner(user.email) && !!SITE_STATE.esdLocked;
+  const exitEsdButton = user && isOwner(user.email) && SITE_STATE.esdLocked
+    ? '<button class="nav-btn" type="button" onclick="updateESDState(false)">Exit ESD</button>'
+    : '';
+
   if (user) {
     const displayLabel = user.displayName || 'Agent';
     const isAdminUser = await getUserAdminFlag(user);
-    navAuth.innerHTML = renderUserMenuHTML(displayLabel);
+    navAuth.innerHTML = renderUserMenuHTML(displayLabel) + exitEsdButton;
     if (submitLink) submitLink.classList.remove('hidden');
     if (adminLink) adminLink.classList.toggle('hidden', !isAdminUser);
   } else {
@@ -339,6 +344,33 @@ async function syncSharedNav(user) {
       : '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     if (submitLink) submitLink.classList.add('hidden');
     if (adminLink) adminLink.classList.add('hidden');
+  }
+}
+
+async function updateESDState(enabled) {
+  if (!auth.currentUser || !isOwner(auth.currentUser.email)) {
+    alert('Only the Owner can activate or deactivate ESD.');
+    return;
+  }
+
+  const ok = confirm(enabled
+    ? 'Activate Emergency Shutdown Protocol? Visitors without moderator clearance will be locked out.'
+    : 'Deactivate Emergency Shutdown Protocol and restore normal access?');
+  if (!ok) return;
+
+  try {
+    await db.collection('config').doc('site').set({
+      esdLocked: !!enabled,
+      esdActivatedBy: enabled ? (auth.currentUser.displayName || auth.currentUser.email || 'Owner') : '',
+      esdActivatedAt: enabled ? firebase.firestore.FieldValue.serverTimestamp() : null
+    }, { merge: true });
+    const doc = await db.collection('config').doc('site').get();
+    if (doc.exists) SITE_STATE = { ...SITE_STATE, ...(doc.data() || {}) };
+    await syncSharedNav(auth.currentUser);
+    applySiteAccessGate(auth.currentUser);
+    alert(enabled ? 'ESD activated.' : 'ESD deactivated.');
+  } catch (err) {
+    alert('Failed to update ESD: ' + err.message);
   }
 }
 

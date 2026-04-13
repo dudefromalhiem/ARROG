@@ -4,13 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Red Oaker Logs — Red Oaker Guild</title>
-  <meta name="description" content="Hierarchical Red Oaker Logs with numbered ranges, encrypted placeholders, and reconstruction routing." />
+  <meta name="description" content="Red Oaker Logs, property of the Anomalous Registry of the Red Oaker Guild (ARROG) database." />
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
   <style>
     .logs-wrap { max-width: 1120px; margin: 40px auto; }
     .logs-head { margin-bottom: 24px; }
     .logs-head p { color: var(--wht-d); font-size: .86rem; max-width: 920px; }
+    .logs-head .logs-subtext { display:block; margin-top:8px; color: var(--wht-f); font-size: .74rem; letter-spacing: .4px; text-transform: none; }
 
     .logs-level { margin-bottom: 20px; padding: 16px; border: 1px solid var(--red-d); background: var(--blk-c); }
     .logs-level .ttl { color: var(--red-b); text-transform: uppercase; letter-spacing: 2px; font-size: .72rem; margin-bottom: 10px; }
@@ -97,8 +98,10 @@
   <div class="logs-head">
     <div class="section-hd" style="border-bottom:none">Red Oaker Logs</div>
     <p>
-      Select a branch, then a compartment, then a numbered range. Unedited entries remain encrypted by default. If you are authorized,
-      choose an entry and use Enter to reconstruct it through the editor workflow.
+      Red Oaker Logs, property of the Anomalous Registry of the Red Oaker Guild (ARROG) database. Select a branch, then a compartment,
+      followed by a registered numerical range. Entries not present within the registry are considered unavailable - lost to degradation,
+      interference, or absence of record. Only accessible entries may be selected for review.
+      <span class="logs-subtext">The point of these records is to keep track of entries that were lost, corrupted, or never existed in a recoverable form.</span>
     </p>
   </div>
 
@@ -161,7 +164,7 @@
       children: [
         { id: 'soa', label: 'Sentient or Accursed Objects', code: 'SOA', format: 'dash', digits: 4, start: 1, end: 6000, group: 100, type: 'Anomaly', listKey: 'SOA' },
         { id: 'ros', label: 'Red Oaker Specimen', code: 'ROS', format: 'dash', digits: 4, start: 1, end: 6000, group: 100, type: 'Anomaly', listKey: 'ROS' },
-        { id: 'sloa', label: 'Specimen Linked Anomalous Objects', code: 'SLOA', format: 'dash', digits: 4, start: 1, end: 6000, group: 100, type: 'Anomaly', listKey: 'SLOA' }
+        { id: 'sloa', label: 'Specimen Linked Anomalous Objects', code: 'SLOA', format: 'sloa', digits: 4, start: 1, end: 26, group: 1, type: 'Anomaly', listKey: 'SLOA' }
       ]
     },
     tests: {
@@ -182,10 +185,15 @@
     return String(value).padStart(digits, '0');
   }
 
-  function buildDesignation(config, index) {
+  function buildDesignation(config, index, suffix = '') {
     const num = padNumber(index, config.digits);
     if (config.format === 'colon') return config.code + ': ' + num;
+    if (config.format === 'sloa') return config.code + '-' + num + suffix;
     return config.code + '-' + num;
+  }
+
+  function letterForIndex(index) {
+    return String.fromCharCode(64 + index);
   }
 
   function normalizeDesignation(text) {
@@ -202,6 +210,17 @@
 
   function buildRangeBuckets(config) {
     const ranges = [];
+    if (config.format === 'sloa') {
+      for (let letter = 1; letter <= 26; letter++) {
+        ranges.push({
+          start: 1,
+          end: 100,
+          label: '000' + letterForIndex(letter) + '-0100' + letterForIndex(letter),
+          suffix: letterForIndex(letter)
+        });
+      }
+      return ranges;
+    }
     for (let start = config.start; start <= config.end; start += config.group) {
       const end = Math.min(config.end, start + config.group - 1);
       ranges.push({ start: start, end: end, label: padNumber(start, config.digits) + '-' + padNumber(end, config.digits) });
@@ -277,14 +296,15 @@
 
     const ranges = buildRangeBuckets(selectedSubcat);
     container.innerHTML = ranges.map(range => {
-      const key = range.start + '-' + range.end;
-      const active = selectedRange && selectedRange.start === range.start && selectedRange.end === range.end ? 'active' : '';
-      return '<button class="range-chip ' + active + '" type="button" onclick="selectRange(' + range.start + ', ' + range.end + ')">' + range.label + '</button>';
+      const active = selectedRange && selectedRange.start === range.start && selectedRange.end === range.end && String(selectedRange.suffix || '') === String(range.suffix || '') ? 'active' : '';
+      const suffixArg = range.suffix ? ", '" + range.suffix + "'" : '';
+      return '<button class="range-chip ' + active + '" type="button" onclick="selectRange(' + range.start + ', ' + range.end + suffixArg + ')">' + range.label + '</button>';
     }).join('');
   }
 
   function selectRange(start, end) {
-    selectedRange = { start: Number(start), end: Number(end) };
+    const suffix = arguments.length > 2 ? String(arguments[2] || '') : '';
+    selectedRange = { start: Number(start), end: Number(end), suffix: suffix };
     renderRanges();
     renderEntries();
   }
@@ -298,11 +318,14 @@
       return;
     }
 
-    title.textContent = 'Level 4 // Entries // ' + selectedSubcat.label + ' // ' + padNumber(selectedRange.start, selectedSubcat.digits) + '-' + padNumber(selectedRange.end, selectedSubcat.digits);
+    const rangeLabel = selectedSubcat.format === 'sloa'
+      ? '000' + (selectedRange.suffix || 'A') + '-0100' + (selectedRange.suffix || 'A')
+      : padNumber(selectedRange.start, selectedSubcat.digits) + '-' + padNumber(selectedRange.end, selectedSubcat.digits);
+    title.textContent = 'Level 4 // Entries // ' + selectedSubcat.label + ' // ' + rangeLabel;
 
     const cards = [];
     for (let idx = selectedRange.start; idx <= selectedRange.end; idx++) {
-      const designation = buildDesignation(selectedSubcat, idx);
+      const designation = buildDesignation(selectedSubcat, idx, selectedRange.suffix || '');
       const normalized = normalizeDesignation(designation);
       const existing = livePagesByDesignation.get(normalized);
       const listTag = '<span class="tag">' + selectedSubcat.listKey + '</span>';

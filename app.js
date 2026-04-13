@@ -350,13 +350,16 @@ async function updateAuthUI(user) {
   const adminLink = document.getElementById('admin-link');
   const submitLink = document.getElementById('submit-link');
   const shownRole = sessionStorage.getItem('clearanceWelcomedRole');
+  const exitEsdButton = user && isOwner(user.email) && SITE_STATE && SITE_STATE.esdLocked
+    ? ' <button class="nav-btn" type="button" onclick="updateESDState(false)">Exit ESD</button>'
+    : '';
 
   if (user) {
     currentUser = user;
     currentRole = resolveRole(user.email);
     const displayLabel = user.displayName || 'Agent';
     const isAdminUser = await getUserAdminFlag(user);
-    navAuth.innerHTML = renderUserMenuHTML(displayLabel);
+    navAuth.innerHTML = renderUserMenuHTML(displayLabel) + exitEsdButton;
     if (submitLink) submitLink.classList.remove('hidden');
     if (adminLink) adminLink.classList.toggle('hidden', !isAdminUser);
     // upsert user doc
