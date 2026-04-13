@@ -40,6 +40,17 @@
       letter-spacing: 2px;
       margin-bottom: 20px;
     }
+    .legacy-description-section {
+      border-top: 1px solid rgba(204,0,0,.3);
+      padding-top: 16px;
+      margin-top: 16px;
+    }
+    .legacy-description-section p {
+      color: var(--wht-m);
+      font-size: .9rem;
+      line-height: 1.7;
+      margin: 0;
+    }
     .legacy-block-line {
       border-left: 3px solid var(--red-d);
       padding-left: 16px;
@@ -344,6 +355,10 @@
       <input class="fi" id="legacy-subtitle" type="text" />
     </div>
     <div class="fg">
+      <label class="fl" for="legacy-description">Description <span style="color:var(--wht-f); font-size:.75rem">(under 200 words)</span></label>
+      <textarea class="fta" id="legacy-description" placeholder="Brief overview of the legacy sheet content and purpose" maxlength="1200"></textarea>
+    </div>
+    <div class="fg">
       <label class="fl" for="legacy-foundation">Foundational Era</label>
       <textarea class="fta" id="legacy-foundation"></textarea>
     </div>
@@ -409,6 +424,7 @@
   const LEGACY_DEFAULT = {
     title: 'Red Oaker Legacy',
     subtitle: 'Compiled ownership record and historical continuity log',
+    description: '',
     foundation: 'The Guild emerged from fragmented wardenship circles that protected anomaly folklore, unindexed field artifacts, and containment rituals from erasure. The founding custodians formalized those fragments into a single oath-bound archive.',
     priorOwners: 'Prior custodians preserved doctrine through collapse cycles, each rebuilding from partial ledgers and damaged sectors. Their continuity work established the designation standards that still govern archive naming and reconstruction today.',
     currentOwner: 'The current Owner maintains the archive as a living continuity system: recover missing entries, enforce designation integrity, and keep every active branch accountable to canonical record discipline.',
@@ -672,11 +688,13 @@
     const studioMarkup = legacyBlocks.length
       ? '<div class="legacy-block-line"><h3>Document Studio</h3>' + legacyBlocks.map(renderLegacyBlockView).join('') + '</div>'
       : '';
+    const descriptionHtml = legacySheet.description ? '<div class="legacy-description-section"><p>' + esc(legacySheet.description).replace(/\n/g, '<br>') + '</p></div>' : '';
 
     host.innerHTML =
       '<div class="legacy-sheet-header">' +
         '<h1>' + esc(legacySheet.title) + '</h1>' +
         '<div class="legacy-sub">' + esc(legacySheet.subtitle) + '</div>' +
+        descriptionHtml +
       '</div>' +
       '<div class="legacy-block-line"><h3>Foundational Era</h3><p>' + esc(legacySheet.foundation) + '</p></div>' +
       '<div class="legacy-block-line"><h3>Prior Owners</h3><p>' + esc(legacySheet.priorOwners) + '</p></div>' +
@@ -865,6 +883,7 @@
     if (open) {
       document.getElementById('legacy-title').value = legacySheet.title || '';
       document.getElementById('legacy-subtitle').value = legacySheet.subtitle || '';
+      document.getElementById('legacy-description').value = legacySheet.description || '';
       document.getElementById('legacy-foundation').value = legacySheet.foundation || '';
       document.getElementById('legacy-prior').value = legacySheet.priorOwners || '';
       document.getElementById('legacy-current').value = legacySheet.currentOwner || '';
@@ -882,6 +901,7 @@
     const payload = {
       title: document.getElementById('legacy-title').value.trim() || LEGACY_DEFAULT.title,
       subtitle: document.getElementById('legacy-subtitle').value.trim() || LEGACY_DEFAULT.subtitle,
+      description: document.getElementById('legacy-description').value.trim() || LEGACY_DEFAULT.description,
       foundation: document.getElementById('legacy-foundation').value.trim() || LEGACY_DEFAULT.foundation,
       priorOwners: document.getElementById('legacy-prior').value.trim() || LEGACY_DEFAULT.priorOwners,
       currentOwner: document.getElementById('legacy-current').value.trim() || LEGACY_DEFAULT.currentOwner,
