@@ -175,7 +175,7 @@ function runTerminal() {
     }
   }
   while (eggIdx < EGG_LINES.length) all.push(EGG_LINES[eggIdx++]);
-  const minHoldMs = 4000;
+  const minHoldMs = 5000;
   const endAt = () => {
     const elapsed = Date.now() - terminalStartedAt;
     if (elapsed < minHoldMs) {
@@ -189,8 +189,8 @@ function runTerminal() {
 
   const isPhoneViewport = window.innerWidth <= 768;
   const initialLines = isPhoneViewport
-    ? Math.max(28, Math.floor(window.innerHeight / 9))
-    : Math.max(52, Math.floor(window.innerHeight / 6));
+    ? Math.max(16, Math.floor(window.innerHeight / 14))
+    : Math.max(22, Math.floor(window.innerHeight / 11));
   const maxLines = initialLines + (isPhoneViewport ? 30 : 60);
   let idx = 0;
 
