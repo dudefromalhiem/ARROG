@@ -100,6 +100,8 @@ const EGG_LINES = [
 ];
 
 function runTerminal() {
+  document.body.classList.add('terminal-active');
+  document.documentElement.classList.add('terminal-active');
   const body = document.getElementById('term-body');
   const corpus = [...CODE_LINES, ...SYS_LOGS];
   // shuffle
@@ -120,7 +122,10 @@ function runTerminal() {
 
   let idx = 0;
   terminalInterval = setInterval(() => {
-    if (idx >= all.length) { skipTerminal(); return; }
+    if (idx >= all.length) {
+      idx = 0;
+      body.innerHTML = '';
+    }
     const line = all[idx];
     const isEgg = EGG_LINES.includes(line);
     const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('const ') || line.startsWith('function ') || line.startsWith('  ') || line.startsWith('    '));
@@ -142,18 +147,15 @@ function skipTerminal() {
     terminal.style.animation = 'fadeOut 0.6s ease-out forwards';
     setTimeout(() => {
       terminal.classList.add('hidden');
+      document.body.classList.remove('terminal-active');
+      document.documentElement.classList.remove('terminal-active');
     }, 600);
   }
-  try { sessionStorage.setItem('rog_terminal_seen', '1'); } catch (_e) { }
 }
 
 function shouldShowTerminal() {
-  try {
-    // Check sessionStorage so terminal shows once per session
-    return sessionStorage.getItem('rog_terminal_seen') !== '1';
-  } catch (_e) {
-    return true;
-  }
+  // Always show the terminal intro on page load.
+  return true;
 }
 
 // ═════════════════════════════════════════════════════════════

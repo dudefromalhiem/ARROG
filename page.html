@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Render content in iframe
     const frame = document.getElementById('pv-frame');
-    const htmlDoc = buildPageDocument(page.htmlContent, page.cssContent || '', page.imageUrls || []);
+    const htmlDoc = buildPageDocument(page.htmlContent, page.cssContent || '', page.imageUrls || [], page.imageAssets || []);
     frame.srcdoc = htmlDoc;
 
     // Show viewer
@@ -240,9 +240,12 @@ function showError() {
   document.getElementById('page-error').classList.remove('hidden');
 }
 
-function buildPageDocument(html, css, imageUrls) {
-  const raw = repairDocumentImagesWithUploads((html || '').trim(), imageUrls || []);
-  const htmlWithUploads = sanitizePageImages(embedUploadedImagesIfMissing(raw, imageUrls || [])).replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
+function buildPageDocument(html, css, imageUrls, imageAssets) {
+  const assets = normalizeImageAssets(imageUrls || [], imageAssets || []);
+  const raw = repairDocumentImagesWithUploads((html || '').trim(), assets.map(asset => asset.url));
+  const withUploads = embedUploadedImagesIfMissing(raw, assets);
+  const withCaptions = applyImageCaptions(withUploads, assets);
+  const htmlWithUploads = sanitizePageImages(withCaptions).replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
   const wrapped = htmlWithUploads.includes('class="page-shell"')
     ? htmlWithUploads
     : '<div class="page-shell"><section class="page-section">' + htmlWithUploads + '</section></div>';
@@ -250,7 +253,7 @@ function buildPageDocument(html, css, imageUrls) {
 
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
     ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
-    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}figure{margin:0 0 14px}figcaption{margin-top:8px;font-size:.82rem;color:#c3c3c3;line-height:1.5}' +
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
     safeCss.replace(/<\/style>/gi, '') +
     '</style></head><body>' + wrapped + '</body></html>';
@@ -267,8 +270,69 @@ function normalizePageCss(css) {
     .replace(/#eee\b/gi, '#2f2f2f');
 }
 
-function embedUploadedImagesIfMissing(html, imageUrls) {
-  const urls = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeImageAssets(imageUrls, imageAssets) {
+  const assets = Array.isArray(imageAssets)
+    ? imageAssets
+      .map(asset => ({
+        url: String(asset && asset.url || '').trim(),
+        alt: String(asset && asset.alt || '').trim(),
+        caption: String(asset && asset.caption || '').trim()
+      }))
+      .filter(asset => asset.url)
+    : [];
+
+  if (assets.length) return assets;
+  return (Array.isArray(imageUrls) ? imageUrls : []).filter(Boolean).map(url => ({ url: String(url), alt: '', caption: '' }));
+}
+
+function applyImageCaptions(html, imageAssets) {
+  const assets = Array.isArray(imageAssets) ? imageAssets : [];
+  if (!assets.length) return String(html || '');
+
+  const captionMap = new Map(assets.filter(asset => asset.url && asset.caption).map(asset => [asset.url, asset.caption]));
+  if (!captionMap.size) return String(html || '');
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = String(html || '');
+
+  wrapper.querySelectorAll('img').forEach(img => {
+    const src = String(img.getAttribute('src') || '').trim();
+    const caption = captionMap.get(src);
+    if (!caption) return;
+
+    const parent = img.parentElement;
+    if (parent && parent.tagName === 'FIGURE') {
+      if (!parent.querySelector('figcaption')) {
+        const figcap = document.createElement('figcaption');
+        figcap.textContent = caption;
+        parent.appendChild(figcap);
+      }
+      return;
+    }
+
+    const figure = document.createElement('figure');
+    const figcap = document.createElement('figcaption');
+    figcap.textContent = caption;
+    img.parentNode.insertBefore(figure, img);
+    figure.appendChild(img);
+    figure.appendChild(figcap);
+  });
+
+  return wrapper.innerHTML;
+}
+
+function embedUploadedImagesIfMissing(html, imageAssets) {
+  const assets = Array.isArray(imageAssets) ? imageAssets : [];
+  const urls = assets.map(asset => asset.url).filter(Boolean);
   if (!urls.length) return String(html || '');
 
   const raw = String(html || '');
@@ -278,10 +342,13 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
   const gallery = '<div class="page-section uploaded-assets">' +
     '<h2>Uploaded Assets</h2>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
-      urls.map((url, idx) =>
-        '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
-          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" loading="lazy" decoding="async" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />' +
-        '</a>'
+      assets.map((asset, idx) =>
+        '<figure style="margin:0">' +
+          '<a href="' + asset.url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
+            '<img src="' + asset.url + '" alt="' + escapeHtml(asset.alt || ('Uploaded asset ' + (idx + 1))) + '" loading="lazy" decoding="async" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />' +
+          '</a>' +
+          (asset.caption ? '<figcaption>' + escapeHtml(asset.caption) + '</figcaption>' : '') +
+        '</figure>'
       ).join('') +
     '</div>' +
   '</div>';

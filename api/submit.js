@@ -128,6 +128,15 @@ function buildSubmissionPayload(body, actor) {
     htmlContent,
     cssContent,
     imageUrls: Array.isArray(payload.imageUrls) ? payload.imageUrls.filter(Boolean).map(String) : [],
+    imageAssets: Array.isArray(payload.imageAssets)
+      ? payload.imageAssets
+          .map(asset => ({
+            url: String(asset && asset.url || '').trim(),
+            alt: String(asset && asset.alt || '').trim(),
+            caption: String(asset && asset.caption || '').trim()
+          }))
+          .filter(asset => asset.url)
+      : [],
     authorUid: actor.uid,
     authorEmail: actor.email,
     authorName: String(payload.authorName || actor.name || actor.email.split('@')[0] || 'Agent').trim(),
@@ -310,6 +319,7 @@ module.exports = async function handler(req, res) {
           htmlContent: payload.htmlContent,
           cssContent: payload.cssContent,
           imageUrls: payload.imageUrls,
+          imageAssets: payload.imageAssets,
           authorUid: actor.uid,
           authorEmail: actor.email,
           authorName: payload.authorName,

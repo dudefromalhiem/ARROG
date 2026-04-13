@@ -413,7 +413,14 @@ async function saveDraft(options = {}) {
     return null;
   }
 
-  const uploadedUrls = uploadedImages.filter(img => !img.removed && img.remoteUrl).map(img => img.remoteUrl);
+  const uploadedAssets = uploadedImages
+    .filter(img => !img.removed && img.remoteUrl)
+    .map(img => ({
+      url: img.remoteUrl,
+      alt: img.alt || img.name || '',
+      caption: img.caption || ''
+    }));
+  const uploadedUrls = uploadedAssets.map(asset => asset.url);
   const sanitizedHTML = sanitizeHTML(content.htmlContent || '');
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title || 'Untitled Draft');
   const mergedCSS = mergeWithDefaultSchemaCSS(content.cssContent || '');
@@ -430,6 +437,7 @@ async function saveDraft(options = {}) {
     htmlContent: wrappedHTML,
     cssContent: mergedCSS,
     imageUrls: uploadedUrls,
+    imageAssets: uploadedAssets,
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
@@ -496,15 +504,21 @@ async function continueDraftSubmission(id) {
     document.getElementById('sf-html').value = draft.htmlContent || DEFAULT_NEW_PAGE_HTML;
     document.getElementById('sf-css').value = draft.cssContent || '';
 
-    uploadedImages = (Array.isArray(draft.imageUrls) ? draft.imageUrls : []).map((url, idx) => ({
+    const draftAssets = Array.isArray(draft.imageAssets) && draft.imageAssets.length
+      ? draft.imageAssets
+      : (Array.isArray(draft.imageUrls) ? draft.imageUrls.map(url => ({ url: url, caption: '', alt: '' })) : []);
+
+    uploadedImages = draftAssets.map((asset, idx) => ({
       id: 'draft_' + idx + '_' + Date.now(),
       name: 'Draft image ' + (idx + 1),
-      url: url,
-      localUrl: url,
-      remoteUrl: url,
+      url: String(asset.url || ''),
+      localUrl: String(asset.url || ''),
+      remoteUrl: String(asset.url || ''),
       status: 'ready',
       removed: false,
       file: null,
+      caption: String(asset.caption || ''),
+      alt: String(asset.alt || ''),
       fingerprint: 'draft-' + idx
     }));
     renderImageList();
@@ -2284,7 +2298,22 @@ async function uploadImage(file) {
   const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
   const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
   const localUrl = await fileToDataUrl(file);
-  const uploadRecord = { id: uploadId, name: file.name, file: file, url: localUrl, localUrl: localUrl, remoteUrl: '', status: 'uploading', removed: false, path: path, task: null, fingerprint: fingerprint, timeoutId: null };
+  const uploadRecord = {
+    id: uploadId,
+    name: file.name,
+    file: file,
+    url: localUrl,
+    localUrl: localUrl,
+    remoteUrl: '',
+    status: 'uploading',
+    removed: false,
+    path: path,
+    task: null,
+    caption: '',
+    alt: file.name.replace(/\.[^.]+$/, ''),
+    fingerprint: fingerprint,
+    timeoutId: null
+  };
   uploadedImages.push(uploadRecord);
   renderImageList();
   refreshImageSelectors();
@@ -2349,6 +2378,7 @@ function renderImageList() {
       <div style="flex:1;min-width:0">
         <span class="img-url" title="${displayUrl}">${img.name}</span>
         <div style="font-size:.65rem;color:var(--wht-f);margin-top:3px;text-transform:uppercase;letter-spacing:1px">${label}</div>
+        <input class="fi" type="text" placeholder="Image caption (shown on page)" value="${escapeHtml(img.caption || '')}" oninput="updateUploadedImageMeta('${img.id}', 'caption', this.value)" style="margin-top:6px;font-size:.72rem;padding:6px 8px" />
       </div>
       <button class="btn btn-sm btn-s btn-copy" type="button" onclick="copyImageUrl('${img.id}', this)">Copy URL</button>
       ${img.status === 'failed' ? '<button class="btn btn-sm btn-s" type="button" onclick="retryUploadedImage(\'' + img.id + '\')">Retry</button>' : ''}
@@ -2356,6 +2386,14 @@ function renderImageList() {
     </div>
   `;
   }).join('');
+}
+
+function updateUploadedImageMeta(id, field, value) {
+  const record = uploadedImages.find(img => img.id === id);
+  if (!record) return;
+  if (field === 'caption') record.caption = String(value || '').slice(0, 180);
+  if (field === 'alt') record.alt = String(value || '').slice(0, 180);
+  scheduleDraftAutoSave();
 }
 
 function retryUploadedImage(id) {
@@ -2446,8 +2484,11 @@ function sanitizeHTML(html) {
   return clean;
 }
 
-function embedUploadedImagesIfMissing(html, imageUrls) {
-  const urls = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+function embedUploadedImagesIfMissing(html, imageAssets) {
+  const assets = Array.isArray(imageAssets)
+    ? imageAssets.map(item => typeof item === 'string' ? { url: item, caption: '', alt: '' } : item).filter(item => item && item.url)
+    : [];
+  const urls = assets.map(item => item.url);
   if (!urls.length) return html || '';
 
   const raw = String(html || '');
@@ -2459,10 +2500,13 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
   const gallery = '\n<div class="page-section uploaded-assets">' +
     '<h2>Uploaded Assets</h2>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
-      urls.map((url, idx) =>
-        '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
-          '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />' +
-        '</a>'
+      assets.map((asset, idx) =>
+        '<figure style="margin:0">' +
+          '<a href="' + asset.url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
+            '<img src="' + asset.url + '" alt="' + escapeHtml(asset.alt || ('Uploaded asset ' + (idx + 1))) + '" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />' +
+          '</a>' +
+          (asset.caption ? '<figcaption style="margin-top:6px;font-size:.75rem;color:#bdbdbd;line-height:1.4">' + escapeHtml(asset.caption) + '</figcaption>' : '') +
+        '</figure>'
       ).join('') +
     '</div>' +
   '</div>';
@@ -2498,7 +2542,11 @@ function updatePreview() {
 
   const frame = document.getElementById('preview-frame');
   const sanitized = sanitizeHTML(html);
-  const htmlWithUploads = embedUploadedImagesIfMissing(sanitized, uploadedImages.map(img => img.remoteUrl || img.url));
+  const htmlWithUploads = embedUploadedImagesIfMissing(sanitized, uploadedImages.map(img => ({
+    url: img.remoteUrl || img.url,
+    caption: img.caption || '',
+    alt: img.alt || img.name || ''
+  })));
   const wrappedHtml = wrapWithDefaultSchema(htmlWithUploads, document.getElementById('sf-title').value || 'New Classified Document');
   const doc = buildSandboxDocument(wrappedHtml, mergeWithDefaultSchemaCSS(css));
   frame.srcdoc = doc;
@@ -2695,7 +2743,14 @@ async function submitPage() {
     return;
   }
 
-  const uploadedUrls = uploadedImages.filter(img => !img.removed && img.remoteUrl).map(img => img.remoteUrl);
+  const uploadedAssets = uploadedImages
+    .filter(img => !img.removed && img.remoteUrl)
+    .map(img => ({
+      url: img.remoteUrl,
+      alt: img.alt || img.name || '',
+      caption: img.caption || ''
+    }));
+  const uploadedUrls = uploadedAssets.map(asset => asset.url);
   const sanitizedHTML = sanitizeHTML(htmlContent);
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title);
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
@@ -2713,6 +2768,7 @@ async function submitPage() {
     htmlContent: wrappedHTML,
     cssContent: mergedCSS,
     imageUrls: uploadedUrls,
+    imageAssets: uploadedAssets,
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],

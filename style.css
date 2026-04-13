@@ -37,6 +37,12 @@
 html{font-size:16px;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:var(--red) var(--blk);background:var(--blk)}
 body{font-family:var(--font-m);background:var(--blk);color:var(--wht-m);line-height:1.7;min-height:100vh;-webkit-font-smoothing:antialiased}
 ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:var(--blk)}::-webkit-scrollbar-thumb{background:var(--red-d)}::-webkit-scrollbar-thumb:hover{background:var(--red)}
+html.terminal-active,
+body.terminal-active{overflow:hidden}
+html.terminal-active::-webkit-scrollbar,
+body.terminal-active::-webkit-scrollbar{width:0;height:0}
+html.terminal-active,
+body.terminal-active{scrollbar-width:none}
 
 /* Links */
 a{color:var(--red-b);text-decoration:none;transition:color var(--tr)}
@@ -213,6 +219,8 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 /* Terminal overlay */
 .term{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:9999;background:var(--blk);display:flex;flex-direction:column;overflow:hidden;font-family:'Courier New',monospace;color:var(--wht-m);background:#000}
 .term-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:24px 32px;font-size:clamp(11px,1.4vw,14px);line-height:1.5;white-space:pre-wrap;word-wrap:break-word;font-weight:500}
+.term-body{-ms-overflow-style:none;scrollbar-width:none}
+.term-body::-webkit-scrollbar{width:0;height:0;display:none}
 .term-line{opacity:0;animation:tfade .2s ease-out forwards}
 .term-line.red{color:#ff4d4d;text-shadow:0 0 10px rgba(204,0,0,.5)}
 .term-line.wht{color:#999}.term-line.hl{color:#ff1a1a;font-weight:700;text-shadow:0 0 15px rgba(255,26,26,.8)}
