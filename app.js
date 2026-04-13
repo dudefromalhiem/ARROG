@@ -10,8 +10,8 @@ let currentRole = "user";
 let authMode = "login"; // login | register
 let terminalInterval = null;
 let terminalStartedAt = 0;
-let terminalColumnTimers = [];
 let terminalEndTimer = null;
+let clearanceWelcomeShownThisLoad = false;
 
 // ═════════════════════════════════════════════════════════════
 // TERMINAL EASTER EGG
@@ -140,60 +140,46 @@ function runTerminal() {
       return;
     }
     skipTerminal();
-  };
-
-  const columns = [];
-  const colCount = Math.max(8, Math.floor(window.innerWidth / 165));
+  const initialLines = Math.max(140, Math.floor(window.innerHeight / 2.8));
+  const maxLines = initialLines + 60;
   const initialLinesPerColumn = Math.max(120, Math.floor(window.innerHeight / 8) + 40);
   const maxLinesPerColumn = initialLinesPerColumn + 40;
-  let idx = 0;
-
-  body.innerHTML = '<div class="term-stream" id="term-stream"></div>';
-  const stream = document.getElementById('term-stream');
+  body.innerHTML = '<div class="term-stream"><div class="term-code" id="term-code"></div></div>';
+  const stream = document.getElementById('term-code');
   if (!stream) return;
 
-  function getNextLine() {
+  const seedRows = ['[BOOT] initializing secure terminal...'];
+
+  const appendTerminalLine = line => {
+    const isEgg = EGG_LINES.includes(line);
+    const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('const ') || line.startsWith('function ') || line.startsWith('int ') || line.startsWith('auto ') || line.startsWith('  ') || line.startsWith('    '));
+    const row = document.createElement('div');
+    row.className = 'term-row ' + (isEgg ? 'hl' : isCode ? 'wht' : 'red');
+    row.textContent = String(line || '\u00A0').replace(/\s+/g, ' ').trim() || '\u00A0';
+    stream.appendChild(row);
+    while (stream.children.length > maxLines) stream.removeChild(stream.firstChild);
+  };
+
+  const getNextLine = () => {
     const line = all[idx % all.length];
     idx += 1;
     return line;
-  }
+  };
 
-  function appendTerminalLine(colEl, line) {
-    const isEgg = EGG_LINES.includes(line);
-    const isCode = line && (line.startsWith('#include') || line.startsWith('import ') || line.startsWith('from ') || line.startsWith('def ') || line.startsWith('class ') || line.startsWith('const ') || line.startsWith('function ') || line.startsWith('int ') || line.startsWith('auto ') || line.startsWith('  ') || line.startsWith('    '));
-    const div = document.createElement('div');
-    div.className = 'term-line ' + (isEgg ? 'hl' : isCode ? 'wht' : 'red');
-    div.textContent = String(line || '\u00A0').replace(/\s+/g, ' ').trim() || '\u00A0';
-    colEl.appendChild(div);
-    while (colEl.children.length > maxLinesPerColumn) colEl.removeChild(colEl.firstChild);
-  }
+  seedRows.forEach(appendTerminalLine);
+  for (let seed = 0; seed < initialLines; seed++) appendTerminalLine(getNextLine());
 
-  for (let i = 0; i < colCount; i++) {
-    const col = document.createElement('div');
-    col.className = 'term-col';
-    stream.appendChild(col);
-    columns.push(col);
-
-    // Front-load each column so animation is visible immediately.
-    for (let seed = 0; seed < initialLinesPerColumn; seed++) {
-      appendTerminalLine(col, getNextLine());
-    }
-
-    const tickMs = 60 + Math.floor(Math.random() * 90);
-    const timer = setInterval(() => {
-      appendTerminalLine(col, getNextLine());
-      if (Math.random() > 0.66) appendTerminalLine(col, getNextLine());
-    }, tickMs);
-    terminalColumnTimers.push(timer);
-  }
-
+  const tickMs = 42 + Math.floor(Math.random() * 38);
   terminalInterval = setInterval(() => {
+    appendTerminalLine(getNextLine());
+    if (Math.random() > 0.58) appendTerminalLine(getNextLine());
+    if (Math.random() > 0.9) appendTerminalLine('');
     if (Date.now() - terminalStartedAt >= minHoldMs) {
       clearInterval(terminalInterval);
       terminalInterval = null;
       endAt();
     }
-  }, 200);
+  }, tickMs);
 }
 
 function stopTerminalAnimation() {
@@ -203,8 +189,6 @@ function stopTerminalAnimation() {
     clearTimeout(terminalEndTimer);
     terminalEndTimer = null;
   }
-  terminalColumnTimers.forEach(timer => clearInterval(timer));
-  terminalColumnTimers = [];
 }
 
 function skipTerminal() {
@@ -370,7 +354,6 @@ async function updateAuthUI(user) {
   const navAuth = document.getElementById('nav-auth');
   const adminLink = document.getElementById('admin-link');
   const submitLink = document.getElementById('submit-link');
-  const shownRole = sessionStorage.getItem('clearanceWelcomedRole');
   const exitEsdButton = user && isOwner(user.email) && SITE_STATE && SITE_STATE.esdLocked
     ? ' <button class="nav-btn" type="button" onclick="updateESDState(false)">Exit ESD</button>'
     : '';
@@ -390,14 +373,14 @@ async function updateAuthUI(user) {
       lastLogin: new Date().toISOString()
     }, { merge: true }).catch(() => { });
 
-    if (shownRole !== currentRole) {
+    if (!clearanceWelcomeShownThisLoad) {
       // Wait for the terminal intro to finish so the welcome is not skipped.
       if (shouldShowTerminal()) {
         showClearanceWelcomeWhenReady(currentRole);
       } else {
         showClearanceWelcome(currentRole);
       }
-      sessionStorage.setItem('clearanceWelcomedRole', currentRole);
+      clearanceWelcomeShownThisLoad = true;
     }
   } else {
     currentUser = null;
@@ -405,14 +388,14 @@ async function updateAuthUI(user) {
     navAuth.innerHTML = '<button class="nav-btn" onclick="openAuth()">Sign In</button>';
     adminLink.classList.add('hidden');
     if (submitLink) submitLink.classList.add('hidden');
-    if (shownRole !== 'guest') {
+    if (!clearanceWelcomeShownThisLoad) {
       // Wait for the terminal intro to finish so the welcome is not skipped.
       if (shouldShowTerminal()) {
         showClearanceWelcomeWhenReady('guest');
       } else {
         showClearanceWelcome('guest');
       }
-      sessionStorage.setItem('clearanceWelcomedRole', 'guest');
+      clearanceWelcomeShownThisLoad = true;
     }
   }
 }
