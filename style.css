@@ -334,12 +334,15 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 @media(max-width:768px){.adm{grid-template-columns:1fr}.adm-side{border-right:none;border-bottom:1px solid var(--red-d)}}
 @media(max-width:768px){
   .adm-main .card div[style*="display:flex"]{
-    flex-direction:column !important;
-    align-items:stretch;
+    flex-direction:row !important;
+    align-items:center;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
   }
   .adm-main .card div[style*="display:flex"] .btn{
-    width:100%;
+    width:auto;
     min-height:44px;
+    flex:0 0 auto;
   }
   .adm-main .card .btn{
     min-height:44px;
