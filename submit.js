@@ -21,12 +21,16 @@ let suppressDraftAutoSave = false;
 let assetSyncTimer = null;
 let assetSyncInFlight = false;
 let lastAssetSyncSignature = '';
+let uploadQueue = [];
+let uploadWorkers = 0;
 const IMAGE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const AUDIO_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const VIDEO_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 const IMAGE_UPLOAD_LIMIT = 5;
 const AUDIO_UPLOAD_LIMIT = 3;
 const VIDEO_UPLOAD_LIMIT = 3;
+const UPLOAD_QUEUE_MAX_PARALLEL = 4;
+const IMAGE_FAST_OPTIMIZE_THRESHOLD_BYTES = 1400000;
 const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
 const ALLOWED_STORAGE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
@@ -236,6 +240,19 @@ function getUploadScopeLabel(kind) {
   if (kind === 'audio') return 'audio file';
   if (kind === 'video') return 'video file';
   return 'image';
+}
+
+function isUploadPendingStatus(status) {
+  return status === 'queued' || status === 'preparing' || status === 'retrying' || status === 'uploading';
+}
+
+function getUploadStatusLabel(status) {
+  if (status === 'ready') return 'Uploaded';
+  if (status === 'failed') return 'Failed';
+  if (status === 'queued') return 'Queued';
+  if (status === 'preparing') return 'Preparing';
+  if (status === 'retrying') return 'Retrying';
+  return 'Uploading';
 }
 
 function applyTypeSubtypeConstraints() {
@@ -2540,8 +2557,8 @@ function handleFiles(files) {
       return;
     }
 
-    const alreadyQueued = uploadedImages.some(img => !img.removed && img.fingerprint === fingerprint && (img.status === 'uploading' || img.status === 'ready'));
-    const alreadyQueuedMedia = uploadedMediaFiles.some(media => !media.removed && media.fingerprint === fingerprint && (media.status === 'uploading' || media.status === 'ready'));
+    const alreadyQueued = uploadedImages.some(img => !img.removed && img.fingerprint === fingerprint && (isUploadPendingStatus(img.status) || img.status === 'ready'));
+    const alreadyQueuedMedia = uploadedMediaFiles.some(media => !media.removed && media.fingerprint === fingerprint && (isUploadPendingStatus(media.status) || media.status === 'ready'));
     if (alreadyQueued) {
       const uploadStatus = document.getElementById('upload-status');
       if (uploadStatus) uploadStatus.textContent = file.name + ' is already queued.';
@@ -2563,11 +2580,7 @@ function handleFiles(files) {
       return;
     }
 
-    if (kind === 'image') {
-      uploadImage(file);
-    } else {
-      uploadSupplementalMedia(file, kind);
-    }
+    enqueueUpload(file, kind);
   });
 }
 
@@ -2832,155 +2845,47 @@ async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
   throw finalErr;
 }
 
-async function uploadImage(file) {
-  if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
-
-  const progressWrap = document.getElementById('upload-progress');
-  const progressBar = document.getElementById('upload-bar');
-  const uploadStatus = document.getElementById('upload-status');
-  if (!progressWrap || !progressBar) {
-    alert('Upload UI is unavailable on this page.');
-    return;
-  }
-
-  progressWrap.style.display = 'block';
-  progressBar.style.width = '0%';
-  if (uploadStatus) uploadStatus.textContent = 'Preparing ' + file.name + '...';
-
-  const activeCount = uploadedImages.filter(img => !img.removed).length;
-  if (activeCount >= IMAGE_UPLOAD_LIMIT) {
-    progressWrap.style.display = 'none';
-    alert('You can attach up to ' + IMAGE_UPLOAD_LIMIT + ' images per submission.');
-    return;
-  }
-
-  if (!isAllowedStorageImage(file)) {
-    progressWrap.style.display = 'none';
-    alert('Only PNG, JPG, GIF, and WebP images can be uploaded.');
-    return;
-  }
-
-  const timestamp = Date.now();
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = 'uploads/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
-  const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
-  const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
-  const preview = createLocalPreviewUrl(file);
-  const localUrl = preview.url || await fileToDataUrl(file);
-  const uploadRecord = {
-    id: uploadId,
-    name: file.name,
-    kind: 'image',
-    file: file,
-    url: localUrl,
-    localUrl: localUrl,
-    remoteUrl: '',
-    status: 'uploading',
-    removed: false,
-    path: path,
-    task: null,
-    caption: '',
-    alt: file.name.replace(/\.[^.]+$/, ''),
-    fingerprint: fingerprint,
-    isObjectUrl: preview.isObjectUrl,
-    timeoutId: null
-  };
-  uploadedImages.push(uploadRecord);
-  renderImageList();
-  refreshImageSelectors();
-
-  console.log('[Upload] Starting upload:', { uid: currentUserForSubmit.uid, path, fileName: file.name, fileSize: file.size });
-
-  function finalizeFailure(msg) {
-    if (uploadRecord.removed) return;
-    uploadRecord.status = 'failed';
-    renderImageList();
-    progressWrap.style.display = 'none';
-    if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '. Click Retry.';
-    console.error('[Upload] Failed:', msg);
-    if (msg) alert(msg);
-    scheduleSubmissionAssetSync();
-  }
-
-  function finalizeSuccess(url) {
-    if (uploadRecord.removed) return;
-    uploadRecord.remoteUrl = url;
-    uploadRecord.url = url;
-    uploadRecord.status = 'ready';
-    renderImageList();
-    refreshImageSelectors();
-    markEditorAsChanged();
-    scheduleDraftAutoSave();
-    progressWrap.style.display = 'none';
-    if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
-    console.log('[Upload] Success:', url);
-    scheduleSubmissionAssetSync();
-  }
+async function maybeOptimizeImageUploadFile(file) {
+  const mime = String(file && file.type ? file.type : '').toLowerCase();
+  if (mime === 'image/gif' || file.size < IMAGE_FAST_OPTIMIZE_THRESHOLD_BYTES) return file;
 
   try {
-    uploadRecord.status = 'uploading';
-    renderImageList();
-    if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + ' to Storage...';
-    progressBar.style.width = '2%';
+    const optimized = await optimizeImageForStorage(file);
+    if (!optimized || !optimized.dataUrl) return file;
 
-    const remoteUrl = await uploadWithBucketFallback(path, file, uploadRecord, snap => {
-      const pct = snap && snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 0;
-      const safePct = Math.max(2, Math.min(100, pct));
-      progressBar.style.width = safePct + '%';
-      if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '... ' + safePct + '%';
+    const response = await fetch(optimized.dataUrl);
+    const blob = await response.blob();
+    if (!blob || !blob.size) return file;
+    if (blob.size >= Math.floor(file.size * 0.95)) return file;
+
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    return new File([blob], baseName + '.jpg', {
+      type: 'image/jpeg',
+      lastModified: Date.now()
     });
-    progressBar.style.width = '100%';
-    finalizeSuccess(remoteUrl);
-    uploadRecord.sizeBytes = file.size;
-    uploadRecord.storageMode = 'storage-download-url';
-    if (uploadStatus) {
-      uploadStatus.textContent = 'Uploaded ' + file.name + ' to Storage.';
-    }
   } catch (err) {
-    const code = err && err.code ? err.code : '';
-    if (code === 'storage/canceled' && uploadRecord.removed) return;
-    finalizeFailure('Image upload failed: ' + (err.message || code || 'Unknown error'));
+    console.warn('[Upload] Image optimization skipped:', err && err.message ? err.message : err);
+    return file;
   }
 }
 
-async function uploadSupplementalMedia(file, kind) {
-  if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
-
-  const progressWrap = document.getElementById('upload-progress');
-  const progressBar = document.getElementById('upload-bar');
-  const uploadStatus = document.getElementById('upload-status');
-  if (!progressWrap || !progressBar) {
-    alert('Upload UI is unavailable on this page.');
-    return;
-  }
-
-  progressWrap.style.display = 'block';
-  progressBar.style.width = '0%';
-  if (uploadStatus) uploadStatus.textContent = 'Preparing ' + file.name + '...';
-
-  const activeCount = getActiveUploadedCount(kind);
-  if (activeCount >= getUploadLimitForKind(kind)) {
-    progressWrap.style.display = 'none';
-    alert('You can attach up to ' + getUploadLimitForKind(kind) + ' ' + getUploadScopeLabel(kind) + (getUploadLimitForKind(kind) > 1 ? 's' : '') + ' per submission.');
-    return;
-  }
-
+function createUploadRecord(file, kind) {
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = 'uploads/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
   const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
   const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
   const preview = createLocalPreviewUrl(file);
-  const localUrl = preview.url || await fileToDataUrl(file);
-  const uploadRecord = {
+
+  return {
     id: uploadId,
     name: file.name,
     kind: kind,
     file: file,
-    url: localUrl,
-    localUrl: localUrl,
+    url: preview.url || '',
+    localUrl: preview.url || '',
     remoteUrl: '',
-    status: 'uploading',
+    status: 'queued',
     removed: false,
     path: path,
     task: null,
@@ -2991,54 +2896,164 @@ async function uploadSupplementalMedia(file, kind) {
     isObjectUrl: preview.isObjectUrl,
     timeoutId: null
   };
-  uploadedMediaFiles.push(uploadRecord);
-  renderMediaList();
+}
 
-  function finalizeFailure(msg) {
-    if (uploadRecord.removed) return;
-    uploadRecord.status = 'failed';
+function queueUploadRecord(record) {
+  const list = record.kind === 'image' ? uploadedImages : uploadedMediaFiles;
+  list.push(record);
+  uploadQueue.push(record.id);
+
+  if (record.kind === 'image') {
+    renderImageList();
+    refreshImageSelectors();
+  } else {
     renderMediaList();
-    progressWrap.style.display = 'none';
-    if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '. Click Retry.';
-    console.error('[Upload] Failed:', msg);
-    if (msg) alert(msg);
-    scheduleSubmissionAssetSync();
   }
 
-  function finalizeSuccess(url) {
-    if (uploadRecord.removed) return;
-    uploadRecord.remoteUrl = url;
-    uploadRecord.url = url;
-    uploadRecord.status = 'ready';
-    renderMediaList();
-    markEditorAsChanged();
-    scheduleDraftAutoSave();
-    progressWrap.style.display = 'none';
-    if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
-    scheduleSubmissionAssetSync();
+  const uploadStatus = document.getElementById('upload-status');
+  if (uploadStatus) uploadStatus.textContent = 'Queued ' + record.name + ' for upload.';
+  scheduleSubmissionAssetSync();
+  pumpUploadQueue();
+}
+
+function enqueueUpload(file, kind) {
+  if (!currentUserForSubmit) {
+    alert('Please sign in first.');
+    return;
   }
+
+  if (kind === 'image' && !isAllowedStorageImage(file)) {
+    alert('Only PNG, JPG, GIF, and WebP images can be uploaded.');
+    return;
+  }
+
+  const progressWrap = document.getElementById('upload-progress');
+  const progressBar = document.getElementById('upload-bar');
+  if (progressWrap && progressBar) {
+    progressWrap.style.display = 'block';
+    progressBar.style.width = '2%';
+  }
+
+  const record = createUploadRecord(file, kind);
+  queueUploadRecord(record);
+
+  if (!record.localUrl) {
+    fileToDataUrl(file).then(dataUrl => {
+      if (record.removed || record.remoteUrl) return;
+      record.localUrl = dataUrl;
+      record.url = dataUrl;
+      if (record.kind === 'image') {
+        renderImageList();
+      } else {
+        renderMediaList();
+      }
+    }).catch(() => { /* ignore preview fallback failure */ });
+  }
+}
+
+async function runQueuedUpload(record) {
+  if (!record || record.removed || !record.file) return;
+
+  const progressWrap = document.getElementById('upload-progress');
+  const progressBar = document.getElementById('upload-bar');
+  const uploadStatus = document.getElementById('upload-status');
 
   try {
-    uploadRecord.status = 'uploading';
-    renderMediaList();
-    if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + ' to Storage...';
-    progressBar.style.width = '2%';
+    record.status = 'preparing';
+    if (record.kind === 'image') {
+      renderImageList();
+      refreshImageSelectors();
+    } else {
+      renderMediaList();
+    }
+    if (uploadStatus) uploadStatus.textContent = 'Preparing ' + record.name + '...';
 
-    const remoteUrl = await uploadWithBucketFallback(path, file, uploadRecord, snap => {
+    let uploadFile = record.file;
+    if (record.kind === 'image') {
+      uploadFile = await maybeOptimizeImageUploadFile(record.file);
+    }
+    if (record.removed) return;
+
+    record.status = 'uploading';
+    if (record.kind === 'image') {
+      renderImageList();
+      refreshImageSelectors();
+    } else {
+      renderMediaList();
+    }
+
+    const remoteUrl = await uploadWithBucketFallback(record.path, uploadFile, record, snap => {
       const pct = snap && snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 0;
       const safePct = Math.max(2, Math.min(100, pct));
-      progressBar.style.width = safePct + '%';
-      if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '... ' + safePct + '%';
+      if (progressBar) progressBar.style.width = safePct + '%';
+      if (uploadStatus) {
+        const queuedCount = uploadQueue.length;
+        uploadStatus.textContent = 'Uploading ' + record.name + '... ' + safePct + '% (' + queuedCount + ' queued)';
+      }
     });
-    progressBar.style.width = '100%';
-    finalizeSuccess(remoteUrl);
-    uploadRecord.sizeBytes = file.size;
-    uploadRecord.storageMode = 'storage-download-url';
+
+    if (record.removed) return;
+    record.remoteUrl = remoteUrl;
+    record.url = remoteUrl;
+    record.status = 'ready';
+    record.sizeBytes = uploadFile.size;
+    record.storageMode = 'storage-download-url';
+
+    if (record.kind === 'image') {
+      renderImageList();
+      refreshImageSelectors();
+    } else {
+      renderMediaList();
+    }
+    markEditorAsChanged();
+    scheduleDraftAutoSave();
+    scheduleSubmissionAssetSync();
+
+    if (progressBar) progressBar.style.width = '100%';
+    if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + record.name + '.';
   } catch (err) {
     const code = err && err.code ? err.code : '';
-    if (code === 'storage/canceled' && uploadRecord.removed) return;
-    finalizeFailure('Media upload failed: ' + (err.message || code || 'Unknown error'));
+    if (code === 'storage/canceled' && record.removed) return;
+
+    record.status = 'failed';
+    if (record.kind === 'image') {
+      renderImageList();
+      refreshImageSelectors();
+    } else {
+      renderMediaList();
+    }
+    scheduleSubmissionAssetSync();
+
+    const msg = (record.kind === 'image' ? 'Image upload failed: ' : 'Media upload failed: ') + (err.message || code || 'Unknown error');
+    console.error('[Upload] Failed:', msg);
+    alert(msg);
+  } finally {
+    if (progressWrap && uploadWorkers <= 1 && uploadQueue.length === 0) {
+      progressWrap.style.display = 'none';
+    }
   }
+}
+
+function pumpUploadQueue() {
+  while (uploadWorkers < UPLOAD_QUEUE_MAX_PARALLEL && uploadQueue.length > 0) {
+    const nextId = uploadQueue.shift();
+    const record = getUploadedMediaRecords().find(item => item.id === nextId && !item.removed);
+    if (!record) continue;
+
+    uploadWorkers++;
+    runQueuedUpload(record).finally(() => {
+      uploadWorkers = Math.max(0, uploadWorkers - 1);
+      pumpUploadQueue();
+    });
+  }
+}
+
+function uploadImage(file) {
+  enqueueUpload(file, 'image');
+}
+
+function uploadSupplementalMedia(file, kind) {
+  enqueueUpload(file, kind);
 }
 
 function renderMediaList() {
@@ -3053,7 +3068,7 @@ function renderMediaList() {
 
   list.innerHTML = media.map((item) => {
     const displayUrl = item.remoteUrl || item.localUrl || item.url || '';
-    const label = item.status === 'ready' ? 'Uploaded' : item.status === 'failed' ? 'Failed' : 'Uploading';
+    const label = getUploadStatusLabel(item.status);
     const preview = item.kind === 'video'
       ? '<video src="' + displayUrl + '" controls playsinline preload="metadata" style="width:100%;max-width:240px;border:1px solid #3a3a3a;background:#111"></video>'
       : '<audio src="' + displayUrl + '" controls preload="metadata" style="width:100%;max-width:240px"></audio>';
@@ -3095,7 +3110,8 @@ function removeUploadedMedia(id) {
   if (index === -1) return;
   const record = uploadedMediaFiles[index];
   record.removed = true;
-  if (record.task && record.status === 'uploading' && typeof record.task.cancel === 'function') {
+  uploadQueue = uploadQueue.filter(queueId => queueId !== id);
+  if (record.task && isUploadPendingStatus(record.status) && typeof record.task.cancel === 'function') {
     try { record.task.cancel(); } catch (e) { /* ignore */ }
   }
   if (record.timeoutId) {
@@ -3156,8 +3172,8 @@ function collectUploadedMediaAssets() {
 }
 
 function getPendingUploadCounts() {
-  const pendingImages = uploadedImages.filter(img => !img.removed && img.status === 'uploading').length;
-  const pendingMedia = uploadedMediaFiles.filter(item => !item.removed && item.status === 'uploading').length;
+  const pendingImages = uploadedImages.filter(img => !img.removed && isUploadPendingStatus(img.status)).length;
+  const pendingMedia = uploadedMediaFiles.filter(item => !item.removed && isUploadPendingStatus(item.status)).length;
   const failedImages = uploadedImages.filter(img => !img.removed && img.status === 'failed').length;
   const failedMedia = uploadedMediaFiles.filter(item => !item.removed && item.status === 'failed').length;
   return {
@@ -3239,7 +3255,7 @@ function renderImageList() {
   const list = document.getElementById('img-list');
   list.innerHTML = uploadedImages.map((img) => {
     const displayUrl = img.remoteUrl || img.localUrl || img.url || '';
-    const label = img.status === 'ready' ? 'Uploaded' : img.status === 'failed' ? 'Failed' : 'Uploading';
+    const label = getUploadStatusLabel(img.status);
     return `
     <div class="img-item">
       <img src="${displayUrl}" alt="${img.name}" />
@@ -3276,7 +3292,8 @@ function removeUploadedImage(id) {
   if (index === -1) return;
   const record = uploadedImages[index];
   record.removed = true;
-  if (record.task && record.status === 'uploading' && typeof record.task.cancel === 'function') {
+  uploadQueue = uploadQueue.filter(queueId => queueId !== id);
+  if (record.task && isUploadPendingStatus(record.status) && typeof record.task.cancel === 'function') {
     try { record.task.cancel(); } catch (e) { /* ignore */ }
   }
   if (record.timeoutId) {
@@ -3628,8 +3645,8 @@ async function submitPage() {
 
   btn.textContent = 'Submitting...';
 
-  const inFlightUploads = uploadedImages.filter(img => !img.removed && img.status === 'uploading');
-  const inFlightMediaUploads = uploadedMediaFiles.filter(item => !item.removed && item.status === 'uploading');
+  const inFlightUploads = uploadedImages.filter(img => !img.removed && isUploadPendingStatus(img.status));
+  const inFlightMediaUploads = uploadedMediaFiles.filter(item => !item.removed && isUploadPendingStatus(item.status));
   const failedUploads = uploadedImages.filter(img => !img.removed && img.status === 'failed');
   const failedMediaUploads = uploadedMediaFiles.filter(item => !item.removed && item.status === 'failed');
   const pendingUploadCount = inFlightUploads.length + inFlightMediaUploads.length;
