@@ -13,6 +13,7 @@ let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
 let docBlocks = [];
 let activeDocEditable = null;
 let docDragIndex = -1;
+let mediaDragReorderEnabled = false;
 let submitEditTarget = null;
 let activeDraftId = null;
 let draftAutoSaveTimer = null;
@@ -53,6 +54,7 @@ const nativeSubmitAlert = window.alert.bind(window);
 let submitAlertModal = null;
 
 const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
+const DOC_MEDIA_DRAG_SETTING_KEY = 'rog-doc-media-drag-enabled';
 const DRAFT_AUTOSAVE_MIN_WORDS = 150;
 
 function closeSubmitAlertModal() {
@@ -1740,6 +1742,10 @@ function getUploadedImageOptions(selected) {
   return options.join('');
 }
 
+function isMediaDocBlockType(type) {
+  return type === 'image' || type === 'audio' || type === 'video';
+}
+
 function renderDocBlocks() {
   const holder = document.getElementById('doc-blocks');
   if (!holder) return;
@@ -1750,10 +1756,14 @@ function renderDocBlocks() {
   }
 
   holder.innerHTML = docBlocks.map((block, idx) => {
+    const canDragThisBlock = mediaDragReorderEnabled && isMediaDocBlockType(block.type);
+    const dragHint = canDragThisBlock
+      ? 'Drag to reorder this media block'
+      : 'Enable Media Drag Reorder to drag image/audio/video blocks';
     const head = '<div class="doc-block-head"><strong style="font-size:.8rem;color:var(--wht-b);text-transform:uppercase;letter-spacing:1px">' +
       escapeHtml(block.type) +
       '</strong><div class="doc-block-actions">' +
-      '<button class="btn btn-sm btn-s doc-drag-handle" draggable="true" type="button" title="Drag to move" data-action="drag" data-index="' + idx + '">↕</button>' +
+      '<button class="btn btn-sm btn-s doc-drag-handle" draggable="' + (canDragThisBlock ? 'true' : 'false') + '" type="button" title="' + dragHint + '" data-action="drag" data-index="' + idx + '"' + (canDragThisBlock ? '' : ' disabled aria-disabled="true"') + '>↕</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="up" data-index="' + idx + '">↑</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="down" data-index="' + idx + '">↓</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="duplicate" data-index="' + idx + '">Clone</button>' +
@@ -1857,7 +1867,36 @@ function initDocumentStudio() {
   const holder = document.getElementById('doc-blocks');
   const formatSelect = document.getElementById('doc-format-select');
   const linkBtn = document.getElementById('doc-link-btn');
+  const mediaReorderToggle = document.getElementById('doc-media-reorder-toggle');
   if (!toolbar || !adders || !holder) return;
+
+  try {
+    mediaDragReorderEnabled = localStorage.getItem(DOC_MEDIA_DRAG_SETTING_KEY) === '1';
+  } catch (_err) {
+    mediaDragReorderEnabled = false;
+  }
+
+  function syncMediaReorderToggle() {
+    if (!mediaReorderToggle) return;
+    mediaReorderToggle.textContent = 'Media Drag Reorder: ' + (mediaDragReorderEnabled ? 'On' : 'Off');
+    mediaReorderToggle.setAttribute('aria-pressed', mediaDragReorderEnabled ? 'true' : 'false');
+    mediaReorderToggle.classList.toggle('btn-p', mediaDragReorderEnabled);
+    mediaReorderToggle.classList.toggle('btn-s', !mediaDragReorderEnabled);
+  }
+
+  if (mediaReorderToggle) {
+    mediaReorderToggle.addEventListener('click', () => {
+      mediaDragReorderEnabled = !mediaDragReorderEnabled;
+      try {
+        localStorage.setItem(DOC_MEDIA_DRAG_SETTING_KEY, mediaDragReorderEnabled ? '1' : '0');
+      } catch (_err) {
+        /* ignore storage write issues */
+      }
+      syncMediaReorderToggle();
+      renderDocBlocks();
+    });
+  }
+  syncMediaReorderToggle();
 
   if (!docBlocks.length) {
     docBlocks = [
@@ -1931,12 +1970,15 @@ function initDocumentStudio() {
   holder.addEventListener('dragstart', e => {
     const handle = e.target.closest('.doc-drag-handle');
     if (!handle) return;
+    if (!mediaDragReorderEnabled || handle.disabled) return;
     const block = handle.closest('.doc-block');
     if (!block) return;
     docDragIndex = Number(block.getAttribute('data-index'));
-    if (Number.isFinite(docDragIndex)) {
+    if (Number.isFinite(docDragIndex) && isMediaDocBlockType((docBlocks[docDragIndex] || {}).type)) {
       e.dataTransfer.effectAllowed = 'move';
       block.style.opacity = '0.45';
+    } else {
+      docDragIndex = -1;
     }
   });
 
@@ -1948,6 +1990,7 @@ function initDocumentStudio() {
   });
 
   holder.addEventListener('dragover', e => {
+    if (!mediaDragReorderEnabled || docDragIndex < 0) return;
     e.preventDefault();
     const targetBlock = e.target.closest('.doc-block');
     if (!targetBlock) return;
@@ -1956,12 +1999,16 @@ function initDocumentStudio() {
   });
 
   holder.addEventListener('drop', e => {
+    if (!mediaDragReorderEnabled || docDragIndex < 0) return;
     e.preventDefault();
     const targetBlock = e.target.closest('.doc-block');
     if (!targetBlock || !Number.isFinite(docDragIndex) || docDragIndex < 0) return;
 
     const targetIndex = Number(targetBlock.getAttribute('data-index'));
     if (!Number.isFinite(targetIndex) || targetIndex === docDragIndex) return;
+
+    const dragged = docBlocks[docDragIndex];
+    if (!dragged || !isMediaDocBlockType(dragged.type)) return;
 
     const moved = docBlocks.splice(docDragIndex, 1)[0];
     const insertAt = docDragIndex < targetIndex ? targetIndex : targetIndex;
