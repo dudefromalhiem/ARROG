@@ -433,6 +433,10 @@ function showAuthError(msg) {
 async function handleAuth() {
   const email = document.getElementById('auth-email').value;
   const pass = document.getElementById('auth-pass').value;
+  if (!auth || typeof auth.signInWithEmailAndPassword !== 'function') {
+    showAuthError('Authentication is not initialized yet. Refresh the page and try again.');
+    return;
+  }
   try {
     if (authMode === 'login') {
       await auth.signInWithEmailAndPassword(email, pass);
@@ -446,6 +450,10 @@ async function handleAuth() {
 async function handleForgotPassword() {
   const emailField = document.getElementById('auth-email');
   const email = String(emailField && emailField.value ? emailField.value : '').trim();
+  if (!auth || typeof auth.sendPasswordResetEmail !== 'function') {
+    showAuthError('Password reset is unavailable because authentication is not initialized. Refresh the page and try again.');
+    return;
+  }
   if (!email) {
     showAuthError('Enter the email address for the account you want to recover.');
     return;
@@ -460,10 +468,27 @@ async function handleForgotPassword() {
 }
 
 async function handleGoogle() {
+  if (!auth || typeof auth.signInWithPopup !== 'function') {
+    showAuthError('Google sign-in is unavailable because authentication is not initialized. Refresh the page and try again.');
+    return;
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
   try {
-    await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    await auth.signInWithPopup(provider);
     closeAuth();
-  } catch (e) { showAuthError(e.message); }
+  } catch (e) {
+    const code = e && e.code ? e.code : '';
+    if (code === 'auth/popup-blocked' || code === 'auth/web-storage-unsupported') {
+      try {
+        await auth.signInWithRedirect(provider);
+        return;
+      } catch (redirectErr) {
+        showAuthError(redirectErr.message || 'Google sign-in failed.');
+        return;
+      }
+    }
+    showAuthError(e.message || 'Google sign-in failed.');
+  }
 }
 
 async function updateAuthUI(user) {

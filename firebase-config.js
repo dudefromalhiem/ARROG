@@ -17,7 +17,11 @@ firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
+const storage = typeof firebase.storage === 'function' ? firebase.storage() : null;
+
+if (!storage) {
+  console.warn('[Firebase] Storage SDK not loaded on this page. Auth and Firestore remain available.');
+}
 
 if (!document.getElementById('auth-pending-style')) {
   const style = document.createElement('style');
