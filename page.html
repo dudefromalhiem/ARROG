@@ -21,7 +21,6 @@
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
-      <li><a href="registry.html">Registry</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
@@ -305,10 +304,11 @@ function escapeHtml(value) {
 }
 
 function normalizeImageAssets(imageUrls, imageAssets) {
+  const normalizeUrl = (url) => normalizeStorageAssetUrl(url);
   const assets = Array.isArray(imageAssets)
     ? imageAssets
       .map(asset => ({
-        url: String(asset && asset.url || '').trim(),
+        url: normalizeUrl(String(asset && asset.url || '').trim()),
         alt: String(asset && asset.alt || '').trim(),
         caption: String(asset && asset.caption || '').trim()
       }))
@@ -316,15 +316,16 @@ function normalizeImageAssets(imageUrls, imageAssets) {
     : [];
 
   if (assets.length) return assets;
-  return (Array.isArray(imageUrls) ? imageUrls : []).filter(Boolean).map(url => ({ url: String(url), alt: '', caption: '' }));
+  return (Array.isArray(imageUrls) ? imageUrls : []).filter(Boolean).map(url => ({ url: normalizeUrl(String(url)), alt: '', caption: '' }));
 }
 
 function normalizeMediaAssets(mediaUrls, mediaAssets) {
+  const normalizeUrl = (url) => normalizeStorageAssetUrl(url);
   const assets = Array.isArray(mediaAssets)
     ? mediaAssets
       .map(asset => ({
         kind: String(asset && asset.kind || '').toLowerCase(),
-        url: String(asset && asset.url || '').trim(),
+        url: normalizeUrl(String(asset && asset.url || '').trim()),
         alt: String(asset && asset.alt || '').trim(),
         caption: String(asset && asset.caption || '').trim(),
         label: String(asset && asset.label || asset.title || asset.name || '').trim()
@@ -333,7 +334,46 @@ function normalizeMediaAssets(mediaUrls, mediaAssets) {
     : [];
 
   if (assets.length) return assets.filter(asset => asset.kind === 'audio' || asset.kind === 'video');
-  return (Array.isArray(mediaUrls) ? mediaUrls : []).filter(Boolean).map(url => ({ url: String(url), kind: 'audio', alt: '', caption: '', label: '' }));
+  return (Array.isArray(mediaUrls) ? mediaUrls : []).filter(Boolean).map(url => ({ url: normalizeUrl(String(url)), kind: 'audio', alt: '', caption: '', label: '' }));
+}
+
+function normalizeStorageAssetUrl(rawUrl) {
+  const input = String(rawUrl || '').trim();
+  if (!input) return '';
+
+  const configured = (typeof firebaseConfig !== 'undefined' && firebaseConfig && firebaseConfig.storageBucket)
+    ? String(firebaseConfig.storageBucket).replace(/^gs:\/\//, '')
+    : '';
+  const projectId = (typeof firebaseConfig !== 'undefined' && firebaseConfig && firebaseConfig.projectId)
+    ? String(firebaseConfig.projectId).trim()
+    : '';
+  const preferredBucket = configured || (projectId ? (projectId + '.firebasestorage.app') : '');
+
+  if (/^gs:\/\//i.test(input)) {
+    const match = input.match(/^gs:\/\/([^\/]+)\/(.+)$/i);
+    if (!match) return input;
+    const bucket = match[1];
+    const objectPath = match[2].replace(/^\/+/, '');
+    return 'https://firebasestorage.googleapis.com/v0/b/' + bucket + '/o/' + encodeURIComponent(objectPath) + '?alt=media';
+  }
+
+  const firebaseApiMatch = input.match(/^https?:\/\/firebasestorage\.googleapis\.com\/v0\/b\/([^\/]+)\/o\/([^?]+)(\?.*)?$/i);
+  if (firebaseApiMatch) {
+    const bucket = firebaseApiMatch[1];
+    const objectEncoded = firebaseApiMatch[2];
+    const query = firebaseApiMatch[3] || '';
+    const aliases = new Set([
+      bucket,
+      preferredBucket,
+      projectId ? (projectId + '.appspot.com') : '',
+      projectId ? (projectId + '.firebasestorage.app') : ''
+    ]);
+    const usePreferred = preferredBucket && aliases.has(bucket);
+    const nextBucket = usePreferred ? preferredBucket : bucket;
+    return 'https://firebasestorage.googleapis.com/v0/b/' + nextBucket + '/o/' + objectEncoded + query;
+  }
+
+  return input;
 }
 
 function applyImageCaptions(html, imageAssets) {

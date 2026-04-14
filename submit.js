@@ -2697,6 +2697,47 @@ function getStorageBucketCandidates() {
   return candidates.filter((bucket, idx) => bucket && candidates.indexOf(bucket) === idx);
 }
 
+function getPreferredStorageBucket() {
+  const configured = (firebaseConfig && firebaseConfig.storageBucket) ? String(firebaseConfig.storageBucket).replace(/^gs:\/\//, '') : '';
+  if (configured) return configured;
+  const projectId = (firebaseConfig && firebaseConfig.projectId) ? String(firebaseConfig.projectId).trim() : '';
+  return projectId ? (projectId + '.firebasestorage.app') : '';
+}
+
+function normalizeStorageAssetUrl(rawUrl) {
+  const input = String(rawUrl || '').trim();
+  if (!input) return '';
+
+  const preferredBucket = getPreferredStorageBucket();
+  const projectId = (firebaseConfig && firebaseConfig.projectId) ? String(firebaseConfig.projectId).trim() : '';
+
+  if (/^gs:\/\//i.test(input)) {
+    const match = input.match(/^gs:\/\/([^\/]+)\/(.+)$/i);
+    if (!match) return input;
+    const bucket = match[1];
+    const objectPath = match[2].replace(/^\/+/, '');
+    return 'https://firebasestorage.googleapis.com/v0/b/' + bucket + '/o/' + encodeURIComponent(objectPath) + '?alt=media';
+  }
+
+  const firebaseApiMatch = input.match(/^https?:\/\/firebasestorage\.googleapis\.com\/v0\/b\/([^\/]+)\/o\/([^?]+)(\?.*)?$/i);
+  if (firebaseApiMatch) {
+    const bucket = firebaseApiMatch[1];
+    const objectEncoded = firebaseApiMatch[2];
+    const query = firebaseApiMatch[3] || '';
+    const aliases = new Set([
+      bucket,
+      preferredBucket,
+      projectId ? (projectId + '.appspot.com') : '',
+      projectId ? (projectId + '.firebasestorage.app') : ''
+    ]);
+    const usePreferred = preferredBucket && aliases.has(bucket);
+    const nextBucket = usePreferred ? preferredBucket : bucket;
+    return 'https://firebasestorage.googleapis.com/v0/b/' + nextBucket + '/o/' + objectEncoded + query;
+  }
+
+  return input;
+}
+
 function getStorageMimeType(file) {
   const mimeType = String(file && file.type ? file.type : '').toLowerCase();
   if (ALLOWED_STORAGE_IMAGE_TYPES.has(mimeType) || ALLOWED_STORAGE_AUDIO_TYPES.has(mimeType) || ALLOWED_STORAGE_VIDEO_TYPES.has(mimeType)) {
@@ -2993,8 +3034,9 @@ async function runQueuedUpload(record) {
     });
 
     if (record.removed) return;
-    record.remoteUrl = remoteUrl;
-    record.url = remoteUrl;
+    const normalizedUrl = normalizeStorageAssetUrl(remoteUrl);
+    record.remoteUrl = normalizedUrl;
+    record.url = normalizedUrl;
     record.status = 'ready';
     record.sizeBytes = uploadFile.size;
     record.storageMode = 'storage-download-url';
@@ -3152,7 +3194,7 @@ function collectUploadedMediaAssets() {
     .filter(img => !img.removed && img.remoteUrl)
     .map(img => ({
       kind: 'image',
-      url: img.remoteUrl,
+      url: normalizeStorageAssetUrl(img.remoteUrl),
       alt: img.alt || img.name || '',
       caption: img.caption || '',
       label: img.name || ''
@@ -3162,7 +3204,7 @@ function collectUploadedMediaAssets() {
     .filter(item => !item.removed && item.remoteUrl)
     .map(item => ({
       kind: item.kind,
-      url: item.remoteUrl,
+      url: normalizeStorageAssetUrl(item.remoteUrl),
       alt: item.alt || item.name || '',
       caption: item.caption || '',
       label: item.label || item.name || ''
