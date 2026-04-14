@@ -55,6 +55,73 @@ function normalizeTags(tags) {
   return Array.isArray(tags) ? tags.map(tag => String(tag || '').trim()).filter(Boolean) : [];
 }
 
+const ANOMALY_SUBTYPE_RULES = {
+  ROS: {
+    label: 'Red Oaker Specimen',
+    listKey: 'ROS',
+    hint: 'ROS format: ROS-0001 (digits only after ROS-).',
+    pattern: /^ROS-\d{1,4}$/
+  },
+  SLOA: {
+    label: 'Specimen Linked Anomalous Object',
+    listKey: 'SLOA',
+    hint: 'SLOA format: SLOA-001A (1-3 digits + trailing letter).',
+    pattern: /^SLOA-\d{1,3}[A-Z]$/
+  },
+  SOA: {
+    label: 'Sentient or Accursed Object',
+    listKey: 'SOA',
+    hint: 'SOA format: SOA-0001 (digits only after SOA-).',
+    pattern: /^SOA-\d{1,4}$/
+  },
+  SCTOR: {
+    label: 'Standard Cross Testing Operations Report',
+    listKey: 'SCTOR',
+    hint: 'SCTOR format: SCTOR: 01',
+    pattern: /^SCTOR:\s*\d{2,}$/
+  },
+  TL: {
+    label: 'Termination Logs',
+    listKey: 'TL',
+    hint: 'TL format: TL: 01',
+    pattern: /^TL:\s*\d{2,}$/
+  }
+};
+
+function validateAnomalyPayloadOrThrow(payload, options = {}) {
+  if (payload.type !== 'Anomaly') return;
+
+  const subtype = String(payload.anomalySubtype || '').toUpperCase().trim();
+  const anomalyId = String(payload.anomalyId || '').toUpperCase().trim();
+  const rule = ANOMALY_SUBTYPE_RULES[subtype];
+
+  if (!rule) {
+    const err = new Error('Please select a valid anomaly submission type.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!rule.pattern.test(anomalyId)) {
+    const err = new Error(rule.hint);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  payload.anomalySubtype = subtype;
+  payload.anomalyId = anomalyId;
+  payload.anomalyListKey = rule.listKey;
+  payload.anomalySubtypeLabel = rule.label;
+
+  if (options.enforceTitlePrefix) {
+    const title = String(payload.title || '').toUpperCase().trim();
+    if (!title.startsWith(anomalyId)) {
+      const err = new Error('Anomaly titles must begin with the exact designation.');
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+}
+
 async function verifyUser(req) {
   const app = initAdmin();
   const token = getBearerToken(req);
@@ -116,10 +183,12 @@ function buildSubmissionPayload(body, actor) {
   const slug = String(payload.slug || '').trim();
   const htmlContent = sanitizeHtmlContent(payload.htmlContent || '');
   const cssContent = sanitizeCssOrThrow(payload.cssContent || '');
+  const anomalySubtype = String(payload.anomalySubtype || '').toUpperCase().trim();
+  const anomalyId = String(payload.anomalyId || '').toUpperCase().trim();
   return {
     title,
-    anomalyId: String(payload.anomalyId || '').trim(),
-    anomalySubtype: String(payload.anomalySubtype || '').trim(),
+    anomalyId,
+    anomalySubtype,
     anomalySubtypeLabel: String(payload.anomalySubtypeLabel || '').trim(),
     anomalyListKey: String(payload.anomalyListKey || '').trim(),
     type: String(payload.type || 'Page').trim(),
@@ -296,6 +365,8 @@ module.exports = async function handler(req, res) {
     if (action === 'submit' || action === 'publish') {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = action === 'publish' ? 'approved' : 'pending';
+
+      validateAnomalyPayloadOrThrow(payload, { enforceTitlePrefix: true });
 
       if (action === 'publish' && !adminAccess) {
         return sendJson(res, 403, { error: 'Admin access required.' });
