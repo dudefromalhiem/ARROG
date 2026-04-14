@@ -303,9 +303,10 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 @keyframes fadeOut{from{opacity:1};to{opacity:0}}
 .term-skip{position:fixed;bottom:20px;right:20px;z-index:10020;background:rgba(0,0,0,.88);padding:10px 14px;border:1px solid var(--red-d);backdrop-filter:blur(1px);pointer-events:auto}
 .term-skip .btn{pointer-events:auto}
-.term.mobile .term-body{padding:10px 10px 8px;font-size:11px}
-.term.mobile .term-stream{min-height:72vh}
-.term.mobile .term-code{padding:8px 8px;gap:2px}
+.term.mobile .term-body{padding:10px 10px 8px;font-size:11px;overflow-y:auto;-ms-overflow-style:none;scrollbar-width:none;overscroll-behavior:contain}
+.term.mobile .term-body::-webkit-scrollbar{width:0;height:0;display:none}
+.term.mobile .term-stream{min-height:72vh;height:auto;overflow:visible}
+.term.mobile .term-code{position:relative;inset:auto;padding:8px 8px 18vh;gap:2px}
 .term.mobile .term-row{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;text-overflow:clip;min-height:0;line-height:1.32;filter:none}
 .term.hidden{display:none}
 
@@ -337,6 +338,14 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .adm-tbl tr:hover{background:rgba(139,0,0,.05)}
 @media(max-width:768px){.adm{grid-template-columns:1fr}.adm-side{border-right:none;border-bottom:1px solid var(--red-d)}}
 @media(max-width:768px){
+  .adm-side a{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:40px;
+    padding:10px 12px;
+    line-height:1;
+  }
   .adm-main .card div[style*="display:flex"]{
     flex-direction:row !important;
     align-items:center;

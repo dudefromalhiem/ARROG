@@ -4,6 +4,7 @@
  * ═══════════════════════════════════════════════════════════════ */
 
 let uploadedImages = [];
+let uploadedMediaFiles = [];
 let currentUserForSubmit = null;
 let previewDebounce = null;
 let currentMode = 'template'; // 'template' | 'doc' | 'code'
@@ -17,13 +18,17 @@ let activeDraftId = null;
 let draftAutoSaveTimer = null;
 let draftSaveInFlight = false;
 let suppressDraftAutoSave = false;
-const UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
+const IMAGE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const AUDIO_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const VIDEO_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+const IMAGE_UPLOAD_LIMIT = 5;
+const AUDIO_UPLOAD_LIMIT = 3;
+const VIDEO_UPLOAD_LIMIT = 3;
 const UPLOAD_STALL_CHECK_MS = 15000;
 const UPLOAD_STALL_TIMEOUT_MS = 300000;
-const FIRESTORE_IMAGE_MAX_BYTES = 250 * 1024;
-const FIRESTORE_IMAGE_MAX_DIMENSION = 1280;
-const FIRESTORE_IMAGE_LIMIT = 5;
 const ALLOWED_STORAGE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+const ALLOWED_STORAGE_AUDIO_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4']);
+const ALLOWED_STORAGE_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg', 'video/x-matroska']);
 const BASE_TAG_OPTIONS = [
   'object', 'animal', 'humanoid', 'plant', 'artifact', 'document', 'digital',
   'memetic', 'cognitohazard', 'spatial', 'temporal', 'biological', 'dangerous',
@@ -172,6 +177,62 @@ function isAnomalyFamilyType(rawType) {
 function isNarrativeFamilyType(rawType) {
   const type = String(rawType || '').trim();
   return type === 'Tale' || type === 'Report';
+}
+
+function isMediaEnabledSubmissionType(rawType) {
+  return isAnomalyFamilyType(rawType) || isNarrativeFamilyType(rawType);
+}
+
+function getSelectedSubmissionType() {
+  return String(document.getElementById('sf-type')?.value || '').trim();
+}
+
+function getStorageMediaKind(file) {
+  const mimeType = String(file && file.type ? file.type : '').toLowerCase();
+  if (ALLOWED_STORAGE_IMAGE_TYPES.has(mimeType)) return 'image';
+  if (ALLOWED_STORAGE_AUDIO_TYPES.has(mimeType)) return 'audio';
+  if (ALLOWED_STORAGE_VIDEO_TYPES.has(mimeType)) return 'video';
+
+  const extension = String(file && file.name ? file.name : '').toLowerCase().split('.').pop();
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension)) return 'image';
+  if (['mp3', 'mpeg', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'webm'].includes(extension)) return 'audio';
+  if (['mp4', 'mov', 'qt', 'webm', 'ogv', 'mkv'].includes(extension)) return 'video';
+  return '';
+}
+
+function getUploadLimitForKind(kind) {
+  if (kind === 'audio') return AUDIO_UPLOAD_LIMIT;
+  if (kind === 'video') return VIDEO_UPLOAD_LIMIT;
+  return IMAGE_UPLOAD_LIMIT;
+}
+
+function getUploadMaxBytesForKind(kind) {
+  if (kind === 'audio') return AUDIO_UPLOAD_MAX_BYTES;
+  if (kind === 'video') return VIDEO_UPLOAD_MAX_BYTES;
+  return IMAGE_UPLOAD_MAX_BYTES;
+}
+
+function isAllowedStorageMedia(file) {
+  return !!getStorageMediaKind(file);
+}
+
+function getUploadedMediaCollection(kind) {
+  if (kind === 'image') return uploadedImages;
+  return uploadedMediaFiles;
+}
+
+function getUploadedMediaRecords() {
+  return uploadedImages.concat(uploadedMediaFiles);
+}
+
+function getActiveUploadedCount(kind) {
+  return getUploadedMediaCollection(kind).filter(item => !item.removed).length;
+}
+
+function getUploadScopeLabel(kind) {
+  if (kind === 'audio') return 'audio file';
+  if (kind === 'video') return 'video file';
+  return 'image';
 }
 
 function applyTypeSubtypeConstraints() {
@@ -589,9 +650,10 @@ function extractWordCountFromHtml(html) {
   return text.split(' ').filter(Boolean).length;
 }
 
-function hasDraftImage(contentHtml, uploadedAssets) {
-  if (Array.isArray(uploadedAssets) && uploadedAssets.length > 0) return true;
-  return /<img\b/i.test(String(contentHtml || ''));
+function hasDraftMedia(contentHtml, imageAssets, mediaAssets) {
+  if (Array.isArray(imageAssets) && imageAssets.length > 0) return true;
+  if (Array.isArray(mediaAssets) && mediaAssets.length > 0) return true;
+  return /<(img|audio|video)\b/i.test(String(contentHtml || ''));
 }
 
 function buildCurrentEditorContent(requireContent) {
@@ -703,16 +765,10 @@ async function saveDraft(options = {}) {
     };
   }
 
-  const uploadedAssets = uploadedImages
-    .filter(img => !img.removed && img.remoteUrl)
-    .map(img => ({
-      url: img.remoteUrl,
-      alt: img.alt || img.name || '',
-      caption: img.caption || ''
-    }));
+  const uploadedAssets = collectUploadedMediaAssets();
 
   const wordCount = extractWordCountFromHtml(content.htmlContent || '');
-  const hasImage = hasDraftImage(content.htmlContent || '', uploadedAssets);
+  const hasImage = hasDraftMedia(content.htmlContent || '', uploadedAssets.imageAssets, uploadedAssets.mediaAssets);
   const meaningfulCss = String(content.cssContent || '').trim().length > 0;
   const isEmpty = !title && !slug && !tags.length && wordCount === 0 && !meaningfulCss && !hasImage;
   if (isEmpty) {
@@ -726,7 +782,7 @@ async function saveDraft(options = {}) {
       return null;
     }
     if (!hasImage) {
-      setDraftStatus('Autosave skipped: add at least one image before autosaving.');
+      setDraftStatus('Autosave skipped: add at least one image, audio, or video before autosaving.');
       return null;
     }
   }
@@ -737,7 +793,8 @@ async function saveDraft(options = {}) {
     return null;
   }
 
-  const uploadedUrls = uploadedAssets.map(asset => asset.url);
+  const uploadedUrls = uploadedAssets.imageAssets.map(asset => asset.url);
+  const uploadedMediaUrls = uploadedAssets.mediaAssets.map(asset => asset.url);
   const sanitizedHTML = sanitizeHTML(content.htmlContent || '');
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title || 'Untitled Draft');
   const mergedCSS = mergeWithDefaultSchemaCSS(content.cssContent || '');
@@ -754,7 +811,9 @@ async function saveDraft(options = {}) {
     htmlContent: wrappedHTML,
     cssContent: mergedCSS,
     imageUrls: uploadedUrls,
-    imageAssets: uploadedAssets,
+    imageAssets: uploadedAssets.imageAssets,
+    mediaUrls: uploadedMediaUrls,
+    mediaAssets: uploadedAssets.mediaAssets,
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
@@ -825,10 +884,14 @@ async function continueDraftSubmission(id) {
     const draftAssets = Array.isArray(draft.imageAssets) && draft.imageAssets.length
       ? draft.imageAssets
       : (Array.isArray(draft.imageUrls) ? draft.imageUrls.map(url => ({ url: url, caption: '', alt: '' })) : []);
+    const draftMediaAssets = Array.isArray(draft.mediaAssets) && draft.mediaAssets.length
+      ? draft.mediaAssets
+      : (Array.isArray(draft.mediaUrls) ? draft.mediaUrls.map(url => ({ url: url, caption: '', alt: '', kind: 'audio' })) : []);
 
     uploadedImages = draftAssets.map((asset, idx) => ({
-      id: 'draft_' + idx + '_' + Date.now(),
+      id: 'draft_image_' + idx + '_' + Date.now(),
       name: 'Draft image ' + (idx + 1),
+      kind: 'image',
       url: String(asset.url || ''),
       localUrl: String(asset.url || ''),
       remoteUrl: String(asset.url || ''),
@@ -837,9 +900,26 @@ async function continueDraftSubmission(id) {
       file: null,
       caption: String(asset.caption || ''),
       alt: String(asset.alt || ''),
-      fingerprint: 'draft-' + idx
+      label: String(asset.label || ''),
+      fingerprint: 'draft-image-' + idx
+    }));
+    uploadedMediaFiles = draftMediaAssets.map((asset, idx) => ({
+      id: 'draft_media_' + idx + '_' + Date.now(),
+      name: 'Draft media ' + (idx + 1),
+      kind: String(asset.kind || 'audio').toLowerCase(),
+      url: String(asset.url || ''),
+      localUrl: String(asset.url || ''),
+      remoteUrl: String(asset.url || ''),
+      status: 'ready',
+      removed: false,
+      file: null,
+      caption: String(asset.caption || ''),
+      alt: String(asset.alt || ''),
+      label: String(asset.label || asset.title || ''),
+      fingerprint: 'draft-media-' + idx
     }));
     renderImageList();
+    renderMediaList();
     refreshImageSelectors();
 
     updateTypeSpecificUI();
@@ -1014,6 +1094,44 @@ async function initializeSubmitEditModeFromUrl() {
 
     document.getElementById('sf-html').value = page.htmlContent || DEFAULT_NEW_PAGE_HTML;
     document.getElementById('sf-css').value = page.cssContent || '';
+
+    uploadedImages = Array.isArray(page.imageAssets) && page.imageAssets.length
+      ? page.imageAssets.map((asset, idx) => ({
+          id: 'page_image_' + idx + '_' + Date.now(),
+          name: 'Page image ' + (idx + 1),
+          kind: 'image',
+          url: String(asset.url || ''),
+          localUrl: String(asset.url || ''),
+          remoteUrl: String(asset.url || ''),
+          status: 'ready',
+          removed: false,
+          file: null,
+          caption: String(asset.caption || ''),
+          alt: String(asset.alt || ''),
+          label: String(asset.label || ''),
+          fingerprint: 'page-image-' + idx
+        }))
+      : [];
+    uploadedMediaFiles = Array.isArray(page.mediaAssets) && page.mediaAssets.length
+      ? page.mediaAssets.map((asset, idx) => ({
+          id: 'page_media_' + idx + '_' + Date.now(),
+          name: 'Page media ' + (idx + 1),
+          kind: String(asset.kind || 'audio').toLowerCase(),
+          url: String(asset.url || ''),
+          localUrl: String(asset.url || ''),
+          remoteUrl: String(asset.url || ''),
+          status: 'ready',
+          removed: false,
+          file: null,
+          caption: String(asset.caption || ''),
+          alt: String(asset.alt || ''),
+          label: String(asset.label || asset.title || ''),
+          fingerprint: 'page-media-' + idx
+        }))
+      : [];
+    renderImageList();
+    renderMediaList();
+    refreshImageSelectors();
 
     const content = String(page.htmlContent || '');
     const isGuide = String(page.type || '') === 'Guide';
@@ -1275,6 +1393,34 @@ function updateTypeSpecificUI() {
     switchMode('template');
     selectTemplate('guide');
     setGuideSectionsFixedStructure();
+  }
+
+  updateUploadZoneCopy();
+}
+
+function updateUploadZoneCopy() {
+  const zone = document.getElementById('upload-zone');
+  const title = document.querySelector('#upload-zone .uz-text');
+  const hint = document.querySelector('#upload-zone .uz-hint');
+  const type = getSelectedSubmissionType();
+  const mediaEnabled = isMediaEnabledSubmissionType(type);
+
+  if (zone) {
+    zone.setAttribute('aria-label', mediaEnabled
+      ? 'Choose image, audio, or video files to upload'
+      : 'Choose image files to upload');
+  }
+
+  if (title) {
+    title.textContent = mediaEnabled
+      ? 'Click or drag images, audio, or video here to upload'
+      : 'Click or drag images here to upload';
+  }
+
+  if (hint) {
+    hint.textContent = mediaEnabled
+      ? 'Images are available for all page types. Audio and video are limited to Tale and Anomaly submissions.'
+      : 'Images are available for all page types. Audio and video are disabled for this submission type.';
   }
 }
 
@@ -2370,24 +2516,55 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function handleFiles(files) {
+  const selectedType = getSelectedSubmissionType();
   Array.from(files).forEach(file => {
     const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
+    const kind = getStorageMediaKind(file);
+    const isMediaEnabled = isMediaEnabledSubmissionType(selectedType);
+
+    if (!kind) {
+      alert('Unsupported file type: ' + file.name);
+      return;
+    }
+
+    if ((kind === 'audio' || kind === 'video') && !isMediaEnabled) {
+      alert('Audio and video uploads are available only for Tale and Anomaly submissions.');
+      return;
+    }
+
+    if (getActiveUploadedCount(kind) >= getUploadLimitForKind(kind)) {
+      alert('You can attach up to ' + getUploadLimitForKind(kind) + ' ' + getUploadScopeLabel(kind) + (getUploadLimitForKind(kind) > 1 ? 's' : '') + ' per submission.');
+      return;
+    }
+
     const alreadyQueued = uploadedImages.some(img => !img.removed && img.fingerprint === fingerprint && (img.status === 'uploading' || img.status === 'ready'));
+    const alreadyQueuedMedia = uploadedMediaFiles.some(media => !media.removed && media.fingerprint === fingerprint && (media.status === 'uploading' || media.status === 'ready'));
     if (alreadyQueued) {
       const uploadStatus = document.getElementById('upload-status');
       if (uploadStatus) uploadStatus.textContent = file.name + ' is already queued.';
       return;
     }
+    if (alreadyQueuedMedia) {
+      const uploadStatus = document.getElementById('upload-status');
+      if (uploadStatus) uploadStatus.textContent = file.name + ' is already queued.';
+      return;
+    }
 
-    if (!isAllowedStorageImage(file)) {
-      alert('Only image files are allowed: ' + file.name);
+    if (!isAllowedStorageMedia(file)) {
+      alert('Unsupported upload type: ' + file.name);
       return;
     }
-    if (file.size > UPLOAD_MAX_BYTES) {
-      alert('File too large (max 2MB): ' + file.name);
+
+    if (file.size > getUploadMaxBytesForKind(kind)) {
+      alert('File too large for ' + kind + ' uploads: ' + file.name);
       return;
     }
-    uploadImage(file);
+
+    if (kind === 'image') {
+      uploadImage(file);
+    } else {
+      uploadSupplementalMedia(file, kind);
+    }
   });
 }
 
@@ -2425,13 +2602,13 @@ function loadImageFromDataUrl(dataUrl) {
   });
 }
 
-async function optimizeImageForFirestore(file) {
+async function optimizeImageForStorage(file) {
   const original = await fileToDataUrl(file);
   const image = await loadImageFromDataUrl(original);
 
   let width = image.naturalWidth || image.width;
   let height = image.naturalHeight || image.height;
-  const maxDim = FIRESTORE_IMAGE_MAX_DIMENSION;
+  const maxDim = 1280;
   const scale = Math.min(1, maxDim / Math.max(width, height));
   width = Math.max(1, Math.floor(width * scale));
   height = Math.max(1, Math.floor(height * scale));
@@ -2443,17 +2620,17 @@ async function optimizeImageForFirestore(file) {
   if (!ctx) throw new Error('Could not create canvas context for image optimization.');
   ctx.drawImage(image, 0, 0, width, height);
 
-  // Convert to JPEG to keep payloads Firestore-friendly for Spark limits.
+  // Convert to JPEG to keep uploads compact for Storage.
   let quality = 0.82;
   let out = canvas.toDataURL('image/jpeg', quality);
 
-  while (dataUrlByteLength(out) > FIRESTORE_IMAGE_MAX_BYTES && quality > 0.45) {
+  while (dataUrlByteLength(out) > IMAGE_UPLOAD_MAX_BYTES && quality > 0.45) {
     quality -= 0.08;
     out = canvas.toDataURL('image/jpeg', quality);
   }
 
   let shrinkPass = 0;
-  while (dataUrlByteLength(out) > FIRESTORE_IMAGE_MAX_BYTES && shrinkPass < 4) {
+  while (dataUrlByteLength(out) > IMAGE_UPLOAD_MAX_BYTES && shrinkPass < 4) {
     width = Math.max(1, Math.floor(width * 0.85));
     height = Math.max(1, Math.floor(height * 0.85));
     canvas.width = width;
@@ -2464,7 +2641,7 @@ async function optimizeImageForFirestore(file) {
   }
 
   const bytes = dataUrlByteLength(out);
-  if (bytes > FIRESTORE_IMAGE_MAX_BYTES) {
+  if (bytes > IMAGE_UPLOAD_MAX_BYTES) {
     throw new Error('Image remains too large after optimization. Use a smaller image.');
   }
 
@@ -2486,9 +2663,9 @@ function getStorageBucketCandidates() {
   return candidates.filter((bucket, idx) => bucket && candidates.indexOf(bucket) === idx);
 }
 
-function getImageMimeType(file) {
+function getStorageMimeType(file) {
   const mimeType = String(file && file.type ? file.type : '').toLowerCase();
-  if (ALLOWED_STORAGE_IMAGE_TYPES.has(mimeType)) {
+  if (ALLOWED_STORAGE_IMAGE_TYPES.has(mimeType) || ALLOWED_STORAGE_AUDIO_TYPES.has(mimeType) || ALLOWED_STORAGE_VIDEO_TYPES.has(mimeType)) {
     return mimeType;
   }
 
@@ -2498,7 +2675,20 @@ function getImageMimeType(file) {
     'jpeg': 'image/jpeg',
     'png': 'image/png',
     'gif': 'image/gif',
-    'webp': 'image/webp'
+    'webp': 'image/webp',
+    'mp3': 'audio/mpeg',
+    'mpeg': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'oga': 'audio/ogg',
+    'm4a': 'audio/mp4',
+    'aac': 'audio/aac',
+    'mp4': 'video/mp4',
+    'mov': 'video/quicktime',
+    'qt': 'video/quicktime',
+    'webm': 'video/webm',
+    'ogv': 'video/ogg',
+    'mkv': 'video/x-matroska'
   };
 
   return mimeMap[ext] || '';
@@ -2510,7 +2700,7 @@ function createUploadTask(ref, file, onProgress) {
     let uploadStarted = false;
     let uploadCompleted = false;
     const metadata = {
-      contentType: getImageMimeType(file),
+      contentType: getStorageMimeType(file) || 'application/octet-stream',
       cacheControl: 'public,max-age=31536000,immutable'
     };
     
@@ -2632,9 +2822,9 @@ async function uploadImage(file) {
   if (uploadStatus) uploadStatus.textContent = 'Preparing ' + file.name + '...';
 
   const activeCount = uploadedImages.filter(img => !img.removed).length;
-  if (activeCount >= FIRESTORE_IMAGE_LIMIT) {
+  if (activeCount >= IMAGE_UPLOAD_LIMIT) {
     progressWrap.style.display = 'none';
-    alert('You can attach up to ' + FIRESTORE_IMAGE_LIMIT + ' images per submission in Spark mode.');
+    alert('You can attach up to ' + IMAGE_UPLOAD_LIMIT + ' images per submission.');
     return;
   }
 
@@ -2653,6 +2843,7 @@ async function uploadImage(file) {
   const uploadRecord = {
     id: uploadId,
     name: file.name,
+    kind: 'image',
     file: file,
     url: localUrl,
     localUrl: localUrl,
@@ -2719,6 +2910,235 @@ async function uploadImage(file) {
     if (code === 'storage/canceled' && uploadRecord.removed) return;
     finalizeFailure('Image upload failed: ' + (err.message || code || 'Unknown error'));
   }
+}
+
+async function uploadSupplementalMedia(file, kind) {
+  if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
+
+  const progressWrap = document.getElementById('upload-progress');
+  const progressBar = document.getElementById('upload-bar');
+  const uploadStatus = document.getElementById('upload-status');
+  if (!progressWrap || !progressBar) {
+    alert('Upload UI is unavailable on this page.');
+    return;
+  }
+
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  if (uploadStatus) uploadStatus.textContent = 'Preparing ' + file.name + '...';
+
+  const activeCount = getActiveUploadedCount(kind);
+  if (activeCount >= getUploadLimitForKind(kind)) {
+    progressWrap.style.display = 'none';
+    alert('You can attach up to ' + getUploadLimitForKind(kind) + ' ' + getUploadScopeLabel(kind) + (getUploadLimitForKind(kind) > 1 ? 's' : '') + ' per submission.');
+    return;
+  }
+
+  const timestamp = Date.now();
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = 'uploads/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
+  const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
+  const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
+  const localUrl = await fileToDataUrl(file);
+  const uploadRecord = {
+    id: uploadId,
+    name: file.name,
+    kind: kind,
+    file: file,
+    url: localUrl,
+    localUrl: localUrl,
+    remoteUrl: '',
+    status: 'uploading',
+    removed: false,
+    path: path,
+    task: null,
+    label: file.name.replace(/\.[^.]+$/, ''),
+    caption: '',
+    alt: file.name.replace(/\.[^.]+$/, ''),
+    fingerprint: fingerprint,
+    timeoutId: null
+  };
+  uploadedMediaFiles.push(uploadRecord);
+  renderMediaList();
+
+  function finalizeFailure(msg) {
+    if (uploadRecord.removed) return;
+    uploadRecord.status = 'failed';
+    renderMediaList();
+    progressWrap.style.display = 'none';
+    if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '. Click Retry.';
+    console.error('[Upload] Failed:', msg);
+    if (msg) alert(msg);
+  }
+
+  function finalizeSuccess(url) {
+    if (uploadRecord.removed) return;
+    uploadRecord.remoteUrl = url;
+    uploadRecord.url = url;
+    uploadRecord.status = 'ready';
+    renderMediaList();
+    markEditorAsChanged();
+    scheduleDraftAutoSave();
+    progressWrap.style.display = 'none';
+    if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
+  }
+
+  try {
+    uploadRecord.status = 'uploading';
+    renderMediaList();
+    if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + ' to Storage...';
+    progressBar.style.width = '20%';
+
+    const remoteUrl = await uploadWithBucketFallback(path, file, uploadRecord, snap => {
+      const pct = snap && snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 20;
+      progressBar.style.width = Math.max(20, Math.min(100, pct)) + '%';
+      if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '... ' + Math.max(20, Math.min(100, pct)) + '%';
+    });
+    progressBar.style.width = '100%';
+    finalizeSuccess(remoteUrl);
+    uploadRecord.sizeBytes = file.size;
+    uploadRecord.storageMode = 'storage-download-url';
+  } catch (err) {
+    const code = err && err.code ? err.code : '';
+    if (code === 'storage/canceled' && uploadRecord.removed) return;
+    finalizeFailure('Media upload failed: ' + (err.message || code || 'Unknown error'));
+  }
+}
+
+function renderMediaList() {
+  const list = document.getElementById('media-list');
+  if (!list) return;
+
+  const media = uploadedMediaFiles.filter(item => !item.removed);
+  if (!media.length) {
+    list.innerHTML = '<p style="font-size:.75rem;color:var(--wht-f);text-align:center;padding:12px 0">No audio or video files uploaded.</p>';
+    return;
+  }
+
+  list.innerHTML = media.map((item) => {
+    const displayUrl = item.remoteUrl || item.localUrl || item.url || '';
+    const label = item.status === 'ready' ? 'Uploaded' : item.status === 'failed' ? 'Failed' : 'Uploading';
+    const preview = item.kind === 'video'
+      ? '<video src="' + displayUrl + '" controls playsinline preload="metadata" style="width:100%;max-width:240px;border:1px solid #3a3a3a;background:#111"></video>'
+      : '<audio src="' + displayUrl + '" controls preload="metadata" style="width:100%;max-width:240px"></audio>';
+
+    return '<div class="img-item">' +
+      '<div style="width:120px;flex:0 0 120px">' + preview + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<span class="img-url" title="' + escapeAttr(displayUrl) + '">' + escapeHtml(item.name) + '</span>' +
+        '<div style="font-size:.65rem;color:var(--wht-f);margin-top:3px;text-transform:uppercase;letter-spacing:1px">' + label + ' · ' + escapeHtml(item.kind) + '</div>' +
+        '<input class="fi" type="text" placeholder="Optional label" value="' + escapeAttr(item.label || '') + '" oninput="updateUploadedMediaMeta(' + JSON.stringify(item.id) + ', ' + JSON.stringify('label') + ', this.value)" style="margin-top:6px;font-size:.72rem;padding:6px 8px" />' +
+      '</div>' +
+      '<button class="btn btn-sm btn-s btn-copy" type="button" onclick="copyMediaUrl(\'' + item.id + '\', this)">Copy URL</button>' +
+      (item.status === 'failed' ? '<button class="btn btn-sm btn-s" type="button" onclick="retryUploadedMedia(\'' + item.id + '\')">Retry</button>' : '') +
+      '<button class="btn btn-sm btn-d" type="button" onclick="removeUploadedMedia(\'' + item.id + '\')">Remove</button>' +
+    '</div>';
+  }).join('');
+}
+
+function updateUploadedMediaMeta(id, field, value) {
+  const record = uploadedMediaFiles.find(item => item.id === id);
+  if (!record) return;
+  if (field === 'label') record.label = String(value || '').slice(0, 180);
+  if (field === 'caption') record.caption = String(value || '').slice(0, 180);
+  if (field === 'alt') record.alt = String(value || '').slice(0, 180);
+  scheduleDraftAutoSave();
+}
+
+function retryUploadedMedia(id) {
+  const record = uploadedMediaFiles.find(item => item.id === id);
+  if (!record || !record.file) return;
+  removeUploadedMedia(id);
+  if (record.kind === 'video' || record.kind === 'audio') {
+    uploadSupplementalMedia(record.file, record.kind);
+  }
+}
+
+function removeUploadedMedia(id) {
+  const index = uploadedMediaFiles.findIndex(item => item.id === id);
+  if (index === -1) return;
+  const record = uploadedMediaFiles[index];
+  record.removed = true;
+  if (record.task && record.status === 'uploading' && typeof record.task.cancel === 'function') {
+    try { record.task.cancel(); } catch (e) { /* ignore */ }
+  }
+  if (record.timeoutId) {
+    try { clearTimeout(record.timeoutId); } catch (e) { /* ignore */ }
+  }
+  uploadedMediaFiles.splice(index, 1);
+  renderMediaList();
+  markEditorAsChanged();
+  scheduleDraftAutoSave();
+  const uploadStatus = document.getElementById('upload-status');
+  if (uploadStatus) uploadStatus.textContent = 'Media removed.';
+}
+
+function copyMediaUrl(id, buttonEl) {
+  const record = uploadedMediaFiles.find(item => item.id === id);
+  if (!record) return;
+  const url = record.remoteUrl || '';
+  if (!url) {
+    alert('Media file is not uploaded yet. Please wait for upload completion.');
+    return;
+  }
+  navigator.clipboard.writeText(url).then(() => {
+    if (buttonEl) {
+      buttonEl.textContent = 'Copied!';
+      setTimeout(() => { buttonEl.textContent = 'Copy URL'; }, 1500);
+    }
+  }).catch(() => {
+    prompt('Copy this URL:', url);
+  });
+}
+
+function collectUploadedMediaAssets() {
+  const imageAssets = uploadedImages
+    .filter(img => !img.removed && img.remoteUrl)
+    .map(img => ({
+      kind: 'image',
+      url: img.remoteUrl,
+      alt: img.alt || img.name || '',
+      caption: img.caption || '',
+      label: img.name || ''
+    }));
+
+  const mediaAssets = uploadedMediaFiles
+    .filter(item => !item.removed && item.remoteUrl)
+    .map(item => ({
+      kind: item.kind,
+      url: item.remoteUrl,
+      alt: item.alt || item.name || '',
+      caption: item.caption || '',
+      label: item.label || item.name || ''
+    }));
+
+  return { imageAssets, mediaAssets };
+}
+
+function normalizeUploadedMediaFromDraft(draftAssets, kind) {
+  return draftAssets.map((asset, idx) => ({
+    id: 'draft_' + kind + '_' + idx + '_' + Date.now(),
+    name: kind + ' file ' + (idx + 1),
+    kind: kind,
+    url: String(asset.url || ''),
+    localUrl: String(asset.url || ''),
+    remoteUrl: String(asset.url || ''),
+    status: 'ready',
+    removed: false,
+    file: null,
+    caption: String(asset.caption || ''),
+    alt: String(asset.alt || ''),
+    label: String(asset.label || asset.title || asset.name || ''),
+    fingerprint: 'draft-' + kind + '-' + idx
+  }));
+}
+
+function resetUploadedMediaState() {
+  uploadedImages = [];
+  uploadedMediaFiles = [];
+  renderImageList();
+  renderMediaList();
+  refreshImageSelectors();
 }
 
 function renderImageList() {
@@ -2870,6 +3290,34 @@ function embedUploadedImagesIfMissing(html, imageAssets) {
   return raw + gallery;
 }
 
+function embedUploadedMediaIfMissing(html, mediaAssets) {
+  const assets = Array.isArray(mediaAssets) ? mediaAssets.filter(asset => asset && asset.url) : [];
+  if (!assets.length) return String(html || '');
+
+  const raw = String(html || '');
+  if (raw.includes('class="uploaded-media"')) return raw;
+  if (assets.some(asset => raw.includes(asset.url))) return raw;
+
+  const gallery = '\n<div class="page-section uploaded-media">' +
+    '<h2>Uploaded Media</h2>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">' +
+      assets.map((asset, idx) => {
+        const kind = String(asset.kind || '').toLowerCase();
+        const label = escapeHtml(asset.label || asset.caption || (kind ? kind + ' ' + (idx + 1) : 'Media ' + (idx + 1)));
+        const player = kind === 'video'
+          ? '<video src="' + asset.url + '" controls playsinline preload="metadata" style="width:100%;display:block;border:1px solid #3a3a3a;background:#111"></video>'
+          : '<audio src="' + asset.url + '" controls preload="metadata" style="width:100%;display:block"></audio>';
+        return '<figure style="margin:0">' +
+          player +
+          '<figcaption style="margin-top:8px;font-size:.75rem;color:#bdbdbd;line-height:1.4">' + label + '</figcaption>' +
+        '</figure>';
+      }).join('') +
+    '</div>' +
+  '</div>';
+
+  return raw + gallery;
+}
+
 // ═════════════════════════════════════════════════════════════
 // LIVE PREVIEW
 // ═════════════════════════════════════════════════════════════
@@ -2898,11 +3346,9 @@ function updatePreview() {
 
   const frame = document.getElementById('preview-frame');
   const sanitized = sanitizeHTML(html);
-  const htmlWithUploads = embedUploadedImagesIfMissing(sanitized, uploadedImages.map(img => ({
-    url: img.remoteUrl || img.url,
-    caption: img.caption || '',
-    alt: img.alt || img.name || ''
-  })));
+  const assets = collectUploadedMediaAssets();
+  const htmlWithImages = embedUploadedImagesIfMissing(sanitized, assets.imageAssets);
+  const htmlWithUploads = embedUploadedMediaIfMissing(htmlWithImages, assets.mediaAssets);
   const wrappedHtml = wrapWithDefaultSchema(htmlWithUploads, document.getElementById('sf-title').value || 'New Classified Document');
   const doc = buildSandboxDocument(wrappedHtml, mergeWithDefaultSchemaCSS(css));
   frame.srcdoc = doc;
@@ -3079,35 +3525,37 @@ async function submitPage() {
       return;
     }
   } catch (e) {
-    // Firestore might not have indexes yet -> proceed
+    // Database might not have indexes yet -> proceed
   }
 
   btn.textContent = 'Submitting...';
 
   const inFlightUploads = uploadedImages.filter(img => !img.removed && img.status === 'uploading');
-  if (inFlightUploads.length) {
-    alert('Please wait until all image uploads finish before submitting.');
+  const inFlightMediaUploads = uploadedMediaFiles.filter(item => !item.removed && item.status === 'uploading');
+  if (inFlightUploads.length || inFlightMediaUploads.length) {
+    alert('Please wait until all uploads finish before submitting.');
     btn.textContent = '>> Submit for Review';
     btn.disabled = false;
     return;
   }
 
   const failedUploads = uploadedImages.filter(img => !img.removed && img.status === 'failed');
-  if (failedUploads.length) {
-    alert('One or more uploads failed. Retry or remove failed images before submitting.');
+  const failedMediaUploads = uploadedMediaFiles.filter(item => !item.removed && item.status === 'failed');
+  if (failedUploads.length || failedMediaUploads.length) {
+    alert('One or more uploads failed. Retry or remove failed files before submitting.');
     btn.textContent = '>> Submit for Review';
     btn.disabled = false;
     return;
   }
 
-  const uploadedAssets = uploadedImages
-    .filter(img => !img.removed && img.remoteUrl)
-    .map(img => ({
-      url: img.remoteUrl,
-      alt: img.alt || img.name || '',
-      caption: img.caption || ''
-    }));
-  const uploadedUrls = uploadedAssets.map(asset => asset.url);
+  const uploadedAssets = collectUploadedMediaAssets();
+  if (!isMediaEnabledSubmissionType(type) && uploadedAssets.mediaAssets.length) {
+    alert('Audio and video files can only be attached to Tale and Anomaly submissions.');
+    btn.textContent = '>> Submit for Review';
+    btn.disabled = false;
+    return;
+  }
+  const uploadedUrls = uploadedAssets.imageAssets.map(asset => asset.url);
   const sanitizedHTML = sanitizeHTML(htmlContent);
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title);
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
@@ -3125,7 +3573,9 @@ async function submitPage() {
     htmlContent: wrappedHTML,
     cssContent: mergedCSS,
     imageUrls: uploadedUrls,
-    imageAssets: uploadedAssets,
+    imageAssets: uploadedAssets.imageAssets,
+    mediaUrls: uploadedAssets.mediaAssets.map(asset => asset.url),
+    mediaAssets: uploadedAssets.mediaAssets,
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
@@ -3219,9 +3669,7 @@ function resetSubmitForm() {
   ];
   renderDocBlocks();
 
-  uploadedImages = [];
-  renderImageList();
-  refreshImageSelectors();
+  resetUploadedMediaState();
   updateTagSummary();
   onAnomalySubtypeChange();
   updateTypeSpecificUI();

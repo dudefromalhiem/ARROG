@@ -6,8 +6,18 @@ service firebase.storage {
     }
 
     function isAllowedImageUpload() {
-      return request.resource.size <= 2 * 1024 * 1024 &&
+      return request.resource.size <= 10 * 1024 * 1024 &&
         request.resource.contentType in ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    }
+
+    function isAllowedAudioUpload() {
+      return request.resource.size <= 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('audio/.*');
+    }
+
+    function isAllowedVideoUpload() {
+      return request.resource.size <= 25 * 1024 * 1024 &&
+        request.resource.contentType.matches('video/.*');
     }
 
     match /{allPaths=**} {
@@ -21,7 +31,7 @@ service firebase.storage {
     match /uploads/{userId}/{fileName} {
       allow write: if isSignedIn() &&
         request.auth.uid == userId &&
-        isAllowedImageUpload();
+        (isAllowedImageUpload() || isAllowedAudioUpload() || isAllowedVideoUpload());
     }
   }
 }

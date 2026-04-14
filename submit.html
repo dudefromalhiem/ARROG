@@ -414,16 +414,16 @@ render.mount('submission-terminal');</pre>
 
     <!-- ═══ IMAGE UPLOAD (shared) ═══ -->
     <div class="section" style="margin-bottom:24px">
-      <div class="section-hd">Image Uploads</div>
+      <div class="section-hd">Asset Uploads</div>
       <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
-        Add images to use in your page. In template mode, images are auto-placed. In code mode, copy the generated data URL into your HTML.
-        Spark-safe mode: images are optimized and embedded. Up to 3 images per submission.
+        Add images to use in your page. Tale and Anomaly submissions can also include audio and video uploads.
+        Blaze mode stores files in Firebase Storage and supports up to 5 images, 3 audio files, and 3 video files per submission.
       </p>
-      <input type="file" id="img-input" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />
-      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Choose image files to upload">
+      <input type="file" id="img-input" accept="image/png,image/jpeg,image/gif,image/webp,audio/*,video/*" multiple hidden />
+      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Choose image, audio, or video files to upload">
         <div class="uz-icon">⬆</div>
-        <div class="uz-text">Click or drag images here to upload</div>
-        <div class="uz-hint">PNG, JPG, GIF, WebP — uploaded to Storage and linked from Firestore</div>
+        <div class="uz-text">Click or drag images, audio, or video here to upload</div>
+        <div class="uz-hint">Images are available for all page types. Audio and video are limited to Tale and Anomaly submissions.</div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-s" type="button" id="choose-images-btn">Choose Files</button>
@@ -433,6 +433,7 @@ render.mount('submission-terminal');</pre>
         <div class="upload-progress-bar" id="upload-bar"></div>
       </div>
       <div class="img-list" id="img-list"></div>
+      <div class="img-list" id="media-list" style="margin-top:12px"></div>
     </div>
 
     <!-- ════════════════════════════════════════════════════════ -->

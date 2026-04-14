@@ -231,6 +231,9 @@ function runTerminal() {
     }
     stream.appendChild(row);
     while (stream.children.length > maxLines) stream.removeChild(stream.firstChild);
+    if (isPhoneViewport) {
+      body.scrollTop = body.scrollHeight;
+    }
   };
 
   const getNextLine = () => {
@@ -241,6 +244,9 @@ function runTerminal() {
 
   appendTerminalLine('[BOOT] initializing secure terminal...');
   for (let seed = 0; seed < initialLines; seed++) appendTerminalLine(getNextLine());
+  if (isPhoneViewport) {
+    body.scrollTop = body.scrollHeight;
+  }
 
   const tickEveryMs = isPhoneViewport ? 72 : 54;
   const pump = now => {
@@ -402,7 +408,12 @@ function showClearanceWelcomeWhenReady(role) {
 // AUTH UI
 // ═════════════════════════════════════════════════════════════
 
-function openAuth() { document.getElementById('auth-modal').classList.remove('hidden'); }
+function updateForgotPasswordVisibility() {
+  const button = document.getElementById('auth-forgot-password');
+  if (button) button.classList.toggle('hidden', authMode !== 'login');
+}
+
+function openAuth() { document.getElementById('auth-modal').classList.remove('hidden'); updateForgotPasswordVisibility(); }
 function closeAuth() { document.getElementById('auth-modal').classList.add('hidden'); document.getElementById('auth-err').classList.add('hidden'); }
 
 function toggleAuthMode() {
@@ -410,6 +421,7 @@ function toggleAuthMode() {
   document.getElementById('auth-title').textContent = authMode === 'login' ? 'Sign In' : 'Register';
   document.getElementById('auth-tog-text').textContent = authMode === 'login' ? 'No account? ' : 'Already registered? ';
   document.getElementById('auth-tog-link').textContent = authMode === 'login' ? 'Register here' : 'Sign in';
+  updateForgotPasswordVisibility();
 }
 
 function showAuthError(msg) {
@@ -429,6 +441,22 @@ async function handleAuth() {
     }
     closeAuth();
   } catch (e) { showAuthError(e.message); }
+}
+
+async function handleForgotPassword() {
+  const emailField = document.getElementById('auth-email');
+  const email = String(emailField && emailField.value ? emailField.value : '').trim();
+  if (!email) {
+    showAuthError('Enter the email address for the account you want to recover.');
+    return;
+  }
+
+  try {
+    await auth.sendPasswordResetEmail(email);
+    alert('Password reset email sent. Check your inbox and spam folder.');
+  } catch (e) {
+    showAuthError(e.message || 'Could not send password reset email.');
+  }
 }
 
 async function handleGoogle() {

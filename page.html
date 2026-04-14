@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Render content in iframe
     const frame = document.getElementById('pv-frame');
-    const htmlDoc = buildPageDocument(page.htmlContent, page.cssContent || '', page.imageUrls || [], page.imageAssets || []);
+    const htmlDoc = buildPageDocument(page.htmlContent, page.cssContent || '', page.imageUrls || [], page.imageAssets || [], page.mediaUrls || [], page.mediaAssets || []);
     frame.srcdoc = htmlDoc;
 
     // Show viewer
@@ -263,11 +263,13 @@ function showError() {
   document.getElementById('page-error').classList.remove('hidden');
 }
 
-function buildPageDocument(html, css, imageUrls, imageAssets) {
+function buildPageDocument(html, css, imageUrls, imageAssets, mediaUrls, mediaAssets) {
   const assets = normalizeImageAssets(imageUrls || [], imageAssets || []);
+  const supplementalMedia = normalizeMediaAssets(mediaUrls || [], mediaAssets || []);
   const raw = repairDocumentImagesWithUploads((html || '').trim(), assets.map(asset => asset.url));
   const withUploads = embedUploadedImagesIfMissing(raw, assets);
-  const withCaptions = applyImageCaptions(withUploads, assets);
+  const withMedia = embedUploadedMediaIfMissing(withUploads, supplementalMedia);
+  const withCaptions = applyImageCaptions(withMedia, assets);
   const htmlWithUploads = sanitizePageImages(withCaptions).replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
   const wrapped = htmlWithUploads.includes('class="page-shell"')
     ? htmlWithUploads
@@ -315,6 +317,23 @@ function normalizeImageAssets(imageUrls, imageAssets) {
 
   if (assets.length) return assets;
   return (Array.isArray(imageUrls) ? imageUrls : []).filter(Boolean).map(url => ({ url: String(url), alt: '', caption: '' }));
+}
+
+function normalizeMediaAssets(mediaUrls, mediaAssets) {
+  const assets = Array.isArray(mediaAssets)
+    ? mediaAssets
+      .map(asset => ({
+        kind: String(asset && asset.kind || '').toLowerCase(),
+        url: String(asset && asset.url || '').trim(),
+        alt: String(asset && asset.alt || '').trim(),
+        caption: String(asset && asset.caption || '').trim(),
+        label: String(asset && asset.label || asset.title || asset.name || '').trim()
+      }))
+      .filter(asset => asset.url)
+    : [];
+
+  if (assets.length) return assets.filter(asset => asset.kind === 'audio' || asset.kind === 'video');
+  return (Array.isArray(mediaUrls) ? mediaUrls : []).filter(Boolean).map(url => ({ url: String(url), kind: 'audio', alt: '', caption: '', label: '' }));
 }
 
 function applyImageCaptions(html, imageAssets) {
@@ -373,6 +392,34 @@ function embedUploadedImagesIfMissing(html, imageAssets) {
           (asset.caption ? '<figcaption>' + escapeHtml(asset.caption) + '</figcaption>' : '') +
         '</figure>'
       ).join('') +
+    '</div>' +
+  '</div>';
+
+  return raw + gallery;
+}
+
+function embedUploadedMediaIfMissing(html, mediaAssets) {
+  const assets = Array.isArray(mediaAssets) ? mediaAssets.filter(asset => asset && asset.url) : [];
+  if (!assets.length) return String(html || '');
+
+  const raw = String(html || '');
+  if (raw.includes('class="uploaded-media"')) return raw;
+  if (assets.some(asset => raw.includes(asset.url))) return raw;
+
+  const gallery = '<div class="page-section uploaded-media">' +
+    '<h2>Uploaded Media</h2>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">' +
+      assets.map((asset, idx) => {
+        const kind = String(asset.kind || 'audio').toLowerCase();
+        const label = escapeHtml(asset.label || asset.caption || (kind + ' ' + (idx + 1)));
+        const player = kind === 'video'
+          ? '<video src="' + asset.url + '" controls playsinline preload="metadata" style="width:100%;display:block;border:1px solid #3a3a3a;background:#111"></video>'
+          : '<audio src="' + asset.url + '" controls preload="metadata" style="width:100%;display:block"></audio>';
+        return '<figure style="margin:0">' +
+          player +
+          (label ? '<figcaption>' + label + '</figcaption>' : '') +
+        '</figure>';
+      }).join('') +
     '</div>' +
   '</div>';
 

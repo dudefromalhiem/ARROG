@@ -55,6 +55,56 @@ function normalizeTags(tags) {
   return Array.isArray(tags) ? tags.map(tag => String(tag || '').trim()).filter(Boolean) : [];
 }
 
+function normalizeMediaAssets(assets) {
+  return Array.isArray(assets)
+    ? assets.map(asset => ({
+        kind: String(asset && asset.kind || 'image').toLowerCase(),
+        url: String(asset && asset.url || '').trim(),
+        alt: String(asset && asset.alt || '').trim(),
+        caption: String(asset && asset.caption || '').trim(),
+        label: String(asset && asset.label || asset.title || asset.name || '').trim()
+      })).filter(asset => asset.url)
+    : [];
+}
+
+function validateSubmissionMediaOrThrow(payload) {
+  const imageAssets = Array.isArray(payload.imageAssets)
+    ? payload.imageAssets.filter(asset => asset && asset.url)
+    : [];
+  const mediaAssets = normalizeMediaAssets(payload.mediaAssets);
+  const mediaKinds = new Set(mediaAssets.map(asset => asset.kind));
+  const requiresMediaGate = String(payload.type || '').trim() !== 'Tale' && String(payload.type || '').trim() !== 'Anomaly';
+
+  if (imageAssets.length > 5) {
+    const err = new Error('Too many image files attached. Maximum is 5 images per submission.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (requiresMediaGate && mediaAssets.length) {
+    const err = new Error('Audio and video uploads are only allowed for Tale and Anomaly submissions.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if ([...mediaKinds].some(kind => kind && kind !== 'audio' && kind !== 'video' && kind !== 'image')) {
+    const err = new Error('Unsupported media asset kind provided.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const audioCount = mediaAssets.filter(asset => asset.kind === 'audio').length;
+  const videoCount = mediaAssets.filter(asset => asset.kind === 'video').length;
+  if (audioCount > 3 || videoCount > 3) {
+    const err = new Error('Too many media files attached. Maximums are 3 audio files and 3 video files.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  payload.mediaAssets = mediaAssets.filter(asset => asset.kind === 'audio' || asset.kind === 'video');
+  payload.mediaUrls = payload.mediaAssets.map(asset => asset.url);
+}
+
 const ANOMALY_SUBTYPE_RULES = {
   ROS: {
     label: 'Red Oaker Specimen',
@@ -185,7 +235,7 @@ function buildSubmissionPayload(body, actor) {
   const cssContent = sanitizeCssOrThrow(payload.cssContent || '');
   const anomalySubtype = String(payload.anomalySubtype || '').toUpperCase().trim();
   const anomalyId = String(payload.anomalyId || '').toUpperCase().trim();
-  return {
+  const normalizedPayload = {
     title,
     anomalyId,
     anomalySubtype,
@@ -206,6 +256,8 @@ function buildSubmissionPayload(body, actor) {
           }))
           .filter(asset => asset.url)
       : [],
+    mediaUrls: Array.isArray(payload.mediaUrls) ? payload.mediaUrls.filter(Boolean).map(String) : [],
+    mediaAssets: normalizeMediaAssets(payload.mediaAssets),
     authorUid: actor.uid,
     authorEmail: actor.email,
     authorName: String(payload.authorName || actor.name || actor.email.split('@')[0] || 'Agent').trim(),
@@ -215,6 +267,9 @@ function buildSubmissionPayload(body, actor) {
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     submittedAt: admin.firestore.FieldValue.serverTimestamp()
   };
+
+  validateSubmissionMediaOrThrow(normalizedPayload);
+  return normalizedPayload;
 }
 
 async function enforceRateLimit(db, uid, ip) {
@@ -391,6 +446,8 @@ module.exports = async function handler(req, res) {
           cssContent: payload.cssContent,
           imageUrls: payload.imageUrls,
           imageAssets: payload.imageAssets,
+          mediaUrls: payload.mediaUrls,
+          mediaAssets: payload.mediaAssets,
           authorUid: actor.uid,
           authorEmail: actor.email,
           authorName: payload.authorName,
