@@ -33,6 +33,7 @@ let customTagOptions = [];
 let selectedTagsState = new Set();
 let selectedEntryProfile = '';
 let designationLocked = false;
+let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history'
 
 const ANOMALY_SUBTYPE_RULES = {
   ROS: {
@@ -210,17 +211,30 @@ function setDesignationLock(locked, note) {
 }
 
 function showSubmitEditor(showEditor) {
+  setSubmitViewMode(showEditor ? 'editor' : 'explorer');
+}
+
+function setSubmitViewMode(mode) {
+  submitViewMode = mode;
   const explorer = document.getElementById('submit-file-explorer');
   const editor = document.getElementById('submit-editor-shell');
   const history = document.getElementById('my-submissions-section');
-  if (!explorer || !editor || !history) return;
-  explorer.classList.toggle('hidden', !!showEditor);
+  const createWorkspace = document.getElementById('submit-create-workspace');
+  if (!explorer || !editor || !history || !createWorkspace) return;
+
+  const showExplorer = mode === 'explorer';
+  const showEditor = mode !== 'explorer';
+  const historyOnly = mode === 'history';
+
+  explorer.classList.toggle('hidden', !showExplorer);
   editor.classList.toggle('hidden', !showEditor);
+  createWorkspace.classList.toggle('hidden', historyOnly);
   history.classList.remove('hidden');
 }
 
 function openSubmissionHistoryView() {
-  showSubmitEditor(true);
+  setSubmitViewMode('history');
+  loadMySubmissions();
   setTimeout(() => {
     const history = document.getElementById('my-submissions-section');
     if (history) history.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -229,6 +243,7 @@ function openSubmissionHistoryView() {
 
 function openSubmitFileExplorer() {
   selectedEntryProfile = '';
+  submitViewMode = 'explorer';
   const banner = document.getElementById('entry-profile-banner');
   if (banner) banner.textContent = 'Mode: General Submission';
   const typeEl = document.getElementById('sf-type');
@@ -2886,13 +2901,14 @@ async function loadMySubmissions() {
   if (!currentUserForSubmit) return;
   const container = document.getElementById('my-submissions');
   if (!container) return;
+  const historyOnly = submitViewMode === 'history';
 
   try {
     const result = await callSubmissionApi('GET');
     const submissions = Array.isArray(result.submissions) ? result.submissions : [];
 
     if (submissions.length === 0) {
-      container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">No submissions yet. Create your first page above!</p>';
+      container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">No submissions yet.</p>';
       return;
     }
 
@@ -2913,10 +2929,10 @@ async function loadMySubmissions() {
         extra = '<div style="margin-top:4px"><a href="' + pageUrl + '" class="btn btn-sm btn-s" style="font-size:.65rem">View Live Page</a></div>';
       }
       let deleteBtn = '';
-      if (s.status === 'pending') {
+      if (!historyOnly && s.status === 'pending') {
         deleteBtn = '<button class="btn btn-sm btn-d" onclick="deleteMySubmission(\'' + d.id + '\')" style="margin-left:8px">Withdraw</button>';
       }
-      if (s.status === 'draft') {
+      if (!historyOnly && s.status === 'draft') {
         deleteBtn = '<button class="btn btn-sm btn-s" type="button" onclick="continueDraftSubmission(\'' + d.id + '\')" style="margin-left:8px">Continue Draft</button>' +
           '<button class="btn btn-sm btn-d" onclick="deleteMySubmission(\'' + d.id + '\')" style="margin-left:8px">Delete Draft</button>';
       }
