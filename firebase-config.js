@@ -7,7 +7,7 @@ const firebaseConfig = {
   authDomain: "redoakerguild.firebaseapp.com",
   projectId: "redoakerguild",
   // Canonical Cloud Storage bucket for Firebase uploads.
-  storageBucket: "redoakerguild.appspot.com",
+  storageBucket: "redoakerguild.firebasestorage.app",
   messagingSenderId: "847903433642",
   appId: "1:847903433642:web:95a9fdddef4099ff8981d3",
   measurementId: "G-WLR20NDRQL"
