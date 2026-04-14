@@ -34,6 +34,7 @@ let selectedTagsState = new Set();
 let selectedEntryProfile = '';
 let designationLocked = false;
 let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history'
+let submissionApiBase = '/api/submit';
 
 const ANOMALY_SUBTYPE_RULES = {
   ROS: {
@@ -148,7 +149,7 @@ auth.onAuthStateChanged(user => {
         '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
       '</div>';
     setDraftStatus('Draft autosave is idle.');
-    loadMySubmissions();
+    configureSubmissionApiBase();
     initializeSubmitEditModeFromUrl();
     initializeReconstructionPrefillFromUrl();
 
@@ -229,7 +230,22 @@ function setSubmitViewMode(mode) {
   explorer.classList.toggle('hidden', !showExplorer);
   editor.classList.toggle('hidden', !showEditor);
   createWorkspace.classList.toggle('hidden', historyOnly);
-  history.classList.remove('hidden');
+  history.classList.toggle('hidden', !historyOnly);
+}
+
+function configureSubmissionApiBase() {
+  try {
+    const host = String(window.location.hostname || '').toLowerCase();
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const isFile = window.location.protocol === 'file:';
+    if (isLocal || isFile) {
+      submissionApiBase = 'https://redoakguild.vercel.app/api/submit';
+      return;
+    }
+  } catch (_err) {
+    // Keep default relative API path.
+  }
+  submissionApiBase = '/api/submit';
 }
 
 function openSubmissionHistoryView() {
@@ -370,7 +386,7 @@ async function getSubmissionApiHeaders() {
 }
 
 async function callSubmissionApi(method, payload = {}, query = '') {
-  const response = await fetch('/api/submit' + query, {
+  const response = await fetch(submissionApiBase + query, {
     method: method,
     headers: await getSubmissionApiHeaders(),
     body: method === 'GET' ? undefined : JSON.stringify(payload)
@@ -2904,8 +2920,22 @@ async function loadMySubmissions() {
   const historyOnly = submitViewMode === 'history';
 
   try {
-    const result = await callSubmissionApi('GET');
-    const submissions = Array.isArray(result.submissions) ? result.submissions : [];
+    let submissions = [];
+    try {
+      const result = await callSubmissionApi('GET');
+      submissions = Array.isArray(result.submissions) ? result.submissions : [];
+    } catch (_apiErr) {
+      const snapshot = await db.collection('submissions')
+        .where('authorUid', '==', currentUserForSubmit.uid)
+        .get();
+      submissions = snapshot.docs
+        .map(doc => ({ id: doc.id, data: doc.data() }))
+        .sort((a, b) => {
+          const aTime = a.data.updatedAt?.seconds || a.data.submittedAt?.seconds || 0;
+          const bTime = b.data.updatedAt?.seconds || b.data.submittedAt?.seconds || 0;
+          return bTime - aTime;
+        });
+    }
 
     if (submissions.length === 0) {
       container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">No submissions yet.</p>';
