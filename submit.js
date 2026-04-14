@@ -85,6 +85,64 @@ const ENTRY_PROFILES = {
   artwork: { key: 'artwork', label: 'Artwork Upload', type: 'Artwork', template: 'artwork' }
 };
 
+const TYPE_CANONICAL_MAP = {
+  Report: 'Tale',
+  Test: 'Anomaly'
+};
+
+function getCanonicalType(rawType) {
+  const value = String(rawType || '').trim();
+  return TYPE_CANONICAL_MAP[value] || value || 'Anomaly';
+}
+
+function getDisplayTypeForEditor(storedType, anomalySubtype) {
+  const baseType = String(storedType || '').trim() || 'Anomaly';
+  if (baseType === 'Anomaly' && (anomalySubtype === 'SCTOR' || anomalySubtype === 'TL')) {
+    return 'Test';
+  }
+  return baseType;
+}
+
+function isAnomalyFamilyType(rawType) {
+  const type = String(rawType || '').trim();
+  return type === 'Anomaly' || type === 'Test';
+}
+
+function isNarrativeFamilyType(rawType) {
+  const type = String(rawType || '').trim();
+  return type === 'Tale' || type === 'Report';
+}
+
+function applyTypeSubtypeConstraints() {
+  const type = String(document.getElementById('sf-type')?.value || '').trim();
+  const subtypeEl = document.getElementById('sf-anomaly-subtype');
+  if (!subtypeEl) return;
+
+  const isTest = type === 'Test';
+  const isAnomaly = type === 'Anomaly';
+
+  const allowed = isTest
+    ? new Set(['SCTOR', 'TL'])
+    : isAnomaly
+      ? new Set(['ROS', 'SOA', 'SLOA'])
+      : new Set(['ROS', 'SOA', 'SLOA', 'SCTOR', 'TL']);
+
+  Array.from(subtypeEl.options || []).forEach(opt => {
+    if (!opt.value) {
+      opt.disabled = false;
+      opt.hidden = false;
+      return;
+    }
+    const enabled = allowed.has(opt.value);
+    opt.disabled = !enabled;
+    opt.hidden = !enabled;
+  });
+
+  if (subtypeEl.value && !allowed.has(subtypeEl.value)) {
+    subtypeEl.value = isTest ? 'SCTOR' : isAnomaly ? 'ROS' : '';
+  }
+}
+
 const DEFAULT_NEW_PAGE_HTML = `<div class="page-shell">
   <header class="page-header">
     <h1 class="page-title">New Classified Document</h1>
@@ -487,7 +545,8 @@ async function saveDraft(options = {}) {
   const trigger = options.trigger || 'manual';
 
   const title = document.getElementById('sf-title').value.trim();
-  const type = document.getElementById('sf-type').value;
+  const selectedType = document.getElementById('sf-type').value;
+  const type = getCanonicalType(selectedType);
   const manualSlug = document.getElementById('sf-slug').value.trim();
   const slug = manualSlug || generateSlug(title);
   const tags = getSelectedTags();
@@ -497,7 +556,7 @@ async function saveDraft(options = {}) {
   let anomalyId = '';
   let anomalyListKey = '';
   let anomalySubtypeLabel = '';
-  if (type === 'Anomaly') {
+  if (isAnomalyFamilyType(selectedType)) {
     const validation = validateAnomalyDesignation(anomalySubtype, anomalyCodeInput);
     if (validation.valid) {
       anomalyId = validation.code;
@@ -601,7 +660,7 @@ async function continueDraftSubmission(id) {
     suppressDraftAutoSave = true;
     activeDraftId = id;
     document.getElementById('sf-title').value = draft.title || '';
-    document.getElementById('sf-type').value = draft.type || 'Anomaly';
+    document.getElementById('sf-type').value = getDisplayTypeForEditor(draft.type || 'Anomaly', draft.anomalySubtype || '');
     document.getElementById('sf-slug').value = draft.slug || '';
     document.getElementById('sf-anomaly-subtype').value = draft.anomalySubtype || '';
     document.getElementById('sf-anomaly-code').value = draft.anomalyId || '';
@@ -718,7 +777,7 @@ function initializeReconstructionPrefillFromUrl() {
   const codeInput = document.getElementById('sf-anomaly-code');
 
   if (entryType && Array.from(typeInput.options).some(opt => opt.value === entryType)) {
-    typeInput.value = entryType;
+    typeInput.value = getDisplayTypeForEditor(entryType, listKey);
   }
   onTypeChange();
 
@@ -787,7 +846,7 @@ async function initializeSubmitEditModeFromUrl() {
     submitEditTarget = { id: pageDoc.id || null, seeded: !pageDoc.id, seedSlug: page.slug || editSlug || '' };
 
     document.getElementById('sf-title').value = page.title || '';
-    document.getElementById('sf-type').value = page.type || 'Anomaly';
+    document.getElementById('sf-type').value = getDisplayTypeForEditor(page.type || 'Anomaly', page.anomalySubtype || '');
     document.getElementById('sf-slug').value = page.slug || '';
 
     const tags = Array.isArray(page.tags) ? page.tags : [];
@@ -1052,8 +1111,9 @@ function setGuideSectionsFixedStructure() {
 
 function updateTypeSpecificUI() {
   const type = document.getElementById('sf-type').value;
+  applyTypeSubtypeConstraints();
   const anomalyRow = document.getElementById('anomaly-meta-row');
-  if (anomalyRow) anomalyRow.classList.toggle('hidden', type !== 'Anomaly');
+  if (anomalyRow) anomalyRow.classList.toggle('hidden', !isAnomalyFamilyType(type));
 
   const isGuide = type === 'Guide';
   const modeDoc = document.getElementById('mode-doc');
@@ -1222,10 +1282,27 @@ function selectTemplate(tpl) {
 
 function onTypeChange() {
   const type = document.getElementById('sf-type').value;
-  const tplMap = { Anomaly: 'anomaly', Tale: 'tale', Artwork: 'artwork', Guide: 'guide', Hub: 'guide' };
+  const tplMap = { Anomaly: 'anomaly', Test: 'anomaly', Tale: 'tale', Report: 'tale', Artwork: 'artwork', Guide: 'guide', Hub: 'guide' };
   if (tplMap[type]) {
     selectTemplate(tplMap[type]);
   }
+
+  if (type === 'Test') {
+    const subtypeEl = document.getElementById('sf-anomaly-subtype');
+    if (subtypeEl && subtypeEl.value !== 'SCTOR' && subtypeEl.value !== 'TL') {
+      subtypeEl.value = 'SCTOR';
+    }
+  }
+
+  if (type === 'Anomaly') {
+    const subtypeEl = document.getElementById('sf-anomaly-subtype');
+    if (subtypeEl && (subtypeEl.value === 'SCTOR' || subtypeEl.value === 'TL')) {
+      subtypeEl.value = 'ROS';
+    }
+  }
+
+  applyTypeSubtypeConstraints();
+  onAnomalySubtypeChange();
   updateTypeSpecificUI();
 }
 
@@ -2103,7 +2180,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const titleEl = document.getElementById('sf-title');
   titleEl.addEventListener('input', () => {
     // If anomaly, enforce uppercase for the ROG-XXX format
-    if (document.getElementById('sf-type').value === 'Anomaly') {
+    if (isAnomalyFamilyType(document.getElementById('sf-type').value)) {
       titleEl.value = titleEl.value.toUpperCase();
     }
     updateSlugPreview();
@@ -2720,14 +2797,15 @@ async function submitPage() {
   if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
 
   let title = document.getElementById('sf-title').value.trim();
-  const type = document.getElementById('sf-type').value;
+  const selectedType = document.getElementById('sf-type').value;
+  const type = getCanonicalType(selectedType);
   const tags = getSelectedTags();
   const manualSlug = document.getElementById('sf-slug').value.trim();
   const slug = manualSlug || generateSlug(title);
   const anomalySubtype = document.getElementById('sf-anomaly-subtype').value;
   const anomalyCodeInput = document.getElementById('sf-anomaly-code').value;
 
-  if (type === 'Anomaly') {
+  if (isAnomalyFamilyType(selectedType)) {
     title = title.toUpperCase();
     document.getElementById('sf-title').value = title;
   }
@@ -2738,7 +2816,7 @@ async function submitPage() {
   let anomalyId = '';
   let anomalyListKey = '';
   let anomalySubtypeLabel = '';
-  if (type === 'Anomaly') {
+  if (isAnomalyFamilyType(selectedType)) {
     const validation = validateAnomalyDesignation(anomalySubtype, anomalyCodeInput);
     if (!validation.valid) {
       alert(validation.error);
@@ -2755,7 +2833,7 @@ async function submitPage() {
   }
 
   // Anomaly-specific validation
-  if (type === 'Anomaly' && currentMode === 'template') {
+  if (isAnomalyFamilyType(selectedType) && currentMode === 'template') {
     const description = document.getElementById('tf-description').value.trim();
     if (!description) {
       alert('Description is mandatory for Anomaly submissions. Please provide a detailed description of the anomaly.');
@@ -2773,7 +2851,7 @@ async function submitPage() {
     return;
   }
 
-  if (type === 'Tale') {
+  if (isNarrativeFamilyType(selectedType)) {
     const narrativeSample = (document.getElementById('tf-tale-intro')?.value || '') + '\n' + String(htmlContent || '');
     if (!hasFirstPersonNarration(narrativeSample)) {
       alert('Narratives/Field Reports must be written in first-person perspective (I, me, my, we, our).');
