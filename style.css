@@ -332,6 +332,24 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .adm-tbl th{color:var(--red-b);text-transform:uppercase;letter-spacing:1px;font-size:.75rem}
 .adm-tbl tr:hover{background:rgba(139,0,0,.05)}
 @media(max-width:768px){.adm{grid-template-columns:1fr}.adm-side{border-right:none;border-bottom:1px solid var(--red-d)}}
+@media(max-width:768px){
+  .adm-main .card div[style*="display:flex"]{
+    flex-direction:column !important;
+    align-items:stretch;
+  }
+  .adm-main .card div[style*="display:flex"] .btn{
+    width:100%;
+    min-height:44px;
+  }
+  .adm-main .card .btn{
+    min-height:44px;
+  }
+  .adm-main .card .fi,
+  .adm-main .card .fse,
+  .adm-main .card .fta{
+    width:100%;
+  }
+}
 
 /* Submit Editor Layout */
 .editor-wrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;min-height:70vh}

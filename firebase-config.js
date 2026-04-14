@@ -89,6 +89,13 @@ function renderUserMenuHTML(displayLabel) {
         <span class="user-menu-caret">▾</span>
       </button>
       <div class="user-menu-panel" role="menu" aria-label="User menu">
+        <div class="user-menu-setting" onclick="event.stopPropagation()">
+          <label class="user-menu-setting-label" for="submit-autosave-setting">Draft Autosave</label>
+          <select class="user-menu-setting-select" id="submit-autosave-setting" aria-label="Draft autosave setting" onchange="typeof setSubmitAutosaveSetting === 'function' && setSubmitAutosaveSetting(this.value)">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
         <button class="user-menu-item" type="button" role="menuitem" onclick="changeUsername(); closeUserMenus();">Change Username</button>
         <button class="user-menu-item" type="button" role="menuitem" onclick="auth.signOut(); closeUserMenus();">Log Out</button>
       </div>
