@@ -36,6 +36,10 @@ let designationLocked = false;
 let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history' | 'drafts'
 let submissionApiBase = '/api/submit';
 let hasUnsavedEditorChanges = false;
+let submitAutosaveEnabled = true;
+
+const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
+const DRAFT_AUTOSAVE_MIN_WORDS = 150;
 
 const ANOMALY_SUBTYPE_RULES = {
   ROS: {
@@ -199,14 +203,11 @@ auth.onAuthStateChanged(user => {
   document.getElementById('submit-loading').classList.add('hidden');
   const navAuth = document.getElementById('nav-auth');
   if (user) {
+    submitAutosaveEnabled = loadSubmitAutosaveSetting();
     currentUserForSubmit = user;
     document.getElementById('submit-denied').classList.add('hidden');
     document.getElementById('submit-panel').classList.remove('hidden');
-    navAuth.innerHTML =
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' +
-        '<button class="nav-btn" onclick="changeUsername()" title="Click to change your username">' + (user.displayName || 'Agent') + '</button>' +
-        '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>' +
-      '</div>';
+    navAuth.innerHTML = renderSubmitUserMenu(user);
     setDraftStatus('Draft autosave is idle.');
     configureSubmissionApiBase();
     initializeSubmitEditModeFromUrl();
@@ -242,19 +243,56 @@ window.addEventListener('beforeunload', event => {
   if (hasUnsavedEditorChanges) {
     event.preventDefault();
     event.returnValue = 'You have unsaved content. Leave this page anyway?';
-    return;
-  }
-  saveDraft({ silent: true, trigger: 'leave' });
-});
-
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && currentUserForSubmit) {
-    saveDraft({ silent: true, trigger: 'hidden' });
   }
 });
 
 function getTagOptions() {
   return [...BASE_TAG_OPTIONS, ...customTagOptions];
+}
+
+function loadSubmitAutosaveSetting() {
+  try {
+    const raw = localStorage.getItem(DRAFT_AUTOSAVE_SETTING_KEY);
+    if (raw === 'off') return false;
+    if (raw === 'on') return true;
+  } catch (_err) {
+    // Use default.
+  }
+  return true;
+}
+
+function setSubmitAutosaveSetting(value) {
+  const normalized = String(value || '').toLowerCase();
+  submitAutosaveEnabled = normalized !== 'off';
+  try {
+    localStorage.setItem(DRAFT_AUTOSAVE_SETTING_KEY, submitAutosaveEnabled ? 'on' : 'off');
+  } catch (_err) {
+    // Storage unavailable. Keep runtime value.
+  }
+  setDraftStatus(submitAutosaveEnabled ? 'Draft autosave is enabled.' : 'Draft autosave is disabled.');
+}
+
+function renderSubmitUserMenu(user) {
+  const label = String((user && user.displayName) || 'Agent').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const autosaveValue = submitAutosaveEnabled ? 'on' : 'off';
+  return '' +
+    '<div class="user-menu" data-user-menu>' +
+      '<button class="nav-btn user-menu-trigger" type="button" onclick="toggleUserMenu(this, event)" aria-haspopup="true" aria-expanded="false">' +
+        '<span class="user-menu-label">' + label + '</span>' +
+        '<span class="user-menu-caret">▾</span>' +
+      '</button>' +
+      '<div class="user-menu-panel" role="menu" aria-label="User menu">' +
+        '<div class="user-menu-setting" onclick="event.stopPropagation()">' +
+          '<label class="user-menu-setting-label" for="submit-autosave-setting">Draft Autosave</label>' +
+          '<select class="user-menu-setting-select" id="submit-autosave-setting" aria-label="Draft autosave setting" onchange="setSubmitAutosaveSetting(this.value)">' +
+            '<option value="on"' + (autosaveValue === 'on' ? ' selected' : '') + '>On</option>' +
+            '<option value="off"' + (autosaveValue === 'off' ? ' selected' : '') + '>Off</option>' +
+          '</select>' +
+        '</div>' +
+        '<button class="user-menu-item" type="button" role="menuitem" onclick="changeUsername(); closeUserMenus();">Change Username</button>' +
+        '<button class="user-menu-item" type="button" role="menuitem" onclick="auth.signOut(); closeUserMenus();">Log Out</button>' +
+      '</div>' +
+    '</div>';
 }
 
 function normalizeTagValue(tag) {
@@ -296,6 +334,21 @@ function setSubmitViewMode(mode) {
   editor.classList.toggle('hidden', !showEditor);
   createWorkspace.classList.toggle('hidden', !showEditor);
   history.classList.toggle('hidden', !listMode);
+  updateMySubmissionsHeading(mode);
+}
+
+function updateMySubmissionsHeading(mode) {
+  const heading = document.getElementById('my-submissions-heading');
+  if (!heading) return;
+  if (mode === 'drafts') {
+    heading.textContent = 'Saved Drafts';
+    return;
+  }
+  if (mode === 'history') {
+    heading.textContent = 'Submission History';
+    return;
+  }
+  heading.textContent = 'Submission Records';
 }
 
 function markEditorAsChanged() {
@@ -458,12 +511,30 @@ function setDraftStatus(message, isError = false) {
 }
 
 function scheduleDraftAutoSave() {
-  if (suppressDraftAutoSave || !currentUserForSubmit || submitEditTarget) return;
+  if (suppressDraftAutoSave || !currentUserForSubmit || submitEditTarget || !submitAutosaveEnabled) return;
   clearTimeout(draftAutoSaveTimer);
   setDraftStatus('Draft changes detected. Autosaving...');
   draftAutoSaveTimer = setTimeout(() => {
     saveDraft({ silent: true, trigger: 'autosave' });
   }, 2500);
+}
+
+function extractWordCountFromHtml(html) {
+  const text = String(html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&[a-z0-9#]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return 0;
+  return text.split(' ').filter(Boolean).length;
+}
+
+function hasDraftImage(contentHtml, uploadedAssets) {
+  if (Array.isArray(uploadedAssets) && uploadedAssets.length > 0) return true;
+  return /<img\b/i.test(String(contentHtml || ''));
 }
 
 function buildCurrentEditorContent(requireContent) {
@@ -575,12 +646,6 @@ async function saveDraft(options = {}) {
     };
   }
 
-  const isEmpty = !title && !slug && !tags.length && !content.htmlContent.trim() && !content.cssContent.trim();
-  if (isEmpty) {
-    if (!silent) setDraftStatus('Draft not saved because the editor is empty.');
-    return null;
-  }
-
   const uploadedAssets = uploadedImages
     .filter(img => !img.removed && img.remoteUrl)
     .map(img => ({
@@ -588,6 +653,33 @@ async function saveDraft(options = {}) {
       alt: img.alt || img.name || '',
       caption: img.caption || ''
     }));
+
+  const wordCount = extractWordCountFromHtml(content.htmlContent || '');
+  const hasImage = hasDraftImage(content.htmlContent || '', uploadedAssets);
+  const meaningfulCss = String(content.cssContent || '').trim().length > 0;
+  const isEmpty = !title && !slug && !tags.length && wordCount === 0 && !meaningfulCss && !hasImage;
+  if (isEmpty) {
+    if (!silent) setDraftStatus('Draft not saved because the page is empty.');
+    return null;
+  }
+
+  if (trigger === 'autosave') {
+    if (wordCount < DRAFT_AUTOSAVE_MIN_WORDS) {
+      setDraftStatus('Autosave skipped: at least ' + DRAFT_AUTOSAVE_MIN_WORDS + ' words are required.');
+      return null;
+    }
+    if (!hasImage) {
+      setDraftStatus('Autosave skipped: add at least one image before autosaving.');
+      return null;
+    }
+  }
+
+  const shouldSave = confirm('Do you want to save this draft now?');
+  if (!shouldSave) {
+    setDraftStatus('Draft save canceled.');
+    return null;
+  }
+
   const uploadedUrls = uploadedAssets.map(asset => asset.url);
   const sanitizedHTML = sanitizeHTML(content.htmlContent || '');
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title || 'Untitled Draft');
@@ -3093,6 +3185,7 @@ async function loadMySubmissions(viewMode = 'history') {
   const container = document.getElementById('my-submissions');
   if (!container) return;
   const showDraftsOnly = viewMode === 'drafts';
+  updateMySubmissionsHeading(viewMode);
 
   try {
     let submissions = [];

@@ -109,6 +109,9 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .user-menu-caret{font-size:.65rem;line-height:1;opacity:.8}
 .user-menu-panel{position:absolute;top:calc(100% + 8px);right:0;min-width:180px;background:var(--blk-s);border:1px solid var(--red-d);box-shadow:0 8px 24px rgba(0,0,0,.35);padding:6px;display:none;z-index:250}
 .user-menu.open .user-menu-panel{display:block}
+.user-menu-setting{padding:8px 10px;border:1px solid var(--blk-d);margin:4px 0 6px;background:rgba(0,0,0,.25)}
+.user-menu-setting-label{display:block;font-family:var(--font-m);font-size:.66rem;letter-spacing:1px;text-transform:uppercase;color:var(--wht-f);margin-bottom:6px}
+.user-menu-setting-select{width:100%;background:var(--blk-b);border:1px solid var(--red-d);color:var(--wht-d);padding:7px 9px;font-family:var(--font-m);font-size:.72rem;text-transform:uppercase;letter-spacing:.9px;min-height:36px}
 .user-menu-item{display:block;width:100%;padding:10px 12px;background:transparent;border:1px solid transparent;color:var(--wht-d);font-family:var(--font-m);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;text-align:left;cursor:pointer;transition:all var(--tr)}
 .user-menu-item:hover{background:var(--red);color:var(--wht);border-color:var(--red)}
 @media(min-width:769px){
