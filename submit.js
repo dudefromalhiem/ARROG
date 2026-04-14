@@ -289,7 +289,7 @@ function setSubmitViewMode(mode) {
   if (!explorer || !editor || !history || !createWorkspace) return;
 
   const showExplorer = mode === 'explorer';
-  const showEditor = mode === 'editor';
+  const showEditor = mode !== 'explorer';
   const listMode = mode === 'history' || mode === 'drafts';
 
   explorer.classList.toggle('hidden', !showExplorer);
