@@ -2717,7 +2717,11 @@ function getStorageMimeType(file) {
 
 function createUploadTask(ref, file, onProgress, onTaskCreated) {
   return new Promise((resolve, reject) => {
+    const NO_PROGRESS_TIMEOUT_MS = 45000;
+    const STALL_TIMEOUT_MS = 180000;
     let uploadCompleted = false;
+    let started = false;
+    let lastProgressAt = Date.now();
     const metadata = {
       contentType: getStorageMimeType(file) || 'application/octet-stream',
       cacheControl: 'public,max-age=31536000,immutable'
@@ -2726,19 +2730,41 @@ function createUploadTask(ref, file, onProgress, onTaskCreated) {
     const task = ref.put(file, metadata);
     if (typeof onTaskCreated === 'function') onTaskCreated(task);
 
+    const watchdog = setInterval(() => {
+      if (uploadCompleted) {
+        clearInterval(watchdog);
+        return;
+      }
+      const idleFor = Date.now() - lastProgressAt;
+      const timedOutBeforeStart = !started && idleFor >= NO_PROGRESS_TIMEOUT_MS;
+      const timedOutAfterStart = started && idleFor >= STALL_TIMEOUT_MS;
+      if (timedOutBeforeStart || timedOutAfterStart) {
+        uploadCompleted = true;
+        clearInterval(watchdog);
+        try { task.cancel(); } catch (e) { /* ignore */ }
+        const err = new Error('Upload stalled with no progress; retrying with fallback bucket.');
+        err.code = 'storage/stalled';
+        reject(err);
+      }
+    }, 4000);
+
     task.on('state_changed',
       snap => {
+        started = true;
+        lastProgressAt = Date.now();
         if (typeof onProgress === 'function') onProgress(snap, task);
       },
       err => {
         if (uploadCompleted) return;
         uploadCompleted = true;
+        clearInterval(watchdog);
         console.error('[Upload Error]', err.code, err.message);
         reject(err);
       },
       async () => {
         if (uploadCompleted) return;
         uploadCompleted = true;
+        clearInterval(watchdog);
         try {
           const url = await ref.getDownloadURL();
           resolve({ task, url });
@@ -2759,6 +2785,7 @@ async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
     'storage/network-request-failed',
     'storage/invalid-default-bucket',
     'storage/bucket-not-found',
+    'storage/stalled',
     'storage/unknown'
   ]);
   const errors = [];
@@ -2894,12 +2921,13 @@ async function uploadImage(file) {
     uploadRecord.status = 'uploading';
     renderImageList();
     if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + ' to Storage...';
-    progressBar.style.width = '20%';
+    progressBar.style.width = '2%';
 
     const remoteUrl = await uploadWithBucketFallback(path, file, uploadRecord, snap => {
-      const pct = snap && snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 20;
-      progressBar.style.width = Math.max(20, Math.min(100, pct)) + '%';
-      if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '... ' + Math.max(20, Math.min(100, pct)) + '%';
+      const pct = snap && snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 0;
+      const safePct = Math.max(2, Math.min(100, pct));
+      progressBar.style.width = safePct + '%';
+      if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '... ' + safePct + '%';
     });
     progressBar.style.width = '100%';
     finalizeSuccess(remoteUrl);
@@ -2994,12 +3022,13 @@ async function uploadSupplementalMedia(file, kind) {
     uploadRecord.status = 'uploading';
     renderMediaList();
     if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + ' to Storage...';
-    progressBar.style.width = '20%';
+    progressBar.style.width = '2%';
 
     const remoteUrl = await uploadWithBucketFallback(path, file, uploadRecord, snap => {
-      const pct = snap && snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 20;
-      progressBar.style.width = Math.max(20, Math.min(100, pct)) + '%';
-      if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '... ' + Math.max(20, Math.min(100, pct)) + '%';
+      const pct = snap && snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 0;
+      const safePct = Math.max(2, Math.min(100, pct));
+      progressBar.style.width = safePct + '%';
+      if (uploadStatus) uploadStatus.textContent = 'Uploading ' + file.name + '... ' + safePct + '%';
     });
     progressBar.style.width = '100%';
     finalizeSuccess(remoteUrl);
