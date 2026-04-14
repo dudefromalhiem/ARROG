@@ -399,6 +399,58 @@ module.exports = async function handler(req, res) {
     const submissionRef = submissionId ? db.collection('submissions').doc(submissionId) : db.collection('submissions').doc();
     const adminAccess = await isAdminUser(db, actor.uid, actor.email);
 
+    if (action === 'patch-assets') {
+      if (!submissionId) return sendJson(res, 400, { error: 'Missing submission id.' });
+
+      const existing = await submissionRef.get();
+      if (!existing.exists) return sendJson(res, 404, { error: 'Submission not found.' });
+
+      const current = existing.data() || {};
+      if (!adminAccess && current.authorUid !== actor.uid) {
+        return sendJson(res, 403, { error: 'Forbidden.' });
+      }
+
+      const imageAssets = Array.isArray(body.imageAssets)
+        ? body.imageAssets
+            .map(asset => ({
+              url: String(asset && asset.url || '').trim(),
+              alt: String(asset && asset.alt || '').trim(),
+              caption: String(asset && asset.caption || '').trim(),
+              label: String(asset && asset.label || '').trim()
+            }))
+            .filter(asset => asset.url)
+        : [];
+      const mediaAssets = normalizeMediaAssets(body.mediaAssets || []);
+
+      const patch = stripUndefined({
+        imageUrls: Array.isArray(body.imageUrls) ? body.imageUrls.filter(Boolean).map(String) : imageAssets.map(asset => asset.url),
+        imageAssets,
+        mediaUrls: Array.isArray(body.mediaUrls) ? body.mediaUrls.filter(Boolean).map(String) : mediaAssets.map(asset => asset.url),
+        mediaAssets,
+        uploadState: {
+          pendingCount: Number(body.uploadState && body.uploadState.pendingCount || 0),
+          failedCount: Number(body.uploadState && body.uploadState.failedCount || 0),
+          syncedAt: admin.firestore.FieldValue.serverTimestamp()
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      await submissionRef.set(patch, { merge: true });
+
+      const approvedPageId = String(current.approvedPageId || '').trim();
+      if (approvedPageId) {
+        await db.collection('pages').doc(approvedPageId).set(stripUndefined({
+          imageUrls: patch.imageUrls,
+          imageAssets: patch.imageAssets,
+          mediaUrls: patch.mediaUrls,
+          mediaAssets: patch.mediaAssets,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }), { merge: true });
+      }
+
+      return sendJson(res, 200, { id: submissionId, status: String(current.status || 'pending') });
+    }
+
     if (action === 'draft') {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = 'draft';

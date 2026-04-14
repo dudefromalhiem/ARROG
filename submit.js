@@ -18,6 +18,9 @@ let activeDraftId = null;
 let draftAutoSaveTimer = null;
 let draftSaveInFlight = false;
 let suppressDraftAutoSave = false;
+let assetSyncTimer = null;
+let assetSyncInFlight = false;
+let lastAssetSyncSignature = '';
 const IMAGE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const AUDIO_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const VIDEO_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
@@ -2585,6 +2588,13 @@ function fileToDataUrl(file) {
   });
 }
 
+function createLocalPreviewUrl(file) {
+  if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    return { url: URL.createObjectURL(file), isObjectUrl: true };
+  }
+  return { url: '', isObjectUrl: false };
+}
+
 function dataUrlByteLength(dataUrl) {
   const parts = String(dataUrl || '').split(',');
   if (parts.length < 2) return 0;
@@ -2705,53 +2715,30 @@ function getStorageMimeType(file) {
   return mimeMap[ext] || '';
 }
 
-function createUploadTask(ref, file, onProgress) {
+function createUploadTask(ref, file, onProgress, onTaskCreated) {
   return new Promise((resolve, reject) => {
-    let lastProgressAt = Date.now();
-    let uploadStarted = false;
     let uploadCompleted = false;
     const metadata = {
       contentType: getStorageMimeType(file) || 'application/octet-stream',
       cacheControl: 'public,max-age=31536000,immutable'
     };
-    
-    // Timeout if nothing happens for 30 seconds
-    const initialTimeout = setTimeout(() => {
-      if (!uploadStarted) {
-        try { task.cancel(); } catch (e) { /* ignore */ }
-        clearInterval(stallTimer);
-        reject(new Error('Upload timeout: No progress after 30 seconds. Check Firebase Storage rules and network connection.'));
-      }
-    }, 30000);
 
     const task = ref.put(file, metadata);
-
-    const stallTimer = setInterval(() => {
-      if (Date.now() - lastProgressAt > UPLOAD_STALL_TIMEOUT_MS) {
-        try { task.cancel(); } catch (e) { /* ignore */ }
-      }
-    }, UPLOAD_STALL_CHECK_MS);
+    if (typeof onTaskCreated === 'function') onTaskCreated(task);
 
     task.on('state_changed',
       snap => {
-        uploadStarted = true;
-        clearTimeout(initialTimeout);
-        lastProgressAt = Date.now();
         if (typeof onProgress === 'function') onProgress(snap, task);
       },
       err => {
         if (uploadCompleted) return;
         uploadCompleted = true;
-        clearInterval(stallTimer);
-        clearTimeout(initialTimeout);
         console.error('[Upload Error]', err.code, err.message);
         reject(err);
       },
       async () => {
         if (uploadCompleted) return;
         uploadCompleted = true;
-        clearInterval(stallTimer);
-        clearTimeout(initialTimeout);
         try {
           const url = await ref.getDownloadURL();
           resolve({ task, url });
@@ -2799,8 +2786,9 @@ async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
     }
 
     try {
-      const { task, url } = await createUploadTask(ref, file, setProgress);
-      uploadRecord.task = task;
+      const { url } = await createUploadTask(ref, file, setProgress, task => {
+        uploadRecord.task = task;
+      });
       console.log('[uploadWithBucketFallback] Upload succeeded');
       return url;
     } catch (err) {
@@ -2850,7 +2838,8 @@ async function uploadImage(file) {
   const path = 'uploads/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
   const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
   const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
-  const localUrl = await fileToDataUrl(file);
+  const preview = createLocalPreviewUrl(file);
+  const localUrl = preview.url || await fileToDataUrl(file);
   const uploadRecord = {
     id: uploadId,
     name: file.name,
@@ -2866,6 +2855,7 @@ async function uploadImage(file) {
     caption: '',
     alt: file.name.replace(/\.[^.]+$/, ''),
     fingerprint: fingerprint,
+    isObjectUrl: preview.isObjectUrl,
     timeoutId: null
   };
   uploadedImages.push(uploadRecord);
@@ -2882,6 +2872,7 @@ async function uploadImage(file) {
     if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '. Click Retry.';
     console.error('[Upload] Failed:', msg);
     if (msg) alert(msg);
+    scheduleSubmissionAssetSync();
   }
 
   function finalizeSuccess(url) {
@@ -2896,6 +2887,7 @@ async function uploadImage(file) {
     progressWrap.style.display = 'none';
     if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
     console.log('[Upload] Success:', url);
+    scheduleSubmissionAssetSync();
   }
 
   try {
@@ -2950,7 +2942,8 @@ async function uploadSupplementalMedia(file, kind) {
   const path = 'uploads/' + currentUserForSubmit.uid + '/' + timestamp + '_' + safeName;
   const uploadId = timestamp + '_' + Math.random().toString(36).slice(2, 8) + '_' + safeName;
   const fingerprint = file.name + '::' + file.size + '::' + file.lastModified;
-  const localUrl = await fileToDataUrl(file);
+  const preview = createLocalPreviewUrl(file);
+  const localUrl = preview.url || await fileToDataUrl(file);
   const uploadRecord = {
     id: uploadId,
     name: file.name,
@@ -2967,6 +2960,7 @@ async function uploadSupplementalMedia(file, kind) {
     caption: '',
     alt: file.name.replace(/\.[^.]+$/, ''),
     fingerprint: fingerprint,
+    isObjectUrl: preview.isObjectUrl,
     timeoutId: null
   };
   uploadedMediaFiles.push(uploadRecord);
@@ -2980,6 +2974,7 @@ async function uploadSupplementalMedia(file, kind) {
     if (uploadStatus) uploadStatus.textContent = 'Upload failed for ' + file.name + '. Click Retry.';
     console.error('[Upload] Failed:', msg);
     if (msg) alert(msg);
+    scheduleSubmissionAssetSync();
   }
 
   function finalizeSuccess(url) {
@@ -2992,6 +2987,7 @@ async function uploadSupplementalMedia(file, kind) {
     scheduleDraftAutoSave();
     progressWrap.style.display = 'none';
     if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
+    scheduleSubmissionAssetSync();
   }
 
   try {
@@ -3076,10 +3072,14 @@ function removeUploadedMedia(id) {
   if (record.timeoutId) {
     try { clearTimeout(record.timeoutId); } catch (e) { /* ignore */ }
   }
+  if (record.isObjectUrl && record.localUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+    try { URL.revokeObjectURL(record.localUrl); } catch (e) { /* ignore */ }
+  }
   uploadedMediaFiles.splice(index, 1);
   renderMediaList();
   markEditorAsChanged();
   scheduleDraftAutoSave();
+  scheduleSubmissionAssetSync();
   const uploadStatus = document.getElementById('upload-status');
   if (uploadStatus) uploadStatus.textContent = 'Media removed.';
 }
@@ -3124,6 +3124,60 @@ function collectUploadedMediaAssets() {
     }));
 
   return { imageAssets, mediaAssets };
+}
+
+function getPendingUploadCounts() {
+  const pendingImages = uploadedImages.filter(img => !img.removed && img.status === 'uploading').length;
+  const pendingMedia = uploadedMediaFiles.filter(item => !item.removed && item.status === 'uploading').length;
+  const failedImages = uploadedImages.filter(img => !img.removed && img.status === 'failed').length;
+  const failedMedia = uploadedMediaFiles.filter(item => !item.removed && item.status === 'failed').length;
+  return {
+    pending: pendingImages + pendingMedia,
+    failed: failedImages + failedMedia
+  };
+}
+
+async function flushSubmissionAssetSync() {
+  if (!activeDraftId || !currentUserForSubmit || assetSyncInFlight) return;
+
+  const uploadedAssets = collectUploadedMediaAssets();
+  const counts = getPendingUploadCounts();
+  const signature = JSON.stringify({
+    id: activeDraftId,
+    imageUrls: uploadedAssets.imageAssets.map(asset => asset.url),
+    mediaUrls: uploadedAssets.mediaAssets.map(asset => asset.url),
+    pending: counts.pending,
+    failed: counts.failed
+  });
+  if (signature === lastAssetSyncSignature) return;
+
+  assetSyncInFlight = true;
+  try {
+    await callSubmissionApi('POST', {
+      action: 'patch-assets',
+      submissionId: activeDraftId,
+      imageUrls: uploadedAssets.imageAssets.map(asset => asset.url),
+      imageAssets: uploadedAssets.imageAssets,
+      mediaUrls: uploadedAssets.mediaAssets.map(asset => asset.url),
+      mediaAssets: uploadedAssets.mediaAssets,
+      uploadState: {
+        pendingCount: counts.pending,
+        failedCount: counts.failed
+      }
+    });
+    lastAssetSyncSignature = signature;
+  } catch (err) {
+    console.warn('[Submission Asset Sync] Failed:', err && err.message ? err.message : err);
+  } finally {
+    assetSyncInFlight = false;
+  }
+}
+
+function scheduleSubmissionAssetSync() {
+  if (assetSyncTimer) clearTimeout(assetSyncTimer);
+  assetSyncTimer = setTimeout(() => {
+    flushSubmissionAssetSync();
+  }, 1200);
 }
 
 function normalizeUploadedMediaFromDraft(draftAssets, kind) {
@@ -3199,11 +3253,15 @@ function removeUploadedImage(id) {
   if (record.timeoutId) {
     try { clearTimeout(record.timeoutId); } catch (e) { /* ignore */ }
   }
+  if (record.isObjectUrl && record.localUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+    try { URL.revokeObjectURL(record.localUrl); } catch (e) { /* ignore */ }
+  }
   uploadedImages.splice(index, 1);
   renderImageList();
   refreshImageSelectors();
   markEditorAsChanged();
   scheduleDraftAutoSave();
+  scheduleSubmissionAssetSync();
   const uploadStatus = document.getElementById('upload-status');
   if (uploadStatus) uploadStatus.textContent = 'Image removed.';
 }
@@ -3543,21 +3601,10 @@ async function submitPage() {
 
   const inFlightUploads = uploadedImages.filter(img => !img.removed && img.status === 'uploading');
   const inFlightMediaUploads = uploadedMediaFiles.filter(item => !item.removed && item.status === 'uploading');
-  if (inFlightUploads.length || inFlightMediaUploads.length) {
-    alert('Please wait until all uploads finish before submitting.');
-    btn.textContent = '>> Submit for Review';
-    btn.disabled = false;
-    return;
-  }
-
   const failedUploads = uploadedImages.filter(img => !img.removed && img.status === 'failed');
   const failedMediaUploads = uploadedMediaFiles.filter(item => !item.removed && item.status === 'failed');
-  if (failedUploads.length || failedMediaUploads.length) {
-    alert('One or more uploads failed. Retry or remove failed files before submitting.');
-    btn.textContent = '>> Submit for Review';
-    btn.disabled = false;
-    return;
-  }
+  const pendingUploadCount = inFlightUploads.length + inFlightMediaUploads.length;
+  const failedUploadCount = failedUploads.length + failedMediaUploads.length;
 
   const uploadedAssets = collectUploadedMediaAssets();
   if (!isMediaEnabledSubmissionType(type) && uploadedAssets.mediaAssets.length) {
@@ -3622,6 +3669,20 @@ async function submitPage() {
       reviewerName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0] || 'Admin',
       removeDraft: !!activeDraftId
     });
+    activeDraftId = result.id || activeDraftId || null;
+    lastAssetSyncSignature = '';
+    scheduleSubmissionAssetSync();
+
+    if (pendingUploadCount || failedUploadCount) {
+      const uploadStatus = document.getElementById('upload-status');
+      if (uploadStatus) {
+        uploadStatus.textContent = 'Submission saved. Uploads continue in background (' + pendingUploadCount + ' pending, ' + failedUploadCount + ' failed).';
+      }
+      alert('Submission saved. Media files will keep uploading in the background and auto-sync to the backend while this tab stays open.');
+      loadMySubmissions('history');
+      return;
+    }
+
     activeDraftId = null;
     if (isAdminUser) {
       alert('Published directly by admin clearance.\nLive at: /pages/' + slug);
