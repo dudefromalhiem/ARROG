@@ -341,36 +341,12 @@ function normalizeStorageAssetUrl(rawUrl) {
   const input = String(rawUrl || '').trim();
   if (!input) return '';
 
-  const configured = (typeof firebaseConfig !== 'undefined' && firebaseConfig && firebaseConfig.storageBucket)
-    ? String(firebaseConfig.storageBucket).replace(/^gs:\/\//, '')
-    : '';
-  const projectId = (typeof firebaseConfig !== 'undefined' && firebaseConfig && firebaseConfig.projectId)
-    ? String(firebaseConfig.projectId).trim()
-    : '';
-  const preferredBucket = configured || (projectId ? (projectId + '.firebasestorage.app') : '');
-
   if (/^gs:\/\//i.test(input)) {
     const match = input.match(/^gs:\/\/([^\/]+)\/(.+)$/i);
     if (!match) return input;
     const bucket = match[1];
     const objectPath = match[2].replace(/^\/+/, '');
     return 'https://firebasestorage.googleapis.com/v0/b/' + bucket + '/o/' + encodeURIComponent(objectPath) + '?alt=media';
-  }
-
-  const firebaseApiMatch = input.match(/^https?:\/\/firebasestorage\.googleapis\.com\/v0\/b\/([^\/]+)\/o\/([^?]+)(\?.*)?$/i);
-  if (firebaseApiMatch) {
-    const bucket = firebaseApiMatch[1];
-    const objectEncoded = firebaseApiMatch[2];
-    const query = firebaseApiMatch[3] || '';
-    const aliases = new Set([
-      bucket,
-      preferredBucket,
-      projectId ? (projectId + '.appspot.com') : '',
-      projectId ? (projectId + '.firebasestorage.app') : ''
-    ]);
-    const usePreferred = preferredBucket && aliases.has(bucket);
-    const nextBucket = usePreferred ? preferredBucket : bucket;
-    return 'https://firebasestorage.googleapis.com/v0/b/' + nextBucket + '/o/' + objectEncoded + query;
   }
 
   return input;

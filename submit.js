@@ -977,7 +977,7 @@ async function openRejectedSubmissionPreview(id) {
       '<button class="btn btn-sm btn-s" type="button" onclick="closeRejectedSubmissionPreview()">Close</button>' +
     '</div>' +
     '<div class="review-modal-body">' +
-      '<iframe class="review-modal-preview" sandbox="allow-same-origin allow-scripts" csp="default-src \'none\'; style-src \'unsafe-inline\'" title="Rejected submission preview"></iframe>' +
+      '<iframe class="review-modal-preview" sandbox="allow-same-origin allow-scripts" csp="default-src \'none\'; style-src \'unsafe-inline\'; img-src https: data: blob:; media-src https: data: blob:; connect-src https:;" title="Rejected submission preview"></iframe>' +
       '<div class="review-modal-meta">' +
         '<dl>' +
           '<dt>Status</dt><dd><span class="status status-rejected">rejected</span></dd>' +
@@ -1675,6 +1675,8 @@ function createDocBlock(type) {
   if (type === 'title') return { type: 'title', text: '' };
   if (type === 'text') return { type: 'text', html: '' };
   if (type === 'image') return { type: 'image', url: '', caption: '', align: 'center', width: '' };
+  if (type === 'audio') return { type: 'audio', url: '', label: '' };
+  if (type === 'video') return { type: 'video', url: '', label: '', poster: '' };
   if (type === 'quote') return { type: 'quote', text: '', source: '' };
   if (type === 'list') return { type: 'list', items: '' };
   if (type === 'code') return { type: 'code', code: '' };
@@ -1774,6 +1776,23 @@ function renderDocBlocks() {
         '<div><label class="fl">Alignment</label><select class="fi" data-field="align" data-index="' + idx + '"><option value="left"' + (block.align === 'left' ? ' selected' : '') + '>Left</option><option value="center"' + (block.align !== 'left' && block.align !== 'right' ? ' selected' : '') + '>Center</option><option value="right"' + (block.align === 'right' ? ' selected' : '') + '>Right</option></select></div>' +
         '<div><label class="fl">Image Width</label><input class="fi" data-field="width" data-index="' + idx + '" value="' + escapeAttr(block.width || '') + '" placeholder="auto, 80%, 420px" /></div>' +
       '</div>' + imageSrc;
+    } else if (block.type === 'audio') {
+      const preview = block.url
+        ? '<audio src="' + escapeAttr(block.url) + '" controls preload="metadata" style="width:100%;display:block;margin-top:8px"></audio>'
+        : '';
+      body = '<div class="doc-grid-2">' +
+        '<div><label class="fl">Audio URL</label><input class="fi" data-field="url" data-index="' + idx + '" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
+        '<div><label class="fl">Label</label><input class="fi" data-field="label" data-index="' + idx + '" value="' + escapeAttr(block.label || '') + '" placeholder="Optional label" /></div>' +
+      '</div>' + preview;
+    } else if (block.type === 'video') {
+      const preview = block.url
+        ? '<video src="' + escapeAttr(block.url) + '" controls playsinline preload="metadata" style="width:100%;display:block;margin-top:8px;border:1px solid #3a3a3a;background:#111"></video>'
+        : '';
+      body = '<div class="doc-grid-2">' +
+        '<div><label class="fl">Video URL</label><input class="fi" data-field="url" data-index="' + idx + '" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
+        '<div><label class="fl">Label</label><input class="fi" data-field="label" data-index="' + idx + '" value="' + escapeAttr(block.label || '') + '" placeholder="Optional label" /></div>' +
+        '<div><label class="fl">Poster URL</label><input class="fi" data-field="poster" data-index="' + idx + '" value="' + escapeAttr(block.poster || '') + '" placeholder="https://..." /></div>' +
+      '</div>' + preview;
     } else if (block.type === 'quote') {
       body = '<textarea class="fta" data-field="text" data-index="' + idx + '" placeholder="Quote text">' + escapeHtml(block.text || '') + '</textarea>' +
         '<input class="fi" data-field="source" data-index="' + idx + '" value="' + escapeAttr(block.source || '') + '" placeholder="Quote source" />';
@@ -2021,6 +2040,18 @@ function buildDocumentModeHTML() {
       parts.push('<figure class="doc-image-wrap align-' + align + '"><img src="' + escapeAttr(block.url) + '" alt="' + escapeAttr(captionText) + '" loading="lazy" decoding="async" />' + caption + '</figure>');
       return;
     }
+    if (block.type === 'audio' && String(block.url || '').trim()) {
+      const label = String(block.label || '').trim();
+      parts.push('<figure class="doc-media-wrap doc-audio-wrap"><audio src="' + escapeAttr(block.url) + '" controls preload="metadata" style="width:100%;display:block"></audio>' + (label ? '<figcaption>' + escapeHtml(label) + '</figcaption>' : '') + '</figure>');
+      return;
+    }
+    if (block.type === 'video' && String(block.url || '').trim()) {
+      const label = String(block.label || '').trim();
+      const poster = String(block.poster || '').trim();
+      const posterAttr = poster ? ' poster="' + escapeAttr(poster) + '"' : '';
+      parts.push('<figure class="doc-media-wrap doc-video-wrap"><video src="' + escapeAttr(block.url) + '" controls playsinline preload="metadata"' + posterAttr + ' style="width:100%;display:block;border:1px solid #3a3a3a;background:#111"></video>' + (label ? '<figcaption>' + escapeHtml(label) + '</figcaption>' : '') + '</figure>');
+      return;
+    }
     if (block.type === 'quote' && (block.text || '').trim()) {
       const source = block.source ? '<footer>— ' + escapeHtml(block.source) + '</footer>' : '';
       parts.push('<blockquote><p>' + escapeHtml(block.text.trim()) + '</p>' + source + '</blockquote>');
@@ -2053,6 +2084,8 @@ function hasDocumentContent() {
     if (block.type === 'title') return !!String(block.text || '').trim();
     if (block.type === 'text') return !!stripTags(block.html || '');
     if (block.type === 'image') return isValidImageSrc(block.url);
+    if (block.type === 'audio') return !!String(block.url || '').trim();
+    if (block.type === 'video') return !!String(block.url || '').trim();
     if (block.type === 'quote') return !!String(block.text || '').trim();
     if (block.type === 'list') return String(block.items || '').split(/\n+/).map(s => s.trim()).filter(Boolean).length > 0;
     if (block.type === 'code') return !!String(block.code || '').trim();
@@ -2119,7 +2152,7 @@ function sanitizeCSS(css) {
 function buildSandboxDocument(html, css) {
   const htmlWithLazyImages = String(html || '').replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' +
-    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'">' +
+    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src https: data: blob:; media-src https: data: blob:; connect-src https:;">' +
     '<style>' +
     ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--wht-d:#999;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
     '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
@@ -2708,31 +2741,12 @@ function normalizeStorageAssetUrl(rawUrl) {
   const input = String(rawUrl || '').trim();
   if (!input) return '';
 
-  const preferredBucket = getPreferredStorageBucket();
-  const projectId = (firebaseConfig && firebaseConfig.projectId) ? String(firebaseConfig.projectId).trim() : '';
-
   if (/^gs:\/\//i.test(input)) {
     const match = input.match(/^gs:\/\/([^\/]+)\/(.+)$/i);
     if (!match) return input;
     const bucket = match[1];
     const objectPath = match[2].replace(/^\/+/, '');
     return 'https://firebasestorage.googleapis.com/v0/b/' + bucket + '/o/' + encodeURIComponent(objectPath) + '?alt=media';
-  }
-
-  const firebaseApiMatch = input.match(/^https?:\/\/firebasestorage\.googleapis\.com\/v0\/b\/([^\/]+)\/o\/([^?]+)(\?.*)?$/i);
-  if (firebaseApiMatch) {
-    const bucket = firebaseApiMatch[1];
-    const objectEncoded = firebaseApiMatch[2];
-    const query = firebaseApiMatch[3] || '';
-    const aliases = new Set([
-      bucket,
-      preferredBucket,
-      projectId ? (projectId + '.appspot.com') : '',
-      projectId ? (projectId + '.firebasestorage.app') : ''
-    ]);
-    const usePreferred = preferredBucket && aliases.has(bucket);
-    const nextBucket = usePreferred ? preferredBucket : bucket;
-    return 'https://firebasestorage.googleapis.com/v0/b/' + nextBucket + '/o/' + objectEncoded + query;
   }
 
   return input;
@@ -3123,6 +3137,7 @@ function renderMediaList() {
         '<input class="fi" type="text" placeholder="Optional label" value="' + escapeAttr(item.label || '') + '" oninput="updateUploadedMediaMeta(' + JSON.stringify(item.id) + ', ' + JSON.stringify('label') + ', this.value)" style="margin-top:6px;font-size:.72rem;padding:6px 8px" />' +
       '</div>' +
       '<button class="btn btn-sm btn-s btn-copy" type="button" onclick="copyMediaUrl(\'' + item.id + '\', this)">Copy URL</button>' +
+      (item.status === 'ready' ? '<button class="btn btn-sm btn-s" type="button" onclick="insertUploadedMediaIntoPage(\'' + item.id + '\')">Insert</button>' : '') +
       (item.status === 'failed' ? '<button class="btn btn-sm btn-s" type="button" onclick="retryUploadedMedia(\'' + item.id + '\')">Retry</button>' : '') +
       '<button class="btn btn-sm btn-d" type="button" onclick="removeUploadedMedia(\'' + item.id + '\')">Remove</button>' +
     '</div>';
@@ -3187,6 +3202,88 @@ function copyMediaUrl(id, buttonEl) {
   }).catch(() => {
     prompt('Copy this URL:', url);
   });
+}
+
+function insertMarkupAtCursorInTextarea(textarea, markup) {
+  if (!textarea) return false;
+  const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+  const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : textarea.value.length;
+  const before = textarea.value.slice(0, start);
+  const after = textarea.value.slice(end);
+  textarea.value = before + markup + after;
+  const caret = start + markup.length;
+  textarea.selectionStart = textarea.selectionEnd = caret;
+  textarea.focus();
+  return true;
+}
+
+function insertUploadedAssetMarkup(kind, url, label) {
+  const safeUrl = escapeAttr(url);
+  const safeLabel = escapeHtml(label || '');
+  if (kind === 'image') {
+    return '<figure><img src="' + safeUrl + '" alt="' + escapeAttr(label || 'Uploaded image') + '" loading="lazy" decoding="async" />' + (safeLabel ? '<figcaption>' + safeLabel + '</figcaption>' : '') + '</figure>';
+  }
+  if (kind === 'video') {
+    return '<figure><video src="' + safeUrl + '" controls playsinline preload="metadata"></video>' + (safeLabel ? '<figcaption>' + safeLabel + '</figcaption>' : '') + '</figure>';
+  }
+  return '<figure><audio src="' + safeUrl + '" controls preload="metadata"></audio>' + (safeLabel ? '<figcaption>' + safeLabel + '</figcaption>' : '') + '</figure>';
+}
+
+function insertUploadedAssetIntoCurrentEditor(kind, url, label) {
+  if (!url) {
+    alert('This file is not uploaded yet. Wait until status is Uploaded.');
+    return;
+  }
+
+  const markup = insertUploadedAssetMarkup(kind, url, label);
+
+  if (currentMode === 'code') {
+    const htmlField = document.getElementById('sf-html');
+    insertMarkupAtCursorInTextarea(htmlField, '\n' + markup + '\n');
+    schedulePreview();
+    return;
+  }
+
+  if (currentMode === 'doc') {
+    if (activeDocEditable && document.contains(activeDocEditable)) {
+      activeDocEditable.focus();
+      document.execCommand('insertHTML', false, markup);
+      schedulePreview();
+      return;
+    }
+    const block = createDocBlock(kind);
+    block.url = url;
+    if (kind === 'image') block.caption = label || '';
+    if (kind === 'audio' || kind === 'video') block.label = label || '';
+    docBlocks.push(block);
+    renderDocBlocks();
+    schedulePreview();
+    return;
+  }
+
+  switchMode('code');
+  const htmlField = document.getElementById('sf-html');
+  insertMarkupAtCursorInTextarea(htmlField, '\n' + markup + '\n');
+  schedulePreview();
+  alert('Inserted into Code Editor for precise placement.');
+}
+
+function insertUploadedImageIntoPage(id) {
+  const record = uploadedImages.find(img => img.id === id && !img.removed);
+  if (!record || !record.remoteUrl) {
+    alert('Image is not uploaded yet.');
+    return;
+  }
+  insertUploadedAssetIntoCurrentEditor('image', record.remoteUrl, record.caption || record.name);
+}
+
+function insertUploadedMediaIntoPage(id) {
+  const record = uploadedMediaFiles.find(item => item.id === id && !item.removed);
+  if (!record || !record.remoteUrl) {
+    alert('Media file is not uploaded yet.');
+    return;
+  }
+  insertUploadedAssetIntoCurrentEditor(record.kind, record.remoteUrl, record.label || record.name);
 }
 
 function collectUploadedMediaAssets() {
@@ -3307,6 +3404,7 @@ function renderImageList() {
         <input class="fi" type="text" placeholder="Image caption (shown on page)" value="${escapeHtml(img.caption || '')}" oninput="updateUploadedImageMeta('${img.id}', 'caption', this.value)" style="margin-top:6px;font-size:.72rem;padding:6px 8px" />
       </div>
       <button class="btn btn-sm btn-s btn-copy" type="button" onclick="copyImageUrl('${img.id}', this)">Copy URL</button>
+      ${img.status === 'ready' ? '<button class="btn btn-sm btn-s" type="button" onclick="insertUploadedImageIntoPage(\'' + img.id + '\')">Insert</button>' : ''}
       ${img.status === 'failed' ? '<button class="btn btn-sm btn-s" type="button" onclick="retryUploadedImage(\'' + img.id + '\')">Retry</button>' : ''}
       <button class="btn btn-sm btn-d" type="button" onclick="removeUploadedImage('${img.id}')">Remove</button>
     </div>
