@@ -432,14 +432,19 @@ function applySiteAccessGate(user) {
 }
 
 auth.onAuthStateChanged(async user => {
-  syncServerAuthCookie(user);
-  await syncSharedNav(user);
-  applySiteAccessGate(user);
-  document.documentElement.classList.remove('auth-pending');
-
-  Promise.allSettled([rolesReady, siteStateReady]).then(() => {
-    SITE_STATE.esdLocked = !!SITE_STATE.esdLocked;
-    syncSharedNav(user);
+  try {
+    await syncServerAuthCookie(user);
+    await syncSharedNav(user);
     applySiteAccessGate(user);
-  });
+    document.documentElement.classList.remove('auth-pending');
+
+    Promise.allSettled([rolesReady, siteStateReady]).then(() => {
+      SITE_STATE.esdLocked = !!SITE_STATE.esdLocked;
+      syncSharedNav(user);
+      applySiteAccessGate(user);
+    }).catch(err => console.warn('[Auth] Error after roles ready:', err));
+  } catch (err) {
+    console.error('[Auth State] Error in auth listener:', err);
+    document.documentElement.classList.remove('auth-pending');
+  }
 });
