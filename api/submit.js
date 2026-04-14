@@ -73,7 +73,9 @@ function validateSubmissionMediaOrThrow(payload) {
     : [];
   const mediaAssets = normalizeMediaAssets(payload.mediaAssets);
   const mediaKinds = new Set(mediaAssets.map(asset => asset.kind));
-  const requiresMediaGate = String(payload.type || '').trim() !== 'Tale' && String(payload.type || '').trim() !== 'Anomaly';
+  const normalizedType = String(payload.type || '').trim().toLowerCase();
+  const mediaEnabledTypes = new Set(['tale', 'anomaly', 'guide', 'legacy']);
+  const requiresMediaGate = !mediaEnabledTypes.has(normalizedType);
 
   if (imageAssets.length > 5) {
     const err = new Error('Too many image files attached. Maximum is 5 images per submission.');
@@ -82,7 +84,7 @@ function validateSubmissionMediaOrThrow(payload) {
   }
 
   if (requiresMediaGate && mediaAssets.length) {
-    const err = new Error('Audio and video uploads are only allowed for Tale and Anomaly submissions.');
+    const err = new Error('Audio and video uploads are only allowed for Tale, Anomaly, Guide, and Legacy submissions.');
     err.statusCode = 400;
     throw err;
   }

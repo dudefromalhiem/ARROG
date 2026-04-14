@@ -422,7 +422,7 @@ render.mount('submission-terminal');</pre>
       <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Choose image, audio, or video files to upload">
         <div class="uz-icon">⬆</div>
         <div class="uz-text">Click or drag images, audio, or video here to upload</div>
-        <div class="uz-hint">Images are available for all page types. Audio and video are limited to Tale and Anomaly submissions.</div>
+        <div class="uz-hint">Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, and Legacy submissions.</div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-s" type="button" id="choose-images-btn">Choose Files</button>
@@ -465,6 +465,20 @@ render.mount('submission-terminal');</pre>
         <div class="fg"><label class="fl" id="tf-containment-label">Containment Procedures</label>
           <textarea class="fta" id="tf-containment" placeholder="Describe how this anomaly is contained..."></textarea>
         </div>
+        <div class="doc-grid-2">
+          <div class="fg">
+            <label class="fl" for="tf-anomaly-audio">Attached Audio</label>
+            <select class="fi" id="tf-anomaly-audio">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl" for="tf-anomaly-video">Attached Video</label>
+            <select class="fi" id="tf-anomaly-video">
+              <option value="">None</option>
+            </select>
+          </div>
+        </div>
         <div class="fg"><label class="fl">Description <span style="color: var(--red-b);">*</span></label>
           <textarea class="fta" id="tf-description" placeholder="Describe the anomaly in detail..." required></textarea>
           <span style="font-size:.7rem;color:var(--red-b)">Required. Provide a detailed description of the anomaly.</span>
@@ -487,6 +501,20 @@ render.mount('submission-terminal');</pre>
         </div>
         <div class="fg"><label class="fl">Prologue / Opening</label>
           <textarea class="fta" id="tf-tale-intro" placeholder="Write the opening passage..."></textarea>
+        </div>
+        <div class="doc-grid-2">
+          <div class="fg">
+            <label class="fl" for="tf-tale-audio">Attached Audio</label>
+            <select class="fi" id="tf-tale-audio">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl" for="tf-tale-video">Attached Video</label>
+            <select class="fi" id="tf-tale-video">
+              <option value="">None</option>
+            </select>
+          </div>
         </div>
 
         <div id="tf-tale-sections"></div>
@@ -519,6 +547,20 @@ render.mount('submission-terminal');</pre>
           <select class="fi" id="tf-guide-hero">
             <option value="">None — No hero image</option>
           </select>
+        </div>
+        <div class="doc-grid-2">
+          <div class="fg">
+            <label class="fl" for="tf-guide-audio">Attached Audio</label>
+            <select class="fi" id="tf-guide-audio">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl" for="tf-guide-video">Attached Video</label>
+            <select class="fi" id="tf-guide-video">
+              <option value="">None</option>
+            </select>
+          </div>
         </div>
 
         <div id="tf-guide-sections"></div>

@@ -189,7 +189,8 @@ function isNarrativeFamilyType(rawType) {
 }
 
 function isMediaEnabledSubmissionType(rawType) {
-  return isAnomalyFamilyType(rawType) || isNarrativeFamilyType(rawType);
+  const type = String(rawType || '').trim().toLowerCase();
+  return isAnomalyFamilyType(rawType) || isNarrativeFamilyType(rawType) || type === 'guide' || type === 'legacy';
 }
 
 function getSelectedSubmissionType() {
@@ -343,8 +344,8 @@ auth.onAuthStateChanged(user => {
   document.getElementById('submit-loading').classList.add('hidden');
   const navAuth = document.getElementById('nav-auth');
   if (user) {
-    submitAutosaveEnabled = loadSubmitAutosaveSetting();
     currentUserForSubmit = user;
+    submitAutosaveEnabled = loadSubmitAutosaveSetting(user);
     document.getElementById('submit-denied').classList.add('hidden');
     document.getElementById('submit-panel').classList.remove('hidden');
     navAuth.innerHTML = renderSubmitUserMenu(user);
@@ -390,9 +391,16 @@ function getTagOptions() {
   return [...BASE_TAG_OPTIONS, ...customTagOptions];
 }
 
-function loadSubmitAutosaveSetting() {
+function loadSubmitAutosaveSetting(user) {
+  const activeUser = user || currentUserForSubmit;
+  const key = activeUser && activeUser.uid ? (DRAFT_AUTOSAVE_SETTING_KEY + ':' + activeUser.uid) : DRAFT_AUTOSAVE_SETTING_KEY;
   try {
-    const raw = localStorage.getItem(DRAFT_AUTOSAVE_SETTING_KEY);
+    const raw = localStorage.getItem(key);
+    if (raw === null && activeUser && activeUser.uid) {
+      const legacy = localStorage.getItem(DRAFT_AUTOSAVE_SETTING_KEY);
+      if (legacy === 'off') return false;
+      if (legacy === 'on') return true;
+    }
     if (raw === 'off') return false;
     if (raw === 'on') return true;
   } catch (_err) {
@@ -404,8 +412,10 @@ function loadSubmitAutosaveSetting() {
 function setSubmitAutosaveSetting(value) {
   const normalized = String(value || '').toLowerCase();
   submitAutosaveEnabled = normalized !== 'off';
+  const activeUser = currentUserForSubmit;
+  const key = activeUser && activeUser.uid ? (DRAFT_AUTOSAVE_SETTING_KEY + ':' + activeUser.uid) : DRAFT_AUTOSAVE_SETTING_KEY;
   try {
-    localStorage.setItem(DRAFT_AUTOSAVE_SETTING_KEY, submitAutosaveEnabled ? 'on' : 'off');
+    localStorage.setItem(key, submitAutosaveEnabled ? 'on' : 'off');
   } catch (_err) {
     // Storage unavailable. Keep runtime value.
   }
@@ -1050,6 +1060,7 @@ function initializeReconstructionPrefillFromUrl() {
   updateTypeSpecificUI();
   updateSlugPreview();
   updatePreview();
+  refreshMediaSelectors();
   setDraftStatus('Reconstruction target loaded for ' + designation + '.');
   showSubmitEditor(true);
 
@@ -1441,7 +1452,7 @@ function updateUploadZoneCopy() {
 
   if (hint) {
     hint.textContent = mediaEnabled
-      ? 'Images are available for all page types. Audio and video are limited to Tale and Anomaly submissions.'
+      ? 'Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, and Legacy submissions.'
       : 'Images are available for all page types. Audio and video are disabled for this submission type.';
   }
 }
@@ -1742,6 +1753,17 @@ function getUploadedImageOptions(selected) {
   return options.join('');
 }
 
+function getUploadedMediaOptions(kind, selected) {
+  const media = uploadedMediaFiles.filter(item => item.status === 'ready' && item.remoteUrl && item.kind === kind);
+  const label = kind === 'video' ? 'video' : 'audio';
+  const options = ['<option value="">Select uploaded ' + label + '</option>'];
+  media.forEach(item => {
+    const isSel = selected && selected === item.remoteUrl ? ' selected' : '';
+    options.push('<option value="' + escapeAttr(item.remoteUrl) + '"' + isSel + '>' + escapeHtml(item.name) + '</option>');
+  });
+  return options.join('');
+}
+
 function isMediaDocBlockType(type) {
   return type === 'image' || type === 'audio' || type === 'video';
 }
@@ -1791,6 +1813,7 @@ function renderDocBlocks() {
         ? '<audio src="' + escapeAttr(block.url) + '" controls preload="metadata" style="width:100%;display:block;margin-top:8px"></audio>'
         : '';
       body = '<div class="doc-grid-2">' +
+        '<div><label class="fl">Uploaded Audio</label><select class="fi" data-field="uploadSelectMedia" data-kind="audio" data-index="' + idx + '">' + getUploadedMediaOptions('audio', block.url || '') + '</select></div>' +
         '<div><label class="fl">Audio URL</label><input class="fi" data-field="url" data-index="' + idx + '" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
         '<div><label class="fl">Label</label><input class="fi" data-field="label" data-index="' + idx + '" value="' + escapeAttr(block.label || '') + '" placeholder="Optional label" /></div>' +
       '</div>' + preview;
@@ -1799,6 +1822,7 @@ function renderDocBlocks() {
         ? '<video src="' + escapeAttr(block.url) + '" controls playsinline preload="metadata" style="width:100%;display:block;margin-top:8px;border:1px solid #3a3a3a;background:#111"></video>'
         : '';
       body = '<div class="doc-grid-2">' +
+        '<div><label class="fl">Uploaded Video</label><select class="fi" data-field="uploadSelectMedia" data-kind="video" data-index="' + idx + '">' + getUploadedMediaOptions('video', block.url || '') + '</select></div>' +
         '<div><label class="fl">Video URL</label><input class="fi" data-field="url" data-index="' + idx + '" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
         '<div><label class="fl">Label</label><input class="fi" data-field="label" data-index="' + idx + '" value="' + escapeAttr(block.label || '') + '" placeholder="Optional label" /></div>' +
         '<div><label class="fl">Poster URL</label><input class="fi" data-field="poster" data-index="' + idx + '" value="' + escapeAttr(block.poster || '') + '" placeholder="https://..." /></div>' +
@@ -2036,9 +2060,20 @@ function initDocumentStudio() {
       return;
     }
 
+    if (field === 'uploadSelectMedia') {
+      docBlocks[index].url = value;
+      renderDocBlocks();
+      schedulePreview();
+      return;
+    }
+
     if (field === 'url') {
       docBlocks[index][field] = value;
-      updateDocImagePreviewInBlock(target.closest('.doc-block'), value);
+      if (docBlocks[index].type === 'image') {
+        updateDocImagePreviewInBlock(target.closest('.doc-block'), value);
+      } else {
+        renderDocBlocks();
+      }
       schedulePreview();
       return;
     }
@@ -2230,6 +2265,8 @@ function buildAnomalyTemplate() {
   const objClass = document.getElementById('tf-object-class').value;
   const heroUrl = document.getElementById('tf-hero-img').value;
   const containment = document.getElementById('tf-containment').value.trim();
+  const mediaAudioUrl = document.getElementById('tf-anomaly-audio')?.value || '';
+  const mediaVideoUrl = document.getElementById('tf-anomaly-video')?.value || '';
   const description = document.getElementById('tf-description').value.trim();
 
   let html = '<div class="rog-header">\n';
@@ -2254,6 +2291,14 @@ function buildAnomalyTemplate() {
     html += '<div class="rog-section">\n';
     html += '  <h2>Description</h2>\n';
     html += '  ' + textToHtmlParagraphs(description) + '\n';
+    html += '</div>\n\n';
+  }
+
+  if (mediaAudioUrl || mediaVideoUrl) {
+    html += '<div class="rog-section">\n';
+    html += '  <h2>Attached Media</h2>\n';
+    if (mediaAudioUrl) html += '  <audio src="' + escapeAttr(mediaAudioUrl) + '" controls preload="metadata" style="width:100%;display:block;margin-bottom:12px"></audio>\n';
+    if (mediaVideoUrl) html += '  <video src="' + escapeAttr(mediaVideoUrl) + '" controls playsinline preload="metadata" style="width:100%;display:block;border:1px solid #3a3a3a;background:#111"></video>\n';
     html += '</div>\n\n';
   }
 
@@ -2322,6 +2367,8 @@ function buildTaleTemplate() {
   const subtitle = document.getElementById('tf-tale-subtitle').value.trim();
   const heroUrl = document.getElementById('tf-tale-hero').value;
   const intro = document.getElementById('tf-tale-intro').value.trim();
+  const mediaAudioUrl = document.getElementById('tf-tale-audio')?.value || '';
+  const mediaVideoUrl = document.getElementById('tf-tale-video')?.value || '';
 
   let html = '<div class="tale-header">\n';
   html += '  <h1>' + escapeHtml(document.getElementById('sf-title').value.trim() || 'Untitled Tale') + '</h1>\n';
@@ -2334,6 +2381,13 @@ function buildTaleTemplate() {
 
   if (intro) {
     html += '<div class="tale-body tale-intro">\n  ' + textToHtmlParagraphs(intro) + '\n</div>\n\n';
+  }
+
+  if (mediaAudioUrl || mediaVideoUrl) {
+    html += '<div class="tale-body" style="margin-bottom:24px">\n';
+    if (mediaAudioUrl) html += '  <audio src="' + escapeAttr(mediaAudioUrl) + '" controls preload="metadata" style="width:100%;display:block;margin-bottom:12px"></audio>\n';
+    if (mediaVideoUrl) html += '  <video src="' + escapeAttr(mediaVideoUrl) + '" controls playsinline preload="metadata" style="width:100%;display:block;border:1px solid #3a3a3a;background:#111"></video>\n';
+    html += '</div>\n\n';
   }
 
   const subs = document.querySelectorAll('#tf-tale-sections .subsection-block');
@@ -2432,6 +2486,8 @@ function buildArtworkTemplate() {
 function buildGuideTemplate() {
   const intro = document.getElementById('tf-guide-intro').value.trim();
   const heroUrl = document.getElementById('tf-guide-hero').value;
+  const mediaAudioUrl = document.getElementById('tf-guide-audio')?.value || '';
+  const mediaVideoUrl = document.getElementById('tf-guide-video')?.value || '';
 
   let html = '<div class="guide-header">\n';
   html += '  <h1>' + escapeHtml(document.getElementById('sf-title').value.trim() || 'Guide') + '</h1>\n';
@@ -2458,6 +2514,13 @@ function buildGuideTemplate() {
 
   if (intro) {
     html += '<div class="guide-section">\n  <h2>Introduction</h2>\n  ' + textToHtmlParagraphs(intro) + '\n</div>\n\n';
+  }
+
+  if (mediaAudioUrl || mediaVideoUrl) {
+    html += '<div class="guide-section">\n  <h2>Attached Media</h2>\n';
+    if (mediaAudioUrl) html += '  <audio src="' + escapeAttr(mediaAudioUrl) + '" controls preload="metadata" style="width:100%;display:block;margin-bottom:12px"></audio>\n';
+    if (mediaVideoUrl) html += '  <video src="' + escapeAttr(mediaVideoUrl) + '" controls playsinline preload="metadata" style="width:100%;display:block;border:1px solid #3a3a3a;background:#111"></video>\n';
+    html += '</div>\n\n';
   }
 
   let secIdx = 1;
@@ -2628,7 +2691,7 @@ function handleFiles(files) {
     }
 
     if ((kind === 'audio' || kind === 'video') && !isMediaEnabled) {
-      alert('Audio and video uploads are available only for Tale and Anomaly submissions.');
+      alert('Audio and video uploads are available only for Tale, Anomaly, Guide, and Legacy submissions.');
       return;
     }
 
@@ -3189,6 +3252,8 @@ function renderMediaList() {
       '<button class="btn btn-sm btn-d" type="button" onclick="removeUploadedMedia(\'' + item.id + '\')">Remove</button>' +
     '</div>';
   }).join('');
+
+  refreshMediaSelectors();
 }
 
 function updateUploadedMediaMeta(id, field, value) {
@@ -3519,6 +3584,50 @@ function refreshImageSelectors() {
   });
 
   refreshDocumentImagePickers();
+  refreshMediaSelectors();
+}
+
+function refreshMediaSelectors() {
+  const templateAudioSelectors = ['tf-anomaly-audio', 'tf-tale-audio', 'tf-guide-audio'];
+  const templateVideoSelectors = ['tf-anomaly-video', 'tf-tale-video', 'tf-guide-video'];
+
+  templateAudioSelectors.forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">None</option>';
+    uploadedMediaFiles.filter(item => item.status === 'ready' && item.remoteUrl && item.kind === 'audio').forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item.remoteUrl;
+      opt.textContent = item.name;
+      sel.appendChild(opt);
+    });
+    if (prev && Array.from(sel.options).some(option => option.value === prev)) sel.value = prev;
+  });
+
+  templateVideoSelectors.forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">None</option>';
+    uploadedMediaFiles.filter(item => item.status === 'ready' && item.remoteUrl && item.kind === 'video').forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item.remoteUrl;
+      opt.textContent = item.name;
+      sel.appendChild(opt);
+    });
+    if (prev && Array.from(sel.options).some(option => option.value === prev)) sel.value = prev;
+  });
+
+  document.querySelectorAll('#doc-blocks select[data-field="uploadSelectMedia"]').forEach(selectEl => {
+    const index = Number(selectEl.getAttribute('data-index'));
+    const kind = String(selectEl.getAttribute('data-kind') || '').toLowerCase();
+    const selected = Number.isFinite(index) && docBlocks[index] ? (docBlocks[index].url || '') : '';
+    selectEl.innerHTML = getUploadedMediaOptions(kind === 'video' ? 'video' : 'audio', selected);
+    if (selected && Array.from(selectEl.options).some(option => option.value === selected)) {
+      selectEl.value = selected;
+    }
+  });
 }
 
 function refreshDocumentImagePickers() {
@@ -3841,7 +3950,7 @@ async function submitPage() {
 
   const uploadedAssets = collectUploadedMediaAssets();
   if (!isMediaEnabledSubmissionType(type) && uploadedAssets.mediaAssets.length) {
-    alert('Audio and video files can only be attached to Tale and Anomaly submissions.');
+    alert('Audio and video files can only be attached to Tale, Anomaly, Guide, and Legacy submissions.');
     btn.textContent = '>> Submit for Review';
     btn.disabled = false;
     return;
@@ -3956,7 +4065,7 @@ function resetSubmitForm() {
     const el = document.getElementById(id);
     if (el) el.value = 'Alona';
   });
-  ['tf-hero-img', 'tf-tale-hero', 'tf-art-img', 'tf-guide-hero'].forEach(id => {
+  ['tf-hero-img', 'tf-tale-hero', 'tf-art-img', 'tf-guide-hero', 'tf-anomaly-audio', 'tf-anomaly-video', 'tf-tale-audio', 'tf-tale-video', 'tf-guide-audio', 'tf-guide-video'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
