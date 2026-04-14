@@ -11,6 +11,7 @@ let authMode = "login"; // login | register
 let terminalInterval = null;
 let terminalStartedAt = 0;
 let terminalEndTimer = null;
+let terminalRafId = null;
 let clearanceWelcomeShownThisLoad = false;
 
 // ═════════════════════════════════════════════════════════════
@@ -190,7 +191,7 @@ function runTerminal() {
     }
   }
   while (eggIdx < EGG_LINES.length) all.push(EGG_LINES[eggIdx++]);
-  const minHoldMs = 7000;
+  const minHoldMs = 4200;
   const endAt = () => {
     const elapsed = Date.now() - terminalStartedAt;
     if (elapsed < minHoldMs) {
@@ -203,11 +204,14 @@ function runTerminal() {
   };
 
   const isPhoneViewport = window.innerWidth <= 768;
+  terminal.classList.toggle('mobile', isPhoneViewport);
   const initialLines = isPhoneViewport
-    ? Math.max(16, Math.floor(window.innerHeight / 14))
-    : Math.max(22, Math.floor(window.innerHeight / 11));
-  const maxLines = initialLines + (isPhoneViewport ? 30 : 60);
+    ? Math.max(14, Math.floor(window.innerHeight / 16))
+    : Math.max(20, Math.floor(window.innerHeight / 12));
+  const maxLines = initialLines + (isPhoneViewport ? 24 : 56);
   let idx = 0;
+  let frameCounter = 0;
+  let lastTickAt = performance.now();
 
   body.innerHTML = '<div class="term-stream"><div class="term-code" id="term-code"></div></div>';
   const stream = document.getElementById('term-code');
@@ -219,6 +223,12 @@ function runTerminal() {
     const row = document.createElement('div');
     row.className = 'term-row ' + (isEgg ? 'hl' : isCode ? 'wht' : 'red');
     row.textContent = String(line || '\u00A0').replace(/\s+/g, ' ').trim() || '\u00A0';
+    if (isPhoneViewport) {
+      row.style.animation = 'none';
+      row.style.opacity = '1';
+      row.style.transform = 'none';
+      row.style.filter = 'none';
+    }
     stream.appendChild(row);
     while (stream.children.length > maxLines) stream.removeChild(stream.firstChild);
   };
@@ -232,22 +242,34 @@ function runTerminal() {
   appendTerminalLine('[BOOT] initializing secure terminal...');
   for (let seed = 0; seed < initialLines; seed++) appendTerminalLine(getNextLine());
 
-  const tickMs = 42 + Math.floor(Math.random() * 38);
-  terminalInterval = setInterval(() => {
-    appendTerminalLine(getNextLine());
-    if (Math.random() > 0.58) appendTerminalLine(getNextLine());
-    if (Math.random() > 0.9) appendTerminalLine('');
+  const tickEveryMs = isPhoneViewport ? 72 : 54;
+  const pump = now => {
     if (Date.now() - terminalStartedAt >= minHoldMs) {
-      clearInterval(terminalInterval);
-      terminalInterval = null;
+      terminalRafId = null;
       endAt();
+      return;
     }
-  }, tickMs);
+
+    if (now - lastTickAt >= tickEveryMs) {
+      appendTerminalLine(getNextLine());
+      if (!isPhoneViewport && frameCounter % 3 === 0) appendTerminalLine(getNextLine());
+      frameCounter += 1;
+      lastTickAt = now;
+    }
+
+    terminalRafId = requestAnimationFrame(pump);
+  };
+
+  terminalRafId = requestAnimationFrame(pump);
 }
 
 function stopTerminalAnimation() {
   clearInterval(terminalInterval);
   terminalInterval = null;
+  if (terminalRafId) {
+    cancelAnimationFrame(terminalRafId);
+    terminalRafId = null;
+  }
   if (terminalEndTimer) {
     clearTimeout(terminalEndTimer);
     terminalEndTimer = null;
@@ -624,11 +646,20 @@ function loadData() {
 // BOOT
 // ═════════════════════════════════════════════════════════════
 
-document.addEventListener('DOMContentLoaded', () => {
+let appBooted = false;
+function bootApp() {
+  if (appBooted) return;
+  appBooted = true;
   const skipBtn = document.querySelector('.term-skip button');
   if (skipBtn) skipBtn.addEventListener('click', skipTerminal);
   if (shouldShowTerminal()) runTerminal();
   else skipTerminal();
   auth.onAuthStateChanged(updateAuthUI);
   loadData();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootApp, { once: true });
+} else {
+  bootApp();
+}
