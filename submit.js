@@ -37,9 +37,66 @@ let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history' | 'drafts'
 let submissionApiBase = '/api/submit';
 let hasUnsavedEditorChanges = false;
 let submitAutosaveEnabled = true;
+const nativeSubmitAlert = window.alert.bind(window);
+let submitAlertModal = null;
 
 const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
 const DRAFT_AUTOSAVE_MIN_WORDS = 150;
+
+function closeSubmitAlertModal() {
+  if (submitAlertModal) {
+    submitAlertModal.remove();
+    submitAlertModal = null;
+  }
+  document.body.classList.remove('submit-alert-open');
+}
+
+function showSubmitAlert(message) {
+  const text = String(message == null ? '' : message);
+  if (!document.body) {
+    nativeSubmitAlert(text);
+    return;
+  }
+
+  closeSubmitAlertModal();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'submit-alert-overlay';
+  overlay.innerHTML = '' +
+    '<div class="submit-alert-modal" role="dialog" aria-modal="true" aria-labelledby="submit-alert-title">' +
+      '<div class="submit-alert-head">' +
+        '<div class="submit-alert-kicker">Red Oaker Guild</div>' +
+        '<h3 id="submit-alert-title">System Notice</h3>' +
+      '</div>' +
+      '<div class="submit-alert-body">' +
+        '<p>' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' +
+      '</div>' +
+      '<div class="submit-alert-actions">' +
+        '<button class="btn btn-p" type="button" data-close-submit-alert>OK</button>' +
+      '</div>' +
+    '</div>';
+
+  submitAlertModal = overlay;
+  document.body.appendChild(overlay);
+  document.body.classList.add('submit-alert-open');
+
+  const closeButton = overlay.querySelector('[data-close-submit-alert]');
+  if (closeButton) {
+    closeButton.addEventListener('click', closeSubmitAlertModal);
+    setTimeout(() => closeButton.focus(), 0);
+  }
+
+  overlay.addEventListener('click', event => {
+    if (event.target === overlay) closeSubmitAlertModal();
+  });
+}
+
+window.alert = showSubmitAlert;
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && submitAlertModal) {
+    closeSubmitAlertModal();
+  }
+});
 
 const ANOMALY_SUBTYPE_RULES = {
   ROS: {

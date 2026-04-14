@@ -176,7 +176,27 @@
       color:var(--wht-f);
       padding:4px;
     }
-    @media (max-width: 760px) { .doc-grid-2 { grid-template-columns:1fr; } }
+    @media (max-width: 760px) {
+      .doc-grid-2 { grid-template-columns:1fr; }
+      .file-grid { grid-template-columns:1fr; }
+      .file-tile { min-height: 96px; }
+      .editor-shell-head { flex-direction: column; align-items: stretch; }
+      .editor-shell-head > div:last-child { width: 100%; display:flex; flex-direction:column; }
+      .editor-shell-head .btn { width: 100%; }
+      .doc-toolbar { position: static; top: auto; }
+      .doc-toolbar .btn,
+      .doc-toolbar .fi { width: 100%; max-width: none; }
+      .tag-picker-tools { flex-direction: column; align-items: stretch; }
+      .tag-picker-tools .fi { min-width: 0; }
+      .file-tile:hover,
+      .file-tile:focus-visible { transform: none; }
+    }
+    @media (hover: none) and (pointer: coarse) {
+      .file-tile:hover,
+      .file-tile:focus-visible,
+      .tag-option:hover,
+      .tag-chip button:hover { transform: none; }
+    }
   </style>
 </head>
 <body>
