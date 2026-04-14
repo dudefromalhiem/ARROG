@@ -117,8 +117,8 @@ const ANOMALY_SUBTYPE_RULES = {
   SLOA: {
     label: 'Specimen Linked Anomalous Object',
     listKey: 'SLOA',
-    hint: 'SLOA format: SLOA-001A (1-3 digits + trailing letter).',
-    pattern: /^SLOA-\d{1,3}[A-Z]$/
+    hint: 'SLOA format: SLOA-A000 (letter + 3 digits, up to A999 per letter).',
+    pattern: /^SLOA-[A-Z]\d{3}$/
   },
   SOA: {
     label: 'Sentient or Accursed Object',

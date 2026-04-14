@@ -164,7 +164,7 @@
       children: [
         { id: 'soa', label: 'Sentient or Accursed Objects', code: 'SOA', format: 'dash', digits: 4, start: 1, end: 6000, group: 100, type: 'Anomaly', listKey: 'SOA' },
         { id: 'ros', label: 'Red Oaker Specimen', code: 'ROS', format: 'dash', digits: 4, start: 1, end: 6000, group: 100, type: 'Anomaly', listKey: 'ROS' },
-        { id: 'sloa', label: 'Specimen Linked Anomalous Objects', code: 'SLOA', format: 'sloa', digits: 4, start: 1, end: 26, group: 1, type: 'Anomaly', listKey: 'SLOA' }
+        { id: 'sloa', label: 'Specimen Linked Anomalous Objects', code: 'SLOA', format: 'sloa', digits: 3, start: 1, end: 26, group: 1, type: 'Anomaly', listKey: 'SLOA' }
       ]
     },
     tests: {
@@ -188,7 +188,7 @@
   function buildDesignation(config, index, suffix = '') {
     const num = padNumber(index, config.digits);
     if (config.format === 'colon') return config.code + ': ' + num;
-    if (config.format === 'sloa') return config.code + '-' + num + suffix;
+    if (config.format === 'sloa') return config.code + '-' + suffix + num;
     return config.code + '-' + num;
   }
 
@@ -204,7 +204,7 @@
     if (!page) return '';
     if (page.anomalyId) return String(page.anomalyId).toUpperCase();
     const title = String(page.title || '');
-    const match = title.match(/^(ROS-\d{1,4}|SOA-\d{1,4}|SLOA-\d{1,4}[A-Z]?|TL:\s*\d+|SCTOR:\s*\d+|FR-\d{1,4}|NAR-\d{1,4})/i);
+    const match = title.match(/^(ROS-\d{1,4}|SOA-\d{1,4}|SLOA-(?:[A-Z]\d{3}|\d{1,4}[A-Z]?)|TL:\s*\d+|SCTOR:\s*\d+|FR-\d{1,4}|NAR-\d{1,4})/i);
     return match ? String(match[1]).toUpperCase() : '';
   }
 
@@ -213,9 +213,9 @@
     if (config.format === 'sloa') {
       for (let letter = 1; letter <= 26; letter++) {
         ranges.push({
-          start: 1,
-          end: 100,
-          label: '000' + letterForIndex(letter) + '-0100' + letterForIndex(letter),
+          start: 0,
+          end: 999,
+          label: letterForIndex(letter) + '000-' + letterForIndex(letter) + '999',
           suffix: letterForIndex(letter)
         });
       }
@@ -319,7 +319,7 @@
     }
 
     const rangeLabel = selectedSubcat.format === 'sloa'
-      ? '000' + (selectedRange.suffix || 'A') + '-0100' + (selectedRange.suffix || 'A')
+      ? (selectedRange.suffix || 'A') + '000-' + (selectedRange.suffix || 'A') + '999'
       : padNumber(selectedRange.start, selectedSubcat.digits) + '-' + padNumber(selectedRange.end, selectedSubcat.digits);
     title.textContent = 'Level 4 // Entries // ' + selectedSubcat.label + ' // ' + rangeLabel;
 
