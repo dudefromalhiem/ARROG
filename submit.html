@@ -284,6 +284,10 @@ render.mount('submission-terminal');</pre>
           <span class="file-name">History</span>
           <span class="file-copy">View your full submission archive.</span>
         </button>
+        <button class="file-tile" type="button" data-open-drafts="1">
+          <span class="file-name">Drafts</span>
+          <span class="file-copy">Open and continue editing your saved drafts.</span>
+        </button>
       </div>
     </div>
 
@@ -293,6 +297,7 @@ render.mount('submission-terminal');</pre>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-s" type="button" onclick="openSubmitFileExplorer()">Back to Files</button>
           <button class="btn btn-s" type="button" onclick="openSubmissionHistoryView()">History</button>
+          <button class="btn btn-s" type="button" onclick="openSubmissionDraftsView()">Drafts</button>
         </div>
       </div>
 

@@ -33,8 +33,9 @@ let customTagOptions = [];
 let selectedTagsState = new Set();
 let selectedEntryProfile = '';
 let designationLocked = false;
-let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history'
+let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history' | 'drafts'
 let submissionApiBase = '/api/submit';
+let hasUnsavedEditorChanges = false;
 
 const ANOMALY_SUBTYPE_RULES = {
   ROS: {
@@ -162,6 +163,8 @@ auth.onAuthStateChanged(user => {
       showSubmitEditor(true);
     } else if (view === 'history') {
       openSubmissionHistoryView();
+    } else if (view === 'drafts') {
+      openSubmissionDraftsView();
     } else if (ENTRY_PROFILES[entryProfile]) {
       applyEntryProfile(entryProfile);
     } else {
@@ -176,10 +179,14 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-window.addEventListener('beforeunload', () => {
-  if (currentUserForSubmit) {
-    saveDraft({ silent: true, trigger: 'leave' });
+window.addEventListener('beforeunload', event => {
+  if (!currentUserForSubmit) return;
+  if (hasUnsavedEditorChanges) {
+    event.preventDefault();
+    event.returnValue = 'You have unsaved content. Leave this page anyway?';
+    return;
   }
+  saveDraft({ silent: true, trigger: 'leave' });
 });
 
 document.addEventListener('visibilitychange', () => {
@@ -224,13 +231,64 @@ function setSubmitViewMode(mode) {
   if (!explorer || !editor || !history || !createWorkspace) return;
 
   const showExplorer = mode === 'explorer';
-  const showEditor = mode !== 'explorer';
-  const historyOnly = mode === 'history';
+  const showEditor = mode === 'editor';
+  const listMode = mode === 'history' || mode === 'drafts';
 
   explorer.classList.toggle('hidden', !showExplorer);
   editor.classList.toggle('hidden', !showEditor);
-  createWorkspace.classList.toggle('hidden', historyOnly);
-  history.classList.toggle('hidden', !historyOnly);
+  createWorkspace.classList.toggle('hidden', !showEditor);
+  history.classList.toggle('hidden', !listMode);
+}
+
+function markEditorAsChanged() {
+  if (!currentUserForSubmit || suppressDraftAutoSave) return;
+  hasUnsavedEditorChanges = true;
+}
+
+function clearEditorUnsavedState() {
+  hasUnsavedEditorChanges = false;
+}
+
+function hasMeaningfulEditorContent() {
+  const title = (document.getElementById('sf-title')?.value || '').trim();
+  const slug = (document.getElementById('sf-slug')?.value || '').trim();
+  const tags = getSelectedTags();
+  let content;
+  try {
+    content = buildCurrentEditorContent(false);
+  } catch (_err) {
+    content = {
+      htmlContent: (document.getElementById('sf-html')?.value || ''),
+      cssContent: (document.getElementById('sf-css')?.value || '')
+    };
+  }
+  return !!(title || slug || (Array.isArray(tags) && tags.length) || String(content.htmlContent || '').trim() || String(content.cssContent || '').trim());
+}
+
+async function confirmEditorLeaveIfUnsaved() {
+  if (submitViewMode !== 'editor' || !hasUnsavedEditorChanges) return true;
+
+  const shouldSave = confirm('You have unsaved content. Save it as a draft before leaving this editor?');
+  if (shouldSave) {
+    if (!hasMeaningfulEditorContent()) {
+      clearEditorUnsavedState();
+      return true;
+    }
+    const draftId = await saveDraft({ silent: false, trigger: 'leave-editor' });
+    if (!draftId) {
+      alert('Draft save failed. Please resolve the issue before leaving.');
+      return false;
+    }
+    clearEditorUnsavedState();
+    return true;
+  }
+
+  const discard = confirm('Unsaved content will be lost. Leave without saving?');
+  if (discard) {
+    clearEditorUnsavedState();
+    return true;
+  }
+  return false;
 }
 
 function configureSubmissionApiBase() {
@@ -248,16 +306,31 @@ function configureSubmissionApiBase() {
   submissionApiBase = '/api/submit';
 }
 
-function openSubmissionHistoryView() {
+async function openSubmissionHistoryView() {
+  const canLeave = await confirmEditorLeaveIfUnsaved();
+  if (!canLeave) return;
   setSubmitViewMode('history');
-  loadMySubmissions();
+  loadMySubmissions('history');
   setTimeout(() => {
     const history = document.getElementById('my-submissions-section');
     if (history) history.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 0);
 }
 
-function openSubmitFileExplorer() {
+async function openSubmissionDraftsView() {
+  const canLeave = await confirmEditorLeaveIfUnsaved();
+  if (!canLeave) return;
+  setSubmitViewMode('drafts');
+  loadMySubmissions('drafts');
+  setTimeout(() => {
+    const history = document.getElementById('my-submissions-section');
+    if (history) history.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 0);
+}
+
+async function openSubmitFileExplorer() {
+  const canLeave = await confirmEditorLeaveIfUnsaved();
+  if (!canLeave) return;
   selectedEntryProfile = '';
   submitViewMode = 'explorer';
   const banner = document.getElementById('entry-profile-banner');
@@ -312,6 +385,10 @@ function initSubmitExplorer() {
 
   panel.querySelectorAll('[data-open-history]').forEach(btn => {
     btn.addEventListener('click', openSubmissionHistoryView);
+  });
+
+  panel.querySelectorAll('[data-open-drafts]').forEach(btn => {
+    btn.addEventListener('click', openSubmissionDraftsView);
   });
 }
 
@@ -493,6 +570,7 @@ async function saveDraft(options = {}) {
     } else {
       setDraftStatus('Draft autosaved at ' + new Date().toLocaleTimeString() + '.');
     }
+    clearEditorUnsavedState();
     return activeDraftId;
   } catch (err) {
     setDraftStatus('Draft save failed: ' + err.message, true);
@@ -560,6 +638,8 @@ async function continueDraftSubmission(id) {
     updateSlugPreview();
     updatePreview();
     setDraftStatus('Loaded draft for editing.');
+    clearEditorUnsavedState();
+    setSubmitViewMode('editor');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (err) {
     alert('Could not load draft: ' + err.message);
@@ -762,6 +842,7 @@ async function initializeSubmitEditModeFromUrl() {
     updateTypeSpecificUI();
     updateSlugPreview();
     updatePreview();
+    clearEditorUnsavedState();
     showSubmitEditor(true);
 
     const submitBtn = document.getElementById('submit-btn');
@@ -1966,6 +2047,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('img-input');
   const chooseBtn = document.getElementById('choose-images-btn');
   const uploadStatus = document.getElementById('upload-status');
+  const editorShell = document.getElementById('submit-editor-shell');
 
   function openFilePicker() {
     input.click();
@@ -2049,6 +2131,16 @@ document.addEventListener('DOMContentLoaded', () => {
   updateTypeSpecificUI();
   updateSlugPreview();
   updatePreview();
+
+  if (editorShell) {
+    const markTrustedChanges = e => {
+      if (!e || !e.isTrusted) return;
+      if (!e.target || !e.target.closest('#submit-create-workspace')) return;
+      markEditorAsChanged();
+    };
+    editorShell.addEventListener('input', markTrustedChanges, true);
+    editorShell.addEventListener('change', markTrustedChanges, true);
+  }
 });
 
 function handleFiles(files) {
@@ -2371,6 +2463,8 @@ async function uploadImage(file) {
     uploadRecord.status = 'ready';
     renderImageList();
     refreshImageSelectors();
+    markEditorAsChanged();
+    scheduleDraftAutoSave();
     progressWrap.style.display = 'none';
     if (uploadStatus) uploadStatus.textContent = 'Uploaded ' + file.name + '.';
     console.log('[Upload] Success:', url);
@@ -2451,6 +2545,8 @@ function removeUploadedImage(id) {
   uploadedImages.splice(index, 1);
   renderImageList();
   refreshImageSelectors();
+  markEditorAsChanged();
+  scheduleDraftAutoSave();
   const uploadStatus = document.getElementById('upload-status');
   if (uploadStatus) uploadStatus.textContent = 'Image removed.';
 }
@@ -2845,7 +2941,7 @@ async function submitPage() {
       alert('Submission received! Your page will be reviewed by Guild admins.\nOnce approved, it will be live at: /pages/' + slug);
     }
     resetSubmitForm();
-    loadMySubmissions();
+    loadMySubmissions('history');
   } catch (err) {
     alert('Submission failed: ' + err.message);
   } finally {
@@ -2906,6 +3002,7 @@ function resetSubmitForm() {
   updatePreview();
   document.getElementById('submit-btn').textContent = '>> Submit for Review';
   setDraftStatus('Draft autosave is idle.');
+  clearEditorUnsavedState();
   suppressDraftAutoSave = false;
 }
 
@@ -2913,11 +3010,11 @@ function resetSubmitForm() {
 // MY SUBMISSIONS
 // ═════════════════════════════════════════════════════════════
 
-async function loadMySubmissions() {
+async function loadMySubmissions(viewMode = 'history') {
   if (!currentUserForSubmit) return;
   const container = document.getElementById('my-submissions');
   if (!container) return;
-  const historyOnly = submitViewMode === 'history';
+  const showDraftsOnly = viewMode === 'drafts';
 
   try {
     let submissions = [];
@@ -2937,12 +3034,18 @@ async function loadMySubmissions() {
         });
     }
 
-    if (submissions.length === 0) {
-      container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">No submissions yet.</p>';
+    const visibleSubmissions = submissions.filter(entry => {
+      const status = String(entry && entry.data && entry.data.status || '').toLowerCase();
+      return showDraftsOnly ? status === 'draft' : status !== 'draft';
+    });
+
+    if (visibleSubmissions.length === 0) {
+      const emptyMessage = showDraftsOnly ? 'No drafts found.' : 'No submission history yet.';
+      container.innerHTML = '<p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">' + emptyMessage + '</p>';
       return;
     }
 
-    container.innerHTML = submissions.map(entry => {
+    container.innerHTML = visibleSubmissions.map(entry => {
       const d = entry;
       const s = entry.data;
       const statusClass = 'status status-' + s.status;
@@ -2959,10 +3062,10 @@ async function loadMySubmissions() {
         extra = '<div style="margin-top:4px"><a href="' + pageUrl + '" class="btn btn-sm btn-s" style="font-size:.65rem">View Live Page</a></div>';
       }
       let deleteBtn = '';
-      if (!historyOnly && s.status === 'pending') {
+      if (!showDraftsOnly && s.status === 'pending') {
         deleteBtn = '<button class="btn btn-sm btn-d" onclick="deleteMySubmission(\'' + d.id + '\')" style="margin-left:8px">Withdraw</button>';
       }
-      if (!historyOnly && s.status === 'draft') {
+      if (showDraftsOnly && s.status === 'draft') {
         deleteBtn = '<button class="btn btn-sm btn-s" type="button" onclick="continueDraftSubmission(\'' + d.id + '\')" style="margin-left:8px">Continue Draft</button>' +
           '<button class="btn btn-sm btn-d" onclick="deleteMySubmission(\'' + d.id + '\')" style="margin-left:8px">Delete Draft</button>';
       }
@@ -2980,7 +3083,7 @@ async function deleteMySubmission(id) {
   try {
     await callSubmissionApi('DELETE', { id: id });
     if (activeDraftId === id) activeDraftId = null;
-    loadMySubmissions();
+    loadMySubmissions(submitViewMode === 'drafts' ? 'drafts' : 'history');
   } catch (err) {
     alert('Error: ' + err.message);
   }
