@@ -332,7 +332,7 @@ function setSubmitViewMode(mode) {
 
   explorer.classList.toggle('hidden', !showExplorer);
   editor.classList.toggle('hidden', !showEditor);
-  createWorkspace.classList.toggle('hidden', !showEditor);
+  createWorkspace.classList.toggle('hidden', !showEditor || listMode);
   history.classList.toggle('hidden', !listMode);
   updateMySubmissionsHeading(mode);
 }
