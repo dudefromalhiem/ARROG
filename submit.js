@@ -2648,6 +2648,17 @@ async function optimizeImageForStorage(file) {
   return { dataUrl: out, bytes: bytes, width: width, height: height };
 }
 
+function getStorageRef(path, bucket) {
+  if (!storage) {
+    throw new Error('Firebase Storage not initialized. Check firebase-config.js');
+  }
+  if (bucket) {
+    const bucketUrl = 'gs://' + bucket;
+    return storage.refFromURL(bucketUrl).child(path);
+  }
+  return storage.ref(path);
+}
+
 function getStorageBucketCandidates() {
   const configured = (firebaseConfig && firebaseConfig.storageBucket) ? String(firebaseConfig.storageBucket).replace(/^gs:\/\//, '') : '';
   const projectId = (firebaseConfig && firebaseConfig.projectId) ? String(firebaseConfig.projectId).trim() : '';
