@@ -475,7 +475,9 @@
 
   let legacyData = { ...LEGACY_DEFAULT };
   let ownerCanEdit = false;
-  const storage = (firebase && typeof firebase.storage === 'function') ? firebase.storage() : null;
+  const legacyStorage = (typeof storage !== 'undefined' && storage)
+    ? storage
+    : ((firebase && typeof firebase.storage === 'function') ? firebase.storage() : null);
   const authRef = (typeof auth !== 'undefined' && auth && typeof auth.onAuthStateChanged === 'function')
     ? auth
     : (firebase && typeof firebase.auth === 'function' ? firebase.auth() : null);
@@ -636,7 +638,7 @@
 
   async function uploadFileImage(fileBlob, chapterId, fileId) {
     if (!ownerCanEdit || !authRef || !authRef.currentUser || !fileBlob) return;
-    if (!storage) {
+    if (!legacyStorage) {
       alert('Storage service is unavailable. Reload and try again.');
       return;
     }
@@ -658,7 +660,7 @@
     statusEl.textContent = 'Uploading image...';
 
     try {
-      const snapshot = await storage.ref(path).put(fileBlob, { contentType: fileBlob.type });
+      const snapshot = await legacyStorage.ref(path).put(fileBlob, { contentType: fileBlob.type });
       const url = await snapshot.ref.getDownloadURL();
       entry.imageUrl = url;
       if (!entry.imageAlt) {
