@@ -277,6 +277,7 @@ if (document.readyState === 'loading') {
 // Bootstrap — only used if Firestore config/roles doesn't exist yet
 const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
 let ROLE_DATA = { owners: [], admins: [], mods: [] };
+let GUILD_PERMISSIONS = {};
 let SITE_STATE = { esdLocked: false, esdActivatedBy: '', esdActivatedAt: null };
 let rolesReadyResolved = false;
 
@@ -293,15 +294,23 @@ const siteStateReady = (async () => {
 
 const rolesReady = (async () => {
   try {
-    const doc = await db.collection('config').doc('roles').get();
-    if (doc.exists) {
-      const d = doc.data();
+    const [rolesDoc, permsDoc] = await Promise.all([
+      db.collection('config').doc('roles').get(),
+      db.collection('config').doc('permissions').get()
+    ]);
+    
+    if (rolesDoc.exists) {
+      const d = rolesDoc.data();
       ROLE_DATA.owners = (d.owners || []).map(e => e.toLowerCase());
       ROLE_DATA.admins = (d.admins || []).map(e => e.toLowerCase());
       ROLE_DATA.mods = (d.mods || []).map(e => e.toLowerCase());
     }
+    
+    if (permsDoc.exists) {
+      GUILD_PERMISSIONS = permsDoc.data() || {};
+    }
   } catch (e) {
-    console.warn('[RBAC] Could not fetch roles from Firestore — using bootstrap.');
+    console.warn('[RBAC] Could not fetch roles or permissions from Firestore — using bootstrap.');
   }
   // Merge bootstrap owners as safety net
   _BOOTSTRAP.forEach(bo => {
@@ -325,6 +334,13 @@ function isModerator(email) {
 }
 function isAdmin(email) { const r = resolveRole(email); return r === "admin" || r === "owner"; }
 function isOwner(email) { return resolveRole(email) === "owner"; }
+function adminHasDelegation(email, permissionKey) {
+  if (isOwner(email)) return true; // Owner always has every permission
+  if (isAdmin(email)) {
+    return GUILD_PERMISSIONS[permissionKey] === true;
+  }
+  return false;
+}
 function clearanceLevelForRole(role) {
   if (role === "owner") return 6;
   if (role === "admin") return 5;

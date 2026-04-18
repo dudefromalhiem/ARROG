@@ -29,7 +29,7 @@ function isGuideType(type) {
 }
 
 function canManageGuidePages() {
-  return isOwner(auth.currentUser?.email);
+  return isOwner(auth.currentUser?.email) || adminHasDelegation(auth.currentUser?.email, 'adminCanManageGuides');
 }
 
 function toDataUrl(file) {
@@ -119,7 +119,7 @@ function applyTabVisibilityForRole(role, hasAdminAccess = false) {
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
   if (usersTab) usersTab.classList.toggle('hidden', !hasAdminAccess);
-  if (rolesTab) rolesTab.classList.toggle('hidden', !isOwner(auth.currentUser?.email));
+  if (rolesTab) rolesTab.classList.toggle('hidden', !(isOwner(auth.currentUser?.email) || adminHasDelegation(auth.currentUser?.email, 'adminCanManageRoles')));
 
   if (isModOnly && activeTab !== 'submissions') {
     activeTab = 'submissions';
@@ -259,12 +259,28 @@ async function loadConfig() {
       updateESDStatus({});
     }
     const ownerOnlyControls = [document.getElementById('esd-on-btn'), document.getElementById('esd-off-btn')];
+    const canControlEsd = isOwner(auth.currentUser?.email) || adminHasDelegation(auth.currentUser?.email, 'adminCanControlESD');
     ownerOnlyControls.forEach(btn => {
       if (!btn) return;
-      btn.classList.toggle('hidden', !isOwner(auth.currentUser?.email));
+      btn.classList.toggle('hidden', !canControlEsd);
     });
     const migrateBtn = document.getElementById('btn-migrate-seed');
-    if (migrateBtn) migrateBtn.classList.toggle('hidden', !isOwner(auth.currentUser?.email));
+    if (migrateBtn) migrateBtn.classList.toggle('hidden', !(isOwner(auth.currentUser?.email) || adminHasDelegation(auth.currentUser?.email, 'adminCanMigrateSeed')));
+    
+    // Delegation checkboxes visibility and state
+    const delegationCard = document.getElementById('card-authority-delegation');
+    if (delegationCard) {
+      if (!isOwner(auth.currentUser?.email)) {
+        delegationCard.classList.add('hidden');
+      } else {
+        delegationCard.classList.remove('hidden');
+        document.getElementById('perm-legacy').checked = GUILD_PERMISSIONS['adminCanEditLegacy'] === true;
+        document.getElementById('perm-guides').checked = GUILD_PERMISSIONS['adminCanManageGuides'] === true;
+        document.getElementById('perm-roles').checked = GUILD_PERMISSIONS['adminCanManageRoles'] === true;
+        document.getElementById('perm-esd').checked = GUILD_PERMISSIONS['adminCanControlESD'] === true;
+        document.getElementById('perm-seed').checked = GUILD_PERMISSIONS['adminCanMigrateSeed'] === true;
+      }
+    }
   } catch (err) {
     console.warn('Config load failed:', err);
   }
@@ -272,8 +288,8 @@ async function loadConfig() {
 
 async function migrateSeededPagesToFirestore() {
   const statusEl = document.getElementById('seed-migrate-status');
-  if (!isOwner(auth.currentUser?.email)) {
-    alert('Only the Owner can run seeded page migration.');
+  if (!(isOwner(auth.currentUser?.email) || adminHasDelegation(auth.currentUser?.email, 'adminCanMigrateSeed'))) {
+    alert('You do not have permission to run seeded page migration.');
     return;
   }
   if (typeof PAGE_SEED === 'undefined' || !Array.isArray(PAGE_SEED) || PAGE_SEED.length === 0) {
@@ -363,9 +379,40 @@ async function saveConfig() {
   }
 }
 
-async function toggleESD(enabled) {
+async function saveDelegationConfig() {
   if (!isOwner(auth.currentUser?.email)) {
-    alert('Only the Owner can activate or deactivate ESD.');
+    alert('Only the Owner can save delegation settings.');
+    return;
+  }
+  const btn = document.getElementById('btn-save-delegation');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  
+  try {
+    const payload = {
+      adminCanEditLegacy: document.getElementById('perm-legacy').checked,
+      adminCanManageGuides: document.getElementById('perm-guides').checked,
+      adminCanManageRoles: document.getElementById('perm-roles').checked,
+      adminCanControlESD: document.getElementById('perm-esd').checked,
+      adminCanMigrateSeed: document.getElementById('perm-seed').checked,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: auth.currentUser?.email
+    };
+    
+    await db.collection('config').doc('permissions').set(payload, { merge: true });
+    GUILD_PERMISSIONS = { ...GUILD_PERMISSIONS, ...payload };
+    alert('Delegation settings saved successfully.');
+  } catch (err) {
+    alert('Failed to save delegation config: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Delegations';
+  }
+}
+
+async function toggleESD(enabled) {
+  if (!(isOwner(auth.currentUser?.email) || adminHasDelegation(auth.currentUser?.email, 'adminCanControlESD'))) {
+    alert('You do not have permission to activate or deactivate ESD.');
     return;
   }
 

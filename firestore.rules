@@ -37,6 +37,15 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Check if the owner has delegated a specific permission to admins.
+    // Returns true if the config/permissions doc has the given key set to true.
+    function adminHasDelegation(permissionKey) {
+      return isAdminUser() &&
+        exists(/databases/$(database)/documents/config/permissions) &&
+        (permissionKey in get(/databases/$(database)/documents/config/permissions).data) &&
+        get(/databases/$(database)/documents/config/permissions).data[permissionKey] == true;
+    }
+
     match /users/{userId} {
       allow read: if isAdminUser() || isSelf(userId);
       allow create: if (isAdminUser() || isSelf(userId)) && !request.resource.data.keys().hasAny(['isAdmin']);
@@ -45,7 +54,8 @@ service cloud.firestore {
     }
 
     match /pages/{pageId} {
-      allow read: if isAdminUser() || (resource.data.status == 'approved');
+      // Allow reads for admins, approved pages, or pages without a status field (legacy/seed pages)
+      allow read: if isAdminUser() || resource.data.status == 'approved' || !('status' in resource.data);
       allow create, update, delete: if isAdminUser();
     }
 
@@ -54,7 +64,13 @@ service cloud.firestore {
         request.resource.data.authorUid == request.auth.uid &&
         (request.resource.data.status == 'pending' || request.resource.data.status == 'draft');
       allow read: if isAdminUser() || (isSignedIn() && resource.data.authorUid == request.auth.uid);
-      allow update, delete: if isAdminUser();
+      // Allow the original author to update their own draft submissions
+      allow update: if isAdminUser() ||
+        (isSignedIn() &&
+         resource.data.authorUid == request.auth.uid &&
+         resource.data.status == 'draft' &&
+         request.resource.data.status == 'draft');
+      allow delete: if isAdminUser();
     }
 
     match /artworks/{artworkId} {
@@ -68,7 +84,9 @@ service cloud.firestore {
     }
 
     match /config/{docId} {
-      allow read, write: if isAdminUser();
+      // All signed-in users can read config (needed for role resolution and ESD state)
+      allow read: if isSignedIn();
+      allow write: if isAdminUser();
     }
 
     match /submissions_meta/{uid} {
@@ -77,7 +95,8 @@ service cloud.firestore {
 
     match /legacySheets/{sheetId} {
       allow read: if true;
-      allow create, update, delete: if isOwnerUser();
+      // Owner can always write. Admins can write ONLY if the owner has delegated this permission.
+      allow create, update, delete: if isOwnerUser() || adminHasDelegation('adminCanEditLegacy');
     }
   }
 }

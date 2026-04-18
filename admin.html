@@ -131,6 +131,43 @@ render.mount('admin-terminal');</pre>
             <p id="esd-status" style="font-size:.75rem;color:var(--wht-f);margin-top:10px">ESD status: checking...</p>
           </div>
           
+          <div class="card" id="card-authority-delegation">
+            <div class="card-t">Authority Delegation</div>
+            <p style="font-size:.8rem;color:var(--wht-d);margin-top:12px;line-height:1.6;margin-bottom:12px">Owner-only control. Select which owner-level actions are delegated to Admins.</p>
+            
+            <div class="fg" style="margin-bottom:12px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--wht);cursor:pointer">
+                <input type="checkbox" id="perm-legacy" />
+                Allow Admins to edit the Legacy Document
+              </label>
+            </div>
+            <div class="fg" style="margin-bottom:12px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--wht);cursor:pointer">
+                <input type="checkbox" id="perm-guides" />
+                Allow Admins to create and manage Guides
+              </label>
+            </div>
+            <div class="fg" style="margin-bottom:12px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--wht);cursor:pointer">
+                <input type="checkbox" id="perm-roles" />
+                Allow Admins to manage User Roles
+              </label>
+            </div>
+            <div class="fg" style="margin-bottom:12px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--wht);cursor:pointer">
+                <input type="checkbox" id="perm-esd" />
+                Allow Admins to activate/deactivate Emergency Shutdown
+              </label>
+            </div>
+            <div class="fg" style="margin-bottom:16px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--wht);cursor:pointer">
+                <input type="checkbox" id="perm-seed" />
+                Allow Admins to migrate Seed records
+              </label>
+            </div>
+            <button class="btn btn-p" type="button" onclick="saveDelegationConfig()" id="btn-save-delegation">Save Delegations</button>
+          </div>
+          
         </div>
       </div>
     </div>

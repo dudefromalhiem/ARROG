@@ -439,10 +439,11 @@
   const LEGACY_SHEET_ID = 'main';
   const LEGACY_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
   const LEGACY_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
-  const FALLBACK_OWNER_EMAILS = new Set([
-    'jaimejoselaureano@gmail.com',
-    'dudefromalhiem@gmail.com'
-  ]);
+
+  function canEditLegacy(email) {
+    if (!email) return false;
+    return isOwner(email) || adminHasDelegation(email, 'adminCanEditLegacy');
+  }
 
   const LEGACY_DEFAULT = {
     title: 'Guild Legacy',
@@ -1095,32 +1096,11 @@
     renderLegacySheet();
   }
 
-  function canEditLegacy(user) {
-    if (!user || !user.email) {
-      console.log('canEditLegacy: No user provided');
-      return false;
-    }
-    
-    const email = String(user.email || '').toLowerCase().trim();
-    console.log('canEditLegacy checking:', { email, userEmail: user.email });
-    
-    // Try isOwner function first (uses ROLE_DATA from firebase-config)
-    if (typeof isOwner === 'function') {
-      try { 
-        const isOwnerResult = !!isOwner(email);
-        console.log('isOwner() result:', isOwnerResult);
-        if (isOwnerResult) return true;
-      } catch (err) { 
-        console.warn('isOwner() threw error:', err.message);
-      }
-    } else {
-      console.warn('isOwner function not available');
-    }
-    
-    // Fallback to hardcoded owner emails
-    const canEdit = FALLBACK_OWNER_EMAILS.has(email);
-    console.log('Fallback owner email check:', { email, inFallbackList: canEdit });
-    return canEdit;
+  // canEditLegacy is defined above using the new adminHasDelegation logic.
+  // We use this local shim if we need to pass a user object explicitly.
+  function _legacyUserCheck(user) {
+    if (!user || !user.email) return false;
+    return canEditLegacy(user.email);
   }
 
   async function hydrateLegacyForUser(user) {
@@ -1142,7 +1122,7 @@
         console.warn('Could not wait for rolesReady:', _err);
       }
       
-      ownerCanEdit = canEditLegacy(user);
+      ownerCanEdit = _legacyUserCheck(user);
       console.log('Legacy Sheet Auth Check:', { 
         userEmail: user.email, 
         ownerCanEdit, 
