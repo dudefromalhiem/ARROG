@@ -1046,20 +1046,20 @@
   }
 
   async function saveLegacySheet() {
-    if (!ownerCanEdit || !authRef || !authRef.currentUser) return;
+    if (!ownerCanEdit || !auth || !auth.currentUser) return;
     
     const statusEl = document.getElementById('legacy-status');
     statusEl.textContent = 'Saving legacy sheet...';
     
     try {
       // Force token refresh to ensure latest claims
-      await authRef.currentUser.getIdToken(true);
+      await auth.currentUser.getIdToken(true);
       
       collectEditorValues();
 
       const payload = {
         ...ensureLegacyAdditions(legacyData),
-        updatedBy: authRef.currentUser.displayName || authRef.currentUser.email || 'Owner',
+        updatedBy: auth.currentUser.displayName || auth.currentUser.email || 'Owner',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
@@ -1069,7 +1069,7 @@
       toggleLegacyEditor(false);
       statusEl.textContent = 'Legacy sheet updated.';
       alert('Legacy sheet saved successfully.');
-      console.log('Legacy sheet saved by:', authRef.currentUser.email);
+      console.log('Legacy sheet saved by:', auth.currentUser.email);
     } catch (err) {
       console.error('Save error:', err);
       statusEl.textContent = 'Save failed: ' + err.code;
@@ -1127,7 +1127,6 @@
         userEmail: user.email, 
         ownerCanEdit, 
         isOwnerFunction: typeof isOwner === 'function' ? 'available' : 'not available',
-        fallbackEmails: Array.from(FALLBACK_OWNER_EMAILS),
         timestamp: new Date().toISOString()
       });
     } else {
@@ -1142,8 +1141,8 @@
       : 'Observer mode. Owner sign-in required for edits.';
   }
 
-  if (authRef && typeof authRef.onAuthStateChanged === 'function') {
-    authRef.onAuthStateChanged(hydrateLegacyForUser);
+  if (auth && typeof auth.onAuthStateChanged === 'function') {
+    auth.onAuthStateChanged(hydrateLegacyForUser);
   } else {
     hydrateLegacyForUser(null);
   }
