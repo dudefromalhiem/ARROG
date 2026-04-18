@@ -1046,23 +1046,37 @@
 
   async function saveLegacySheet() {
     if (!ownerCanEdit || !authRef || !authRef.currentUser) return;
-    collectEditorValues();
-
-    const payload = {
-      ...ensureLegacyAdditions(legacyData),
-      updatedBy: authRef.currentUser.displayName || authRef.currentUser.email || 'Owner',
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
+    
+    const statusEl = document.getElementById('legacy-status');
+    statusEl.textContent = 'Saving legacy sheet...';
+    
     try {
+      // Force token refresh to ensure latest claims
+      await authRef.currentUser.getIdToken(true);
+      
+      collectEditorValues();
+
+      const payload = {
+        ...ensureLegacyAdditions(legacyData),
+        updatedBy: authRef.currentUser.displayName || authRef.currentUser.email || 'Owner',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
       await db.collection('legacySheets').doc(LEGACY_SHEET_ID).set(payload, { merge: true });
       legacyData = ensureLegacyAdditions(payload);
       renderLegacySheet();
       toggleLegacyEditor(false);
-      document.getElementById('legacy-status').textContent = 'Legacy sheet updated.';
-      alert('Legacy sheet saved.');
+      statusEl.textContent = 'Legacy sheet updated.';
+      alert('Legacy sheet saved successfully.');
+      console.log('Legacy sheet saved by:', authRef.currentUser.email);
     } catch (err) {
-      alert('Could not save legacy sheet: ' + err.message);
+      console.error('Save error:', err);
+      statusEl.textContent = 'Save failed: ' + err.code;
+      if (err.code === 'permission-denied') {
+        alert('Permission denied. Try signing out and signing back in.');
+      } else {
+        alert('Could not save legacy sheet: ' + err.message);
+      }
     }
   }
 
@@ -1082,23 +1096,30 @@
   }
 
   function canEditLegacy(user) {
-    if (!user || !user.email) return false;
-    const email = String(user.email || '').toLowerCase().trim();
+    if (!user || !user.email) {
+      console.log('canEditLegacy: No user provided');
+      return false;
+    }
     
-    // Try isOwner function first
+    const email = String(user.email || '').toLowerCase().trim();
+    console.log('canEditLegacy checking:', { email, userEmail: user.email });
+    
+    // Try isOwner function first (uses ROLE_DATA from firebase-config)
     if (typeof isOwner === 'function') {
       try { 
         const isOwnerResult = !!isOwner(email);
-        console.log('isOwner check result:', isOwnerResult);
+        console.log('isOwner() result:', isOwnerResult);
         if (isOwnerResult) return true;
       } catch (err) { 
-        console.warn('isOwner check failed:', err.message);
+        console.warn('isOwner() threw error:', err.message);
       }
+    } else {
+      console.warn('isOwner function not available');
     }
     
     // Fallback to hardcoded owner emails
     const canEdit = FALLBACK_OWNER_EMAILS.has(email);
-    console.log('Fallback owner email check:', { email, canEdit });
+    console.log('Fallback owner email check:', { email, inFallbackList: canEdit });
     return canEdit;
   }
 
@@ -1114,9 +1135,21 @@
         navAuth.innerHTML = '<button class="nav-btn" onclick="auth.signOut()">Sign Out</button>';
       }
 
-      try { if (typeof rolesReady !== 'undefined') await rolesReady; } catch (_err) { }
+      // Wait for role resolution before checking ownership
+      try { 
+        if (typeof rolesReady !== 'undefined') await rolesReady; 
+      } catch (_err) { 
+        console.warn('Could not wait for rolesReady:', _err);
+      }
+      
       ownerCanEdit = canEditLegacy(user);
-      console.log('Legacy Sheet Auth Check:', { userEmail: user.email, ownerCanEdit, fallbackEmails: Array.from(FALLBACK_OWNER_EMAILS) });
+      console.log('Legacy Sheet Auth Check:', { 
+        userEmail: user.email, 
+        ownerCanEdit, 
+        isOwnerFunction: typeof isOwner === 'function' ? 'available' : 'not available',
+        fallbackEmails: Array.from(FALLBACK_OWNER_EMAILS),
+        timestamp: new Date().toISOString()
+      });
     } else {
       ownerCanEdit = false;
       navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
