@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Collections - Red Oaker Guild</title>
+  <meta name="description" content="Guild collections of anomalies, tales, artwork, and personnel organized by category." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .coll-wrap { max-width: 1120px; margin: 34px auto; }
+    .coll-meta {
+      border: 2px solid var(--red-d);
+      background: linear-gradient(135deg, rgba(139, 0, 0, 0.1), rgba(0, 0, 0, 0.45));
+      padding: 12px 14px;
+      color: var(--wht-d);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .coll-sheet {
+      border: 2px solid var(--red-d);
+      background: linear-gradient(180deg, rgba(35, 0, 0, 0.22), rgba(0, 0, 0, 0.55));
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+    .coll-title {
+      font-size: clamp(2rem, 4.4vw, 3.2rem);
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+    }
+    .coll-subtitle {
+      color: var(--wht-d);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-size: 0.82rem;
+      margin-bottom: 14px;
+    }
+    .coll-description {
+      color: var(--wht-m);
+      font-size: 0.93rem;
+      line-height: 1.75;
+      border-top: 1px solid rgba(204, 0, 0, 0.35);
+      padding-top: 12px;
+      margin-bottom: 20px;
+      white-space: pre-wrap;
+    }
+    .chapter {
+      border: 1px solid var(--red-d);
+      background: rgba(0, 0, 0, 0.34);
+      margin-top: 18px;
+    }
+    .chapter-head {
+      border-bottom: 1px solid var(--red-d);
+      background: linear-gradient(90deg, rgba(139, 0, 0, 0.26), rgba(0, 0, 0, 0.15));
+      padding: 12px 14px;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .chapter-title {
+      font-size: 1.05rem;
+      letter-spacing: 1px;
+      color: var(--wht);
+      text-transform: uppercase;
+      margin: 0;
+    }
+    .chapter-meta {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      color: var(--wht-f);
+      letter-spacing: 1px;
+    }
+    .chapter-chip {
+      border: 1px solid var(--red-d);
+      background: rgba(0, 0, 0, 0.34);
+      padding: 3px 7px;
+    }
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0;
+      border-top: 1px solid var(--red-d);
+      border-left: 1px solid var(--red-d);
+    }
+    .file-card {
+      position: relative;
+      min-height: 192px;
+      background: #050505;
+      border-right: 1px solid var(--red-d);
+      border-bottom: 1px solid var(--red-d);
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .file-card:hover,
+    .file-card:focus-visible {
+      outline: none;
+      box-shadow: inset 0 0 0 2px var(--red-b);
+    }
+    .file-front {
+      position: relative;
+      z-index: 2;
+      height: 100%;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      transition: opacity 0.16s ease;
+    }
+    .file-card:hover .file-front,
+    .file-card:focus-visible .file-front {
+      opacity: 0.1;
+    }
+    .file-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .file-designation {
+      color: var(--red-b);
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      line-height: 1.4;
+      font-weight: 700;
+    }
+    .file-clearance {
+      border: 1px solid var(--red-d);
+      background: rgba(139, 0, 0, 0.2);
+      color: var(--red-b);
+      font-size: 0.62rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 3px 6px;
+      white-space: nowrap;
+    }
+    .file-label {
+      color: var(--wht-m);
+      font-size: 0.8rem;
+      line-height: 1.45;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .file-notes {
+      color: var(--wht-f);
+      font-size: 0.72rem;
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-link-note {
+      margin-top: auto;
+      color: var(--wht-d);
+      font-size: 0.62rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: 1px solid var(--red-d);
+      padding: 4px 7px;
+      width: fit-content;
+      background: rgba(0, 0, 0, 0.35);
+    }
+    .file-hover {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      z-index: 3;
+      transition: opacity 0.16s ease;
+      background: #000;
+    }
+    .file-card:hover .file-hover,
+    .file-card:focus-visible .file-hover {
+      opacity: 1;
+    }
+    .file-hover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transform: scale(1);
+      transition: transform 0.2s ease;
+    }
+    .file-card:hover .file-hover img,
+    .file-card:focus-visible .file-hover img {
+      transform: scale(1.03);
+    }
+    .file-hover-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.52);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: var(--wht-m);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1.45;
+      padding: 10px;
+    }
+    .coll-empty {
+      border: 1px dashed var(--red-d);
+      color: var(--wht-f);
+      font-size: 0.76rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 12px;
+    }
+    .coll-search-controls {
+      border: 1px solid var(--red-d);
+      background: rgba(0, 0, 0, 0.28);
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .coll-search-controls .fi {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--red-d);
+      color: var(--wht);
+      padding: 8px 10px;
+      font-size: 0.87rem;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .coll-search-controls .fi::placeholder {
+      color: var(--wht-f);
+    }
+    @media (max-width: 768px) {
+      .coll-wrap { margin: 20px auto; padding: 0 10px; }
+      .coll-sheet { padding: 16px; }
+      .coll-title { font-size: 1.8rem; }
+      .file-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .file-card { min-height: 170px; }
+    }
+  </style>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="explore.html">Explore</a></li>
+      <li><a href="guide.html">Guide</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap coll-wrap">
+  <div class="section-hd" style="border-bottom:none">Collections</div>
+
+  <div class="coll-meta">
+    <span>Document: Guild Collections</span>
+    <span id="coll-status">Loading collections...</span>
+  </div>
+
+  <div class="coll-search-controls" id="coll-search-controls" style="display:none">
+    <input type="text" id="coll-search-input" class="fi" placeholder="Search collections, designations, or labels..." onkeyup="filterCollections()" />
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <select id="coll-filter-type" class="fi" onchange="filterCollections()" style="flex:1; min-width:120px">
+        <option value="">All Types</option>
+        <option value="Anomalies">Anomalies</option>
+        <option value="Tales">Tales & Reports</option>
+        <option value="Artwork">Artwork</option>
+        <option value="Personnel">Personnel</option>
+      </select>
+      <button class="btn btn-sm btn-s" onclick="resetCollectionFilters()">Reset Filters</button>
+    </div>
+  </div>
+
+  <article class="coll-sheet" id="coll-sheet-view"></article>
+</main>
+
+<footer class="ftr">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild - Collections Archive</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const COLL_SHEET_ID = 'collections';
+  
+  let collData = {
+    title: 'Guild Collections',
+    subtitle: 'Organized archives of anomalies, tales, artwork, and personnel',
+    description: 'Browse categorized collections of Guild holdings, maintained across multiple organizational systems.',
+    chapters: [
+      {
+        id: 'anomalies',
+        title: 'Anomalies',
+        branch: 'Scientific Archive',
+        compartment: 'Anomaly Database',
+        rangeStart: '0001',
+        rangeEnd: '5000',
+        files: [
+          { id: 'anom_1', designation: 'ROS-0001', label: 'Ringing Object Subject', clearanceLevel: 'LEVEL 3', notes: 'Acoustic anomaly with unusual resonance properties.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' },
+          { id: 'anom_2', designation: 'ROS-0002', label: 'Crystalline Formation', clearanceLevel: 'LEVEL 2', notes: 'Geometric crystal structure of unknown composition.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' }
+        ]
+      },
+      {
+        id: 'tales',
+        title: 'Tales & Field Reports',
+        branch: 'Narrative Archive',
+        compartment: 'Field Documentation',
+        rangeStart: '0001F',
+        rangeEnd: '2000F',
+        files: [
+          { id: 'tale_1', designation: 'FIE-0001', label: 'Incident at Station Alpha', clearanceLevel: 'LEVEL 1', notes: 'Documentation of containment breach and response.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' }
+        ]
+      },
+      {
+        id: 'artwork',
+        title: 'Artwork & Visuals',
+        branch: 'Creative Archive',
+        compartment: 'Visual Documentation',
+        rangeStart: 'ART-0001',
+        rangeEnd: 'ART-5000',
+        files: [
+          { id: 'art_1', designation: 'ART-0001', label: 'Guild Seal - Official', clearanceLevel: 'REQUIRED', notes: 'Official Guild seal and insignia artwork.', pageSlug: '', imageUrl: '', imageAlt: '', hoverCaption: '' }
+        ]
+      }
+    ]
+  };
+
+  let currentSearchQuery = '';
+  let currentTypeFilter = '';
+
+  function esc(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(value) {
+    return esc(value);
+  }
+
+  function isValidImageSrc(url) {
+    const src = String(url || '').trim();
+    return /^https?:\/\//i.test(src) || /^data:image\//i.test(src);
+  }
+
+  function filterCollections() {
+    currentSearchQuery = document.getElementById('coll-search-input').value;
+    currentTypeFilter = document.getElementById('coll-filter-type').value;
+    renderCollections();
+  }
+
+  function resetCollectionFilters() {
+    document.getElementById('coll-search-input').value = '';
+    document.getElementById('coll-filter-type').value = '';
+    currentSearchQuery = '';
+    currentTypeFilter = '';
+    renderCollections();
+  }
+
+  function getFilteredCollections() {
+    let chapters = JSON.parse(JSON.stringify(collData.chapters));
+    
+    // Apply type filter
+    if (currentTypeFilter) {
+      chapters = chapters.filter(ch => ch.title.includes(currentTypeFilter));
+    }
+    
+    // Apply search filter
+    if (currentSearchQuery.trim()) {
+      const query = currentSearchQuery.toLowerCase();
+      chapters = chapters.map(ch => ({
+        ...ch,
+        files: ch.files.filter(file =>
+          file.designation.toLowerCase().includes(query) ||
+          file.label.toLowerCase().includes(query) ||
+          file.notes.toLowerCase().includes(query)
+        )
+      })).filter(ch => ch.files.length > 0);
+    }
+    
+    return chapters;
+  }
+
+  function renderCollections() {
+    const host = document.getElementById('coll-sheet-view');
+    const chaptersToRender = (currentSearchQuery || currentTypeFilter) ? getFilteredCollections() : collData.chapters;
+    
+    const chaptersHtml = chaptersToRender.length
+      ? chaptersToRender.map(chapter => {
+          const fileGrid = chapter.files.length
+            ? '<div class="file-grid">' + chapter.files.map(file => {
+                const hoverCaption = file.hoverCaption || file.imageAlt || file.label || 'Collection item';
+                const imageLayer = isValidImageSrc(file.imageUrl)
+                  ? '<div class="file-hover"><img src="' + escapeAttr(file.imageUrl) + '" alt="' + escapeAttr(file.imageAlt || file.label || 'Collection image') + '" loading="lazy" decoding="async" /><div class="file-hover-overlay">' + esc(hoverCaption) + '</div></div>'
+                  : '';
+
+                return '<div class="file-card">' +
+                    '<div class="file-front">' +
+                      '<div class="file-top">' +
+                        '<div class="file-designation">' + esc(file.designation || 'UNREGISTERED') + '</div>' +
+                        '<div class="file-clearance">' + esc(file.clearanceLevel || 'REQUIRED') + '</div>' +
+                      '</div>' +
+                      '<div class="file-label">' + esc(file.label || 'Untitled') + '</div>' +
+                      '<div class="file-notes">' + esc(file.notes || 'No description available.') + '</div>' +
+                    '</div>' +
+                    imageLayer +
+                  '</div>';
+              }).join('') + '</div>'
+            : '<div class="coll-empty">No items in this collection.</div>';
+
+          return '<section class="chapter">' +
+            '<div class="chapter-head">' +
+              '<h2 class="chapter-title">' + esc(chapter.title || 'Untitled') + '</h2>' +
+              '<div class="chapter-meta">' +
+                '<span class="chapter-chip">Branch: ' + esc(chapter.branch || '-') + '</span>' +
+                '<span class="chapter-chip">Range: ' + esc(chapter.rangeStart || '-') + ' - ' + esc(chapter.rangeEnd || '-') + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="chapter-body">' + fileGrid + '</div>' +
+          '</section>';
+        }).join('')
+      : '<div class="coll-empty">No collections to display.</div>';
+
+    host.innerHTML =
+      '<h1 class="coll-title">' + esc(collData.title) + '</h1>' +
+      '<div class="coll-subtitle">' + esc(collData.subtitle) + '</div>' +
+      (collData.description ? '<div class="coll-description">' + esc(collData.description) + '</div>' : '') +
+      chaptersHtml;
+    
+    // Toggle search controls visibility
+    const searchControls = document.getElementById('coll-search-controls');
+    if (searchControls) {
+      searchControls.style.display = collData.chapters.length > 0 ? 'block' : 'none';
+    }
+
+    document.getElementById('coll-status').textContent = 'Collections loaded. Observer mode.';
+  }
+
+  // Initialize on load
+  renderCollections();
+</script>
+</body>
+</html>

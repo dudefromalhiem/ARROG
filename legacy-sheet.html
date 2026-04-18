@@ -284,6 +284,22 @@
       text-transform: uppercase;
       padding: 12px;
     }
+    .legacy-search-controls {
+      border: 1px solid var(--red-d);
+      background: rgba(0, 0, 0, 0.28);
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .legacy-search-controls .fi {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--red-d);
+      color: var(--wht);
+      padding: 8px 10px;
+      font-size: 0.87rem;
+    }
+    .legacy-search-controls .fi::placeholder {
+      color: var(--wht-f);
+    }
     @media (max-width: 768px) {
       .legacy-wrap { margin: 20px auto; padding: 0 10px; }
       .legacy-sheet { padding: 16px; }
@@ -305,6 +321,7 @@
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="explore.html">Explore</a></li>
+      <li><a href="collections.html">Collections</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
@@ -318,6 +335,38 @@
   <div class="legacy-meta">
     <span>Document: Guild Legacy Register</span>
     <span id="legacy-status">Loading archival sheet...</span>
+  </div>
+
+  <div class="legacy-search-controls" id="legacy-search-controls" style="display:none">
+    <input type="text" id="legacy-search-input" class="fi" placeholder="Search designations, labels, or notes..." style="margin-bottom:10px" onkeyup="filterLegacyEntries()" />
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px">
+      <select id="legacy-filter-clearance" class="fi" onchange="filterLegacyEntries()" style="flex:1; min-width:120px">
+        <option value="">All Clearance Levels</option>
+        <option value="REQUIRED">REQUIRED</option>
+        <option value="LEVEL 1">LEVEL 1</option>
+        <option value="LEVEL 2">LEVEL 2</option>
+        <option value="LEVEL 3">LEVEL 3</option>
+        <option value="LEVEL 4">LEVEL 4</option>
+        <option value="LEVEL 5">LEVEL 5</option>
+        <option value="RESTRICTED">RESTRICTED</option>
+      </select>
+      <select id="legacy-sort-by" class="fi" onchange="sortLegacyEntries()" style="flex:1; min-width:120px">
+        <option value="chapter">Sort by Chapter</option>
+        <option value="designation">Sort by Designation</option>
+        <option value="clearance">Sort by Clearance</option>
+        <option value="label">Sort by Label</option>
+      </select>
+      <button class="btn btn-sm btn-s" onclick="resetLegacyFilters()">Reset Filters</button>
+    </div>
+    <div id="legacy-bulk-actions" style="display:none">
+      <div style="border-top:1px solid var(--red-d); padding-top:10px; margin-top:10px">
+        <label style="color:var(--wht-m); font-size:0.85rem"><input type="checkbox" id="legacy-select-all" onchange="toggleSelectAllEntries(this.checked)" /> Select All Results</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px">
+          <button class="btn btn-sm btn-p" onclick="bulkUpdateClearance()">Bulk Update Clearance</button>
+          <button class="btn btn-sm btn-d" onclick="bulkDeleteEntries()" style="display:none">Bulk Delete</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <article class="legacy-sheet" id="legacy-sheet-view"></article>
@@ -687,10 +736,163 @@
     return 'page.html?slug=' + encodeURIComponent(s);
   }
 
+  let currentSearchQuery = '';
+  let currentClearanceFilter = '';
+  let currentSortBy = 'chapter';
+  let filteredChapters = [];
+  let selectedEntries = new Map(); // Map of fileId -> { chapterId, fileId }
+
+  function toggleSelectAllEntries(checked) {
+    selectedEntries.clear();
+    if (checked && currentSearchQuery || currentClearanceFilter) {
+      const chapters = getFilteredAndSortedChapters();
+      chapters.forEach(ch => {
+        ch.files.forEach(file => {
+          selectedEntries.set(file.id, { chapterId: ch.id, fileId: file.id });
+        });
+      });
+    } else if (checked) {
+      legacyData.chapters.forEach(ch => {
+        ch.files.forEach(file => {
+          selectedEntries.set(file.id, { chapterId: ch.id, fileId: file.id });
+        });
+      });
+    }
+    updateBulkActionUI();
+  }
+
+  function bulkUpdateClearance() {
+    if (!ownerCanEdit) {
+      alert('Owner authorization required.');
+      return;
+    }
+    if (selectedEntries.size === 0) {
+      alert('Select entries first.');
+      return;
+    }
+    const newLevel = prompt('Enter new clearance level (e.g., LEVEL 3, REQUIRED):');
+    if (!newLevel) return;
+    
+    selectedEntries.forEach(({ chapterId, fileId }) => {
+      const file = getFileById(chapterId, fileId);
+      if (file) file.clearanceLevel = newLevel;
+    });
+    renderLegacySheet();
+    renderEditorChapters();
+    selectedEntries.clear();
+    updateBulkActionUI();
+    document.getElementById('legacy-select-all').checked = false;
+  }
+
+  function bulkDeleteEntries() {
+    if (!ownerCanEdit) {
+      alert('Owner authorization required.');
+      return;
+    }
+    if (selectedEntries.size === 0) {
+      alert('Select entries first.');
+      return;
+    }
+    if (!confirm(`Delete ${selectedEntries.size} entry/entries? This cannot be undone.`)) return;
+    
+    selectedEntries.forEach(({ chapterId, fileId }) => {
+      const chapter = getChapterById(chapterId);
+      if (chapter) {
+        chapter.files = chapter.files.filter(f => f.id !== fileId);
+      }
+    });
+    renderLegacySheet();
+    renderEditorChapters();
+    selectedEntries.clear();
+    updateBulkActionUI();
+    document.getElementById('legacy-select-all').checked = false;
+  }
+
+  function updateBulkActionUI() {
+    const bulkPanel = document.getElementById('legacy-bulk-actions');
+    if (bulkPanel && ownerCanEdit) {
+      bulkPanel.style.display = selectedEntries.size > 0 ? 'block' : 'none';
+    }
+  }
+
+  function getFilteredAndSortedChapters() {
+    let chapters = JSON.parse(JSON.stringify(legacyData.chapters));
+    
+    // Apply search filter
+    if (currentSearchQuery.trim()) {
+      const query = currentSearchQuery.toLowerCase();
+      chapters = chapters.map(ch => ({
+        ...ch,
+        files: ch.files.filter(file =>
+          file.designation.toLowerCase().includes(query) ||
+          file.label.toLowerCase().includes(query) ||
+          file.notes.toLowerCase().includes(query)
+        )
+      })).filter(ch => ch.files.length > 0);
+    }
+    
+    // Apply clearance filter
+    if (currentClearanceFilter) {
+      chapters = chapters.map(ch => ({
+        ...ch,
+        files: ch.files.filter(file => file.clearanceLevel === currentClearanceFilter)
+      })).filter(ch => ch.files.length > 0);
+    }
+    
+    // Apply sorting (only applies when not showing all chapters in order)
+    if (currentSearchQuery || currentClearanceFilter) {
+      if (currentSortBy === 'designation') {
+        chapters.forEach(ch => {
+          ch.files.sort((a, b) => a.designation.localeCompare(b.designation));
+        });
+      } else if (currentSortBy === 'clearance') {
+        const clearanceOrder = { 'REQUIRED': 0, 'LEVEL 1': 1, 'LEVEL 2': 2, 'LEVEL 3': 3, 'LEVEL 4': 4, 'LEVEL 5': 5, 'RESTRICTED': 6 };
+        chapters.forEach(ch => {
+          ch.files.sort((a, b) => (clearanceOrder[a.clearanceLevel] || 99) - (clearanceOrder[b.clearanceLevel] || 99));
+        });
+      } else if (currentSortBy === 'label') {
+        chapters.forEach(ch => {
+          ch.files.sort((a, b) => a.label.localeCompare(b.label));
+        });
+      }
+    }
+    
+    return chapters;
+  }
+
+  function filterLegacyEntries() {
+    currentSearchQuery = document.getElementById('legacy-search-input').value;
+    currentClearanceFilter = document.getElementById('legacy-filter-clearance').value;
+    selectedEntries.clear();
+    document.getElementById('legacy-select-all').checked = false;
+    renderLegacySheet();
+    updateBulkActionUI();
+  }
+
+  function sortLegacyEntries() {
+    currentSortBy = document.getElementById('legacy-sort-by').value;
+    renderLegacySheet();
+  }
+
+  function resetLegacyFilters() {
+    document.getElementById('legacy-search-input').value = '';
+    document.getElementById('legacy-filter-clearance').value = '';
+    document.getElementById('legacy-sort-by').value = 'chapter';
+    currentSearchQuery = '';
+    currentClearanceFilter = '';
+    currentSortBy = 'chapter';
+    selectedEntries.clear();
+    document.getElementById('legacy-select-all').checked = false;
+    renderLegacySheet();
+    updateBulkActionUI();
+  }
+
   function renderLegacySheet() {
     const host = document.getElementById('legacy-sheet-view');
-    const chaptersHtml = legacyData.chapters.length
-      ? legacyData.chapters.map(chapter => {
+    const chaptersToRender = (currentSearchQuery || currentClearanceFilter) ? getFilteredAndSortedChapters() : legacyData.chapters;
+    
+    const chaptersHtml = chaptersToRender.length
+      ? chaptersToRender.map(chapter => {
           const fileGrid = chapter.files.length
             ? '<div class="file-grid">' + chapter.files.map(file => {
                 const openHref = pageOpenHref(file.pageSlug);
@@ -738,6 +940,18 @@
         '<div class="legacy-core-item"><h3>Current Owner Mandate</h3><p>' + esc(legacyData.currentOwner) + '</p></div>' +
       '</section>' +
       chaptersHtml;
+    
+    // Toggle search controls visibility
+    const searchControls = document.getElementById('legacy-search-controls');
+    if (searchControls) {
+      searchControls.style.display = legacyData.chapters.length > 0 ? 'block' : 'none';
+      
+      // Show bulk actions panel if owner and there are filters/search
+      const bulkPanel = document.getElementById('legacy-bulk-actions');
+      if (bulkPanel) {
+        bulkPanel.style.display = (ownerCanEdit && (currentSearchQuery || currentClearanceFilter)) ? 'block' : 'none';
+      }
+    }
   }
 
   function renderEditorChapters() {
@@ -869,11 +1083,23 @@
 
   function canEditLegacy(user) {
     if (!user || !user.email) return false;
-    const email = String(user.email || '').toLowerCase();
+    const email = String(user.email || '').toLowerCase().trim();
+    
+    // Try isOwner function first
     if (typeof isOwner === 'function') {
-      try { return !!isOwner(email); } catch (_err) { }
+      try { 
+        const isOwnerResult = !!isOwner(email);
+        console.log('isOwner check result:', isOwnerResult);
+        if (isOwnerResult) return true;
+      } catch (err) { 
+        console.warn('isOwner check failed:', err.message);
+      }
     }
-    return FALLBACK_OWNER_EMAILS.has(email);
+    
+    // Fallback to hardcoded owner emails
+    const canEdit = FALLBACK_OWNER_EMAILS.has(email);
+    console.log('Fallback owner email check:', { email, canEdit });
+    return canEdit;
   }
 
   async function hydrateLegacyForUser(user) {
@@ -890,6 +1116,7 @@
 
       try { if (typeof rolesReady !== 'undefined') await rolesReady; } catch (_err) { }
       ownerCanEdit = canEditLegacy(user);
+      console.log('Legacy Sheet Auth Check:', { userEmail: user.email, ownerCanEdit, fallbackEmails: Array.from(FALLBACK_OWNER_EMAILS) });
     } else {
       ownerCanEdit = false;
       navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
@@ -899,7 +1126,7 @@
     ownerActions.style.display = ownerCanEdit ? 'flex' : 'none';
     document.getElementById('legacy-status').textContent = ownerCanEdit
       ? 'Owner verified. Edit mode available.'
-      : 'Read-only mode. Owner sign-in required for edits.';
+      : 'Observer mode. Owner sign-in required for edits.';
   }
 
   if (authRef && typeof authRef.onAuthStateChanged === 'function') {
