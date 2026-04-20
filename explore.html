@@ -48,6 +48,35 @@
     .exp-art-info { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.9)); padding: 16px; }
     
     .no-results { text-align: center; color: var(--wht-d); padding: 40px; font-style: italic; background: rgba(255,255,255,0.02); border: 1px dashed var(--blk-m); }
+
+    .skeleton-card {
+      border: 1px solid var(--blk-d);
+      background: var(--blk-b);
+      padding: 16px;
+    }
+    .skeleton-line {
+      height: 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.05) 63%);
+      background-size: 400% 100%;
+      animation: shimmer 1.2s ease-in-out infinite;
+    }
+    .skeleton-line.short { width: 45%; }
+    .skeleton-line.mid { width: 70%; }
+    @keyframes shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0 0; }
+    }
+
+    @media (max-width: 640px) {
+      .exp-wrap { margin: 22px auto; padding: 0 12px; }
+      .exp-search { padding: 18px 12px; margin-bottom: 24px; }
+      .exp-search h1 { font-size: 1.25rem; letter-spacing: 1px; }
+      .exp-search input { font-size: 16px; padding: 12px; }
+      .exp-grid { grid-template-columns: 1fr; gap: 14px; }
+      .exp-section { margin-bottom: 30px; }
+    }
   </style>
 </head>
 <body>
@@ -75,7 +104,8 @@
   <div class="exp-search">
     <h1>Explore the Universe</h1>
     <p>Search via keyword or Designation ID (e.g., ROS-0001) to cross-reference anomalies, tales, and artwork.</p>
-    <input type="text" id="universe-search" placeholder="Enter keyword or anomaly ID..." />
+    <input type="text" id="universe-search" list="universe-search-suggestions" placeholder="Enter keyword or anomaly ID..." />
+    <datalist id="universe-search-suggestions"></datalist>
   </div>
 
   <div class="exp-section" id="sec-anom">
@@ -106,6 +136,16 @@
     </div>
   </div>
 
+  <div class="exp-section" id="sec-history">
+    <div class="exp-section-hd">
+      <h2>Archived History</h2>
+      <a href="legacy-sheet.html">Open Legacy Folder »</a>
+    </div>
+    <div class="exp-grid" id="grid-history">
+      <div class="no-results">Accessing databanks...</div>
+    </div>
+  </div>
+
 </main>
 
 <footer class="ftr">
@@ -121,7 +161,8 @@
 <script src="seed-data.js"></script>
 
 <script>
-  let universeData = { Anomaly: [], Tale: [], Artwork: [] };
+  let universeData = { Anomaly: [], Tale: [], Artwork: [], Lore: [] };
+  let universeSearchTimer = null;
 
   function buildSnippet(html) {
     if (!html) return '';
@@ -134,7 +175,47 @@
     return match ? match[1] : null;
   }
 
+  function renderGridSkeleton(gridId, count = 6) {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    grid.innerHTML = Array.from({ length: count }).map(() =>
+      '<div class="skeleton-card" aria-hidden="true">' +
+        '<div class="skeleton-line short"></div>' +
+        '<div class="skeleton-line mid"></div>' +
+        '<div class="skeleton-line"></div>' +
+        '<div class="skeleton-line"></div>' +
+      '</div>'
+    ).join('');
+  }
+
+  function seedSearchSuggestions() {
+    const data = document.getElementById('universe-search-suggestions');
+    if (!data) return;
+    const seen = new Set();
+    const options = [];
+    Object.values(universeData).forEach(items => {
+      items.forEach(item => {
+        const title = String(item.title || '').trim();
+        const slug = String(item.slug || '').trim();
+        if (title && !seen.has('t:' + title.toLowerCase())) {
+          seen.add('t:' + title.toLowerCase());
+          options.push('<option value="' + escapeHtml(title) + '"></option>');
+        }
+        if (slug && !seen.has('s:' + slug.toLowerCase())) {
+          seen.add('s:' + slug.toLowerCase());
+          options.push('<option value="' + escapeHtml(slug) + '"></option>');
+        }
+      });
+    });
+    data.innerHTML = options.join('');
+  }
+
   async function loadUniverse() {
+    renderGridSkeleton('grid-anom');
+    renderGridSkeleton('grid-tale');
+    renderGridSkeleton('grid-art');
+    renderGridSkeleton('grid-history');
+
     // Load from PAGE_SEED first so the universe remains visible even before Firestore migration
     if (typeof PAGE_SEED !== 'undefined') {
       PAGE_SEED.forEach(p => {
@@ -155,18 +236,19 @@
       const snap = await db.collection('pages').get();
       snap.docs.forEach(doc => {
         const d = doc.data();
-        if (!universeData[d.type]) return;
+        const normalizedType = String(d.type || '').trim() === 'Lore' ? 'Lore' : d.type;
+        if (!universeData[normalizedType]) return;
         if (universeData[d.type].some(u => u.slug === d.slug)) return;
         
         const displayExcerpt = d.type === 'Anomaly' && d.anomalyDescription 
           ? d.anomalyDescription 
           : buildSnippet(d.htmlContent);
         
-        universeData[d.type].push({
+        universeData[normalizedType].push({
           id: doc.id,
           slug: d.slug,
           title: d.title,
-          type: d.type,
+          type: normalizedType,
           excerpt: displayExcerpt,
           img: getImgSrc(d.htmlContent)
         });
@@ -175,6 +257,26 @@
       console.warn("Could not fetch from Firestore.");
     }
 
+    try {
+      const loreSnap = await db.collection('loreIndex').get();
+      loreSnap.docs.forEach(doc => {
+        const d = doc.data() || {};
+        const slug = String(d.slug || '').trim();
+        if (slug && universeData.Lore.some(item => item.slug === slug)) return;
+        universeData.Lore.push({
+          id: d.pageId || doc.id,
+          slug: slug,
+          title: d.title || 'Untitled Archived History Page',
+          type: 'Lore',
+          excerpt: d.summary || 'Archived History page linked from the legacy folder.',
+          img: null
+        });
+      });
+    } catch (_err) {
+      // Optional index fetch.
+    }
+
+    seedSearchSuggestions();
     renderAll();
   }
 
@@ -197,18 +299,18 @@
     }
 
     grid.innerHTML = items.map(i => {
-      const href = i.slug ? 'page.html?slug=' + i.slug : 'page.html?id=' + i.id;
+      const href = i.slug ? 'page.html?slug=' + encodeURIComponent(i.slug) : 'page.html?id=' + encodeURIComponent(i.id);
       
       if (type === 'Artwork' && i.img) {
         return `<div class="exp-card exp-art-card" onclick="window.location.href='${href}'">
-               <img src="${i.img}" alt="${i.title}" />
+               <img src="${i.img}" alt="${i.title}" loading="lazy" decoding="async" />
                <div class="exp-art-info">
                  <div class="exp-card-title" style="margin:0">${i.title}</div>
                </div></div>`;
       }
 
       return `<div class="exp-card" onclick="window.location.href='${href}'">
-             <div class="exp-card-type">${type}</div>
+             <div class="exp-card-type">${type === 'Lore' ? 'Archived History' : type}</div>
              <div class="exp-card-title">${i.title}</div>
              <div class="exp-card-excerpt">${i.excerpt}</div>
              </div>`;
@@ -220,9 +322,13 @@
     renderGrid('Anomaly', 'grid-anom', q);
     renderGrid('Tale', 'grid-tale', q);
     renderGrid('Artwork', 'grid-art', q);
+    renderGrid('Lore', 'grid-history', q);
   }
 
-  document.getElementById('universe-search').addEventListener('input', renderAll);
+  document.getElementById('universe-search').addEventListener('input', () => {
+    clearTimeout(universeSearchTimer);
+    universeSearchTimer = setTimeout(renderAll, 100);
+  });
   document.addEventListener('DOMContentLoaded', loadUniverse);
 
 </script>

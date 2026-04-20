@@ -524,8 +524,9 @@ render.mount('submission-terminal');</pre>
         <label class="fl" for="sf-slug">Page Link Name</label>
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:.8rem;color:var(--wht-f);white-space:nowrap">/pages/</span>
-          <input class="fi" id="sf-slug" placeholder="auto-generated from title" style="font-family:var(--font-m);font-size:.8rem" />
+          <input class="fi" id="sf-slug" list="page-link-suggestions" placeholder="auto-generated from title" style="font-family:var(--font-m);font-size:.8rem" />
         </div>
+        <datalist id="page-link-suggestions"></datalist>
         <span style="font-size:.7rem;color:var(--wht-f)">Leave blank to create one from the title automatically. Use lowercase letters and hyphens only.</span>
       </div>
     </div>

@@ -66,11 +66,37 @@
       background: rgba(0, 0, 0, .25);
     }
 
+    .entry-skeleton {
+      border: 1px solid var(--red-d);
+      background: var(--blk-c);
+      padding: 14px;
+    }
+    .entry-skeleton-line {
+      height: 11px;
+      border-radius: 8px;
+      margin-bottom: 9px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.05) 63%);
+      background-size: 400% 100%;
+      animation: reg-shimmer 1.2s ease-in-out infinite;
+    }
+    .entry-skeleton-line.short { width: 42%; }
+    .entry-skeleton-line.mid { width: 68%; }
+    @keyframes reg-shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0 0; }
+    }
+
     @media (max-width: 960px) {
       .logs-options { grid-template-columns: 1fr; }
       .logs-options.subcats { grid-template-columns: 1fr; }
       .range-grid { grid-template-columns: repeat(3, 1fr); }
       .entry-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .logs-wrap { margin: 22px auto; padding: 0 10px; }
+      .logs-level { padding: 10px; }
+      .range-grid { grid-template-columns: repeat(2, 1fr); }
+      .logs-head p { font-size: .84rem; }
     }
   </style>
 </head>
@@ -102,6 +128,7 @@
       followed by a registered numerical range. Entries not present within the registry are considered unavailable - lost to degradation,
       interference, or absence of record. Only accessible entries may be selected for review.
       <span class="logs-subtext">The point of these records is to keep track of entries that were lost, corrupted, or never existed in a recoverable form.</span>
+      <span class="logs-subtext">Looking for community lore additions? View <a href="explore.html#sec-history" style="color:var(--red-b)">Archived History</a> in Explore.</span>
     </p>
   </div>
 
@@ -180,6 +207,35 @@
   let selectedSubcat = null;
   let selectedRange = null;
   let livePagesByDesignation = new Map();
+  let registryDataLoading = true;
+  function copyTextToClipboard(value) {
+    const text = String(value || '').trim();
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+      return;
+    }
+    const helper = document.createElement('textarea');
+    helper.value = text;
+    document.body.appendChild(helper);
+    helper.select();
+    try { document.execCommand('copy'); } catch (_err) {}
+    document.body.removeChild(helper);
+  }
+
+  function renderEntriesSkeleton(count = 8) {
+    const grid = document.getElementById('entries-grid');
+    if (!grid) return;
+    grid.innerHTML = Array.from({ length: count }).map(() =>
+      '<div class="entry-skeleton" aria-hidden="true">' +
+        '<div class="entry-skeleton-line short"></div>' +
+        '<div class="entry-skeleton-line mid"></div>' +
+        '<div class="entry-skeleton-line"></div>' +
+        '<div class="entry-skeleton-line"></div>' +
+      '</div>'
+    ).join('');
+  }
+
 
   function padNumber(value, digits) {
     return String(value).padStart(digits, '0');
@@ -312,6 +368,11 @@
   function renderEntries() {
     const grid = document.getElementById('entries-grid');
     const title = document.getElementById('entries-title');
+    if (registryDataLoading) {
+      title.textContent = 'Level 4 // Entries';
+      renderEntriesSkeleton();
+      return;
+    }
     if (!selectedSubcat || !selectedRange) {
       title.textContent = 'Level 4 // Entries';
       grid.innerHTML = '<div class="empty-note">Choose a range to load entries.</div>';
@@ -342,6 +403,7 @@
             '<div class="entry-actions">' +
               '<a class="btn btn-sm btn-s" href="' + href + '">Open</a>' +
               '<a class="btn btn-sm btn-p" href="submit.html?editId=' + encodeURIComponent(existing.id) + '">Edit</a>' +
+              '<button class="btn btn-sm btn-s" type="button" onclick="copyTextToClipboard(\'' + escapeHtml(href).replace(/'/g, '\\&#39;') + '\')">Copy Link</button>' +
             '</div>' +
           '</article>'
         );
@@ -402,8 +464,10 @@
     renderTopLevel();
     renderSubcategories();
     renderRanges();
+    renderEntriesSkeleton();
     renderEntries();
     await buildLiveDesignationIndex();
+    registryDataLoading = false;
     selectTopLevel('anomalies');
     if (selectedTop && LOG_TREE[selectedTop] && LOG_TREE[selectedTop].children[0]) {
       selectSubcategory(LOG_TREE[selectedTop].children[0].id);
