@@ -699,6 +699,22 @@ function updateCommentMediaSelection() {
   if (status) status.textContent = files.length ? files.map(file => file.name).join(', ') : 'Images, audio, or video can be attached.';
 }
 
+function isAllowedCommentMediaFile(file) {
+  const type = String(file && file.type ? file.type : '').toLowerCase();
+  if (!type) return false;
+  if (type === 'image/png' || type === 'image/jpeg' || type === 'image/gif' || type === 'image/webp') return true;
+  if (type.startsWith('audio/')) return true;
+  if (type.startsWith('video/')) return true;
+  return false;
+}
+
+function getCommentMediaSizeLimit(type) {
+  const mime = String(type || '').toLowerCase();
+  if (mime.startsWith('video/')) return 25 * 1024 * 1024;
+  if (mime.startsWith('audio/')) return 10 * 1024 * 1024;
+  return 10 * 1024 * 1024;
+}
+
 async function uploadCommentMediaFiles(files) {
   if (!files || !files.length) return [];
   if (!storage || !auth.currentUser) throw new Error('Media uploads require an active signed-in session.');
@@ -707,6 +723,13 @@ async function uploadCommentMediaFiles(files) {
   const limit = Math.min(files.length, 4);
   for (let index = 0; index < limit; index++) {
     const file = files[index];
+    if (!isAllowedCommentMediaFile(file)) {
+      throw new Error('Unsupported media type: ' + (file.name || 'attachment') + '. Allowed: PNG, JPG, GIF, WEBP, audio, and video.');
+    }
+    const maxBytes = getCommentMediaSizeLimit(file.type || '');
+    if (Number(file.size || 0) > maxBytes) {
+      throw new Error((file.name || 'Attachment') + ' exceeds the upload size limit.');
+    }
     const safeName = String(file.name || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = 'uploads/' + auth.currentUser.uid + '/comments/' + Date.now() + '-' + index + '-' + safeName;
     const ref = storage.ref(filePath);

@@ -24,7 +24,7 @@ service firebase.storage {
       allow read: if true;
     }
 
-    match /artworks/{fileName} {
+    match /artworks/{allPaths=**} {
       allow write: if isSignedIn() && isAllowedImageUpload();
     }
 
