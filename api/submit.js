@@ -478,10 +478,6 @@ module.exports = async function handler(req, res) {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = 'draft';
 
-      if (String(payload.type || '').trim().toLowerCase() === 'lore' && !adminAccess) {
-        return sendJson(res, 403, { error: 'Admin access required for Lore pages.' });
-      }
-
       if (submissionId) {
         const existing = await submissionRef.get();
         if (existing.exists) {
@@ -502,10 +498,6 @@ module.exports = async function handler(req, res) {
 
       validateAnomalyPayloadOrThrow(payload, { enforceTitlePrefix: true });
 
-      if (String(payload.type || '').trim().toLowerCase() === 'lore' && !adminAccess) {
-        return sendJson(res, 403, { error: 'Admin access required for Lore pages.' });
-      }
-
       if (action === 'publish' && !adminAccess) {
         return sendJson(res, 403, { error: 'Admin access required.' });
       }
@@ -524,7 +516,7 @@ module.exports = async function handler(req, res) {
           anomalyListKey: payload.anomalyListKey,
           type: payload.type,
           contentFamily: payload.contentFamily,
-          legacySection: String(payload.type || '').trim().toLowerCase() === 'lore' ? 'Guild Legacy' : '',
+          legacySection: String(payload.type || '').trim().toLowerCase() === 'lore' ? 'Archived History' : '',
           tags: payload.tags,
           slug: payload.slug,
           htmlContent: payload.htmlContent,
@@ -561,7 +553,8 @@ module.exports = async function handler(req, res) {
             slug: payload.slug,
             type: payload.type,
             contentFamily: payload.contentFamily,
-            legacySection: 'Guild Legacy',
+            legacySection: 'Archived History',
+            authenticityNote: 'Documents that contradict first Legacy records created by owners/admins are considered false.',
             summary: extractPlainTextExcerpt(payload.htmlContent || payload.title || '', 240),
             tags: payload.tags,
             authorUid: actor.uid,

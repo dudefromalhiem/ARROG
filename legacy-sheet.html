@@ -75,6 +75,18 @@
       white-space: pre-wrap;
       font-size: 0.87rem;
     }
+    .legacy-auth-note {
+      border: 2px solid var(--red-b);
+      background: linear-gradient(135deg, rgba(204, 0, 0, 0.26), rgba(0, 0, 0, 0.62));
+      color: var(--wht);
+      padding: 12px 14px;
+      margin: 0 0 22px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1.55;
+      font-size: 0.78rem;
+      box-shadow: 0 0 0 1px rgba(204, 0, 0, 0.35) inset;
+    }
     .chapter {
       border: 1px solid var(--red-d);
       background: rgba(0, 0, 0, 0.34);
@@ -448,10 +460,10 @@
   const LEGACY_DEFAULT = {
     title: 'Guild Legacy',
     subtitle: 'Designation archive of leadership, departments, and notable personnel',
-    description: '',
-    foundation: 'Origins and preservation directives are maintained here.',
-    priorOwners: 'Historical owner transitions are logged here.',
-    currentOwner: 'Current continuity directives are logged here.',
+    description: 'Legacy front page record for Guild archival continuity.',
+    foundation: 'Prior to becoming a multinational private organization, the Red Oaker Guild was made up of a singular team of scientific researchers, doctors, and priests. Led by one man\'s vision, they strived to understand and even befriend the anomalous beings and objects they encountered, harboring and consistently observing many of them. Throughout decades, leadership shifted, and many personnel recorded their findings until the Guild\'s collapse near the late 20th century.',
+    priorOwners: 'During the collapse many anomalies escaped, and those too weak, succumbed to the harsh nature of the world. Many records were destroyed or lost. Under the first Archon, Mikolov "Ekat" Gunitsky, the Guild was rebuilt and found records were consolidated into a system known as the Anomalous Registry of the Red Oaker Guild or "ARROG". This served to centralize all information of the Guild and the anomalies into a single controlled system.',
+    currentOwner: 'Today, the Guild still uses the ARROG system, with the hopes of one day restoring the archive to its former glory. The Guild has expanded, with 242 Facilities and 12 Complexes placed around the world. The current Archon, Archon Quincy, operates the Guild as both a psychiatric ward and an anomalous research center, allowing patients to be selected for testing with anomalies.\n\nThe Guild prioritizes the recovery of lost research and the expansion of the Registry through newly acquired anomalies. In accordance with its doctrine, all anomalies are sheltered, observed, and pursued for understanding.',
     chapters: [
       {
         id: 'leadership',
@@ -523,6 +535,8 @@
     ]
   };
 
+  const LEGACY_AUTHENTICITY_NOTICE = 'Authenticity Order: Historical documents that contradict the first archived records are considered false and must be treated as invalid. Only aligned primary records are recognized in this folder.';
+
   let legacyData = { ...LEGACY_DEFAULT };
   let ownerCanEdit = false;
   const legacyStorage = (typeof storage !== 'undefined' && storage)
@@ -589,8 +603,30 @@
     };
   }
 
+  function applyLegacyNarrativeDefaults(data) {
+    const normalized = { ...(data || {}) };
+    const oldFoundation = 'Origins and preservation directives are maintained here.';
+    const oldPrior = 'Historical owner transitions are logged here.';
+    const oldCurrent = 'Current continuity directives are logged here.';
+
+    if (!String(normalized.description || '').trim()) {
+      normalized.description = LEGACY_DEFAULT.description;
+    }
+    if (!String(normalized.foundation || '').trim() || normalized.foundation === oldFoundation) {
+      normalized.foundation = LEGACY_DEFAULT.foundation;
+    }
+    if (!String(normalized.priorOwners || '').trim() || normalized.priorOwners === oldPrior) {
+      normalized.priorOwners = LEGACY_DEFAULT.priorOwners;
+    }
+    if (!String(normalized.currentOwner || '').trim() || normalized.currentOwner === oldCurrent) {
+      normalized.currentOwner = LEGACY_DEFAULT.currentOwner;
+    }
+
+    return normalized;
+  }
+
   function ensureLegacyAdditions(data) {
-    const normalized = normalizeLegacyData(data);
+    const normalized = applyLegacyNarrativeDefaults(normalizeLegacyData(data));
     const defaultOttChapter = LEGACY_DEFAULT.chapters.find(ch => ch.id === 'hostile-orders');
     if (!defaultOttChapter) return normalized;
 
@@ -906,8 +942,8 @@
     const loreHtml = loreIndexEntries.length
       ? '<section class="chapter" style="margin-top:22px">' +
           '<div class="chapter-head">' +
-            '<h2 class="chapter-title">Lore Index</h2>' +
-            '<div class="chapter-meta"><span class="chapter-chip">Dynamic Legacy Linkage</span></div>' +
+            '<h2 class="chapter-title">Archived History</h2>' +
+            '<div class="chapter-meta"><span class="chapter-chip">Dynamic Legacy Linkage</span><span class="chapter-chip">Contradicting first owner/admin Legacy records are false</span></div>' +
           '</div>' +
           '<div class="chapter-body"><div class="file-grid">' + loreIndexEntries.map(entry => {
             const openHref = pageOpenHref(entry.slug);
@@ -915,22 +951,22 @@
             return '<a class="file-card" href="' + (openHref || '#') + '" ' + (openHref ? '' : 'onclick="return false"') + '>' +
               '<div class="file-front">' +
                 '<div class="file-top">' +
-                  '<div class="file-designation">' + esc(entry.type || 'Lore') + '</div>' +
-                  '<div class="file-clearance">Guild Legacy</div>' +
+                  '<div class="file-designation">' + esc(entry.legacySection || 'Archived History') + '</div>' +
+                  '<div class="file-clearance">Archived History</div>' +
                 '</div>' +
-                '<div class="file-label">' + esc(entry.title || 'Untitled Lore Page') + '</div>' +
-                '<div class="file-notes">' + esc(summary || 'Lore page linked from Workshop.') + '</div>' +
-                '<div class="file-link-note">' + (openHref ? 'Open Lore Page' : 'No Linked Page') + '</div>' +
+                '<div class="file-label">' + esc(entry.title || 'Untitled Archived History Page') + '</div>' +
+                '<div class="file-notes">' + esc(summary || 'Archived History page linked from Workshop.') + '</div>' +
+                '<div class="file-link-note">' + (openHref ? 'Open Archived History Page' : 'No Linked Page') + '</div>' +
               '</div>' +
             '</a>';
           }).join('') + '</div></div>' +
         '</section>'
       : '<section class="chapter" style="margin-top:22px">' +
           '<div class="chapter-head">' +
-            '<h2 class="chapter-title">Lore Index</h2>' +
-            '<div class="chapter-meta"><span class="chapter-chip">Dynamic Legacy Linkage</span></div>' +
+            '<h2 class="chapter-title">Archived History</h2>' +
+            '<div class="chapter-meta"><span class="chapter-chip">Dynamic Legacy Linkage</span><span class="chapter-chip">Contradicting first owner/admin Legacy records are false</span></div>' +
           '</div>' +
-          '<div class="legacy-empty" style="margin:14px">No published Lore pages yet.</div>' +
+          '<div class="legacy-empty" style="margin:14px">No published Archived History pages yet.</div>' +
         '</section>';
     
     const chaptersHtml = chaptersToRender.length
@@ -981,6 +1017,7 @@
         '<div class="legacy-core-item"><h3>Prior Owners</h3><p>' + esc(legacyData.priorOwners) + '</p></div>' +
         '<div class="legacy-core-item"><h3>Current Owner Mandate</h3><p>' + esc(legacyData.currentOwner) + '</p></div>' +
       '</section>' +
+      '<div class="legacy-auth-note">' + esc(LEGACY_AUTHENTICITY_NOTICE) + '</div>' +
       loreHtml +
       chaptersHtml;
     

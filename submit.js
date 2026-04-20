@@ -159,7 +159,7 @@ const ENTRY_PROFILES = {
   tl: { key: 'tl', label: 'Termination Log Format', type: 'Anomaly', subtype: 'TL', template: 'anomaly' },
   tale: { key: 'tale', label: 'Narrative / Field Report', type: 'Tale', template: 'tale' },
   artwork: { key: 'artwork', label: 'Artwork Upload', type: 'Artwork', template: 'artwork' },
-  lore: { key: 'lore', label: 'Lore Pages', type: 'Lore', template: 'guide' }
+  lore: { key: 'lore', label: 'Archived History', type: 'Lore', template: 'guide' }
 };
 
 const TYPE_CANONICAL_MAP = {
@@ -357,8 +357,7 @@ auth.onAuthStateChanged(async user => {
     navAuth.innerHTML = renderSubmitUserMenu(user);
     setDraftStatus('Draft autosave is idle.');
     configureSubmissionApiBase();
-    const isAdminUser = await getUserAdminFlag(user);
-    setLoreWorkshopVisibility(isAdminUser);
+    setLoreWorkshopVisibility(true);
     initializeSubmitEditModeFromUrl();
     initializeReconstructionPrefillFromUrl();
 
@@ -373,8 +372,6 @@ auth.onAuthStateChanged(async user => {
       openSubmissionHistoryView();
     } else if (view === 'drafts') {
       openSubmissionDraftsView();
-    } else if (entryProfile === 'lore' && !currentUserCanAccessLore) {
-      showSubmitEditor(false);
     } else if (ENTRY_PROFILES[entryProfile]) {
       applyEntryProfile(entryProfile);
     } else {
@@ -616,9 +613,6 @@ async function openSubmitFileExplorer() {
 
 function setLoreWorkshopVisibility(canAccess) {
   currentUserCanAccessLore = !!canAccess;
-  document.querySelectorAll('.lore-workshop-only').forEach(el => {
-    el.classList.toggle('hidden', !currentUserCanAccessLore);
-  });
   const loreOption = document.querySelector('#sf-type option[value="Lore"]');
   if (loreOption) {
     loreOption.hidden = !currentUserCanAccessLore;
@@ -629,11 +623,6 @@ function setLoreWorkshopVisibility(canAccess) {
 function applyEntryProfile(profileKey) {
   const profile = ENTRY_PROFILES[profileKey];
   if (!profile) return;
-
-  if (profile.key === 'lore' && !currentUserCanAccessLore) {
-    alert('Lore pages are restricted to Admins and Owners.');
-    return;
-  }
 
   selectedEntryProfile = profile.key;
   const banner = document.getElementById('entry-profile-banner');

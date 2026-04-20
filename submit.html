@@ -368,6 +368,14 @@ render.mount('submission-terminal');</pre>
             <li>Drafts stay available until you remove them or publish them.</li>
           </ul>
         </div>
+        <div class="guidebook-card">
+          <h3>Archived History (Lore)</h3>
+          <ul>
+            <li>Any signed-in user can submit Archived History pages from this workshop.</li>
+            <li>These pages appear in the Archived History folder after approval.</li>
+            <li>Documents that contradict the first Legacy records created by owners/admins are considered false.</li>
+          </ul>
+        </div>
       </div>
     </section>
 
@@ -405,9 +413,9 @@ render.mount('submission-terminal');</pre>
           <span class="file-name">Artwork Upload</span>
           <span class="file-copy">Visual gallery asset submission flow.</span>
         </button>
-        <button class="file-tile lore-workshop-only" type="button" data-entry-profile="lore">
-          <span class="file-name">Lore Pages</span>
-          <span class="file-copy">Admin-only codex and legacy-linked page authoring.</span>
+        <button class="file-tile" type="button" data-entry-profile="lore">
+          <span class="file-name">Archived History</span>
+          <span class="file-copy">Community lore submissions. Records that contradict first owner/admin legacy documents are false.</span>
         </button>
         <button class="file-tile" type="button" data-open-history="1">
           <span class="file-name">History</span>
@@ -473,7 +481,7 @@ render.mount('submission-terminal');</pre>
             <option value="Tale">Narrative / Tale</option>
             <option value="Artwork">Artwork</option>
             <option value="Guide">Guide</option>
-            <option value="Lore">Lore</option>
+            <option value="Lore">Archived History</option>
           </select>
         </div>
       </div>
