@@ -128,8 +128,8 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .nav a:hover,.nav a.active{color:var(--red-b);border-bottom-color:var(--red-b);text-decoration:none}
 .nav-btn{font-family:var(--font-m);font-size:.68rem;padding:7px 12px;border:1px solid var(--red-d);background:transparent;color:var(--red-b);cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:all var(--tr);min-height:36px}
 .nav-btn:hover{background:var(--red);color:var(--wht)}
-.nav-toggle{position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);width:10px;height:5px;min-width:10px;min-height:5px;padding:0;border:0;background:transparent;color:transparent;cursor:pointer;z-index:260;line-height:1;font-size:0}
-.nav-toggle::before{content:'';display:block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid var(--red-b);transition:transform .22s ease,opacity .22s ease}
+.nav-toggle{position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);width:15px;height:8px;min-width:15px;min-height:8px;padding:0;border:0;background:transparent;color:transparent;cursor:pointer;z-index:260;line-height:1;font-size:0}
+.nav-toggle::before{content:'';display:block;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:8px solid var(--red-b);transition:transform .22s ease,opacity .22s ease}
 .nav-toggle:hover::before,.nav-toggle:focus-visible::before{opacity:.85}
 .hdr.is-collapsed .nav-toggle::before{transform:rotate(180deg)}
 .hdr.is-collapsed .nav{opacity:0;pointer-events:none}
@@ -158,7 +158,7 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
   .nav li{width:auto}
   .nav a,.nav-btn{display:block;width:auto;text-align:left}
   .nav-btn{min-height:44px;padding:10px 14px}
-  .nav-toggle{bottom:-10px}
+  .nav-toggle{bottom:-12px}
   .user-menu{width:100%}
   .user-menu-panel{position:static;min-width:0;margin-top:8px;width:100%;padding:10px}
   .user-menu-trigger{width:100%;justify-content:space-between}
