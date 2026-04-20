@@ -43,7 +43,7 @@
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -71,6 +71,29 @@
     <span id="breadcrumb-title" style="color:var(--wht-m);font-weight:bold">Loading...</span>
     <a href="explore.html" style="margin-left:auto;color:var(--red-b);text-decoration:none">← Back to Explore</a>
   </div>
+    <pre class="load-monocode" aria-hidden="true">// ROG ARCHIVE FETCH
+const session = await gateway.open('page-viewer');
+const profile = await session.identify(agentFingerprint);
+const role = acl.resolve(profile.email);
+const clearance = level.map(role);
+
+if (!session.secure || !profile.valid) {
+  throw new SecurityError('AUTHENTICATION BLOCKED');
+}
+
+await vault.bind(profile.uid, clearance);
+await stream.prime('/pages/requested');
+await stream.prime('/assets/linked');
+await stream.prime('/history/trail');
+
+log.info('AUTHORIZED', {
+  uid: profile.uid,
+  role,
+  clearance,
+  channel: 'guild-core'
+});
+
+render.mount('archive-viewer');</pre>
   </div>
 
   <!-- Error State -->
@@ -118,8 +141,8 @@
       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
         <span class="comments-status" id="comment-compose-status">Comments are tied to your guild account.</span>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-s" id="comment-submit-btn" type="button" onclick="saveCommentEdit()">Post Comment</button>
-          <button class="btn btn-s" id="comment-cancel-btn" type="button" onclick="cancelCommentEdit()" style="display:none">Cancel</button>
+          <button class="btn btn-s" id="comment-submit-btn" type="button">Post Comment</button>
+          <button class="btn btn-s" id="comment-cancel-btn" type="button" style="display:none">Cancel</button>
         </div>
       </div>
     </div>
@@ -271,13 +294,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Fill metadata bar
     document.getElementById('pv-title').textContent = page.title;
-    document.getElementById('pv-type').innerHTML = '<span class="tag">' + (page.type || 'Page') + '</span>';
+    document.getElementById('pv-type').innerHTML = '<span class="tag">' + escapeCommentHtml(page.type || 'Page') + '</span>';
 
     const authorDisplay = page.authorName || 'Unknown Agent';
     document.getElementById('pv-author').textContent = 'by ' + authorDisplay;
 
     if (page.approvedBy) {
-      document.getElementById('pv-approved').innerHTML = ` <span style="color:var(--wht-d)">|</span> Approved by: <span style="color:var(--red-b)">${page.approvedBy}</span> <span style="color:var(--wht-d)">|</span> `;
+      document.getElementById('pv-approved').innerHTML = ` <span style="color:var(--wht-d)">|</span> Approved by: <span style="color:var(--red-b)">${escapeCommentHtml(page.approvedBy)}</span> <span style="color:var(--wht-d)">|</span> `;
     } else {
       document.getElementById('pv-approved').innerHTML = ' <span style="color:var(--wht-d)">|</span> ';
     }
@@ -288,8 +311,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const tagsEl = document.getElementById('pv-tags');
     if (page.tags && page.tags.length) {
-      tagsEl.innerHTML = page.tags.map(t => '<span class="tag">' + t + '</span>').join('');
+      tagsEl.innerHTML = page.tags.map(t => '<span class="tag">' + escapeCommentHtml(t) + '</span>').join('');
     }
+
+    const breadcrumbType = document.getElementById('breadcrumb-type');
+    const breadcrumbTitle = document.getElementById('breadcrumb-title');
+    if (breadcrumbType) breadcrumbType.textContent = page.type || 'Page';
+    if (breadcrumbTitle) breadcrumbTitle.textContent = page.title || 'Loading...';
 
     // Render content in iframe
     const frame = document.getElementById('pv-frame');
@@ -314,9 +342,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentCommentUserIsAdmin = !!(user && isAdmin(user.email));
     currentCommentUserCanModerate = !!(user && isModerator(user.email));
     const navAuth = document.getElementById('nav-auth');
+    const messagingLink = document.getElementById('messaging-link');
+    const submitLink = document.getElementById('submit-link');
+    const adminLink = document.getElementById('admin-link');
     if (user) {
       const displayLabel = user.displayName || 'Agent';
       navAuth.innerHTML = renderUserMenuHTML(displayLabel);
+      if (messagingLink) messagingLink.classList.remove('hidden');
+      if (submitLink) submitLink.classList.remove('hidden');
+      if (adminLink) adminLink.classList.toggle('hidden', !isAdmin(user.email));
       
       // Inject admin actions
       let actionsDiv = document.getElementById('pv-actions');
@@ -334,6 +368,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       const composeStatus = document.getElementById('comment-compose-status');
       if (composeStatus) composeStatus.textContent = 'Sign in to post comments.';
+      if (messagingLink) messagingLink.classList.add('hidden');
+      if (submitLink) submitLink.classList.add('hidden');
+      if (adminLink) adminLink.classList.add('hidden');
     }
 
     const communitySection = document.getElementById('community-section');
@@ -390,7 +427,9 @@ function configureCommentsApiBase() {
 
 function bindCommentComposerEvents() {
   const btn = document.getElementById('comment-submit-btn');
-  if (btn) btn.addEventListener('click', submitComment);
+  if (btn) btn.addEventListener('click', saveCommentEdit);
+  const editCancelBtn = document.getElementById('comment-cancel-btn');
+  if (editCancelBtn) editCancelBtn.addEventListener('click', cancelCommentEdit);
   const reportBtn = document.getElementById('comment-report-submit-btn');
   if (reportBtn) reportBtn.addEventListener('click', submitCommentReport);
   const cancelBtn = document.getElementById('comment-report-cancel-btn');

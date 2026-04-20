@@ -47,7 +47,7 @@
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -200,7 +200,7 @@
     <div id="newest-feed"></div>
   </div>
   <!-- Scroll to Top Button -->
-  <button id="scroll-to-top" style="display:none;position:fixed;bottom:40px;right:40px;width:44px;height:44px;background:var(--red-b);border:none;color:var(--wht-b);border-radius:4px;cursor:pointer;font-size:20px;z-index:100;transition:opacity 0.3s" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Scroll to top">↑</button>
+  <button id="scroll-to-top" aria-label="Scroll to top" style="display:none;position:fixed;bottom:40px;right:40px;width:44px;height:44px;background:var(--red-b);border:none;color:var(--wht-b);border-radius:4px;cursor:pointer;font-size:20px;z-index:100;transition:opacity 0.3s" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Scroll to top">↑</button>
 
 </main>
 

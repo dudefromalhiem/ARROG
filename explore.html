@@ -87,7 +87,7 @@
       <img src="logo.png" alt="ROG" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -165,6 +165,16 @@
   let universeData = { Anomaly: [], Tale: [], Artwork: [], Lore: [] };
   let universeSearchTimer = null;
 
+  function escapeHtml(value) {
+    const text = String(value == null ? '' : value);
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function buildSnippet(html) {
     if (!html) return '';
     return html.replace(/<[^>]*>?/gm, '').substring(0, 120) + '...';
@@ -234,12 +244,13 @@
 
     // Load from Firestore
     try {
+      if (!db || typeof db.collection !== 'function') throw new Error('Firestore unavailable');
       const snap = await db.collection('pages').get();
       snap.docs.forEach(doc => {
         const d = doc.data();
         const normalizedType = String(d.type || '').trim() === 'Lore' ? 'Lore' : d.type;
         if (!universeData[normalizedType]) return;
-          if (universeData[normalizedType].some(u => u.slug === d.slug)) return;
+        if (universeData[normalizedType].some(u => u.slug === d.slug)) return;
         
         const displayExcerpt = d.type === 'Anomaly' && d.anomalyDescription 
           ? d.anomalyDescription 
@@ -259,6 +270,7 @@
     }
 
     try {
+      if (!db || typeof db.collection !== 'function') throw new Error('Firestore unavailable');
       const loreSnap = await db.collection('loreIndex').get();
       loreSnap.docs.forEach(doc => {
         const d = doc.data() || {};
@@ -301,20 +313,24 @@
 
     grid.innerHTML = items.map(i => {
       const href = i.slug ? 'page.html?slug=' + encodeURIComponent(i.slug) : 'page.html?id=' + encodeURIComponent(i.id);
+      const safeTitle = escapeHtml(i.title || 'Untitled');
+      const safeExcerpt = escapeHtml(i.excerpt || '');
+      const safeType = escapeHtml(type === 'Lore' ? 'Archived History' : type);
+      const safeImg = escapeHtml(i.img || '');
       
       if (type === 'Artwork' && i.img) {
-        return `<div class="exp-card exp-art-card" onclick="window.location.href='${href}'">
-               <img src="${i.img}" alt="${i.title}" loading="lazy" decoding="async" />
+        return `<a class="exp-card exp-art-card" href="${href}" style="text-decoration:none">
+               <img src="${safeImg}" alt="${safeTitle}" loading="lazy" decoding="async" />
                <div class="exp-art-info">
-                 <div class="exp-card-title" style="margin:0">${i.title}</div>
-               </div></div>`;
+                 <div class="exp-card-title" style="margin:0">${safeTitle}</div>
+               </div></a>`;
       }
 
-      return `<div class="exp-card" onclick="window.location.href='${href}'">
-             <div class="exp-card-type">${type === 'Lore' ? 'Archived History' : type}</div>
-             <div class="exp-card-title">${i.title}</div>
-             <div class="exp-card-excerpt">${i.excerpt}</div>
-             </div>`;
+      return `<a class="exp-card" href="${href}" style="text-decoration:none">
+             <div class="exp-card-type">${safeType}</div>
+             <div class="exp-card-title">${safeTitle}</div>
+             <div class="exp-card-excerpt">${safeExcerpt}</div>
+             </a>`;
     }).join('');
   }
 

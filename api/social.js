@@ -129,6 +129,7 @@ async function listPublicAdmins(db) {
     const appointedRaw = appointments[email] || user.adminSince || user.lastLogin || null;
     const role = adminEmails.includes(email) ? 'Admin' : 'Moderator';
     return {
+      uid: String(user.uid || user.id || ''),
       displayName,
       role,
       appointedAt: formatTimestamp(appointedRaw)

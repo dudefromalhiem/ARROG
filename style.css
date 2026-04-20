@@ -588,6 +588,15 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
   100%{transform:translateX(400%)}
 }
 
+@media (prefers-reduced-motion: reduce){
+  .spinner,
+  .progress-bar-fill,
+  .progress-bar.indeterminate .progress-bar-fill{
+    animation:none!important;
+    transition:none!important;
+  }
+}
+
 /* Loading Container (Google style) */
 .loading-container{
   display:inline-flex;

@@ -76,7 +76,7 @@
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -99,9 +99,9 @@
     <div class="msg-sidebar">
       <!-- Tabs -->
       <div class="msg-tabs">
-        <button class="msg-tab-btn active" onclick="switchTab('friends')">Friends</button>
-        <button class="msg-tab-btn" onclick="switchTab('requests')">Requests</button>
-        <button class="msg-tab-btn" onclick="switchTab('notifications')">Alerts <span class="msg-notifications-badge" id="notif-count" style="display: none;">0</span></button>
+        <button class="msg-tab-btn active" type="button" data-tab="friends">Friends</button>
+        <button class="msg-tab-btn" type="button" data-tab="requests">Requests</button>
+        <button class="msg-tab-btn" type="button" data-tab="notifications">Alerts <span class="msg-notifications-badge" id="notif-count" style="display: none;">0</span></button>
       </div>
 
       <!-- Search -->
@@ -136,10 +136,10 @@
           <div class="msg-chat-title" id="msg-current-name">Select a friend to start messaging</div>
           <div class="msg-chat-status" id="msg-current-status"></div>
         </div>
-        <div class="msg-chat-messages" id="msg-messages"></div>
+        <div class="msg-chat-messages" id="msg-messages" aria-live="polite"></div>
         <div class="msg-input-area" id="msg-input-area" style="display: none;">
           <textarea class="msg-input" id="msg-input" placeholder="Type your message..." rows="1"></textarea>
-          <button class="msg-input-btn" onclick="sendMessage()" id="msg-send-btn">Send</button>
+          <button class="msg-input-btn" type="button" id="msg-send-btn">Send</button>
         </div>
         <div id="msg-no-selection" class="msg-no-selection">
           <div>
@@ -168,366 +168,366 @@
 <script src="seed-data.js"></script>
 
 <script>
-// ─────────────────────────────────────────────────────────
-// MESSAGING SYSTEM
-// ─────────────────────────────────────────────────────────
-
+let socialApiBase = '/api/social';
 let currentUser = null;
-let currentChat = null;
-let currentChatName = null;
-let friends = [];
-let conversations = {};
-let messageRequests = [];
-let notifications = [];
 let currentTab = 'friends';
-let messageLoadTimer = null;
+let currentPeerUid = '';
+let inboxThreads = [];
+let threadMessages = [];
+let notifications = [];
+let previousThreadTimestamps = new Map();
+let pollingTimer = null;
 
-// Auth state
-firebase.auth().onAuthStateChanged(async (user) => {
-  currentUser = user;
-  if (user) {
-    document.getElementById('nav-auth').innerHTML = `<button class="nav-btn" onclick="firebase.auth().signOut()">Sign Out</button>`;
-    await loadMessagingData();
-    
-    // Check for pre-selected recipient
-    const params = new URLSearchParams(window.location.search);
-    const toUid = params.get('to') || localStorage.getItem('dmRecipientUid');
-    if (toUid) {
-      openChat(toUid, localStorage.getItem('dmRecipientName') || 'Guild Member');
-      localStorage.removeItem('dmRecipientUid');
-      localStorage.removeItem('dmRecipientName');
-    }
-  } else {
-    location.href = 'index.html';
-  }
-});
-
-async function loadMessagingData() {
-  if (!currentUser) return;
-  
-  try {
-    // Load user's profile
-    const userDoc = await db.collection('users').doc(currentUser.uid).get();
-    const userData = userDoc.data() || {};
-    
-    // Load friends list
-    friends = userData.friends || [];
-    renderFriends();
-    
-    // Load message requests
-    messageRequests = userData.messageRequests || [];
-    renderRequests();
-    
-    // Load conversations for each friend
-    for (const friendId of friends) {
-      const convId = [currentUser.uid, friendId].sort().join('_');
-      const convDoc = await db.collection('conversations').doc(convId).get();
-      conversations[friendId] = convDoc.data()?.messages || [];
-    }
-  } catch (err) {
-    console.error('Error loading messaging data:', err);
-  }
+function escapeHtml(text) {
+  return String(text == null ? '' : text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-function switchTab(tab) {
+function formatDateTime(value) {
+  if (!value) return '';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return '';
+  return dt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function configureSocialApiBase() {
+  const host = String(window.location.hostname || '').toLowerCase();
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  const isFile = window.location.protocol === 'file:';
+  socialApiBase = (isLocal || isFile) ? 'https://redoakguild.vercel.app/api/social' : '/api/social';
+}
+
+async function getAuthHeaders() {
+  if (!currentUser) throw new Error('Sign-in required.');
+  const token = await currentUser.getIdToken();
+  return {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer ' + token
+  };
+}
+
+async function apiGet(type, params) {
+  const url = new URL(socialApiBase, window.location.origin);
+  url.searchParams.set('type', type);
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v != null && v !== '') url.searchParams.set(k, String(v));
+  });
+  const response = await fetch(url.toString(), { headers: await getAuthHeaders() });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Request failed.');
+  return payload;
+}
+
+async function apiPost(body) {
+  const response = await fetch(socialApiBase, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body || {})
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Request failed.');
+  return payload;
+}
+
+function extractPeer(thread) {
+  const participants = Array.isArray(thread.participants) ? thread.participants : [];
+  const names = Array.isArray(thread.participantNames) ? thread.participantNames : [];
+  const peerUid = participants.find(uid => uid !== currentUser.uid) || '';
+  const peerIndex = participants.indexOf(peerUid);
+  const peerName = names[peerIndex] || 'Guild Member';
+  return { peerUid, peerName };
+}
+
+function setTab(tab) {
   currentTab = tab;
-  
-  // Update button states
-  document.querySelectorAll('.msg-tab-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
-  
-  // Hide all tabs
-  document.querySelectorAll('.msg-list-wrapper').forEach(el => el.style.display = 'none');
-  
-  // Show selected tab
-  document.getElementById('tab-' + tab).style.display = 'block';
-  
-  // Render tab content
-  if (tab === 'friends') {
-    renderFriends();
-  } else if (tab === 'requests') {
-    renderRequests();
-  } else if (tab === 'notifications') {
-    renderNotifications();
-  }
+  document.querySelectorAll('.msg-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.querySelectorAll('.msg-list-wrapper').forEach(el => { el.style.display = 'none'; });
+  const tabEl = document.getElementById('tab-' + tab);
+  if (tabEl) tabEl.style.display = 'block';
+  if (tab === 'notifications') renderNotifications();
+  if (tab === 'requests') renderRequests();
 }
 
-function renderFriends() {
-  const list = document.getElementById('msg-friends-list');
-  if (friends.length === 0) {
-    list.innerHTML = '<div class="msg-empty">No friends yet. Start messaging to add friends!</div>';
+function updateNotificationBadge() {
+  const badge = document.getElementById('notif-count');
+  if (!badge) return;
+  if (!notifications.length) {
+    badge.style.display = 'none';
     return;
   }
-  
-  list.innerHTML = friends.map(friendId => {
-    const name = friendId; // In a real system, fetch the display name from DB
-    const isOnline = Math.random() > 0.5; // Mock online status
-    const lastMsg = conversations[friendId]?.[conversations[friendId].length - 1];
-    const preview = lastMsg?.text?.substring(0, 30) || 'No messages yet';
-    const time = lastMsg?.timestamp ? new Date(lastMsg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-    
-    return `
-    <div class="msg-item ${currentChat === friendId ? 'active' : ''}" onclick="openChat('${friendId}', '${name}')">
-      <div class="msg-item-name">
-        <span class="msg-item-status ${isOnline ? 'online' : ''}"></span>
-        ${name}
-      </div>
-      <div class="msg-item-preview">${preview}</div>
-      <div class="msg-item-time">${time}</div>
-    </div>`;
-  }).join('');
+  badge.textContent = String(notifications.length > 9 ? '9+' : notifications.length);
+  badge.style.display = 'inline-block';
 }
 
-function renderRequests() {
-  const area = document.getElementById('msg-requests-area');
-  if (messageRequests.length === 0) {
-    area.innerHTML = '<div class="msg-empty">No pending requests.</div>';
-    return;
-  }
-  
-  area.innerHTML = messageRequests.map(req => `
-    <div class="msg-request-card">
-      <div class="msg-request-header">
-        <span class="msg-request-name">${req.fromName || 'Guild Member'}</span>
-        <div class="msg-request-actions">
-          <button class="msg-request-btn" onclick="acceptRequest('${req.fromUid}')">Accept</button>
-          <button class="msg-request-btn reject" onclick="rejectRequest('${req.fromUid}')">Reject</button>
-        </div>
-      </div>
-      <p style="font-size: 0.8rem; color: var(--wht-f);">${req.message || 'Wants to message you'}</p>
-    </div>`).join('');
+function addNotification(message) {
+  notifications.unshift({ message: String(message || ''), timestamp: new Date().toISOString() });
+  notifications = notifications.slice(0, 30);
+  updateNotificationBadge();
+  if (currentTab === 'notifications') renderNotifications();
 }
 
 function renderNotifications() {
   const area = document.getElementById('msg-notifications-area');
-  if (notifications.length === 0) {
+  if (!area) return;
+  if (!notifications.length) {
     area.innerHTML = '<div class="msg-empty">No new notifications.</div>';
     return;
   }
-  
-  area.innerHTML = notifications.map((notif, idx) => `
-    <div class="msg-notification">
-      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
-        <strong>${notif.type === 'message' ? '✉ New Message' : notif.type === 'friend_request' ? '👤 Friend Request' : '📌 Update'}</strong>
-        <button style="background: none; border: none; color: var(--wht-f); cursor: pointer; font-size: 0.8rem;" onclick="clearNotification(${idx})">✕</button>
-      </div>
-      <p>${notif.message}</p>
-      <p style="font-size: 0.75rem; color: var(--wht-f); margin-top: 4px;">${new Date(notif.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-    </div>`).join('');
+  area.innerHTML = notifications.map((note, idx) => {
+    return '<div class="msg-notification">' +
+      '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">' +
+      '<strong>Update</strong>' +
+      '<button type="button" class="msg-request-btn reject" data-clear-note="' + idx + '">Dismiss</button>' +
+      '</div>' +
+      '<p>' + escapeHtml(note.message) + '</p>' +
+      '<p style="font-size:0.75rem;color:var(--wht-f);margin-top:4px">' + escapeHtml(formatDateTime(note.timestamp)) + '</p>' +
+    '</div>';
+  }).join('');
 }
 
-function openChat(friendId, friendName) {
-  currentChat = friendId;
-  currentChatName = friendName;
-  
-  // Update header
-  document.getElementById('msg-current-name').textContent = friendName;
-  document.getElementById('msg-current-status').textContent = 'Online';
-  
-  // Show input area
-  document.getElementById('msg-input-area').style.display = 'flex';
-  document.getElementById('msg-no-selection').style.display = 'none';
-  
-  // Load messages
-  loadMessages();
-  
-  // Update UI
-  renderFriends();
-  
-  // Auto focus input
-  setTimeout(() => document.getElementById('msg-input').focus(), 100);
+function renderFriends() {
+  const list = document.getElementById('msg-friends-list');
+  if (!list) return;
+  if (!inboxThreads.length) {
+    list.innerHTML = '<div class="msg-empty">No friends yet. Add friends to start messaging!</div>';
+    return;
+  }
+  const q = String(document.getElementById('msg-search')?.value || '').toLowerCase().trim();
+  const rows = inboxThreads.map(thread => {
+    const peer = extractPeer(thread);
+    return { thread, peer };
+  }).filter(row => !q || row.peer.peerName.toLowerCase().includes(q));
+
+  if (!rows.length) {
+    list.innerHTML = '<div class="msg-empty">No friends yet. Add friends to start messaging!</div>';
+    return;
+  }
+
+  list.innerHTML = rows.map(row => {
+    const isActive = row.peer.peerUid === currentPeerUid;
+    const preview = escapeHtml(String(row.thread.lastMessagePreview || 'No messages yet'));
+    return '<button type="button" class="msg-item ' + (isActive ? 'active' : '') + '" data-peer-uid="' + escapeHtml(row.peer.peerUid) + '" data-peer-name="' + escapeHtml(row.peer.peerName) + '">' +
+      '<div class="msg-item-name"><span class="msg-item-status"></span>' + escapeHtml(row.peer.peerName) + '</div>' +
+      '<div class="msg-item-preview">' + preview + '</div>' +
+      '<div class="msg-item-time">' + escapeHtml(formatDateTime(row.thread.updatedAt)) + '</div>' +
+    '</button>';
+  }).join('');
 }
 
-async function loadMessages() {
-  if (!currentChat || !currentUser) return;
-  
+async function renderRequests() {
+  const area = document.getElementById('msg-requests-area');
+  if (!area) return;
+  const query = String(document.getElementById('msg-search')?.value || '').trim();
+  if (query.length < 2) {
+    area.innerHTML = '<div class="msg-empty">No pending requests.</div>';
+    return;
+  }
+
   try {
-    const convId = [currentUser.uid, currentChat].sort().join('_');
-    const convDoc = await db.collection('conversations').doc(convId).get();
-    const messages = convDoc.data()?.messages || [];
-    conversations[currentChat] = messages;
-    
-    renderMessages();
-  } catch (err) {
-    console.error('Error loading messages:', err);
+    const result = await apiGet('searchusers', { q: query });
+    const users = (result.users || []).filter(u => u.uid && u.uid !== currentUser.uid).slice(0, 20);
+    if (!users.length) {
+      area.innerHTML = '<div class="msg-empty">No pending requests.</div>';
+      return;
+    }
+    area.innerHTML = users.map(u => {
+      return '<div class="msg-request-card">' +
+        '<div class="msg-request-header">' +
+          '<span class="msg-request-name">' + escapeHtml(u.displayName || 'Guild Member') + '</span>' +
+          '<div class="msg-request-actions"><button type="button" class="msg-request-btn" data-request-uid="' + escapeHtml(u.uid) + '" data-request-name="' + escapeHtml(u.displayName || 'Guild Member') + '">Request Message</button></div>' +
+        '</div>' +
+        '<p style="font-size:0.8rem;color:var(--wht-f);">Wants to message you</p>' +
+      '</div>';
+    }).join('');
+  } catch (_err) {
+    area.innerHTML = '<div class="msg-empty">No pending requests.</div>';
   }
 }
 
 function renderMessages() {
   const container = document.getElementById('msg-messages');
-  const msgs = conversations[currentChat] || [];
-  
-  if (msgs.length === 0) {
-    container.innerHTML = '<div style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--wht-d); font-style: italic;">Start the conversation!</div>';
+  if (!container) return;
+  if (!threadMessages.length) {
+    container.innerHTML = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--wht-d);font-style:italic;">Start the conversation!</div>';
     return;
   }
-  
-  container.innerHTML = msgs.map(msg => {
-    const isSent = msg.uid === currentUser.uid;
-    const initials = (msg.senderName || 'U').substring(0, 1).toUpperCase();
-    const time = new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    
-    return `
-    <div class="msg-message ${isSent ? 'sent' : ''}">
-      <div class="msg-message-avatar">${initials}</div>
-      <div class="msg-message-content">
-        <div class="msg-message-text">${escapeHtml(msg.text)}</div>
-        <div class="msg-message-time">${time}</div>
-      </div>
-    </div>`;
+  container.innerHTML = threadMessages.map(msg => {
+    const isSent = msg.senderUid === currentUser.uid;
+    const senderName = String(msg.senderName || 'U');
+    const initials = escapeHtml(senderName.slice(0, 1).toUpperCase());
+    return '<div class="msg-message ' + (isSent ? 'sent' : '') + '">' +
+      '<div class="msg-message-avatar">' + initials + '</div>' +
+      '<div class="msg-message-content">' +
+        '<div class="msg-message-text">' + escapeHtml(msg.text || '') + '</div>' +
+        '<div class="msg-message-time">' + escapeHtml(formatDateTime(msg.createdAt && msg.createdAt.seconds ? new Date(msg.createdAt.seconds * 1000).toISOString() : msg.createdAt)) + '</div>' +
+      '</div>' +
+    '</div>';
   }).join('');
-  
-  // Scroll to bottom
   container.scrollTop = container.scrollHeight;
 }
 
-async function sendMessage() {
-  if (!currentChat || !currentUser) return;
-  
-  const input = document.getElementById('msg-input');
-  const text = input.value.trim();
-  if (!text) return;
-  
-  const btn = document.getElementById('msg-send-btn');
-  btn.disabled = true;
-  btn.textContent = 'Sending...';
-  
+async function openChat(peerUid, peerName) {
+  currentPeerUid = String(peerUid || '');
+  if (!currentPeerUid) return;
+  document.getElementById('msg-current-name').textContent = peerName || 'Guild Member';
+  document.getElementById('msg-current-status').textContent = 'Connected';
+  document.getElementById('msg-input-area').style.display = 'flex';
+  document.getElementById('msg-no-selection').style.display = 'none';
+  renderFriends();
+  await loadMessages();
+  setTimeout(() => {
+    const input = document.getElementById('msg-input');
+    if (input) input.focus();
+  }, 20);
+}
+
+async function loadMessages() {
+  if (!currentPeerUid) return;
   try {
-    const convId = [currentUser.uid, currentChat].sort().join('_');
-    const timestamp = new Date().toISOString();
-    
-    const newMsg = {
-      uid: currentUser.uid,
-      senderName: currentUser.displayName || 'Anonymous',
-      text: text,
-      timestamp: timestamp
-    };
-    
-    // Add to Firestore
-    await db.collection('conversations').doc(convId).set(
-      {
-        participants: [currentUser.uid, currentChat],
-        messages: firebase.firestore.FieldValue.arrayUnion(newMsg),
-        lastMessageTime: timestamp,
-        lastMessageText: text
-      },
-      { merge: true }
-    );
-    
-    // Update local state
-    if (!conversations[currentChat]) conversations[currentChat] = [];
-    conversations[currentChat].push(newMsg);
-    
-    input.value = '';
+    const payload = await apiGet('thread', { peerUid: currentPeerUid });
+    threadMessages = Array.isArray(payload.messages) ? payload.messages : [];
     renderMessages();
-    
-    // Add notification for recipient
-    addNotification(currentChat, 'message', `New message from ${currentUser.displayName || 'Guild Member'}`);
-    
-  } catch (err) {
-    console.error('Error sending message:', err);
-    btn.textContent = 'Error sending';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Send';
+  } catch (_err) {
+    threadMessages = [];
+    renderMessages();
   }
 }
 
-async function acceptRequest(fromUid) {
-  if (!currentUser) return;
-  
+async function refreshInbox() {
   try {
-    // Add to friends
-    await db.collection('users').doc(currentUser.uid).update({
-      friends: firebase.firestore.FieldValue.arrayUnion(fromUid),
-      messageRequests: firebase.firestore.FieldValue.arrayRemove({ fromUid: fromUid })
+    const payload = await apiGet('inbox');
+    const nextThreads = Array.isArray(payload.threads) ? payload.threads : [];
+    nextThreads.forEach(thread => {
+      const updated = String(thread.updatedAt || '');
+      const previous = previousThreadTimestamps.get(thread.id);
+      if (previous && previous !== updated && thread.lastMessageBy && thread.lastMessageBy !== currentUser.uid) {
+        const peer = extractPeer(thread);
+        addNotification('New message from ' + (peer.peerName || 'Guild Member'));
+      }
+      previousThreadTimestamps.set(thread.id, updated);
     });
-    
-    // Also add current user to their friends
-    await db.collection('users').doc(fromUid).update({
-      friends: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
-    });
-    
-    // Reload data
-    await loadMessagingData();
+    inboxThreads = nextThreads;
     renderFriends();
-    renderRequests();
-    
-  } catch (err) {
-    console.error('Error accepting request:', err);
+  } catch (_err) {
+    inboxThreads = [];
+    renderFriends();
   }
 }
 
-async function rejectRequest(fromUid) {
-  if (!currentUser) return;
-  
+async function sendMessage() {
+  if (!currentPeerUid) return;
+  const input = document.getElementById('msg-input');
+  const sendBtn = document.getElementById('msg-send-btn');
+  const text = String(input && input.value || '').trim();
+  if (!text) return;
+
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Sending...';
   try {
-    await db.collection('users').doc(currentUser.uid).update({
-      messageRequests: firebase.firestore.FieldValue.arrayRemove({ fromUid: fromUid })
+    await apiPost({ action: 'message', recipientUid: currentPeerUid, text });
+    if (input) input.value = '';
+    await loadMessages();
+    await refreshInbox();
+  } catch (_err) {
+    addNotification('Unable to send message right now.');
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Send';
+  }
+}
+
+async function startRequest(uid, name) {
+  await openChat(uid, name);
+  const input = document.getElementById('msg-input');
+  if (input && !input.value) input.value = 'Message request';
+}
+
+function bindUiEvents() {
+  document.querySelectorAll('.msg-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => setTab(btn.dataset.tab || 'friends'));
+  });
+
+  document.getElementById('msg-send-btn')?.addEventListener('click', sendMessage);
+  document.getElementById('msg-input')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  });
+
+  document.getElementById('msg-search')?.addEventListener('input', () => {
+    if (currentTab === 'friends') renderFriends();
+    if (currentTab === 'requests') renderRequests();
+  });
+
+  document.getElementById('msg-friends-list')?.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-peer-uid]');
+    if (!target) return;
+    openChat(target.getAttribute('data-peer-uid') || '', target.getAttribute('data-peer-name') || 'Guild Member');
+  });
+
+  document.getElementById('msg-requests-area')?.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-request-uid]');
+    if (!target) return;
+    startRequest(target.getAttribute('data-request-uid') || '', target.getAttribute('data-request-name') || 'Guild Member');
+  });
+
+  document.getElementById('msg-notifications-area')?.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-clear-note]');
+    if (!target) return;
+    const idx = Number(target.getAttribute('data-clear-note') || -1);
+    if (Number.isNaN(idx) || idx < 0) return;
+    notifications.splice(idx, 1);
+    updateNotificationBadge();
+    renderNotifications();
+  });
+}
+
+async function bootstrapMessaging() {
+  configureSocialApiBase();
+  bindUiEvents();
+
+  firebase.auth().onAuthStateChanged(async (user) => {
+    currentUser = user;
+    if (!user) {
+      window.location.href = 'index.html';
+      return;
+    }
+
+    document.getElementById('nav-auth').innerHTML = '<button class="nav-btn" type="button" id="msg-signout-btn">Sign Out</button>';
+    document.getElementById('msg-signout-btn')?.addEventListener('click', async () => {
+      await firebase.auth().signOut();
+      window.location.href = 'index.html';
     });
-    
-    await loadMessagingData();
-    renderRequests();
-    
-  } catch (err) {
-    console.error('Error rejecting request:', err);
-  }
-}
 
-function addNotification(fromUid, type, message) {
-  notifications.unshift({
-    fromUid,
-    type,
-    message,
-    timestamp: new Date().toISOString()
+    await refreshInbox();
+
+    const params = new URLSearchParams(window.location.search);
+    const uidFromQuery = params.get('to') || localStorage.getItem('dmRecipientUid') || '';
+    const nameFromQuery = localStorage.getItem('dmRecipientName') || 'Guild Member';
+    if (uidFromQuery) {
+      await openChat(uidFromQuery, nameFromQuery);
+      localStorage.removeItem('dmRecipientUid');
+      localStorage.removeItem('dmRecipientName');
+    }
+
+    if (pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = setInterval(async () => {
+      await refreshInbox();
+      if (currentPeerUid) await loadMessages();
+    }, 6000);
   });
-  
-  // Keep only last 20 notifications
-  if (notifications.length > 20) notifications.pop();
-  
-  // Update badge
-  updateNotificationBadge();
 }
 
-function clearNotification(idx) {
-  notifications.splice(idx, 1);
-  updateNotificationBadge();
-  renderNotifications();
-}
-
-function updateNotificationBadge() {
-  const badge = document.getElementById('notif-count');
-  if (notifications.length > 0) {
-    badge.textContent = Math.min(notifications.length, 9) + (notifications.length > 9 ? '+' : '');
-    badge.style.display = 'inline-block';
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// ─────────────────────────────────────────────────────────
-// Search functionality
-// ─────────────────────────────────────────────────────────
-
-document.getElementById('msg-search').addEventListener('input', (e) => {
-  const query = e.target.value.toLowerCase();
-  const items = document.querySelectorAll('.msg-item');
-  items.forEach(item => {
-    const name = item.querySelector('.msg-item-name').textContent.toLowerCase();
-    item.style.display = name.includes(query) ? 'block' : 'none';
-  });
+bootstrapMessaging().catch(() => {
+  addNotification('Unable to initialize messaging.');
 });
-
-// Auto-load new messages every 3 seconds
-setInterval(() => {
-  if (currentChat) loadMessages();
-}, 3000);
 
 </script>
 </body>

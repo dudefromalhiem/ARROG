@@ -584,7 +584,7 @@ const FALLBACK_NEWEST = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.slice().rev
   type: p.type,
   slug: p.slug,
   htmlContent: p.htmlContent,
-  updatedAt: new Date().toLocaleDateString()
+  updatedAt: new Date().toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 })) : [];
 
 // ═════════════════════════════════════════════════════════════
@@ -595,34 +595,73 @@ function renderFeatured(items) {
   const grid = document.getElementById('featured-grid');
   grid.innerHTML = items.map(item => {
     const hasPage = item.htmlContent || item.slug;
-    const href = hasPage ? (item.slug ? 'page.html?slug=' + item.slug : 'page.html?id=' + item.id) : '#';
-    const primaryId = item.anomalyId || item.id || 'N/A';
+    const href = hasPage
+      ? (item.slug ? 'page.html?slug=' + encodeURIComponent(String(item.slug || '')) : 'page.html?id=' + encodeURIComponent(String(item.id || '')))
+      : '#';
+    const primaryId = escapeHtmlApp(item.anomalyId || item.id || 'N/A');
+    const type = escapeHtmlApp(item.type || 'Page');
+    const title = escapeHtmlApp(item.title || 'Untitled');
+    const excerpt = escapeHtmlApp(item.excerpt || '');
     return `
     <a href="${href}" style="text-decoration:none">
       <div class="card">
-        <div class="card-m">${primaryId} — ${item.type}</div>
-        <div class="card-t">${item.title}</div>
-        <div class="card-b">${item.excerpt || ''}</div>
-        <div class="mt-md">${(item.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+        <div class="card-m">${primaryId} — ${type}</div>
+        <div class="card-t">${title}</div>
+        <div class="card-b">${excerpt}</div>
+        <div class="mt-md">${(item.tags || []).map(t => `<span class="tag">${escapeHtmlApp(t)}</span>`).join('')}</div>
       </div>
     </a>`;
   }).join('');
 }
 
+function sanitizeAssetUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw) || /^\//.test(raw) || /^[a-z0-9._\-/]+$/i.test(raw)) return raw;
+  return '';
+}
+
 function renderNews(items) {
   const feed = document.getElementById('news-feed');
   feed.innerHTML = items.map(n => {
-    const hasImage = !!(n.imageUrl && String(n.imageUrl).trim());
+    const imageUrl = sanitizeAssetUrl(n.imageUrl);
+    const hasImage = !!imageUrl;
+    const title = escapeHtmlApp(n.title || '');
+    const body = escapeHtmlApp(n.body || '');
+    const date = escapeHtmlApp(n.date || '');
     return `
     <div class="news-item" style="display:grid;grid-template-columns:${hasImage ? '180px 1fr' : '1fr'};gap:16px;align-items:start">
-      ${hasImage ? `<a href="${n.imageUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none"><img src="${n.imageUrl}" alt="${n.title}" loading="lazy" decoding="async" style="width:100%;height:140px;object-fit:cover;border:1px solid var(--blk-d);background:#111" /></a>` : ''}
+      ${hasImage ? `<a href="${imageUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none"><img src="${imageUrl}" alt="${title}" loading="lazy" decoding="async" style="width:100%;height:140px;object-fit:cover;border:1px solid var(--blk-d);background:#111" /></a>` : ''}
       <div>
-        <div class="news-dt">${n.date}</div>
-        <div class="news-tt">${n.title}</div>
-        <div class="news-bd">${n.body}</div>
+        <div class="news-dt">${date}</div>
+        <div class="news-tt">${title}</div>
+        <div class="news-bd">${body}</div>
       </div>
     </div>`;
   }).join('');
+}
+
+function escapeHtmlApp(value) {
+  const text = String(value == null ? '' : value);
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  if (typeof value === 'string' || typeof value === 'number') {
+    const dt = new Date(value);
+    return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  if (typeof value === 'object' && typeof value.seconds === 'number') {
+    const dt = new Date(value.seconds * 1000);
+    return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  return '—';
 }
 
 function renderAdminRoster(items) {
@@ -634,17 +673,18 @@ function renderAdminRoster(items) {
   }
 
   grid.innerHTML = items.map(item => {
-    const name = item.displayName || 'Agent';
-    const role = item.role || 'Authority';
-    const date = item.appointedAt ? new Date(item.appointedAt).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-    const uid = item.uid || '';
+    const name = escapeHtmlApp(item.displayName || 'Agent');
+    const role = escapeHtmlApp(item.role || 'Authority');
+    const date = formatDateTime(item.appointedAt);
+    const uid = encodeURIComponent(String(item.uid || ''));
+    const encodedName = encodeURIComponent(String(item.displayName || 'Agent'));
     return `
     <div class="card">
       <div class="card-t">${name}</div>
       <div class="card-m">${role}</div>
       <div class="card-b">Appointed ${date}</div>
       <div style="margin-top:12px;display:flex;gap:8px">
-        <button class="btn btn-s" onclick="openDirectMessage('${uid}', '${name.replace(/'/g, '\\'')}')">Message Admin</button>
+        <button class="btn btn-s" type="button" onclick="openDirectMessage('${uid}', '${encodedName}')">Message Admin</button>
       </div>
     </div>`;
   }).join('');
@@ -653,12 +693,16 @@ function renderAdminRoster(items) {
 function renderNewest(items) {
   const feed = document.getElementById('newest-feed');
   feed.innerHTML = items.map(p => {
-    const hasPage = p.htmlContent || p.slug;
-    const href = hasPage ? (p.slug ? 'page.html?slug=' + p.slug : 'page.html?id=' + p.id) : '#';
-    const dateStr = p.updatedAt || (p.createdAt && p.createdAt.seconds ? new Date(p.createdAt.seconds * 1000).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+    const hasPage = !!(p && (p.htmlContent || p.slug || p.id));
+    const href = hasPage
+      ? (p.slug ? 'page.html?slug=' + encodeURIComponent(String(p.slug)) : 'page.html?id=' + encodeURIComponent(String(p.id || '')))
+      : '#';
+    const type = escapeHtmlApp(p.type || 'Page');
+    const title = escapeHtmlApp(p.title || 'Untitled');
+    const dateStr = formatDateTime(p.updatedAt || p.createdAt);
     return `
     <div class="newest-row">
-      <div><span class="tag">${p.type}</span> <a href="${href}">${p.title}</a></div>
+      <div><span class="tag">${type}</span> <a href="${href}">${title}</a></div>
       <span style="font-size:.7rem;color:var(--wht-f);font-family:var(--font-m)">${dateStr}</span>
     </div>`;
   }).join('');
@@ -701,10 +745,16 @@ function openDirectMessage(uid, name) {
     alert('Please sign in to send messages.');
     return;
   }
+  const decodedUid = decodeURIComponent(String(uid || ''));
+  const decodedName = decodeURIComponent(String(name || ''));
+  if (!decodedUid) {
+    alert('Direct messaging is unavailable for this account.');
+    return;
+  }
   // Navigate to messaging page with recipient pre-selected
-  localStorage.setItem('dmRecipientUid', uid);
-  localStorage.setItem('dmRecipientName', name);
-  window.location.href = 'messaging.html?to=' + encodeURIComponent(uid);
+  localStorage.setItem('dmRecipientUid', decodedUid);
+  localStorage.setItem('dmRecipientName', decodedName);
+  window.location.href = 'messaging.html?to=' + encodeURIComponent(decodedUid);
 }
 
 // ═════════════════════════════════════════════════════════════

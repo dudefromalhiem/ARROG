@@ -681,13 +681,15 @@ function setDraftStatus(message, isError = false) {
   el.style.color = isError ? 'var(--red-b)' : 'var(--wht-f)';
 }
 
-  function toggleGuidebook() {
-    const guidebook = document.querySelector('.guidebook');
-    if (!guidebook) return;
-    const isHidden = guidebook.style.display === 'none';
-    guidebook.style.display = isHidden ? 'block' : 'none';
-    document.getElementById('submit-file-explorer').style.display = isHidden ? 'none' : 'flex';
-  }
+function toggleGuidebook() {
+  const guidebook = document.querySelector('.guidebook');
+  const explorer = document.getElementById('submit-file-explorer');
+  if (!guidebook || !explorer) return;
+  const isHidden = guidebook.style.display === 'none';
+  guidebook.style.display = isHidden ? 'block' : 'none';
+  explorer.style.display = isHidden ? 'none' : '';
+}
+
 function scheduleDraftAutoSave() {
   if (suppressDraftAutoSave || !currentUserForSubmit || !submitAutosaveEnabled) return;
   clearTimeout(draftAutoSaveTimer);
