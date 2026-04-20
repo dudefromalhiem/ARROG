@@ -785,7 +785,6 @@ function loadData() {
   // Render fallbacks immediately so content is always visible
   renderFeatured(FALLBACK_ANOMALIES);
   renderNews(FALLBACK_NEWS);
-  renderAdminRoster([]);
   initCarousel(FALLBACK_ART);
   renderNewest(FALLBACK_NEWEST);
 
@@ -793,8 +792,6 @@ function loadData() {
   if (Array.isArray(cachedFeatured) && cachedFeatured.length) renderFeatured(cachedFeatured);
   const cachedNews = getCachedHomeData('news');
   if (Array.isArray(cachedNews) && cachedNews.length) renderNews(cachedNews);
-  const cachedRoster = getCachedHomeData('roster');
-  if (Array.isArray(cachedRoster) && cachedRoster.length) renderAdminRoster(cachedRoster);
   const cachedArt = getCachedHomeData('art');
   if (Array.isArray(cachedArt) && cachedArt.length) initCarousel(cachedArt);
   const cachedNewest = getCachedHomeData('newest');
@@ -822,16 +819,6 @@ function loadData() {
         }
       })
       .catch(function (_e) { });
-
-    fetch('/api/social?type=admins')
-      .then(function (response) { return response.ok ? response.json() : Promise.reject(new Error('Roster unavailable.')); })
-      .then(function (data) {
-        if (Array.isArray(data.admins)) {
-          renderAdminRoster(data.admins);
-          setCachedHomeData('roster', data.admins);
-        }
-      })
-      .catch(function (_e) { renderAdminRoster([]); });
 
     db.collection('artworks').where('displayInSpotlight', '==', true).get()
       .then(function (snap) {

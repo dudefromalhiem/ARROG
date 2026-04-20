@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff - Red Oaker Guild</title>
+  <meta name="description" content="Contact Red Oaker Guild admins and moderators." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="guide.html">Guide</a></li>
+      <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap" id="main-content">
+  <section class="section" style="margin-bottom:24px">
+    <div class="section-hd">Active Authorities</div>
+    <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
+      Guild administrators and moderators currently appointed to maintain the archive.
+    </p>
+    <div id="staff-status" style="font-size:.8rem;color:var(--wht-f);margin-bottom:12px">Loading staff roster...</div>
+    <div class="g2" id="admin-roster-grid"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-hd">Need Support?</div>
+    <p style="font-size:.85rem;color:var(--wht-m);line-height:1.7;margin-bottom:16px">
+      Use direct messaging to contact a moderator or admin. For account issues, include relevant details in your first message for faster routing.
+    </p>
+    <a href="index.html" class="btn btn-s">Return Home</a>
+  </section>
+</main>
+
+<footer class="ftr">
+  <div class="ftr-in">
+    <ul class="ftr-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="guide.html">Guide</a></li>
+      <li><a href="messaging.html">Messages</a></li>
+    </ul>
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+function escapeHtmlStaff(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  if (typeof value === 'string' || typeof value === 'number') {
+    const dt = new Date(value);
+    return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  }
+  if (typeof value === 'object' && typeof value.seconds === 'number') {
+    const dt = new Date(value.seconds * 1000);
+    return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  }
+  return '—';
+}
+
+function openDirectMessage(uid, name) {
+  if (!auth.currentUser) {
+    alert('Please sign in to send messages.');
+    location.href = 'index.html';
+    return;
+  }
+  const decodedUid = decodeURIComponent(String(uid || ''));
+  const decodedName = decodeURIComponent(String(name || ''));
+  if (!decodedUid) {
+    alert('Direct messaging is unavailable for this account.');
+    return;
+  }
+  localStorage.setItem('dmRecipientUid', decodedUid);
+  localStorage.setItem('dmRecipientName', decodedName);
+  location.href = 'messaging.html?to=' + encodeURIComponent(decodedUid);
+}
+
+function renderAdminRoster(items) {
+  const grid = document.getElementById('admin-roster-grid');
+  const status = document.getElementById('staff-status');
+  if (!grid) return;
+
+  if (!Array.isArray(items) || !items.length) {
+    grid.innerHTML = '<div class="card"><div class="card-t">No public roster available</div><div class="card-b">The current administration list could not be loaded.</div></div>';
+    if (status) status.textContent = 'Roster unavailable right now.';
+    return;
+  }
+
+  if (status) status.textContent = items.length + ' authority account' + (items.length === 1 ? '' : 's') + ' listed.';
+  grid.innerHTML = items.map(item => {
+    const name = escapeHtmlStaff(item.displayName || 'Agent');
+    const role = escapeHtmlStaff(item.role || 'Authority');
+    const date = formatDateTime(item.appointedAt);
+    const uid = encodeURIComponent(String(item.uid || ''));
+    const encodedName = encodeURIComponent(String(item.displayName || 'Agent'));
+    return '<div class="card">' +
+      '<div class="card-t">' + name + '</div>' +
+      '<div class="card-m">' + role + '</div>' +
+      '<div class="card-b">Appointed ' + date + '</div>' +
+      '<div style="margin-top:12px;display:flex;gap:8px">' +
+        '<button class="btn btn-s" type="button" onclick="openDirectMessage(\'' + uid + '\', \'' + encodedName + '\')">Message Admin</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function loadAdminRoster() {
+  fetch('/api/social?type=admins')
+    .then(function (response) { return response.ok ? response.json() : Promise.reject(new Error('Roster unavailable.')); })
+    .then(function (data) {
+      renderAdminRoster(Array.isArray(data.admins) ? data.admins : []);
+    })
+    .catch(function () {
+      renderAdminRoster([]);
+    });
+}
+
+auth.onAuthStateChanged(async function (user) {
+  const navAuth = document.getElementById('nav-auth');
+  const submitLink = document.getElementById('submit-link');
+  const adminLink = document.getElementById('admin-link');
+  const messagingLink = document.getElementById('messaging-link');
+
+  if (user) {
+    const displayLabel = user.displayName || 'Agent';
+    navAuth.innerHTML = renderUserMenuHTML(displayLabel);
+    if (submitLink) submitLink.classList.remove('hidden');
+    if (messagingLink) messagingLink.classList.remove('hidden');
+    if (adminLink) {
+      const isAdminUser = await getUserAdminFlag(user);
+      adminLink.classList.toggle('hidden', !isAdminUser);
+    }
+  } else {
+    navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    if (submitLink) submitLink.classList.add('hidden');
+    if (messagingLink) messagingLink.classList.add('hidden');
+    if (adminLink) adminLink.classList.add('hidden');
+  }
+});
+
+loadAdminRoster();
+</script>
+</body>
+</html>
