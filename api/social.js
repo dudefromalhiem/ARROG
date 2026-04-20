@@ -118,15 +118,19 @@ async function fetchUsersByEmails(db, emails) {
 async function listPublicAdmins(db) {
   const roles = await getRolesData(db);
   const adminEmails = Array.isArray(roles.admins) ? roles.admins.map(value => String(value || '').toLowerCase()) : [];
+  const modEmails = Array.isArray(roles.mods) ? roles.mods.map(value => String(value || '').toLowerCase()) : [];
+  const allAuthorities = [...new Set([...adminEmails, ...modEmails])];
   const appointments = roles.adminAppointments || {};
-  const userMap = await fetchUsersByEmails(db, adminEmails);
+  const userMap = await fetchUsersByEmails(db, allAuthorities);
 
-  return adminEmails.map(email => {
+  return allAuthorities.map(email => {
     const user = userMap.get(email) || {};
     const displayName = normalizeText(user.displayName || email.split('@')[0] || 'Agent', 120);
     const appointedRaw = appointments[email] || user.adminSince || user.lastLogin || null;
+    const role = adminEmails.includes(email) ? 'Admin' : 'Moderator';
     return {
       displayName,
+      role,
       appointedAt: formatTimestamp(appointedRaw)
     };
   });

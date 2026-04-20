@@ -91,6 +91,7 @@
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
+        <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
       <li><a href="collections.html">Collections</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
@@ -238,7 +239,7 @@
         const d = doc.data();
         const normalizedType = String(d.type || '').trim() === 'Lore' ? 'Lore' : d.type;
         if (!universeData[normalizedType]) return;
-        if (universeData[d.type].some(u => u.slug === d.slug)) return;
+          if (universeData[normalizedType].some(u => u.slug === d.slug)) return;
         
         const displayExcerpt = d.type === 'Anomaly' && d.anomalyDescription 
           ? d.anomalyDescription 
@@ -254,7 +255,7 @@
         });
       });
     } catch(e) {
-      console.warn("Could not fetch from Firestore.");
+      console.warn("Could not fetch from Firestore.", e);
     }
 
     try {

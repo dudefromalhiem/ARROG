@@ -254,6 +254,37 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 200, { ok: true });
     }
 
+    if (method === 'PATCH') {
+      const body = req.body || {};
+      const id = normalizeText(body.id || '', 128);
+      const content = normalizeText(body.content || '', 1200);
+      
+      if (!id) return sendJson(res, 400, { error: 'Missing comment id.' });
+      if (!content) return sendJson(res, 400, { error: 'Comment cannot be empty.' });
+
+      const ref = db.collection('comments').doc(id);
+      const doc = await ref.get();
+      if (!doc.exists) return sendJson(res, 404, { error: 'Comment not found.' });
+
+      const data = doc.data() || {};
+      const isAuthor = String(data.authorUid || '') === actor.uid;
+      if (!isAuthor) {
+        return sendJson(res, 403, { error: 'Only comment author can edit.' });
+      }
+
+      const updatePayload = {
+        content,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        editedAt: admin.firestore.FieldValue.serverTimestamp(),
+        editedByUid: actor.uid,
+        editedByEmail: actor.email
+      };
+
+      await ref.set(updatePayload, { merge: true });
+      const updated = await ref.get();
+      return sendJson(res, 200, { id: ref.id, data: toPlainValue(updated.data()) });
+    }
+
     return sendJson(res, 405, { error: 'Method not allowed.' });
   } catch (err) {
     return sendJson(res, Number(err.statusCode || 500), { error: err.message || 'Server error.' });

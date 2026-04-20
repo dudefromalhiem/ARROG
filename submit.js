@@ -668,6 +668,10 @@ function initSubmitExplorer() {
   panel.querySelectorAll('[data-open-drafts]').forEach(btn => {
     btn.addEventListener('click', openSubmissionDraftsView);
   });
+
+  panel.querySelectorAll('[data-show-guidebook]').forEach(btn => {
+    btn.addEventListener('click', toggleGuidebook);
+  });
 }
 
 function setDraftStatus(message, isError = false) {
@@ -677,6 +681,13 @@ function setDraftStatus(message, isError = false) {
   el.style.color = isError ? 'var(--red-b)' : 'var(--wht-f)';
 }
 
+  function toggleGuidebook() {
+    const guidebook = document.querySelector('.guidebook');
+    if (!guidebook) return;
+    const isHidden = guidebook.style.display === 'none';
+    guidebook.style.display = isHidden ? 'block' : 'none';
+    document.getElementById('submit-file-explorer').style.display = isHidden ? 'none' : 'flex';
+  }
 function scheduleDraftAutoSave() {
   if (suppressDraftAutoSave || !currentUserForSubmit || !submitAutosaveEnabled) return;
   clearTimeout(draftAutoSaveTimer);

@@ -496,6 +496,7 @@ async function updateAuthUI(user) {
   const navAuth = document.getElementById('nav-auth');
   const adminLink = document.getElementById('admin-link');
   const submitLink = document.getElementById('submit-link');
+    const messagingLink = document.getElementById('messaging-link');
   const exitEsdButton = user && isOwner(user.email) && SITE_STATE && SITE_STATE.esdLocked
     ? ' <button class="nav-btn" type="button" onclick="updateESDState(false)">Exit ESD</button>'
     : '';
@@ -507,6 +508,9 @@ async function updateAuthUI(user) {
     const isAdminUser = await getUserAdminFlag(user);
     navAuth.innerHTML = renderUserMenuHTML(displayLabel) + exitEsdButton;
     if (submitLink) submitLink.classList.remove('hidden');
+      if (messagingLink) messagingLink.classList.remove('hidden');
+    if (document.getElementById('footer-submit-link')) document.getElementById('footer-submit-link').classList.remove('hidden');
+    if (document.getElementById('footer-messaging-link')) document.getElementById('footer-messaging-link').classList.remove('hidden');
     if (adminLink) adminLink.classList.toggle('hidden', !isAdminUser);
     // upsert user doc
     db.collection('users').doc(user.uid).set({
@@ -530,6 +534,9 @@ async function updateAuthUI(user) {
     navAuth.innerHTML = '<button class="nav-btn" onclick="openAuth()">Sign In</button>';
     adminLink.classList.add('hidden');
     if (submitLink) submitLink.classList.add('hidden');
+    if (messagingLink) messagingLink.classList.add('hidden');
+    if (document.getElementById('footer-submit-link')) document.getElementById('footer-submit-link').classList.add('hidden');
+    if (document.getElementById('footer-messaging-link')) document.getElementById('footer-messaging-link').classList.add('hidden');
     if (!clearanceWelcomeShownThisLoad) {
       // Wait for the terminal intro to finish so the welcome is not skipped.
       if (shouldShowTerminal()) {
@@ -628,11 +635,17 @@ function renderAdminRoster(items) {
 
   grid.innerHTML = items.map(item => {
     const name = item.displayName || 'Agent';
-    const date = item.appointedAt ? new Date(item.appointedAt).toLocaleDateString() : '—';
+    const role = item.role || 'Authority';
+    const date = item.appointedAt ? new Date(item.appointedAt).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+    const uid = item.uid || '';
     return `
     <div class="card">
       <div class="card-t">${name}</div>
+      <div class="card-m">${role}</div>
       <div class="card-b">Appointed ${date}</div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn btn-s" onclick="openDirectMessage('${uid}', '${name.replace(/'/g, '\\'')}')">Message Admin</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -642,7 +655,7 @@ function renderNewest(items) {
   feed.innerHTML = items.map(p => {
     const hasPage = p.htmlContent || p.slug;
     const href = hasPage ? (p.slug ? 'page.html?slug=' + p.slug : 'page.html?id=' + p.id) : '#';
-    const dateStr = p.updatedAt || (p.createdAt && p.createdAt.seconds ? new Date(p.createdAt.seconds * 1000).toLocaleDateString() : '—');
+    const dateStr = p.updatedAt || (p.createdAt && p.createdAt.seconds ? new Date(p.createdAt.seconds * 1000).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
     return `
     <div class="newest-row">
       <div><span class="tag">${p.type}</span> <a href="${href}">${p.title}</a></div>
@@ -680,6 +693,18 @@ function updateCarousel() {
   document.getElementById('carousel-track').style.transform = `translateX(-${carouselIdx * 100}%)`;
   document.getElementById('carousel-label').textContent = carouselItems[carouselIdx]?.title || '';
   document.querySelectorAll('.carousel-dot').forEach((d, i) => d.classList.toggle('on', i === carouselIdx));
+}
+
+// ── Direct Messaging ──────────────────────────────────────────
+function openDirectMessage(uid, name) {
+  if (!currentUser) {
+    alert('Please sign in to send messages.');
+    return;
+  }
+  // Navigate to messaging page with recipient pre-selected
+  localStorage.setItem('dmRecipientUid', uid);
+  localStorage.setItem('dmRecipientName', name);
+  window.location.href = 'messaging.html?to=' + encodeURIComponent(uid);
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -738,6 +763,12 @@ function bootApp() {
   else skipTerminal();
   auth.onAuthStateChanged(updateAuthUI);
   loadData();
+  
+  // Scroll to top button functionality
+  window.addEventListener('scroll', () => {
+    const btn = document.getElementById('scroll-to-top');
+    if (btn) btn.style.display = window.scrollY > 300 ? 'block' : 'none';
+  });
 }
 
 if (document.readyState === 'loading') {

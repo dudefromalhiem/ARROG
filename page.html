@@ -47,6 +47,7 @@
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
+        <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
@@ -61,29 +62,15 @@
   <div id="page-loading" class="section tc load-state">
     <div class="section-hd load-title">Loading Document...</div>
     <p class="load-copy">Retrieving classified archive entry...</p>
-    <pre class="load-monocode" aria-hidden="true">// ROG ARCHIVE FETCH
-const session = await gateway.open('page-viewer');
-const profile = await session.identify(agentFingerprint);
-const role = acl.resolve(profile.email);
-const clearance = level.map(role);
-
-if (!session.secure || !profile.valid) {
-  throw new SecurityError('AUTHENTICATION BLOCKED');
-}
-
-await vault.bind(profile.uid, clearance);
-await stream.prime('/pages/requested');
-await stream.prime('/assets/linked');
-await stream.prime('/history/trail');
-
-log.info('AUTHORIZED', {
-  uid: profile.uid,
-  role,
-  clearance,
-  channel: 'guild-core'
-});
-
-render.mount('archive-viewer');</pre>
+  <!-- Quick Navigation Breadcrumb -->
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--blk-m);border-radius:2px;font-size:.8rem;color:var(--wht-d)">
+    <a href="index.html" style="color:var(--red-b);text-decoration:none">Home</a>
+    <span>/</span>
+    <span id="breadcrumb-type" style="color:var(--red-b)">Page</span>
+    <span>/</span>
+    <span id="breadcrumb-title" style="color:var(--wht-m);font-weight:bold">Loading...</span>
+    <a href="explore.html" style="margin-left:auto;color:var(--red-b);text-decoration:none">← Back to Explore</a>
+  </div>
   </div>
 
   <!-- Error State -->
@@ -130,7 +117,10 @@ render.mount('archive-viewer');</pre>
       </div>
       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
         <span class="comments-status" id="comment-compose-status">Comments are tied to your guild account.</span>
-        <button class="btn btn-s" id="comment-submit-btn" type="button">Post Comment</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-s" id="comment-submit-btn" type="button" onclick="saveCommentEdit()">Post Comment</button>
+          <button class="btn btn-s" id="comment-cancel-btn" type="button" onclick="cancelCommentEdit()" style="display:none">Cancel</button>
+        </div>
       </div>
     </div>
     <div class="comment-report-panel hidden" id="comment-report-panel">
@@ -467,6 +457,107 @@ function canDeleteComment(comment) {
   return !!currentCommentUser && String(comment.authorUid || '') === String(currentCommentUser.uid || '');
 }
 
+function canEditComment(comment) {
+  if (!comment) return false;
+  return !!currentCommentUser && String(comment.authorUid || '') === String(currentCommentUser.uid || '');
+}
+
+let editingCommentId = null;
+
+function startEditComment(id) {
+  const commentId = String(id || '').trim();
+  if (!commentId) return;
+  
+  const comment = currentComments.find(c => c.id === commentId);
+  if (!comment) return;
+
+  editingCommentId = commentId;
+  const input = document.getElementById('comment-input');
+  const submitBtn = document.getElementById('comment-submit-btn');
+  const cancelBtn = document.getElementById('comment-cancel-btn');
+  
+  if (input) {
+    input.value = comment.content || '';
+    input.focus();
+    input.classList.add('editing-comment');
+    input.style.borderColor = 'var(--red-b)';
+  }
+
+  if (submitBtn) {
+    submitBtn.textContent = 'Save Changes';
+  }
+
+  if (cancelBtn) {
+    cancelBtn.style.display = 'block';
+  }
+
+  // Update status message
+  const status = document.getElementById('comment-compose-status');
+  if (status) status.textContent = 'Editing comment. Click Save to update, or click Cancel to discard.';
+}
+
+async function saveCommentEdit() {
+  if (!editingCommentId) {
+    submitComment();
+    return;
+  }
+
+  const input = document.getElementById('comment-input');
+  const composeStatus = document.getElementById('comment-compose-status');
+  const text = String(input && input.value || '').trim();
+
+  if (!text) {
+    if (composeStatus) composeStatus.textContent = 'Comment cannot be empty.';
+    return;
+  }
+
+  try {
+    if (composeStatus) composeStatus.innerHTML = '<span class="spinner spinner-sm"></span> Saving changes...';
+    const response = await fetch(commentsApiBase, {
+      method: 'PATCH',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({
+        id: editingCommentId,
+        content: text
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not save comment.');
+
+    editingCommentId = null;
+    if (input) {
+      input.value = '';
+      input.classList.remove('editing-comment');
+      input.style.borderColor = '';
+    }
+    const submitBtn = document.getElementById('comment-submit-btn');
+    if (submitBtn) submitBtn.textContent = 'Post Comment';
+    const cancelBtn = document.getElementById('comment-cancel-btn');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">✓</span> Comment updated.';
+    await loadCommentsForCurrentPage();
+  } catch (err) {
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">✗</span> Save failed: ' + err.message;
+  }
+}
+
+function cancelCommentEdit() {
+  editingCommentId = null;
+  const input = document.getElementById('comment-input');
+  const status = document.getElementById('comment-compose-status');
+  const submitBtn = document.getElementById('comment-submit-btn');
+  const cancelBtn = document.getElementById('comment-cancel-btn');
+  
+  if (input) {
+    input.value = '';
+    input.classList.remove('editing-comment');
+    input.style.borderColor = '';
+  }
+  if (submitBtn) submitBtn.textContent = 'Post Comment';
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  if (status) status.textContent = 'Comments are tied to your guild account.';
+}
+
 function renderCommentMedia(mediaList) {
   if (!Array.isArray(mediaList) || !mediaList.length) return '';
   return '<div class="comment-media">' + mediaList.map(item => {
@@ -545,21 +636,29 @@ function renderComments() {
 
   host.innerHTML = currentComments.map(c => {
     const deletable = canDeleteComment(c);
+    const editable = canEditComment(c);
     const canReport = !!currentCommentUser;
+    const editedIndicator = c.editedAt ? '<span style="font-size:.7rem;color:var(--wht-f);margin-left:8px">(edited ' + escapeCommentHtml(formatCommentDate(c.editedAt)) + ')</span>' : '';
     return '<article class="comment-item">' +
       '<div class="comment-meta">' +
         '<span>' + escapeCommentHtml(c.authorName || 'Agent') + '</span>' +
         '<span>|</span>' +
         '<span>' + escapeCommentHtml(formatCommentDate(c.createdAt)) + '</span>' +
+        editedIndicator +
       '</div>' +
       '<div class="comment-content">' + escapeCommentHtml(c.content || '') + '</div>' +
       renderCommentMedia(c.media || []) +
-      (deletable
-        ? '<div class="comment-actions"><button class="btn btn-sm btn-d" type="button" onclick="deleteComment(\'' + escapeCommentHtml(c.id || '') + '\')">Delete</button></div>'
-        : '') +
-      (canReport
-        ? '<div class="comment-actions"><button class="btn btn-sm btn-s" type="button" data-comment-id="' + escapeCommentHtml(c.id || '') + '" data-comment-author="' + escapeCommentHtml(c.authorName || 'Agent') + '" onclick="openCommentReportPanel(this.dataset.commentId, this.dataset.commentAuthor)">Report</button></div>'
-        : '') +
+      '<div class="comment-actions">' +
+        (editable
+          ? '<button class="btn btn-sm btn-s" type="button" onclick="startEditComment(\'' + escapeCommentHtml(c.id || '') + '\')">Edit</button>'
+          : '') +
+        (deletable
+          ? '<button class="btn btn-sm btn-d" type="button" onclick="deleteComment(\'' + escapeCommentHtml(c.id || '') + '\')">Delete</button>'
+          : '') +
+        (canReport
+          ? '<button class="btn btn-sm btn-s" type="button" data-comment-id="' + escapeCommentHtml(c.id || '') + '" data-comment-author="' + escapeCommentHtml(c.authorName || 'Agent') + '" onclick="openCommentReportPanel(this.dataset.commentId, this.dataset.commentAuthor)">Report</button>'
+          : '') +
+      '</div>' +
     '</article>';
   }).join('');
 
@@ -623,7 +722,7 @@ async function submitComment() {
   }
 
   try {
-    if (composeStatus) composeStatus.textContent = 'Posting comment...';
+    if (composeStatus) composeStatus.innerHTML = '<span class="spinner spinner-sm"></span> Posting comment...';
     const media = mediaFiles.length ? await uploadCommentMediaFiles(mediaFiles) : [];
     const response = await fetch(commentsApiBase, {
       method: 'POST',
@@ -643,10 +742,10 @@ async function submitComment() {
     if (input) input.value = '';
     if (mediaInput) mediaInput.value = '';
     updateCommentMediaSelection();
-    if (composeStatus) composeStatus.textContent = 'Comment posted.';
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">✓</span> Comment posted.';
     await loadCommentsForCurrentPage();
   } catch (err) {
-    if (composeStatus) composeStatus.textContent = 'Post failed: ' + err.message;
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">✗</span> Post failed: ' + err.message;
   }
 }
 
@@ -664,7 +763,7 @@ async function submitCommentReport() {
   }
 
   try {
-    if (composeStatus) composeStatus.textContent = 'Submitting report...';
+    if (composeStatus) composeStatus.innerHTML = '<span class="spinner spinner-sm"></span> Submitting report...';
     const response = await fetch(commentsApiBase, {
       method: 'POST',
       headers: await getCommentsAuthHeaders(),
@@ -678,9 +777,9 @@ async function submitCommentReport() {
     if (!response.ok) throw new Error(data.error || 'Could not submit report.');
     if (reasonInput) reasonInput.value = '';
     closeCommentReportPanel();
-    if (composeStatus) composeStatus.textContent = 'Report submitted for review.';
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">✓</span> Report submitted for review.';
   } catch (err) {
-    if (composeStatus) composeStatus.textContent = 'Report failed: ' + err.message;
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">✗</span> Report failed: ' + err.message;
   }
 }
 

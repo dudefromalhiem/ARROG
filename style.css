@@ -538,6 +538,139 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
   .load-monocode, .load-monocode::before { animation: none !important; }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+ *  LOADING ANIMATIONS & PROGRESS INDICATORS
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* Spinner (Google/YouTube inspired) */
+.spinner{
+  display:inline-block;
+  width:20px;
+  height:20px;
+  border:2px solid rgba(255,255,255,.2);
+  border-top-color:var(--red-b);
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+.spinner-sm{width:14px;height:14px;border-width:2px}
+.spinner-lg{width:32px;height:32px;border-width:3px}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Progress Bar */
+.progress-bar{
+  height:3px;
+  background:var(--blk-c);
+  border:1px solid var(--red-d);
+  overflow:hidden;
+  margin:8px 0;
+  position:relative;
+}
+.progress-bar-fill{
+  height:100%;
+  background:linear-gradient(90deg, var(--red-d), var(--red-b), var(--red-m));
+  width:0;
+  transition:width .3s ease;
+  animation:progressPulse 1.2s ease-in-out infinite;
+}
+.progress-bar.indeterminate .progress-bar-fill{
+  width:30%;
+  animation:progressIndeterminate 2s ease-in-out infinite;
+}
+
+@keyframes progressPulse{
+  0%,100%{opacity:.8}
+  50%{opacity:1}
+}
+
+@keyframes progressIndeterminate{
+  0%{transform:translateX(-100%)}
+  100%{transform:translateX(400%)}
+}
+
+/* Loading Container (Google style) */
+.loading-container{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding:4px 12px;
+  font-size:.8rem;
+  color:var(--wht-d);
+  background:rgba(139,0,0,.08);
+  border:1px solid var(--red-d);
+  border-radius:2px;
+}
+
+.loading-container.hidden{display:none}
+
+/* Spinner in button */
+.btn .spinner{
+  width:14px;
+  height:14px;
+  margin-right:6px;
+  vertical-align:middle;
+}
+
+.btn.loading{
+  opacity:.8;
+  cursor:wait;
+  pointer-events:none;
+}
+
+/* Status message */
+.status-msg{
+  font-size:.8rem;
+  padding:8px 12px;
+  margin:8px 0;
+  border-left:3px solid;
+  background:rgba(0,0,0,.2);
+}
+
+.status-msg.loading{
+  border-left-color:var(--red-b);
+  color:var(--wht-m);
+}
+
+.status-msg.success{
+  border-left-color:#32cd32;
+  color:#90ee90;
+}
+
+.status-msg.error{
+  border-left-color:var(--red-g);
+  color:var(--red-m);
+}
+
+/* Upload progress */
+.upload-item-progress{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:8px;
+  font-size:.7rem;
+  color:var(--wht-d);
+}
+
+.upload-item-progress-bar{
+  flex:1;
+  height:2px;
+  background:var(--blk-c);
+  border:1px solid var(--red-d);
+  overflow:hidden;
+}
+
+.upload-item-progress-bar-fill{
+  height:100%;
+  background:var(--red-b);
+  width:0;
+  transition:width .2s ease;
+}
+
+.upload-item-progress-text{
+  min-width:40px;
+  text-align:right;
+}
+
 /* Utility */
 .hidden{display:none!important}
 .tc{text-align:center}

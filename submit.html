@@ -253,6 +253,7 @@
     <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
+      <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
       <li><a href="guide.html">Guide</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workshop</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
@@ -416,6 +417,10 @@ render.mount('submission-terminal');</pre>
         <button class="file-tile" type="button" data-entry-profile="lore">
           <span class="file-name">Archived History</span>
           <span class="file-copy">Community lore submissions. Records that contradict first owner/admin legacy documents are false.</span>
+        </button>
+        <button class="file-tile" type="button" data-show-guidebook="1">
+          <span class="file-name">Workshop Guidebook</span>
+          <span class="file-copy">Learn how to create and manage pages in the Guild archive.</span>
         </button>
         <button class="file-tile" type="button" data-open-history="1">
           <span class="file-name">History</span>

@@ -51,6 +51,7 @@
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
+        <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
@@ -79,18 +80,13 @@
     <div class="legacy-kicker">Guild Chronicle</div>
     <h2 class="legacy-title">Legacy of the Red Oaker Guild</h2>
     <p class="legacy-copy">
-      Long before the modern archive grid, the Guild existed as fragmented cells guarding oral records, damaged field reels,
-      and hand-scribed anomaly codes. The First Custodian Circle unified those cells under a single doctrine: preserve truth,
-      contain contagion, and never let entropy write history for us.
+      Prior to becoming a multinational private organization, the Red Oaker Guild was made up of a singular team of scientific researchers, doctors, and priests. Led by one man's vision, they strived to understand and even befriend the anomalous beings and objects they encountered, harboring and consistently observing many of them. Throughout decades, leadership shifted, and many personnel recorded their findings until the Guild's collapse near the late 20th century.
     </p>
     <p class="legacy-copy">
-      Through successive administrations, each Archon inherited incomplete ledgers and unstable sectors, then rebuilt the
-      registry one generation at a time. Under Archon Mikolov's reconstruction, legacy indexes were consolidated into the current
-      Red Oaker Legacy architecture to restore lost entries and eliminate designation drift.
+      During the collapse many anomalies escaped, and those too weak succumbed to the harsh nature of the world. Many records were destroyed or lost. Under the first Archon, Mikolov "Ekat" Gunitsky, the Guild was rebuilt and found records were consolidated into a system known as the Anomalous Registry of the Red Oaker Guild or "ARROG". This served to centralize all information of the guild and the anomalies into a single controlled system. Today, the Guild still uses the ARROG system, with the hopes of one day restoring the archive to its former glory. The Guild has expanded, with 242 Facilities and 12 Complexes placed around the world.
     </p>
     <p class="legacy-copy">
-      The current Owner maintains the archive as both fortress and record: every recovered page extends the Guild's continuity,
-      and every deleted page returns to encrypted placeholder state until a verified member reconstructs it again.
+      The current Archon, Archon Quincy, operates the guild as both a psychiatric ward and an anomalous research center, allowing patients to be selected for testing with anomalies. The Guild prioritizes the recovery of lost research and the expansion of the Registry through newly acquired anomalies. In accordance with its doctrine, all anomalies are sheltered, observed, and pursued for understanding.
     </p>
     <div class="legacy-actions">
       <a href="legacy-sheet.html" class="btn btn-p">Open Red Oaker Legacy</a>
@@ -109,9 +105,9 @@
 
   <!-- Public Administration Roster -->
   <div class="section" id="admin-roster" style="margin-bottom:64px">
-    <div class="section-hd">Current Admins</div>
+    <div class="section-hd">Active Authorities</div>
     <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
-      Active Guild administrators currently appointed to maintain the archive. Only the display name and appointment date are shown publicly.
+      Guild administrators and moderators currently appointed to maintain the archive. Only the display name, role, and appointment date are shown publicly.
     </p>
     <div class="g2" id="admin-roster-grid"></div>
   </div>
@@ -203,12 +199,41 @@
     <div class="section-hd">Newest Pages</div>
     <div id="newest-feed"></div>
   </div>
+  <!-- Scroll to Top Button -->
+  <button id="scroll-to-top" style="display:none;position:fixed;bottom:40px;right:40px;width:44px;height:44px;background:var(--red-b);border:none;color:var(--wht-b);border-radius:4px;cursor:pointer;font-size:20px;z-index:100;transition:opacity 0.3s" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Scroll to top">↑</button>
 
 </main>
 
 <!-- ═══ FOOTER ═══ -->
 <footer class="ftr">
   <div class="ftr-in">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-bottom:24px">
+      <div>
+        <h3 style="font-size:.9rem;color:var(--red-b);text-transform:uppercase;margin-bottom:12px;letter-spacing:1px">Explore</h3>
+        <ul class="ftr-links" style="display:flex;flex-direction:column;gap:8px">
+          <li><a href="registry.html">Anomaly Registry</a></li>
+          <li><a href="explore.html">Search Universe</a></li>
+          <li><a href="collections.html">Collections</a></li>
+          <li><a href="legacy-sheet.html">Guild Legacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="font-size:.9rem;color:var(--red-b);text-transform:uppercase;margin-bottom:12px;letter-spacing:1px">Participate</h3>
+        <ul class="ftr-links" style="display:flex;flex-direction:column;gap:8px">
+          <li><a href="submit.html" id="footer-submit-link" class="hidden">Submit Content</a></li>
+          <li><a href="guide.html">Read Guide</a></li>
+          <li><a href="messaging.html" id="footer-messaging-link" class="hidden">Guild Messages</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="font-size:.9rem;color:var(--red-b);text-transform:uppercase;margin-bottom:12px;letter-spacing:1px">Information</h3>
+        <ul class="ftr-links" style="display:flex;flex-direction:column;gap:8px">
+          <li><a href="guide.html">Newcomer's Guide</a></li>
+          <li><a href="#">About the Guild</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
     <ul class="ftr-links">
       <li><a href="submit.html">Contribute</a></li>
       <li><a href="#">List of Hubs</a></li>
