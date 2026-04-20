@@ -28,7 +28,7 @@ service firebase.storage {
       allow write: if isSignedIn() && isAllowedImageUpload();
     }
 
-    match /uploads/{userId}/{fileName} {
+    match /uploads/{userId}/{allPaths=**} {
       allow write: if isSignedIn() &&
         request.auth.uid == userId &&
         (isAllowedImageUpload() || isAllowedAudioUpload() || isAllowedVideoUpload());
