@@ -7,6 +7,19 @@
   <meta name="description" content="View a community-submitted page in the Red Oaker Guild archive." />
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .comments-wrap { margin-top: 24px; }
+    .comments-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:12px; }
+    .comments-title { font-family: var(--font-h); letter-spacing: 2px; text-transform: uppercase; color: var(--wht); }
+    .comments-status { font-size: .78rem; color: var(--wht-f); }
+    .comment-compose { border: 1px solid var(--blk-m); background: var(--blk-b); padding: 12px; margin-bottom: 12px; }
+    .comment-compose textarea { min-height: 88px; }
+    .comment-list { display:grid; gap:10px; }
+    .comment-item { border:1px solid var(--blk-m); background: var(--blk-b); padding:10px; }
+    .comment-meta { font-size:.72rem; color: var(--wht-f); display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+    .comment-content { font-size:.9rem; color: var(--wht-m); line-height:1.65; white-space: pre-wrap; }
+    .comment-actions { margin-top:8px; }
+  </style>
 </head>
 <body>
 
@@ -87,6 +100,24 @@ render.mount('archive-viewer');</pre>
     <div id="pv-actions" class="tc hidden" style="margin-top:24px;"></div>
   </div>
 
+  <section id="comments-section" class="section hidden comments-wrap">
+    <div class="comments-head">
+      <div class="comments-title">Archive Comments</div>
+      <div class="comments-status" id="comments-status">Loading comments...</div>
+    </div>
+    <div class="comment-compose" id="comment-compose">
+      <div class="fg" style="margin-bottom:8px">
+        <label class="fl" for="comment-input">Leave a comment</label>
+        <textarea class="fta" id="comment-input" maxlength="1200" placeholder="Sign in to comment on this page."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
+        <span class="comments-status" id="comment-compose-status">Comments are tied to your guild account.</span>
+        <button class="btn btn-s" id="comment-submit-btn" type="button">Post Comment</button>
+      </div>
+    </div>
+    <div class="comment-list" id="comment-list"></div>
+  </section>
+
 </main>
 
 <!-- ═══ FOOTER ═══ -->
@@ -116,6 +147,9 @@ render.mount('archive-viewer');</pre>
  * ═══════════════════════════════════════════════════════════════ */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  configureCommentsApiBase();
+  bindCommentComposerEvents();
+
   const params = new URLSearchParams(window.location.search);
   let pageId = params.get('id');
   let slug = params.get('slug');
@@ -167,6 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     window.__pageDocId = docId;
     window.__pageSlug = page.slug || slug || '';
+    window.__pageTitle = page.title || '';
 
     // Update page title + meta
     document.title = page.title + ' — Red Oaker Guild';
@@ -203,6 +238,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Show viewer
     document.getElementById('page-loading').classList.add('hidden');
     document.getElementById('page-viewer').classList.remove('hidden');
+    document.getElementById('comments-section').classList.remove('hidden');
+    await loadCommentsForCurrentPage();
 
   } catch (err) {
     console.error('Failed to load page:', err);
@@ -212,6 +249,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Auth UI
   auth.onAuthStateChanged(async user => {
     await rolesReady;
+    currentCommentUser = user || null;
+    currentCommentUserIsAdmin = !!(user && isAdmin(user.email));
     const navAuth = document.getElementById('nav-auth');
     if (user) {
       const displayLabel = user.displayName || 'Agent';
@@ -230,9 +269,210 @@ document.addEventListener('DOMContentLoaded', async () => {
             <button class="btn btn-d" onclick="confirmDeleteDocument()">Delete Document</button>
           </div>`;
       }
+    } else {
+      const composeStatus = document.getElementById('comment-compose-status');
+      if (composeStatus) composeStatus.textContent = 'Sign in to post comments.';
     }
+
+    updateCommentComposerAuthState();
+    renderComments();
   });
 });
+
+let commentsApiBase = '/api/comments';
+let currentCommentUser = null;
+let currentCommentUserIsAdmin = false;
+let currentComments = [];
+
+function configureCommentsApiBase() {
+  try {
+    const host = String(window.location.hostname || '').toLowerCase();
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const isFile = window.location.protocol === 'file:';
+    commentsApiBase = (isLocal || isFile)
+      ? 'https://redoakguild.vercel.app/api/comments'
+      : '/api/comments';
+  } catch (_err) {
+    commentsApiBase = '/api/comments';
+  }
+}
+
+function bindCommentComposerEvents() {
+  const btn = document.getElementById('comment-submit-btn');
+  if (btn) btn.addEventListener('click', submitComment);
+}
+
+function getCommentsPageRef() {
+  return {
+    pageId: String(window.__pageDocId || '').trim(),
+    slug: String(window.__pageSlug || '').trim(),
+    pageTitle: String(window.__pageTitle || '').trim()
+  };
+}
+
+function updateCommentComposerAuthState() {
+  const input = document.getElementById('comment-input');
+  const btn = document.getElementById('comment-submit-btn');
+  const pageRef = getCommentsPageRef();
+  const hasTarget = !!(pageRef.pageId || pageRef.slug);
+  const canWrite = !!currentCommentUser && hasTarget;
+
+  if (input) {
+    input.disabled = !canWrite;
+    input.placeholder = canWrite
+      ? 'Share relevant findings, corrections, or context for this archive entry.'
+      : (!hasTarget ? 'Comments unavailable for this page.' : 'Sign in to comment on this page.');
+  }
+  if (btn) btn.disabled = !canWrite;
+}
+
+function formatCommentDate(value) {
+  const seconds = value && typeof value.seconds === 'number' ? value.seconds : 0;
+  if (!seconds) return 'just now';
+  return new Date(seconds * 1000).toLocaleString();
+}
+
+function escapeCommentHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function canDeleteComment(comment) {
+  if (!comment) return false;
+  if (currentCommentUserIsAdmin) return true;
+  return !!currentCommentUser && String(comment.authorUid || '') === String(currentCommentUser.uid || '');
+}
+
+function renderComments() {
+  const host = document.getElementById('comment-list');
+  const status = document.getElementById('comments-status');
+  if (!host) return;
+
+  if (!currentComments.length) {
+    host.innerHTML = '<div class="comment-item"><div class="comment-content">No comments yet. Be the first to contribute context for this document.</div></div>';
+    if (status) status.textContent = '0 comments';
+    return;
+  }
+
+  host.innerHTML = currentComments.map(c => {
+    const deletable = canDeleteComment(c);
+    return '<article class="comment-item">' +
+      '<div class="comment-meta">' +
+        '<span>' + escapeCommentHtml(c.authorName || 'Agent') + '</span>' +
+        '<span>|</span>' +
+        '<span>' + escapeCommentHtml(formatCommentDate(c.createdAt)) + '</span>' +
+      '</div>' +
+      '<div class="comment-content">' + escapeCommentHtml(c.content || '') + '</div>' +
+      (deletable
+        ? '<div class="comment-actions"><button class="btn btn-sm btn-d" type="button" onclick="deleteComment(\'' + escapeCommentHtml(c.id || '') + '\')">Delete</button></div>'
+        : '') +
+    '</article>';
+  }).join('');
+
+  if (status) status.textContent = currentComments.length + ' comment' + (currentComments.length === 1 ? '' : 's');
+}
+
+async function getCommentsAuthHeaders() {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Please sign in first.');
+  const token = await user.getIdToken();
+  return {
+    Authorization: 'Bearer ' + token,
+    'Content-Type': 'application/json'
+  };
+}
+
+async function loadCommentsForCurrentPage() {
+  const status = document.getElementById('comments-status');
+  const pageRef = getCommentsPageRef();
+  if (!(pageRef.pageId || pageRef.slug)) {
+    currentComments = [];
+    renderComments();
+    return;
+  }
+
+  if (status) status.textContent = 'Loading comments...';
+  const query = pageRef.pageId
+    ? ('?pageId=' + encodeURIComponent(pageRef.pageId))
+    : ('?slug=' + encodeURIComponent(pageRef.slug));
+
+  try {
+    const response = await fetch(commentsApiBase + query, { method: 'GET' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not load comments.');
+    currentComments = Array.isArray(data.comments)
+      ? data.comments.map(item => ({ id: item.id, ...(item.data || {}) }))
+      : [];
+    renderComments();
+  } catch (err) {
+    currentComments = [];
+    renderComments();
+    if (status) status.textContent = 'Comments unavailable: ' + err.message;
+  }
+}
+
+async function submitComment() {
+  const input = document.getElementById('comment-input');
+  const composeStatus = document.getElementById('comment-compose-status');
+  const text = String(input && input.value || '').trim();
+  const pageRef = getCommentsPageRef();
+
+  if (!text) {
+    if (composeStatus) composeStatus.textContent = 'Write a comment before posting.';
+    return;
+  }
+  if (!(pageRef.pageId || pageRef.slug)) {
+    if (composeStatus) composeStatus.textContent = 'Comments unavailable for this page.';
+    return;
+  }
+
+  try {
+    if (composeStatus) composeStatus.textContent = 'Posting comment...';
+    const response = await fetch(commentsApiBase, {
+      method: 'POST',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({
+        pageId: pageRef.pageId,
+        slug: pageRef.slug,
+        pageTitle: pageRef.pageTitle,
+        content: text,
+        authorName: currentCommentUser?.displayName || ''
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not post comment.');
+
+    if (input) input.value = '';
+    if (composeStatus) composeStatus.textContent = 'Comment posted.';
+    await loadCommentsForCurrentPage();
+  } catch (err) {
+    if (composeStatus) composeStatus.textContent = 'Post failed: ' + err.message;
+  }
+}
+
+async function deleteComment(id) {
+  const commentId = String(id || '').trim();
+  if (!commentId) return;
+  const ok = confirm('Delete this comment?');
+  if (!ok) return;
+
+  try {
+    const response = await fetch(commentsApiBase, {
+      method: 'DELETE',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({ id: commentId })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Delete failed.');
+    await loadCommentsForCurrentPage();
+  } catch (err) {
+    alert('Delete failed: ' + err.message);
+  }
+}
 
 function confirmEditDocument(editHref) {
   const ok = confirm('Open this document in the unified submit editor?');

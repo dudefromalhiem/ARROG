@@ -23,6 +23,9 @@
     .doc-table th { background: var(--blk); color: var(--wht); text-transform: uppercase; letter-spacing: 1px; }
     .doc-table tr:nth-child(even) { background: rgba(139,0,0,0.08); }
     .classified-stamp { color: var(--red-b); font-family: var(--font-h); font-size: 2rem; border: 3px solid var(--red-b); display: inline-block; padding: 8px 16px; transform: rotate(-5deg); margin-bottom: 24px; opacity: 0.8; }
+    .guide-state { max-width: 800px; margin: 40px auto 0; background: var(--blk-c); color: var(--wht-m); padding: 24px; border: 1px solid var(--red-d); box-shadow: 0 0 20px rgba(0,0,0,0.35); text-align: center; font-family: var(--font-m); }
+    .guide-state .guide-state-title { font-family: var(--font-h); font-size: 1.3rem; letter-spacing: 2px; color: var(--wht); margin-bottom: 10px; text-transform: uppercase; }
+    .guide-state.hidden { display: none; }
   </style>
 </head>
 <body>
@@ -42,13 +45,17 @@
 </header>
 
 <main class="wrap" style="padding-top:40px; padding-bottom:60px;">
+  <div class="guide-state" id="guide-loading">
+    <div class="guide-state-title">Loading guide content</div>
+    <p>Resolving the live draft or static reference copy.</p>
+  </div>
   <div class="guide-toolbar hidden" id="guide-owner-actions">
     <button class="btn btn-s" id="guide-edit-btn" type="button">>> Edit Guide [Owner]</button>
   </div>
 
   <div id="guide-dynamic" class="hidden"></div>
 
-  <div class="doc-wrap">
+  <div class="doc-wrap hidden" id="guide-static-wrap">
     <div id="guide-static">
     <div class="doc-hdr">
       <img src="logo.png" alt="Guild Logo" />
@@ -175,12 +182,36 @@ function buildGuideDocument(html, css) {
   const wrapped = raw.includes('class="page-shell"') ? raw : '<div class="page-shell"><section class="page-section">' + raw + '</section></div>';
   const safeCss = String(css || '');
   const htmlWithLazyImages = wrapped.replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
+  const guideMarkup = document.createElement('div');
+  guideMarkup.innerHTML = htmlWithLazyImages;
+  const usedIds = new Map();
+  const slugify = value => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'section';
+  guideMarkup.querySelectorAll('h1, h2, h3, h4').forEach(node => {
+    if (!node.id) {
+      const baseId = slugify(node.textContent || 'section');
+      const nextIndex = Number(usedIds.get(baseId) || 0);
+      node.id = nextIndex ? baseId + '-' + nextIndex : baseId;
+      usedIds.set(baseId, nextIndex + 1);
+    }
+  });
+  guideMarkup.querySelectorAll('a[href]').forEach(anchor => {
+    const href = String(anchor.getAttribute('href') || '').trim();
+    const isInternalAnchor = href.startsWith('#') || (/^[^:]+#/.test(href) && !/^https?:\/\//i.test(href));
+    if (isInternalAnchor) {
+      anchor.removeAttribute('target');
+      anchor.removeAttribute('rel');
+    }
+  });
+  const normalizedHtml = guideMarkup.innerHTML;
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
     ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
-    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
+    'html{scroll-behavior:smooth}*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}a[href^="#"]{scroll-behavior:smooth}' +
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}img{max-width:100%;height:auto}' +
     safeCss.replace(/<\/style>/gi, '') +
-    '</style></head><body>' + htmlWithLazyImages + '</body></html>';
+    '</style></head><body>' + normalizedHtml + '</body></html>';
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -198,15 +229,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!snap.empty) {
       const doc = snap.docs[0].data();
       const dynamic = document.getElementById('guide-dynamic');
-      const staticWrap = document.querySelector('.doc-wrap');
+      const staticWrap = document.getElementById('guide-static-wrap');
+      const loading = document.getElementById('guide-loading');
       dynamic.classList.remove('hidden');
       dynamic.innerHTML = '<iframe id="guide-frame" title="Guide content" sandbox="allow-same-origin" style="width:100%;min-height:1200px;border:1px solid var(--red-d);background:#000"></iframe>';
       document.getElementById('guide-frame').srcdoc = buildGuideDocument(doc.htmlContent || '', doc.cssContent || '');
       staticWrap.classList.add('hidden');
+      if (loading) loading.classList.add('hidden');
+      return;
     }
   } catch (err) {
     console.warn('Guide override unavailable:', err);
   }
+
+  document.getElementById('guide-static-wrap').classList.remove('hidden');
+  document.getElementById('guide-loading').classList.add('hidden');
 });
 </script>
 </body>

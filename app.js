@@ -492,7 +492,7 @@ async function handleGoogle() {
 }
 
 async function updateAuthUI(user) {
-  await waitForReady(rolesReady, 1200);
+  await rolesReady;
   const navAuth = document.getElementById('nav-auth');
   const adminLink = document.getElementById('admin-link');
   const submitLink = document.getElementById('submit-link');

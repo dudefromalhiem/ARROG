@@ -600,7 +600,13 @@ async function deletePage(id) {
   }
 
   if (!confirm('Delete this page permanently?')) return;
-  try { await db.collection('pages').doc(id).delete(); await refreshPages(); }
+  try {
+    if (String(p.type || '').trim() === 'Lore' || String(p.contentFamily || '').trim() === 'lore') {
+      await db.collection('loreIndex').doc(id).delete().catch(() => {});
+    }
+    await db.collection('pages').doc(id).delete();
+    await refreshPages();
+  }
   catch (err) { alert('Delete failed: ' + err.message); }
 }
 

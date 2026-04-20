@@ -55,6 +55,22 @@ function normalizeTags(tags) {
   return Array.isArray(tags) ? tags.map(tag => String(tag || '').trim()).filter(Boolean) : [];
 }
 
+function determineContentFamily(type) {
+  return String(type || '').trim().toLowerCase() === 'lore' ? 'lore' : '';
+}
+
+function extractPlainTextExcerpt(html, maxLength = 220) {
+  const text = String(html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&[a-z0-9#]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > maxLength ? text.slice(0, maxLength).trim() + '…' : text;
+}
+
 function normalizeMediaAssets(assets) {
   return Array.isArray(assets)
     ? assets.map(asset => ({
@@ -244,6 +260,7 @@ function buildSubmissionPayload(body, actor) {
     anomalySubtypeLabel: String(payload.anomalySubtypeLabel || '').trim(),
     anomalyListKey: String(payload.anomalyListKey || '').trim(),
     type: String(payload.type || 'Page').trim(),
+    contentFamily: determineContentFamily(payload.type),
     tags: normalizeTags(payload.tags),
     slug,
     htmlContent,
@@ -314,7 +331,11 @@ async function checkDuplicateSubmission(db, submissionId, payload, ignorePageId 
   }
 
   const submissionQuery = await db.collection('submissions').where('slug', '==', payload.slug).limit(5).get();
-  const conflict = submissionQuery.docs.some(doc => doc.id !== submissionId);
+  const conflict = submissionQuery.docs.some(doc => {
+    if (doc.id === submissionId) return false;
+    const status = String((doc.data() || {}).status || '').toLowerCase();
+    return status === 'pending';
+  });
   if (conflict) {
     const err = new Error('That slug is already in use by another submission.');
     err.statusCode = 409;
@@ -457,6 +478,10 @@ module.exports = async function handler(req, res) {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = 'draft';
 
+      if (String(payload.type || '').trim().toLowerCase() === 'lore' && !adminAccess) {
+        return sendJson(res, 403, { error: 'Admin access required for Lore pages.' });
+      }
+
       if (submissionId) {
         const existing = await submissionRef.get();
         if (existing.exists) {
@@ -477,6 +502,10 @@ module.exports = async function handler(req, res) {
 
       validateAnomalyPayloadOrThrow(payload, { enforceTitlePrefix: true });
 
+      if (String(payload.type || '').trim().toLowerCase() === 'lore' && !adminAccess) {
+        return sendJson(res, 403, { error: 'Admin access required for Lore pages.' });
+      }
+
       if (action === 'publish' && !adminAccess) {
         return sendJson(res, 403, { error: 'Admin access required.' });
       }
@@ -494,6 +523,8 @@ module.exports = async function handler(req, res) {
           anomalySubtypeLabel: payload.anomalySubtypeLabel,
           anomalyListKey: payload.anomalyListKey,
           type: payload.type,
+          contentFamily: payload.contentFamily,
+          legacySection: String(payload.type || '').trim().toLowerCase() === 'lore' ? 'Guild Legacy' : '',
           tags: payload.tags,
           slug: payload.slug,
           htmlContent: payload.htmlContent,
@@ -514,11 +545,33 @@ module.exports = async function handler(req, res) {
         });
 
         const pageId = String(body.pageId || '').trim();
+        let publishedPageId = pageId;
         if (pageId) {
           await db.collection('pages').doc(pageId).set(pagePayload, { merge: true });
         } else {
           const pageRef = await db.collection('pages').add(pagePayload);
           body.pageId = pageRef.id;
+          publishedPageId = pageRef.id;
+        }
+
+        if (String(payload.type || '').trim().toLowerCase() === 'lore') {
+          await db.collection('loreIndex').doc(publishedPageId).set(stripUndefined({
+            pageId: publishedPageId,
+            title: payload.title,
+            slug: payload.slug,
+            type: payload.type,
+            contentFamily: payload.contentFamily,
+            legacySection: 'Guild Legacy',
+            summary: extractPlainTextExcerpt(payload.htmlContent || payload.title || '', 240),
+            tags: payload.tags,
+            authorUid: actor.uid,
+            authorEmail: actor.email,
+            authorName: payload.authorName,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            publishedAt: admin.firestore.FieldValue.serverTimestamp()
+          }), { merge: true });
+        } else if (pageId) {
+          await db.collection('loreIndex').doc(pageId).delete().catch(() => {});
         }
 
         await submissionRef.set(stripUndefined({

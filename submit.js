@@ -50,6 +50,7 @@ let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history' | 'drafts'
 let submissionApiBase = '/api/submit';
 let hasUnsavedEditorChanges = false;
 let submitAutosaveEnabled = true;
+let currentUserCanAccessLore = false;
 const nativeSubmitAlert = window.alert.bind(window);
 let submitAlertModal = null;
 
@@ -157,7 +158,8 @@ const ENTRY_PROFILES = {
   sctor: { key: 'sctor', label: 'Cross Test Format', type: 'Anomaly', subtype: 'SCTOR', template: 'anomaly' },
   tl: { key: 'tl', label: 'Termination Log Format', type: 'Anomaly', subtype: 'TL', template: 'anomaly' },
   tale: { key: 'tale', label: 'Narrative / Field Report', type: 'Tale', template: 'tale' },
-  artwork: { key: 'artwork', label: 'Artwork Upload', type: 'Artwork', template: 'artwork' }
+  artwork: { key: 'artwork', label: 'Artwork Upload', type: 'Artwork', template: 'artwork' },
+  lore: { key: 'lore', label: 'Lore Pages', type: 'Lore', template: 'guide' }
 };
 
 const TYPE_CANONICAL_MAP = {
@@ -188,9 +190,13 @@ function isNarrativeFamilyType(rawType) {
   return type === 'Tale' || type === 'Report';
 }
 
+function isLoreFamilyType(rawType) {
+  return String(rawType || '').trim() === 'Lore';
+}
+
 function isMediaEnabledSubmissionType(rawType) {
   const type = String(rawType || '').trim().toLowerCase();
-  return isAnomalyFamilyType(rawType) || isNarrativeFamilyType(rawType) || type === 'guide' || type === 'legacy';
+  return isAnomalyFamilyType(rawType) || isNarrativeFamilyType(rawType) || type === 'guide' || type === 'legacy' || type === 'lore';
 }
 
 function getSelectedSubmissionType() {
@@ -340,7 +346,7 @@ const DOC_DEFAULT_CSS = `
 // AUTH GATE
 // ═════════════════════════════════════════════════════════════
 
-auth.onAuthStateChanged(user => {
+auth.onAuthStateChanged(async user => {
   document.getElementById('submit-loading').classList.add('hidden');
   const navAuth = document.getElementById('nav-auth');
   if (user) {
@@ -351,6 +357,8 @@ auth.onAuthStateChanged(user => {
     navAuth.innerHTML = renderSubmitUserMenu(user);
     setDraftStatus('Draft autosave is idle.');
     configureSubmissionApiBase();
+    const isAdminUser = await getUserAdminFlag(user);
+    setLoreWorkshopVisibility(isAdminUser);
     initializeSubmitEditModeFromUrl();
     initializeReconstructionPrefillFromUrl();
 
@@ -365,6 +373,8 @@ auth.onAuthStateChanged(user => {
       openSubmissionHistoryView();
     } else if (view === 'drafts') {
       openSubmissionDraftsView();
+    } else if (entryProfile === 'lore' && !currentUserCanAccessLore) {
+      showSubmitEditor(false);
     } else if (ENTRY_PROFILES[entryProfile]) {
       applyEntryProfile(entryProfile);
     } else {
@@ -372,6 +382,7 @@ auth.onAuthStateChanged(user => {
     }
   } else {
     currentUserForSubmit = null;
+    currentUserCanAccessLore = false;
     activeDraftId = null;
     document.getElementById('submit-denied').classList.remove('hidden');
     document.getElementById('submit-panel').classList.add('hidden');
@@ -603,9 +614,26 @@ async function openSubmitFileExplorer() {
   showSubmitEditor(false);
 }
 
+function setLoreWorkshopVisibility(canAccess) {
+  currentUserCanAccessLore = !!canAccess;
+  document.querySelectorAll('.lore-workshop-only').forEach(el => {
+    el.classList.toggle('hidden', !currentUserCanAccessLore);
+  });
+  const loreOption = document.querySelector('#sf-type option[value="Lore"]');
+  if (loreOption) {
+    loreOption.hidden = !currentUserCanAccessLore;
+    loreOption.disabled = !currentUserCanAccessLore;
+  }
+}
+
 function applyEntryProfile(profileKey) {
   const profile = ENTRY_PROFILES[profileKey];
   if (!profile) return;
+
+  if (profile.key === 'lore' && !currentUserCanAccessLore) {
+    alert('Lore pages are restricted to Admins and Owners.');
+    return;
+  }
 
   selectedEntryProfile = profile.key;
   const banner = document.getElementById('entry-profile-banner');
@@ -661,7 +689,7 @@ function setDraftStatus(message, isError = false) {
 }
 
 function scheduleDraftAutoSave() {
-  if (suppressDraftAutoSave || !currentUserForSubmit || submitEditTarget || !submitAutosaveEnabled) return;
+  if (suppressDraftAutoSave || !currentUserForSubmit || !submitAutosaveEnabled) return;
   clearTimeout(draftAutoSaveTimer);
   setDraftStatus('Draft changes detected. Autosaving...');
   draftAutoSaveTimer = setTimeout(() => {
@@ -760,8 +788,11 @@ async function callSubmissionApi(method, payload = {}, query = '') {
 }
 
 async function saveDraft(options = {}) {
-  if (!currentUserForSubmit || submitEditTarget) return null;
+  if (!currentUserForSubmit) return null;
   if (draftSaveInFlight) return activeDraftId;
+
+  const canEditExistingPage = !submitEditTarget || await getUserAdminFlag(currentUserForSubmit);
+  if (submitEditTarget && !canEditExistingPage) return null;
 
   const silent = !!options.silent;
   const trigger = options.trigger || 'manual';
@@ -860,7 +891,7 @@ async function saveDraft(options = {}) {
   try {
     const result = await callSubmissionApi('POST', {
       action: 'draft',
-      submissionId: activeDraftId || '',
+      submissionId: activeDraftId || (submitEditTarget && submitEditTarget.id) || '',
       submission: removeClientOnlySubmissionFields(draftPayload)
     });
     activeDraftId = result.id || activeDraftId;
@@ -1106,6 +1137,7 @@ async function initializeSubmitEditModeFromUrl() {
 
     const page = pageDoc.data() || {};
     submitEditTarget = { id: pageDoc.id || null, seeded: !pageDoc.id, seedSlug: page.slug || editSlug || '' };
+    activeDraftId = pageDoc.id || null;
 
     document.getElementById('sf-title').value = page.title || '';
     document.getElementById('sf-type').value = getDisplayTypeForEditor(page.type || 'Anomaly', page.anomalySubtype || '');
@@ -1167,7 +1199,7 @@ async function initializeSubmitEditModeFromUrl() {
     refreshImageSelectors();
 
     const content = String(page.htmlContent || '');
-    const isGuide = String(page.type || '') === 'Guide';
+    const isGuide = String(page.type || '') === 'Guide' || String(page.type || '') === 'Lore';
     if (isGuide) {
       switchMode('template');
       selectTemplate('guide');
@@ -1415,7 +1447,7 @@ function updateTypeSpecificUI() {
   const anomalyRow = document.getElementById('anomaly-meta-row');
   if (anomalyRow) anomalyRow.classList.toggle('hidden', !isAnomalyFamilyType(type));
 
-  const isGuide = type === 'Guide';
+  const isGuide = type === 'Guide' || type === 'Lore';
   const modeDoc = document.getElementById('mode-doc');
   const modeCode = document.getElementById('mode-code');
 
@@ -1452,7 +1484,7 @@ function updateUploadZoneCopy() {
 
   if (hint) {
     hint.textContent = mediaEnabled
-      ? 'Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, and Legacy submissions.'
+      ? 'Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, Lore, and Legacy submissions.'
       : 'Images are available for all page types. Audio and video are disabled for this submission type.';
   }
 }
@@ -1559,7 +1591,7 @@ function onAnomalyCodeInput() {
 
 function switchMode(mode) {
   const type = document.getElementById('sf-type').value;
-  if (type === 'Guide' && mode !== 'template') {
+  if ((type === 'Guide' || type === 'Lore') && mode !== 'template') {
     mode = 'template';
   }
   currentMode = mode;
@@ -1586,8 +1618,13 @@ function selectTemplate(tpl) {
   });
 
   // Auto-set the type dropdown
-  const typeMap = { anomaly: 'Anomaly', tale: 'Tale', artwork: 'Artwork', guide: 'Guide' };
-  document.getElementById('sf-type').value = typeMap[tpl] || 'Anomaly';
+  const typeMap = { anomaly: 'Anomaly', tale: 'Tale', artwork: 'Artwork' };
+  if (tpl === 'guide') {
+    const currentType = String(document.getElementById('sf-type').value || '').trim();
+    document.getElementById('sf-type').value = currentType === 'Lore' ? 'Lore' : 'Guide';
+  } else {
+    document.getElementById('sf-type').value = typeMap[tpl] || 'Anomaly';
+  }
 
   // Update Title label and placeholder based on type
   const titleLabel = document.getElementById('lbl-title');
@@ -1610,7 +1647,7 @@ function selectTemplate(tpl) {
 
 function onTypeChange() {
   const type = document.getElementById('sf-type').value;
-  const tplMap = { Anomaly: 'anomaly', Test: 'anomaly', Tale: 'tale', Report: 'tale', Artwork: 'artwork', Guide: 'guide', Hub: 'guide' };
+  const tplMap = { Anomaly: 'anomaly', Test: 'anomaly', Tale: 'tale', Report: 'tale', Artwork: 'artwork', Guide: 'guide', Lore: 'guide', Hub: 'guide' };
   if (tplMap[type]) {
     selectTemplate(tplMap[type]);
   }
@@ -3901,7 +3938,7 @@ async function submitPage() {
       const existingPages = await db.collection('pages')
         .where('type', '==', 'Anomaly')
         .where('anomalyId', '==', anomalyId)
-        .limit(1)
+        .limit(5)
         .get();
       const existingSubs = await db.collection('submissions')
         .where('type', '==', 'Anomaly')
@@ -3909,7 +3946,8 @@ async function submitPage() {
         .where('status', '==', 'pending')
         .limit(1)
         .get();
-      const found = !existingPages.empty || !existingSubs.empty;
+      const foundInOtherPage = !existingPages.empty && existingPages.docs.some(doc => doc.id !== (submitEditTarget && submitEditTarget.id));
+      const found = foundInOtherPage || !existingSubs.empty;
 
       if (found) {
         alert('An Anomaly entry for ID "' + anomalyId + '" already exists or is pending review. You cannot create a duplicate Anomaly designation, though you may submit Tales or Art for it.');
@@ -3990,16 +4028,23 @@ async function submitPage() {
         return;
       }
 
+      const editPageId = submitEditTarget.id;
+
       const result = await callSubmissionApi('POST', {
         action: 'publish',
-        pageId: submitEditTarget.id,
+        pageId: editPageId,
         submissionId: activeDraftId || '',
         submission: submission,
         reviewerName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0] || 'Admin',
         removeDraft: !!activeDraftId
       });
       alert('Page updated successfully.');
-      const publishedPageId = result.pageId || submitEditTarget.id;
+      clearTimeout(draftAutoSaveTimer);
+      submitEditTarget = null;
+      activeDraftId = null;
+      hasUnsavedEditorChanges = false;
+      suppressDraftAutoSave = true;
+      const publishedPageId = result.pageId || editPageId;
       window.location.href = slug ? ('page.html?slug=' + encodeURIComponent(slug)) : ('page.html?id=' + encodeURIComponent(publishedPageId));
       return;
     }

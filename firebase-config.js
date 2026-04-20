@@ -74,6 +74,7 @@ async function changeUsername() {
 async function getUserAdminFlag(user) {
   if (!user) return false;
   try {
+    if (BOOTSTRAP_OWNER_SET.has(String(user.email || '').toLowerCase())) return true;
     const doc = await db.collection('users').doc(user.uid).get();
     if (doc.exists && doc.data() && doc.data().isAdmin === true) {
       return true;
@@ -276,6 +277,7 @@ if (document.readyState === 'loading') {
 
 // Bootstrap — only used if Firestore config/roles doesn't exist yet
 const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
+const BOOTSTRAP_OWNER_SET = new Set(_BOOTSTRAP.map(email => String(email || '').toLowerCase()));
 let ROLE_DATA = { owners: [], admins: [], mods: [] };
 let GUILD_PERMISSIONS = {};
 let SITE_STATE = { esdLocked: false, esdActivatedBy: '', esdActivatedAt: null };
@@ -323,6 +325,7 @@ const rolesReady = (async () => {
 function resolveRole(email) {
   if (!email) return "user";
   const e = email.toLowerCase();
+  if (BOOTSTRAP_OWNER_SET.has(e)) return "owner";
   if (ROLE_DATA.owners.includes(e)) return "owner";
   if (ROLE_DATA.admins.includes(e)) return "admin";
   if (ROLE_DATA.mods.includes(e)) return "mod";
@@ -332,8 +335,17 @@ function isModerator(email) {
   const r = resolveRole(email);
   return r === "mod" || r === "admin" || r === "owner";
 }
-function isAdmin(email) { const r = resolveRole(email); return r === "admin" || r === "owner"; }
-function isOwner(email) { return resolveRole(email) === "owner"; }
+function isAdmin(email) {
+  const e = String(email || '').toLowerCase();
+  if (BOOTSTRAP_OWNER_SET.has(e)) return true;
+  const r = resolveRole(email);
+  return r === "admin" || r === "owner";
+}
+function isOwner(email) {
+  const e = String(email || '').toLowerCase();
+  if (BOOTSTRAP_OWNER_SET.has(e)) return true;
+  return resolveRole(email) === "owner";
+}
 function adminHasDelegation(email, permissionKey) {
   if (isOwner(email)) return true; // Owner always has every permission
   if (isAdmin(email)) {
