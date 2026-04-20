@@ -561,7 +561,13 @@
 
   function isValidImageSrc(url) {
     const src = String(url || '').trim();
-    return /^https?:\/\//i.test(src) || /^data:image\//i.test(src);
+    if (!src) return false;
+    if (/^https?:\/\//i.test(src)) return true;
+    if (/^data:image\//i.test(src)) return true;
+    if (/^blob:/i.test(src)) return true;
+    if (/^\//.test(src)) return true;
+    if (/^[a-z0-9._\-/]+\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(src)) return true;
+    return false;
   }
 
   function normalizeFile(file) {
