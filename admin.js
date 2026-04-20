@@ -106,6 +106,7 @@ function applyTabVisibilityForRole(role, hasAdminAccess = false) {
   const submissionsTab = document.getElementById('tab-submissions');
   const artworksTab = document.getElementById('tab-artworks');
   const newsTab = document.getElementById('tab-news');
+  const reportsTab = document.getElementById('tab-reports');
   const usersTab = document.getElementById('tab-users');
   const rolesTab = document.getElementById('tab-roles');
   const configTab = document.getElementById('tab-config');
@@ -116,6 +117,7 @@ function applyTabVisibilityForRole(role, hasAdminAccess = false) {
   if (submissionsTab) submissionsTab.classList.remove('hidden');
   if (artworksTab) artworksTab.classList.toggle('hidden', isModOnly);
   if (newsTab) newsTab.classList.toggle('hidden', isModOnly);
+  if (reportsTab) reportsTab.classList.toggle('hidden', isModOnly);
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
   if (usersTab) usersTab.classList.toggle('hidden', !hasAdminAccess);
@@ -241,8 +243,78 @@ function loadTab() {
     else if (activeTab === 'submissions') loadSubmissions(main);
     else if (activeTab === 'artworks') loadArtworks(main);
     else if (activeTab === 'news') loadNewsAdmin(main);
+    else if (activeTab === 'reports') loadReports(main);
     else if (activeTab === 'users') loadUsers(main);
     else if (activeTab === 'roles') loadRolesManager(main);
+  }
+}
+
+async function loadReports(container) {
+  container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading report queues...</p>';
+
+  try {
+    const [commentSnap, dmSnap] = await Promise.all([
+      db.collection('commentReports').orderBy('createdAt', 'desc').limit(200).get(),
+      db.collection('dmReports').orderBy('createdAt', 'desc').limit(200).get()
+    ]);
+
+    const rows = [];
+    commentSnap.docs.forEach(doc => {
+      const data = doc.data() || {};
+      rows.push({
+        id: doc.id,
+        type: 'Comment',
+        reporter: data.reporterName || data.reporterEmail || 'Unknown',
+        reported: data.reportedName || data.reportedEmail || 'Unknown',
+        content: data.reportedContent || '(content unavailable)',
+        reason: data.reason || '',
+        status: data.status || 'open',
+        createdAt: data.createdAt && data.createdAt.seconds ? data.createdAt.seconds : 0
+      });
+    });
+    dmSnap.docs.forEach(doc => {
+      const data = doc.data() || {};
+      rows.push({
+        id: doc.id,
+        type: 'DM',
+        reporter: data.reporterName || data.reporterEmail || 'Unknown',
+        reported: data.reportedName || data.reportedEmail || 'Unknown',
+        content: data.reportedContent || '(content unavailable)',
+        reason: data.reason || '',
+        status: data.status || 'open',
+        createdAt: data.createdAt && data.createdAt.seconds ? data.createdAt.seconds : 0
+      });
+    });
+
+    rows.sort((a, b) => b.createdAt - a.createdAt);
+    if (!rows.length) {
+      container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">No reports filed yet.</p>';
+      return;
+    }
+
+    container.innerHTML = [
+      '<h3 style="margin-bottom:16px">Moderation Reports</h3>',
+      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Review reported comments and direct messages. This segment is admin-only.</p>',
+      '<div style="overflow:auto;border:1px solid var(--blk-m)">',
+      '<table style="width:100%;border-collapse:collapse;font-size:.8rem">',
+      '<thead><tr style="background:rgba(139,0,0,.16)"><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Type</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reporter</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reported User</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reported Content</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reason</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Status</th></tr></thead>',
+      '<tbody>',
+      rows.map(row => {
+        return '<tr>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);white-space:nowrap">' + escapeHtml(row.type) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m)">' + escapeHtml(row.reporter) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m)">' + escapeHtml(row.reported) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);max-width:360px;white-space:normal;word-break:break-word">' + escapeHtml(row.content) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);max-width:240px;white-space:normal;word-break:break-word">' + escapeHtml(row.reason) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);text-transform:uppercase">' + escapeHtml(row.status) + '</td>' +
+        '</tr>';
+      }).join(''),
+      '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  } catch (err) {
+    container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load reports: ' + escapeHtml(err.message) + '</p>';
   }
 }
 

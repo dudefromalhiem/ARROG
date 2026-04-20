@@ -343,6 +343,42 @@ async function reportUser(db, actor, body) {
   return { statusCode: 200, payload: { ok: true } };
 }
 
+async function reportMessage(db, actor, body) {
+  const targetUid = normalizeText(body.targetUid || '', 128);
+  const reason = normalizeText(body.reason || '', 500);
+  const messageId = normalizeText(body.messageId || '', 128);
+  const messageText = normalizeText(body.messageText || '', 1200);
+  if (!targetUid) {
+    return { statusCode: 400, payload: { error: 'Missing target user.' } };
+  }
+  if (!reason) {
+    return { statusCode: 400, payload: { error: 'Report reason cannot be empty.' } };
+  }
+
+  const targetSnap = await db.collection('users').doc(targetUid).get();
+  if (!targetSnap.exists) {
+    return { statusCode: 404, payload: { error: 'Target user not found.' } };
+  }
+
+  const targetData = targetSnap.data() || {};
+  await db.collection('dmReports').add({
+    reporterUid: actor.uid,
+    reporterEmail: actor.email,
+    reporterName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
+    reportedUid: targetUid,
+    reportedEmail: String(targetData.email || ''),
+    reportedName: normalizeText(targetData.displayName || targetData.email || 'Agent', 120),
+    messageId,
+    reportedContent: messageText,
+    reason,
+    status: 'open',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  return { statusCode: 200, payload: { ok: true } };
+}
+
 module.exports = async function handler(req, res) {
   try {
     const app = initAdmin();
@@ -392,6 +428,11 @@ module.exports = async function handler(req, res) {
 
       if (action === 'report') {
         const result = await reportUser(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'reportmessage') {
+        const result = await reportMessage(db, actor, body);
         return sendJson(res, result.statusCode, result.payload);
       }
 

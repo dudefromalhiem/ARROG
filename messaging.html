@@ -34,6 +34,9 @@
     .msg-chat-header { border-bottom: 1px solid var(--blk-m); padding-bottom: 16px; margin-bottom: 16px; }
     .msg-chat-title { font-size: 1.1rem; color: var(--wht-b); font-weight: bold; margin-bottom: 4px; }
     .msg-chat-status { font-size: 0.75rem; color: var(--wht-f); }
+    .msg-chat-actions { display:flex; gap:8px; margin-top:10px; }
+    .msg-chat-action-btn { background: transparent; border:1px solid var(--blk-m); color: var(--wht-d); padding:6px 10px; font-size:.74rem; cursor:pointer; }
+    .msg-chat-action-btn:hover { border-color: var(--red-d); color: var(--wht-b); }
     .msg-chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; padding-right: 8px; }
     .msg-message { display: flex; gap: 12px; max-width: 85%; }
     .msg-message.sent { align-self: flex-end; flex-direction: row-reverse; }
@@ -42,6 +45,7 @@
     .msg-message.sent .msg-message-content { background: rgba(139, 0, 0, 0.15); border-color: var(--red-d); }
     .msg-message-text { color: var(--wht-b); font-size: 0.9rem; line-height: 1.5; }
     .msg-message-time { color: var(--wht-f); font-size: 0.65rem; margin-top: 4px; }
+    .msg-message-report { margin-top: 6px; font-size: .65rem; color: var(--red-b); cursor: pointer; border: 0; background: none; padding: 0; text-transform: uppercase; letter-spacing: .7px; }
     .msg-input-area { display: flex; gap: 8px; border-top: 1px solid var(--blk-m); padding-top: 16px; }
     .msg-input { flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--blk-m); padding: 12px; color: var(--wht-b); border-radius: 2px; font-size: 0.9rem; font-family: var(--font-m); resize: none; max-height: 100px; }
     .msg-input::placeholder { color: var(--wht-f); }
@@ -135,6 +139,9 @@
         <div class="msg-chat-header">
           <div class="msg-chat-title" id="msg-current-name">Select a friend to start messaging</div>
           <div class="msg-chat-status" id="msg-current-status"></div>
+          <div class="msg-chat-actions" id="msg-chat-actions" style="display:none;">
+            <button type="button" class="msg-chat-action-btn" id="msg-block-btn">Block User</button>
+          </div>
         </div>
         <div class="msg-chat-messages" id="msg-messages" aria-live="polite"></div>
         <div class="msg-input-area" id="msg-input-area" style="display: none;">
@@ -367,6 +374,9 @@ function renderMessages() {
       '<div class="msg-message-content">' +
         '<div class="msg-message-text">' + escapeHtml(msg.text || '') + '</div>' +
         '<div class="msg-message-time">' + escapeHtml(formatDateTime(msg.createdAt && msg.createdAt.seconds ? new Date(msg.createdAt.seconds * 1000).toISOString() : msg.createdAt)) + '</div>' +
+        (!isSent
+          ? '<button type="button" class="msg-message-report" data-report-mid="' + escapeHtml(msg.id || '') + '" data-report-suid="' + escapeHtml(msg.senderUid || '') + '" data-report-text="' + escapeHtml(msg.text || '') + '">Report message</button>'
+          : '') +
       '</div>' +
     '</div>';
   }).join('');
@@ -378,6 +388,8 @@ async function openChat(peerUid, peerName) {
   if (!currentPeerUid) return;
   document.getElementById('msg-current-name').textContent = peerName || 'Guild Member';
   document.getElementById('msg-current-status').textContent = 'Connected';
+  const actions = document.getElementById('msg-chat-actions');
+  if (actions) actions.style.display = 'flex';
   document.getElementById('msg-input-area').style.display = 'flex';
   document.getElementById('msg-no-selection').style.display = 'none';
   renderFriends();
@@ -443,6 +455,46 @@ async function sendMessage() {
   }
 }
 
+async function blockCurrentPeer() {
+  if (!currentPeerUid) return;
+  const reason = prompt('Reason for blocking this user (optional):', '');
+  if (reason === null) return;
+  try {
+    await apiPost({ action: 'block', targetUid: currentPeerUid, reason: String(reason || '').trim() });
+    addNotification('User blocked. They can no longer DM you.');
+  } catch (_err) {
+    addNotification('Unable to block user right now.');
+  }
+}
+
+async function reportMessageFromButton(button) {
+  const targetUid = String(button?.getAttribute('data-report-suid') || '').trim();
+  const messageId = String(button?.getAttribute('data-report-mid') || '').trim();
+  const messageText = String(button?.getAttribute('data-report-text') || '').trim();
+  if (!targetUid || !messageId) return;
+
+  const reason = prompt('Reason for reporting this message:', '');
+  if (reason === null) return;
+  const trimmed = String(reason || '').trim();
+  if (!trimmed) {
+    addNotification('Report cancelled.');
+    return;
+  }
+
+  try {
+    await apiPost({
+      action: 'reportmessage',
+      targetUid,
+      messageId,
+      messageText,
+      reason: trimmed
+    });
+    addNotification('Message report submitted.');
+  } catch (_err) {
+    addNotification('Unable to submit message report.');
+  }
+}
+
 async function startRequest(uid, name) {
   await openChat(uid, name);
   const input = document.getElementById('msg-input');
@@ -455,6 +507,7 @@ function bindUiEvents() {
   });
 
   document.getElementById('msg-send-btn')?.addEventListener('click', sendMessage);
+  document.getElementById('msg-block-btn')?.addEventListener('click', blockCurrentPeer);
   document.getElementById('msg-input')?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -471,6 +524,12 @@ function bindUiEvents() {
     const target = event.target.closest('[data-peer-uid]');
     if (!target) return;
     openChat(target.getAttribute('data-peer-uid') || '', target.getAttribute('data-peer-name') || 'Guild Member');
+  });
+
+  document.getElementById('msg-messages')?.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-report-mid]');
+    if (!target) return;
+    reportMessageFromButton(target);
   });
 
   document.getElementById('msg-requests-area')?.addEventListener('click', (event) => {

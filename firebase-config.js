@@ -103,7 +103,7 @@ function renderUserMenuHTML(displayLabel) {
           </select>
         </div>
         <button class="user-menu-item" type="button" role="menuitem" onclick="location.href='messaging.html'; closeUserMenus();">Messages</button>
-        <button class="user-menu-item" type="button" role="menuitem" onclick="changeUsername(); closeUserMenus();">Change Username</button>
+        <button class="user-menu-item" type="button" role="menuitem" onclick="location.href='profile.html'; closeUserMenus();">Profile</button>
         <button class="user-menu-item" type="button" role="menuitem" onclick="auth.signOut(); closeUserMenus();">Log Out</button>
       </div>
     </div>`;
@@ -144,6 +144,7 @@ function normalizeNavIA() {
 
   const submitLi = nav.querySelector('#submit-link');
   const adminLi = nav.querySelector('#admin-link');
+  const messagingLi = nav.querySelector('#messaging-link');
   const authLi = nav.querySelector('#nav-auth');
 
   const primary = [
@@ -163,6 +164,7 @@ function normalizeNavIA() {
     nav.appendChild(li);
   });
 
+  if (messagingLi) nav.appendChild(messagingLi);
   if (submitLi) nav.appendChild(submitLi);
   if (adminLi) nav.appendChild(adminLi);
   if (authLi) nav.appendChild(authLi);
@@ -226,34 +228,33 @@ function ensureBackToTop() {
 }
 
 function bindGlobalNavUX() {
+  const header = document.querySelector('.hdr');
   const nav = document.getElementById('nav');
   const toggle = document.querySelector('.nav-toggle');
-  if (!nav || !toggle) return;
+  if (!header || !nav || !toggle) return;
 
-  const desktopQuery = window.matchMedia('(min-width: 769px)');
-  const collapseKey = 'rog.nav.collapsed';
-  const applyDesktopCollapseState = () => {
-    if (!desktopQuery.matches) {
-      nav.classList.remove('collapsed');
-      return;
-    }
+  const collapseKey = 'rog.nav.band.collapsed';
+  const applyCollapseState = () => {
     const collapsed = localStorage.getItem(collapseKey) === '1';
-    nav.classList.toggle('collapsed', collapsed);
+    header.classList.toggle('is-collapsed', collapsed);
+    if (collapsed) nav.classList.remove('open');
     toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   };
 
-  toggle.setAttribute('aria-label', 'Toggle navigation');
-  toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
+  toggle.removeAttribute('onclick');
+  toggle.textContent = '';
+  toggle.setAttribute('aria-label', 'Collapse or expand navigation band');
+  toggle.setAttribute('aria-expanded', header.classList.contains('is-collapsed') ? 'false' : 'true');
   toggle.setAttribute('aria-controls', 'nav');
 
-  toggle.addEventListener('click', () => {
-    if (desktopQuery.matches) {
-      const nextCollapsed = !nav.classList.contains('collapsed');
-      nav.classList.toggle('collapsed', nextCollapsed);
-      localStorage.setItem(collapseKey, nextCollapsed ? '1' : '0');
-      nav.classList.remove('open');
-      toggle.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
-    }
+  toggle.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextCollapsed = !header.classList.contains('is-collapsed');
+    header.classList.toggle('is-collapsed', nextCollapsed);
+    localStorage.setItem(collapseKey, nextCollapsed ? '1' : '0');
+    if (nextCollapsed) nav.classList.remove('open');
+    toggle.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
   });
 
   nav.addEventListener('click', e => {
@@ -274,16 +275,11 @@ function bindGlobalNavUX() {
   });
 
   const observer = new MutationObserver(() => {
-    if (desktopQuery.matches) {
-      toggle.setAttribute('aria-expanded', nav.classList.contains('collapsed') ? 'false' : 'true');
-    } else {
-      toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
-    }
+    toggle.setAttribute('aria-expanded', header.classList.contains('is-collapsed') ? 'false' : 'true');
   });
-  observer.observe(nav, { attributes: true, attributeFilter: ['class'] });
+  observer.observe(header, { attributes: true, attributeFilter: ['class'] });
 
-  desktopQuery.addEventListener('change', applyDesktopCollapseState);
-  applyDesktopCollapseState();
+  applyCollapseState();
 }
 
 function initializeGlobalUX() {

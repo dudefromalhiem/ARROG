@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile - Red Oaker Guild</title>
+  <meta name="description" content="Manage your Red Oaker Guild profile." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .profile-shell { max-width: 840px; margin: 0 auto; }
+    .profile-grid { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+    .profile-card { border:1px solid var(--blk-m); background:var(--blk-b); padding:14px; }
+    .profile-avatar { width: 180px; height: 180px; border-radius: 50%; object-fit: cover; border:2px solid var(--red-d); background:#111; display:block; margin: 8px auto; }
+    .profile-warning { border:1px solid var(--red-g); background: rgba(139,0,0,.12); color: var(--wht); font-weight: 700; padding: 10px 12px; margin-bottom: 12px; }
+    .profile-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .profile-status { font-size:.8rem; color:var(--wht-f); margin-top:8px; }
+    @media (max-width: 880px) { .profile-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap profile-shell" id="main-content">
+  <div class="section">
+    <div class="section-hd">Profile</div>
+    <div class="profile-warning">Any user with inappropriate profile images will be banned.</div>
+
+    <div class="profile-grid">
+      <div class="profile-card">
+        <div class="card-t">Profile Picture</div>
+        <img id="profile-avatar" class="profile-avatar" src="logo.png" alt="Profile picture" loading="lazy" decoding="async" />
+        <div class="fg">
+          <label class="fl" for="profile-picture">Upload picture</label>
+          <input class="fi" id="profile-picture" type="file" accept="image/*" />
+        </div>
+        <div class="profile-actions">
+          <button class="btn btn-p" id="profile-upload-btn" type="button">Upload</button>
+        </div>
+      </div>
+
+      <div class="profile-card">
+        <div class="card-t">Identity</div>
+        <div class="fg">
+          <label class="fl" for="profile-username">Username</label>
+          <input class="fi" id="profile-username" maxlength="80" placeholder="Enter a username" />
+        </div>
+        <div class="fg">
+          <label class="fl" for="profile-bio">Bio</label>
+          <textarea class="fta" id="profile-bio" maxlength="500" placeholder="Write a short bio"></textarea>
+        </div>
+        <div class="profile-actions">
+          <button class="btn btn-p" id="profile-save-btn" type="button">Save Profile</button>
+          <a class="btn btn-s" href="index.html">Back Home</a>
+        </div>
+        <div class="profile-status" id="profile-status">Sign in to update your profile.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="ftr">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+function setProfileStatus(message, isError) {
+  const el = document.getElementById('profile-status');
+  if (!el) return;
+  el.textContent = message;
+  el.style.color = isError ? 'var(--red-g)' : 'var(--wht-f)';
+}
+
+function safeProfileText(value, max) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function bytesFromDataUrl(dataUrl) {
+  const parts = String(dataUrl || '').split(',');
+  if (parts.length < 2) return 0;
+  const base64 = parts[1];
+  const padding = (base64.match(/=+$/) || [''])[0].length;
+  return Math.floor((base64.length * 3) / 4) - padding;
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not decode image.'));
+    img.src = url;
+  });
+}
+
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function optimizeProfileImage(file) {
+  const original = await fileToDataUrl(file);
+  const image = await loadImage(original);
+
+  let width = image.naturalWidth || image.width;
+  let height = image.naturalHeight || image.height;
+  const scale = Math.min(1, 512 / Math.max(width, height));
+  width = Math.max(1, Math.floor(width * scale));
+  height = Math.max(1, Math.floor(height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not initialize image pipeline.');
+
+  ctx.drawImage(image, 0, 0, width, height);
+  let quality = 0.84;
+  let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+  while (bytesFromDataUrl(dataUrl) > 230 * 1024 && quality > 0.48) {
+    quality -= 0.08;
+    dataUrl = canvas.toDataURL('image/jpeg', quality);
+  }
+
+  if (bytesFromDataUrl(dataUrl) > 230 * 1024) {
+    throw new Error('Image is too large after optimization. Use a smaller image.');
+  }
+
+  return dataUrl;
+}
+
+async function loadProfile(user) {
+  const username = document.getElementById('profile-username');
+  const bio = document.getElementById('profile-bio');
+  const avatar = document.getElementById('profile-avatar');
+  if (!username || !bio || !avatar) return;
+
+  try {
+    const doc = await db.collection('users').doc(user.uid).get();
+    const data = doc.exists ? (doc.data() || {}) : {};
+    username.value = data.displayName || user.displayName || '';
+    bio.value = data.bio || '';
+    avatar.src = data.photoURL || user.photoURL || 'logo.png';
+    setProfileStatus('Profile loaded.', false);
+  } catch (err) {
+    setProfileStatus('Could not load profile: ' + err.message, true);
+  }
+}
+
+async function saveProfile() {
+  const user = auth.currentUser;
+  if (!user) {
+    setProfileStatus('Please sign in first.', true);
+    return;
+  }
+
+  const username = safeProfileText(document.getElementById('profile-username')?.value || '', 80);
+  const bio = safeProfileText(document.getElementById('profile-bio')?.value || '', 500);
+  if (!username) {
+    setProfileStatus('Username cannot be empty.', true);
+    return;
+  }
+
+  try {
+    setProfileStatus('Saving profile...', false);
+    await user.updateProfile({ displayName: username });
+    await db.collection('users').doc(user.uid).set({
+      uid: user.uid,
+      email: user.email || '',
+      displayName: username,
+      bio: bio,
+      updatedAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
+    }, { merge: true });
+    setProfileStatus('Profile saved.', false);
+  } catch (err) {
+    setProfileStatus('Save failed: ' + err.message, true);
+  }
+}
+
+async function uploadProfilePicture() {
+  const user = auth.currentUser;
+  if (!user) {
+    setProfileStatus('Please sign in first.', true);
+    return;
+  }
+
+  const picker = document.getElementById('profile-picture');
+  const file = picker && picker.files && picker.files[0] ? picker.files[0] : null;
+  if (!file) {
+    setProfileStatus('Select an image first.', true);
+    return;
+  }
+
+  try {
+    setProfileStatus('Uploading profile picture...', false);
+    const optimized = await optimizeProfileImage(file);
+    let photoURL = optimized;
+
+    if (storage && typeof storage.ref === 'function') {
+      const path = 'uploads/' + user.uid + '/profile/avatar.jpg';
+      const ref = storage.ref(path);
+      await ref.putString(optimized, 'data_url', { contentType: 'image/jpeg' });
+      photoURL = await ref.getDownloadURL();
+    }
+
+    await user.updateProfile({ photoURL: photoURL });
+    await db.collection('users').doc(user.uid).set({
+      photoURL: photoURL,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    const avatar = document.getElementById('profile-avatar');
+    if (avatar) avatar.src = photoURL;
+    setProfileStatus('Profile picture updated.', false);
+  } catch (err) {
+    setProfileStatus('Upload failed: ' + err.message, true);
+  }
+}
+
+auth.onAuthStateChanged(async user => {
+  const navAuth = document.getElementById('nav-auth');
+  const submitLink = document.getElementById('submit-link');
+  const adminLink = document.getElementById('admin-link');
+
+  if (!user) {
+    navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    if (submitLink) submitLink.classList.add('hidden');
+    if (adminLink) adminLink.classList.add('hidden');
+    setProfileStatus('Please sign in to edit your profile.', true);
+    return;
+  }
+
+  navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
+  if (submitLink) submitLink.classList.remove('hidden');
+  if (adminLink) adminLink.classList.toggle('hidden', !isAdmin(user.email));
+  await loadProfile(user);
+});
+
+document.getElementById('profile-save-btn')?.addEventListener('click', saveProfile);
+document.getElementById('profile-upload-btn')?.addEventListener('click', uploadProfilePicture);
+</script>
+</body>
+</html>

@@ -83,6 +83,16 @@ async function verifyUser(req) {
   };
 }
 
+async function verifyUserIfPresent(req) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+  try {
+    return await verifyUser(req);
+  } catch (_err) {
+    return null;
+  }
+}
+
 const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem@gmail.com']);
 
 async function isAdminUser(db, uid, email) {
@@ -145,6 +155,10 @@ async function storeCommentReport(db, actor, body) {
     reporterUid: actor.uid,
     reporterEmail: actor.email,
     reporterName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
+    reportedUid: String(commentData.authorUid || ''),
+    reportedEmail: String(commentData.authorEmail || ''),
+    reportedName: normalizeText(commentData.authorName || commentData.authorEmail || 'Agent', 120),
+    reportedContent: normalizeText(commentData.content || '', 1200),
     status: 'open',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -156,7 +170,7 @@ async function storeCommentReport(db, actor, body) {
   return { statusCode: 200, payload: { ok: true, reportCount: reportsSnap.size } };
 }
 
-async function listComments(db, pageId, slug) {
+async function listComments(db, pageId, slug, actor) {
   let query = db.collection('comments');
   if (pageId) {
     query = query.where('pageId', '==', pageId);
@@ -165,7 +179,16 @@ async function listComments(db, pageId, slug) {
   }
 
   const snap = await query.limit(300).get();
-  const comments = snap.docs.map(doc => ({ id: doc.id, data: toPlainValue(doc.data()) }));
+  let comments = snap.docs.map(doc => ({ id: doc.id, data: toPlainValue(doc.data()) }));
+
+  if (actor && actor.uid) {
+    const blocksSnap = await db.collection('blocks').where('blockerUid', '==', actor.uid).limit(500).get();
+    const blockedUids = new Set(blocksSnap.docs.map(d => String((d.data() || {}).targetUid || '')).filter(Boolean));
+    if (blockedUids.size) {
+      comments = comments.filter(entry => !blockedUids.has(String(entry?.data?.authorUid || '')));
+    }
+  }
+
   comments.sort((a, b) => {
     const sa = Number(a && a.data && a.data.createdAt && a.data.createdAt.seconds || 0);
     const sb = Number(b && b.data && b.data.createdAt && b.data.createdAt.seconds || 0);
@@ -187,7 +210,8 @@ module.exports = async function handler(req, res) {
         return sendJson(res, 400, { error: 'Missing page reference.' });
       }
 
-      const comments = await listComments(db, pageId, slug);
+      const actor = await verifyUserIfPresent(req);
+      const comments = await listComments(db, pageId, slug, actor);
       return sendJson(res, 200, { comments });
     }
 

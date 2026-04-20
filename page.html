@@ -14,10 +14,16 @@
     .comments-status { font-size: .78rem; color: var(--wht-f); }
     .comment-compose { border: 1px solid var(--blk-m); background: var(--blk-b); padding: 12px; margin-bottom: 12px; }
     .comment-compose textarea { min-height: 88px; }
+    .comment-toolbar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+    .comment-toolbar button { padding:4px 8px; font-size:.72rem; line-height:1.2; }
     .comment-list { display:grid; gap:10px; }
     .comment-item { border:1px solid var(--blk-m); background: var(--blk-b); padding:10px; }
     .comment-meta { font-size:.72rem; color: var(--wht-f); display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
-    .comment-content { font-size:.9rem; color: var(--wht-m); line-height:1.65; white-space: pre-wrap; }
+    .comment-content { font-size:.9rem; color: var(--wht-m); line-height:1.65; white-space: normal; }
+    .comment-content .comment-spoiler { display:inline-block; background:#141414; color:transparent; border:1px solid var(--red-d); padding:0 6px; cursor:pointer; user-select:none; }
+    .comment-content .comment-spoiler::after { content:'Spoiler'; color:var(--red-b); letter-spacing:.6px; text-transform:uppercase; font-size:.66rem; }
+    .comment-content .comment-spoiler.revealed { color:var(--wht-m); }
+    .comment-content .comment-spoiler.revealed::after { content:''; }
     .comment-actions { margin-top:8px; }
     .comment-media { display:grid; gap:10px; margin-top:10px; }
     .comment-media-item { display:block; border:1px solid var(--blk-m); background: rgba(255,255,255,0.02); padding:8px; text-decoration:none; color: var(--wht-m); }
@@ -131,6 +137,13 @@ render.mount('archive-viewer');</pre>
     <div class="comment-compose" id="comment-compose">
       <div class="fg" style="margin-bottom:8px">
         <label class="fl" for="comment-input">Leave a comment</label>
+        <div class="comment-toolbar" id="comment-toolbar">
+          <button class="btn btn-sm btn-s" type="button" data-tag="b">Bold</button>
+          <button class="btn btn-sm btn-s" type="button" data-tag="i">Italic</button>
+          <button class="btn btn-sm btn-s" type="button" data-tag="u">Underline</button>
+          <button class="btn btn-sm btn-s" type="button" data-tag="s">Strike</button>
+          <button class="btn btn-sm btn-s" type="button" data-tag="spoiler">Spoiler</button>
+        </div>
         <textarea class="fta" id="comment-input" maxlength="1200" placeholder="Sign in to comment on this page."></textarea>
       </div>
       <div class="fg" style="margin-bottom:8px">
@@ -436,6 +449,14 @@ function bindCommentComposerEvents() {
   if (cancelBtn) cancelBtn.addEventListener('click', closeCommentReportPanel);
   const mediaInput = document.getElementById('comment-media');
   if (mediaInput) mediaInput.addEventListener('change', updateCommentMediaSelection);
+  const toolbar = document.getElementById('comment-toolbar');
+  if (toolbar) {
+    toolbar.addEventListener('click', (event) => {
+      const target = event.target && event.target.closest ? event.target.closest('[data-tag]') : null;
+      if (!target) return;
+      applyCommentTag(target.getAttribute('data-tag') || '');
+    });
+  }
 }
 
 function bindCommunityEvents() {
@@ -488,6 +509,40 @@ function escapeCommentHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function wrapSelectedText(input, openTag, closeTag) {
+  if (!input) return;
+  const start = Number(input.selectionStart || 0);
+  const end = Number(input.selectionEnd || 0);
+  const original = String(input.value || '');
+  const selected = original.slice(start, end) || 'text';
+  input.value = original.slice(0, start) + openTag + selected + closeTag + original.slice(end);
+  const nextPos = start + openTag.length + selected.length + closeTag.length;
+  input.focus();
+  input.setSelectionRange(nextPos, nextPos);
+}
+
+function applyCommentTag(tag) {
+  const input = document.getElementById('comment-input');
+  const normalized = String(tag || '').toLowerCase();
+  if (!input || !normalized) return;
+  if (normalized === 'b') wrapSelectedText(input, '[b]', '[/b]');
+  else if (normalized === 'i') wrapSelectedText(input, '[i]', '[/i]');
+  else if (normalized === 'u') wrapSelectedText(input, '[u]', '[/u]');
+  else if (normalized === 's') wrapSelectedText(input, '[s]', '[/s]');
+  else if (normalized === 'spoiler') wrapSelectedText(input, '[spoiler]', '[/spoiler]');
+}
+
+function renderCommentRichText(value) {
+  let html = escapeCommentHtml(value || '');
+  html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>');
+  html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>');
+  html = html.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '<u>$1</u>');
+  html = html.replace(/\[s\]([\s\S]*?)\[\/s\]/gi, '<s>$1</s>');
+  html = html.replace(/\[spoiler\]([\s\S]*?)\[\/spoiler\]/gi, '<span class="comment-spoiler" role="button" tabindex="0" onclick="this.classList.add(\'revealed\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.classList.add(\'revealed\');}">$1</span>');
+  html = html.replace(/\n/g, '<br />');
+  return html;
 }
 
 function canDeleteComment(comment) {
@@ -685,7 +740,7 @@ function renderComments() {
         '<span>' + escapeCommentHtml(formatCommentDate(c.createdAt)) + '</span>' +
         editedIndicator +
       '</div>' +
-      '<div class="comment-content">' + escapeCommentHtml(c.content || '') + '</div>' +
+      '<div class="comment-content">' + renderCommentRichText(c.content || '') + '</div>' +
       renderCommentMedia(c.media || []) +
       '<div class="comment-actions">' +
         (editable
@@ -714,6 +769,17 @@ async function getCommentsAuthHeaders() {
   };
 }
 
+async function getOptionalCommentsAuthHeaders() {
+  const user = auth.currentUser;
+  if (!user) return {};
+  try {
+    const token = await user.getIdToken();
+    return { Authorization: 'Bearer ' + token };
+  } catch (_err) {
+    return {};
+  }
+}
+
 async function loadCommentsForCurrentPage() {
   const status = document.getElementById('comments-status');
   const pageRef = getCommentsPageRef();
@@ -729,7 +795,10 @@ async function loadCommentsForCurrentPage() {
     : ('?slug=' + encodeURIComponent(pageRef.slug));
 
   try {
-    const response = await fetch(commentsApiBase + query, { method: 'GET' });
+    const response = await fetch(commentsApiBase + query, {
+      method: 'GET',
+      headers: await getOptionalCommentsAuthHeaders()
+    });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Could not load comments.');
     currentComments = Array.isArray(data.comments)
