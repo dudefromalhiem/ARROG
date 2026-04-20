@@ -586,6 +586,26 @@ const FALLBACK_NEWEST = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.slice().rev
   htmlContent: p.htmlContent,
   updatedAt: new Date().toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 })) : [];
+const HOME_CACHE_PREFIX = 'rog.home.cache.';
+const HOME_CACHE_TTL_MS = 3 * 60 * 1000;
+
+function getCachedHomeData(key) {
+  try {
+    const raw = sessionStorage.getItem(HOME_CACHE_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.ts || (Date.now() - parsed.ts) > HOME_CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function setCachedHomeData(key, data) {
+  try {
+    sessionStorage.setItem(HOME_CACHE_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data }));
+  } catch (_err) { }
+}
 
 // ═════════════════════════════════════════════════════════════
 // RENDER FUNCTIONS
@@ -769,32 +789,68 @@ function loadData() {
   initCarousel(FALLBACK_ART);
   renderNewest(FALLBACK_NEWEST);
 
+  const cachedFeatured = getCachedHomeData('featured');
+  if (Array.isArray(cachedFeatured) && cachedFeatured.length) renderFeatured(cachedFeatured);
+  const cachedNews = getCachedHomeData('news');
+  if (Array.isArray(cachedNews) && cachedNews.length) renderNews(cachedNews);
+  const cachedRoster = getCachedHomeData('roster');
+  if (Array.isArray(cachedRoster) && cachedRoster.length) renderAdminRoster(cachedRoster);
+  const cachedArt = getCachedHomeData('art');
+  if (Array.isArray(cachedArt) && cachedArt.length) initCarousel(cachedArt);
+  const cachedNewest = getCachedHomeData('newest');
+  if (Array.isArray(cachedNewest) && cachedNewest.length) renderNewest(cachedNewest);
+
   // Then try to overlay with live Firestore data (non-blocking)
   try {
     db.collection('pages').where('featured', '==', true).orderBy('createdAt', 'desc').limit(4).get()
       .then(function (snap) {
         if (!snap.empty) {
-          renderFeatured(snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }));
+          const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+          renderFeatured(rows);
+          setCachedHomeData('featured', rows);
           return;
         }
       })
       .catch(function (_e) { });
 
     db.collection('news').orderBy('date', 'desc').limit(10).get()
-      .then(function (snap) { if (!snap.empty) renderNews(snap.docs.map(function (d) { return d.data(); })); })
+      .then(function (snap) {
+        if (!snap.empty) {
+          const rows = snap.docs.map(function (d) { return d.data(); });
+          renderNews(rows);
+          setCachedHomeData('news', rows);
+        }
+      })
       .catch(function (_e) { });
 
     fetch('/api/social?type=admins')
       .then(function (response) { return response.ok ? response.json() : Promise.reject(new Error('Roster unavailable.')); })
-      .then(function (data) { if (Array.isArray(data.admins)) renderAdminRoster(data.admins); })
+      .then(function (data) {
+        if (Array.isArray(data.admins)) {
+          renderAdminRoster(data.admins);
+          setCachedHomeData('roster', data.admins);
+        }
+      })
       .catch(function (_e) { renderAdminRoster([]); });
 
     db.collection('artworks').where('displayInSpotlight', '==', true).get()
-      .then(function (snap) { if (!snap.empty) initCarousel(snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })); })
+      .then(function (snap) {
+        if (!snap.empty) {
+          const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+          initCarousel(rows);
+          setCachedHomeData('art', rows);
+        }
+      })
       .catch(function (_e) { });
 
     db.collection('pages').orderBy('createdAt', 'desc').limit(5).get()
-      .then(function (snap) { if (!snap.empty) renderNewest(snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })); })
+      .then(function (snap) {
+        if (!snap.empty) {
+          const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+          renderNewest(rows);
+          setCachedHomeData('newest', rows);
+        }
+      })
       .catch(function (_e) { });
   } catch (_e) { /* Firestore not configured — fallbacks already rendered */ }
 }
@@ -813,12 +869,6 @@ function bootApp() {
   else skipTerminal();
   auth.onAuthStateChanged(updateAuthUI);
   loadData();
-  
-  // Scroll to top button functionality
-  window.addEventListener('scroll', () => {
-    const btn = document.getElementById('scroll-to-top');
-    if (btn) btn.style.display = window.scrollY > 300 ? 'block' : 'none';
-  });
 }
 
 if (document.readyState === 'loading') {

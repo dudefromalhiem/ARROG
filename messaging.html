@@ -177,6 +177,7 @@ let threadMessages = [];
 let notifications = [];
 let previousThreadTimestamps = new Map();
 let pollingTimer = null;
+let pollIntervalMs = 12000;
 
 function escapeHtml(text) {
   return String(text == null ? '' : text)
@@ -519,11 +520,19 @@ async function bootstrapMessaging() {
 
     if (pollingTimer) clearInterval(pollingTimer);
     pollingTimer = setInterval(async () => {
+      if (document.hidden) return;
       await refreshInbox();
       if (currentPeerUid) await loadMessages();
-    }, 6000);
+    }, pollIntervalMs);
   });
 }
+
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden && currentUser) {
+    await refreshInbox();
+    if (currentPeerUid) await loadMessages();
+  }
+});
 
 bootstrapMessaging().catch(() => {
   addNotification('Unable to initialize messaging.');

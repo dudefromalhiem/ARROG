@@ -164,6 +164,8 @@
 <script>
   let universeData = { Anomaly: [], Tale: [], Artwork: [], Lore: [] };
   let universeSearchTimer = null;
+  const UNIVERSE_CACHE_KEY = 'rog.explore.cache.v1';
+  const UNIVERSE_CACHE_TTL_MS = 3 * 60 * 1000;
 
   function escapeHtml(value) {
     const text = String(value == null ? '' : value);
@@ -227,10 +229,32 @@
     renderGridSkeleton('grid-art');
     renderGridSkeleton('grid-history');
 
+    try {
+      const cachedRaw = sessionStorage.getItem(UNIVERSE_CACHE_KEY);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached && cached.ts && (Date.now() - cached.ts) < UNIVERSE_CACHE_TTL_MS && cached.data) {
+          universeData = cached.data;
+          seedSearchSuggestions();
+          renderAll();
+        }
+      }
+    } catch (_cacheErr) { }
+
+    const seenByType = {
+      Anomaly: new Set(),
+      Tale: new Set(),
+      Artwork: new Set(),
+      Lore: new Set()
+    };
+
     // Load from PAGE_SEED first so the universe remains visible even before Firestore migration
     if (typeof PAGE_SEED !== 'undefined') {
       PAGE_SEED.forEach(p => {
         if (!universeData[p.type]) return;
+        const key = String(p.slug || p.title || '').toLowerCase();
+        if (key && seenByType[p.type] && seenByType[p.type].has(key)) return;
+        if (key && seenByType[p.type]) seenByType[p.type].add(key);
         universeData[p.type].push({
           id: p.slug || p.title,
           slug: p.slug,
@@ -245,12 +269,14 @@
     // Load from Firestore
     try {
       if (!db || typeof db.collection !== 'function') throw new Error('Firestore unavailable');
-      const snap = await db.collection('pages').get();
+      const snap = await db.collection('pages').where('approvalStatus', '==', 'approved').limit(300).get();
       snap.docs.forEach(doc => {
         const d = doc.data();
         const normalizedType = String(d.type || '').trim() === 'Lore' ? 'Lore' : d.type;
         if (!universeData[normalizedType]) return;
-        if (universeData[normalizedType].some(u => u.slug === d.slug)) return;
+        const key = String(d.slug || d.title || doc.id || '').toLowerCase();
+        if (key && seenByType[normalizedType].has(key)) return;
+        if (key) seenByType[normalizedType].add(key);
         
         const displayExcerpt = d.type === 'Anomaly' && d.anomalyDescription 
           ? d.anomalyDescription 
@@ -271,11 +297,13 @@
 
     try {
       if (!db || typeof db.collection !== 'function') throw new Error('Firestore unavailable');
-      const loreSnap = await db.collection('loreIndex').get();
+      const loreSnap = await db.collection('loreIndex').limit(250).get();
       loreSnap.docs.forEach(doc => {
         const d = doc.data() || {};
         const slug = String(d.slug || '').trim();
-        if (slug && universeData.Lore.some(item => item.slug === slug)) return;
+        const key = String(slug || d.title || doc.id || '').toLowerCase();
+        if (key && seenByType.Lore.has(key)) return;
+        if (key) seenByType.Lore.add(key);
         universeData.Lore.push({
           id: d.pageId || doc.id,
           slug: slug,
@@ -288,6 +316,10 @@
     } catch (_err) {
       // Optional index fetch.
     }
+
+    try {
+      sessionStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: universeData }));
+    } catch (_cacheWriteErr) { }
 
     seedSearchSuggestions();
     renderAll();

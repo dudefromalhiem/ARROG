@@ -117,8 +117,8 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .tag{display:inline-block;padding:2px 8px;font-size:.7rem;font-family:var(--font-m);text-transform:uppercase;letter-spacing:1px;border:1px solid var(--red-d);color:var(--red-b);margin-right:4px;margin-bottom:4px}
 
 /* Header */
-.hdr{border-bottom:2px solid var(--red);padding:16px 0;background:var(--blk-s);position:sticky;top:0;z-index:100}
-.hdr-in{max-width:none;margin:0;padding:0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));display:flex;align-items:center;justify-content:space-between;width:100%}
+.hdr{border-bottom:1px solid rgba(139,0,0,.45);padding:10px 0;background:linear-gradient(180deg,rgba(12,12,12,.96),rgba(8,8,8,.92));position:sticky;top:0;z-index:220;backdrop-filter:blur(8px);box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.hdr-in{max-width:1280px;margin:0 auto;padding:0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));display:flex;align-items:center;justify-content:space-between;width:100%}
 .hdr-brand{display:flex;align-items:center;gap:16px;text-decoration:none}
 .hdr-logo{width:48px;height:48px;border-radius:50%;border:2px solid var(--red);object-fit:cover}
 .hdr-title{font-family:var(--font-d);font-size:1.2rem;color:var(--red-b);text-transform:uppercase;letter-spacing:3px}
@@ -127,7 +127,8 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .nav a:hover,.nav a.active{color:var(--red-b);border-bottom-color:var(--red-b);text-decoration:none}
 .nav-btn{font-family:var(--font-m);font-size:.68rem;padding:7px 12px;border:1px solid var(--red-d);background:transparent;color:var(--red-b);cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:all var(--tr);min-height:36px}
 .nav-btn:hover{background:var(--red);color:var(--wht)}
-.nav-toggle{display:none;background:none;border:none;color:var(--red-b);font-size:1.5rem;cursor:pointer;min-height:44px;min-width:44px}
+.nav-toggle{display:block;background:rgba(255,255,255,.02);border:1px solid var(--red-d);color:var(--red-b);font-size:1.15rem;cursor:pointer;min-height:42px;min-width:42px;border-radius:8px;transition:all var(--tr)}
+.nav-toggle:hover{background:rgba(139,0,0,.15);border-color:var(--red-b);color:var(--wht)}
 .user-menu{position:relative;display:inline-block}
 .user-menu-trigger{display:inline-flex;align-items:center;gap:6px}
 .user-menu-caret{font-size:.65rem;line-height:1;opacity:.8}
@@ -139,13 +140,13 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .user-menu-item{display:block;width:100%;padding:10px 12px;background:transparent;border:1px solid transparent;color:var(--wht-d);font-family:var(--font-m);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;text-align:left;cursor:pointer;transition:all var(--tr)}
 .user-menu-item:hover{background:var(--red);color:var(--wht);border-color:var(--red)}
 @media(min-width:769px){
-  .nav{flex:1;justify-content:flex-end;margin-left:22px;gap:20px}
+  .nav{flex:1;justify-content:flex-end;margin-left:22px;gap:20px;max-height:80px;overflow:hidden;opacity:1;transition:max-height .22s ease,opacity .22s ease,margin .22s ease}
+  .nav.collapsed{max-height:0;opacity:0;margin-left:0;pointer-events:none}
   .nav li{display:flex;justify-content:flex-end;flex:0 0 auto;min-width:0}
   .nav a{text-align:center}
   #nav-auth{justify-content:flex-end;flex:0 0 auto}
 }
 @media(max-width:768px){
-  .nav-toggle{display:block}
   .nav{display:none;position:absolute;top:100%;left:0;width:100%;background:var(--blk-s);flex-direction:column;padding:16px;border-bottom:2px solid var(--red);box-shadow:0 10px 26px rgba(0,0,0,.45)}
   .nav li{width:100%}
   .nav a,.nav-btn{display:block;width:100%;text-align:left}

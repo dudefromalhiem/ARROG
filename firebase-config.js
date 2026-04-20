@@ -102,6 +102,7 @@ function renderUserMenuHTML(displayLabel) {
             <option value="off">Off</option>
           </select>
         </div>
+        <button class="user-menu-item" type="button" role="menuitem" onclick="location.href='messaging.html'; closeUserMenus();">Messages</button>
         <button class="user-menu-item" type="button" role="menuitem" onclick="changeUsername(); closeUserMenus();">Change Username</button>
         <button class="user-menu-item" type="button" role="menuitem" onclick="auth.signOut(); closeUserMenus();">Log Out</button>
       </div>
@@ -146,6 +147,7 @@ function normalizeNavIA() {
   const authLi = nav.querySelector('#nav-auth');
 
   const primary = [
+    { href: 'index.html', label: 'Home' },
     { href: 'explore.html', label: 'Explore' },
     { href: 'registry.html', label: 'Registry' },
     { href: 'guide.html', label: 'Guide' }
@@ -228,9 +230,31 @@ function bindGlobalNavUX() {
   const toggle = document.querySelector('.nav-toggle');
   if (!nav || !toggle) return;
 
+  const desktopQuery = window.matchMedia('(min-width: 769px)');
+  const collapseKey = 'rog.nav.collapsed';
+  const applyDesktopCollapseState = () => {
+    if (!desktopQuery.matches) {
+      nav.classList.remove('collapsed');
+      return;
+    }
+    const collapsed = localStorage.getItem(collapseKey) === '1';
+    nav.classList.toggle('collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  };
+
   toggle.setAttribute('aria-label', 'Toggle navigation');
   toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
   toggle.setAttribute('aria-controls', 'nav');
+
+  toggle.addEventListener('click', () => {
+    if (desktopQuery.matches) {
+      const nextCollapsed = !nav.classList.contains('collapsed');
+      nav.classList.toggle('collapsed', nextCollapsed);
+      localStorage.setItem(collapseKey, nextCollapsed ? '1' : '0');
+      nav.classList.remove('open');
+      toggle.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
+    }
+  });
 
   nav.addEventListener('click', e => {
     const target = e.target;
@@ -250,9 +274,16 @@ function bindGlobalNavUX() {
   });
 
   const observer = new MutationObserver(() => {
-    toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
+    if (desktopQuery.matches) {
+      toggle.setAttribute('aria-expanded', nav.classList.contains('collapsed') ? 'false' : 'true');
+    } else {
+      toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
+    }
   });
   observer.observe(nav, { attributes: true, attributeFilter: ['class'] });
+
+  desktopQuery.addEventListener('change', applyDesktopCollapseState);
+  applyDesktopCollapseState();
 }
 
 function initializeGlobalUX() {
