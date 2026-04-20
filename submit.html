@@ -176,6 +176,48 @@
       color:var(--wht-f);
       padding:4px;
     }
+    .guidebook {
+      border: 1px solid var(--red-d);
+      background: linear-gradient(180deg, rgba(139,0,0,.08), rgba(0,0,0,.25));
+      padding: 18px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    .guidebook h2 {
+      font-family: var(--font-h);
+      font-size: 1.1rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      color: var(--wht);
+    }
+    .guidebook-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .guidebook-card {
+      border: 1px solid var(--blk-m);
+      background: rgba(0,0,0,.25);
+      padding: 12px;
+      border-radius: 4px;
+    }
+    .guidebook-card h3 {
+      font-size: .9rem;
+      margin-bottom: 8px;
+      color: var(--wht);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .guidebook-card p, .guidebook-card li {
+      font-size: .8rem;
+      line-height: 1.7;
+      color: var(--wht-m);
+    }
+    .guidebook-card ul {
+      margin: 0;
+      padding-left: 18px;
+    }
     @media (max-width: 760px) {
       .doc-grid-2 { grid-template-columns:1fr; }
       .file-grid { grid-template-columns:1fr; }
@@ -212,7 +254,7 @@
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
-      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Workshop</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
     </ul>
@@ -229,7 +271,7 @@
       Verifying credentials with the Guild central server.
     </p>
     <pre class="load-monocode" aria-hidden="true">// ROG SUBMISSION LINK
-const session = await gateway.open('workstation');
+  const session = await gateway.open('workshop');
 const profile = await session.identify(agentFingerprint);
 const role = acl.resolve(profile.email);
 const clearance = level.map(role);
@@ -265,10 +307,74 @@ render.mount('submission-terminal');</pre>
   <!-- Create Panel (hidden until auth) -->
   <div class="hidden" id="submit-panel">
 
+    <section class="guidebook" aria-labelledby="guidebook-title">
+      <h2 id="guidebook-title">Workshop Guidebook</h2>
+      <div class="guidebook-grid">
+        <div class="guidebook-card">
+          <h3>What this page does</h3>
+          <p>Use this workshop to create a new page, update an existing page, or save a draft for later.</p>
+          <p>Choose a file type first, then fill in the title, page name, tags, and content.</p>
+        </div>
+        <div class="guidebook-card">
+          <h3>How the page link works</h3>
+          <p>The page link is the short address that appears after <span style="color:var(--red-b)">/pages/</span>.</p>
+          <p>If you leave it blank, the workshop creates one from your title automatically.</p>
+        </div>
+        <div class="guidebook-card">
+          <h3>Choosing a page type</h3>
+          <ul>
+            <li><strong>Template Builder</strong>: easiest option for standard pages.</li>
+            <li><strong>Document Studio</strong>: drag and arrange blocks like a document.</li>
+            <li><strong>Code Editor</strong>: write your own HTML and CSS.</li>
+          </ul>
+        </div>
+        <div class="guidebook-card">
+          <h3>Before you publish</h3>
+          <ul>
+            <li>Make sure the title is clear and matches the page content.</li>
+            <li>Add images, audio, or video where needed.</li>
+            <li>Use drafts if you are not ready to publish yet.</li>
+          </ul>
+        </div>
+        <div class="guidebook-card">
+          <h3>Editing an existing page</h3>
+          <ul>
+            <li>Open the page from the admin area or a linked page card.</li>
+            <li>The workshop loads the current page so you can update it.</li>
+            <li>Save a draft first if you want to compare versions safely.</li>
+          </ul>
+        </div>
+        <div class="guidebook-card">
+          <h3>Saving and publishing</h3>
+          <ul>
+            <li>Drafts keep your work private until you are ready.</li>
+            <li>Publishing sends the page for review or posts it right away if you have higher clearance.</li>
+            <li>After publishing, the page opens at its public address.</li>
+          </ul>
+        </div>
+        <div class="guidebook-card">
+          <h3>Using media</h3>
+          <ul>
+            <li>Upload images for almost any page.</li>
+            <li>Use audio or video when the page type allows it.</li>
+            <li>Choose a file from the upload area, then pick it inside the page builder.</li>
+          </ul>
+        </div>
+        <div class="guidebook-card">
+          <h3>Finding your page later</h3>
+          <ul>
+            <li>Your public address starts with <strong>/pages/</strong>.</li>
+            <li>The history area shows everything you have submitted.</li>
+            <li>Drafts stay available until you remove them or publish them.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
     <div class="file-explorer" id="submit-file-explorer">
       <div class="file-explorer-head">
-        <span>Archive Workstation // Select File</span>
-        <span>Submission Terminal</span>
+        <span>Workshop // Choose a Page Type</span>
+        <span>Page Builder</span>
       </div>
       <div class="file-grid">
         <button class="file-tile" type="button" data-entry-profile="ros">
@@ -316,9 +422,9 @@ render.mount('submission-terminal');</pre>
 
     <div class="hidden" id="submit-editor-shell">
       <div class="editor-shell-head">
-        <div class="muted-file-note" id="entry-profile-banner">Mode: General Submission</div>
+        <div class="muted-file-note" id="entry-profile-banner">Mode: General Page</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-s" type="button" onclick="openSubmitFileExplorer()">Back to Files</button>
+          <button class="btn btn-s" type="button" onclick="openSubmitFileExplorer()">Back to Page Types</button>
           <button class="btn btn-s" type="button" onclick="openSubmissionHistoryView()">History</button>
           <button class="btn btn-s" type="button" onclick="openSubmissionDraftsView()">Drafts</button>
         </div>
@@ -407,12 +513,12 @@ render.mount('submission-terminal');</pre>
         <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px;">Select multiple tags. Use search to filter quickly.</span>
       </div>
       <div class="fg">
-        <label class="fl" for="sf-slug">Page URL Slug</label>
+        <label class="fl" for="sf-slug">Page Link Name</label>
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:.8rem;color:var(--wht-f);white-space:nowrap">/pages/</span>
           <input class="fi" id="sf-slug" placeholder="auto-generated from title" style="font-family:var(--font-m);font-size:.8rem" />
         </div>
-        <span style="font-size:.7rem;color:var(--wht-f)">Leave blank to auto-generate from title. Use lowercase, hyphens only.</span>
+        <span style="font-size:.7rem;color:var(--wht-f)">Leave blank to create one from the title automatically. Use lowercase letters and hyphens only.</span>
       </div>
     </div>
 
@@ -421,7 +527,7 @@ render.mount('submission-terminal');</pre>
       <div class="section-hd">Asset Uploads</div>
       <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
         Add images to use in your page. Tale and Anomaly submissions can also include audio and video uploads.
-        Blaze mode stores files in Firebase Storage and supports up to 5 images, 3 audio files, and 3 video files per submission.
+        The workshop stores files in the cloud and supports up to 5 images, 3 audio files, and 3 video files per submission.
       </p>
       <input type="file" id="img-input" accept="image/png,image/jpeg,image/gif,image/webp,audio/*,video/*" multiple hidden />
       <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Choose image, audio, or video files to upload">
@@ -447,7 +553,7 @@ render.mount('submission-terminal');</pre>
 
       <div class="section" style="margin-bottom:24px">
         <div class="section-hd">Template Source</div>
-        <p style="font-size:.8rem;color:var(--wht-d)">Template fields below are auto-assigned from your selected workstation file profile.</p>
+        <p style="font-size:.8rem;color:var(--wht-d)">Template fields below are auto-assigned from your selected page profile.</p>
       </div>
 
       <!-- Anomaly Template Fields -->
@@ -672,7 +778,7 @@ render.mount('submission-terminal');</pre>
     <div class="submit-bar">
       <div>
         <span style="font-size:.75rem;color:var(--wht-f)">Your page will appear at: </span>
-        <span style="font-size:.8rem;color:var(--red-b);font-family:var(--font-m)" id="slug-preview">/pages/...</span>
+        <span style="font-size:.8rem;color:var(--red-b);font-family:var(--font-m)" id="slug-preview">/pages/your-page-name</span>
         <div id="draft-status" style="font-size:.72rem;color:var(--wht-f);margin-top:6px">Draft autosave is idle.</div>
       </div>
       <div style="display:flex;gap:12px">
@@ -685,7 +791,7 @@ render.mount('submission-terminal');</pre>
 
     <!-- ═══ MY SUBMISSIONS ═══ -->
     <div class="section" id="my-submissions-section">
-      <div class="section-hd" id="my-submissions-heading">Submission Records</div>
+      <div class="section-hd" id="my-submissions-heading">Your Pages</div>
       <div id="my-submissions">
         <p style="font-size:.8rem;color:var(--wht-f);text-align:center;padding:24px">Loading...</p>
       </div>

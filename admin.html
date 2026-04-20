@@ -20,7 +20,7 @@
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
-      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Workshop</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
     </ul>
@@ -91,7 +91,7 @@ render.mount('admin-terminal');</pre>
       <!-- Config Tab (Hidden by default, shown by switchTab) -->
       <div id="section-config" class="hidden" style="flex:1; padding:24px">
         <div class="section-hd">System Configuration</div>
-        <p style="font-size: .8rem; color: var(--wht-f); margin-bottom: 24px">Manage dynamic site-wide categories, tags, and compartments.</p>
+        <p style="font-size: .8rem; color: var(--wht-f); margin-bottom: 24px">Adjust the site-wide page categories, tags, and sections.</p>
         
         <div class="g2">
           <div class="card">
@@ -144,13 +144,13 @@ render.mount('admin-terminal');</pre>
             <div class="fg" style="margin-bottom:12px">
               <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--wht);cursor:pointer">
                 <input type="checkbox" id="perm-guides" />
-                Allow Admins to create and manage Guides
+                Allow Admins to create and update Guides
               </label>
             </div>
             <div class="fg" style="margin-bottom:12px">
               <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--wht);cursor:pointer">
                 <input type="checkbox" id="perm-roles" />
-                Allow Admins to manage User Roles
+                Allow Admins to manage staff access
               </label>
             </div>
             <div class="fg" style="margin-bottom:12px">

@@ -1026,7 +1026,7 @@ async function openRejectedSubmissionPreview(id) {
           '<dt>Status</dt><dd><span class="status status-rejected">rejected</span></dd>' +
           '<dt>Reason</dt><dd>' + escapeHtml(s.rejectionReason || 'No rejection reason provided.') + '</dd>' +
           '<dt>Type</dt><dd>' + escapeHtml(s.type || 'Unknown') + '</dd>' +
-          '<dt>Slug</dt><dd>' + escapeHtml(s.slug || '[none]') + '</dd>' +
+          '<dt>Page link</dt><dd>' + escapeHtml(s.slug || '[none]') + '</dd>' +
         '</dl>' +
       '</div>' +
     '</div>';
@@ -3960,7 +3960,7 @@ async function submitPage() {
     }
   }
 
-  btn.textContent = 'Checking slug...';
+  btn.textContent = 'Checking page link...';
   btn.disabled = true;
 
   try {
@@ -3968,7 +3968,7 @@ async function submitPage() {
     const existingSubs = await db.collection('submissions').where('slug', '==', slug).where('status', '==', 'pending').limit(1).get();
     const slugUsedByOtherPage = !existingPages.empty && existingPages.docs.some(doc => doc.id !== (submitEditTarget && submitEditTarget.id));
     if (slugUsedByOtherPage || (!submitEditTarget && !existingSubs.empty)) {
-      alert('The URL slug "' + slug + '" is already in use. Please choose a different slug.');
+      alert('The page link "' + slug + '" is already in use. Please choose a different one.');
       btn.textContent = '>> Submit for Review';
       btn.disabled = false;
       return;

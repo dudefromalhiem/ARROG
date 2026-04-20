@@ -322,7 +322,7 @@
       <li><a href="index.html">Home</a></li>
       <li><a href="explore.html">Explore</a></li>
       <li><a href="collections.html">Collections</a></li>
-      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Workshop</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
     </ul>
@@ -372,7 +372,7 @@
   <article class="legacy-sheet" id="legacy-sheet-view"></article>
 
   <section class="legacy-editor" id="legacy-editor">
-    <div class="section-hd" style="font-size:1rem">Owner Edit Mode</div>
+    <div class="section-hd" style="font-size:1rem">Owner Editing</div>
 
     <div class="fg">
       <label class="fl" for="legacy-title">Sheet Title</label>
@@ -1017,7 +1017,7 @@
             <div class="legacy-doc-head">
               <div class="legacy-doc-label">File ${fIndex + 1}</div>
               <div class="legacy-actions" style="margin-top:0">
-                ${workshopHref ? `<a class="btn btn-sm btn-s" target="_blank" rel="noopener noreferrer" href="${workshopHref}">Edit In Workshop</a>` : ''}
+                ${workshopHref ? `<a class="btn btn-sm btn-s" target="_blank" rel="noopener noreferrer" href="${workshopHref}">Open in Workshop</a>` : ''}
                 <button class="btn btn-sm btn-d" type="button" onclick="removeFileFromChapter('${chapterId}','${fileId}')">Delete</button>
               </div>
             </div>
@@ -1025,7 +1025,7 @@
               <div class="fg"><label class="fl">Designation</label><input class="fi" type="text" value="${escapeAttr(file.designation)}" onchange="updateFileField('${chapterId}','${fileId}','designation', this.value)" /></div>
               <div class="fg"><label class="fl">Name / Label</label><input class="fi" type="text" value="${escapeAttr(file.label)}" onchange="updateFileField('${chapterId}','${fileId}','label', this.value)" /></div>
               <div class="fg"><label class="fl">Clearance</label><input class="fi" type="text" value="${escapeAttr(file.clearanceLevel)}" onchange="updateFileField('${chapterId}','${fileId}','clearanceLevel', this.value)" /></div>
-              <div class="fg"><label class="fl">Linked Page Slug</label><input class="fi" type="text" value="${escapeAttr(file.pageSlug)}" onchange="updateFileField('${chapterId}','${fileId}','pageSlug', this.value)" placeholder="page slug edited in workshop" /></div>
+              <div class="fg"><label class="fl">Linked Page Address</label><input class="fi" type="text" value="${escapeAttr(file.pageSlug)}" onchange="updateFileField('${chapterId}','${fileId}','pageSlug', this.value)" placeholder="page name edited in the workshop" /></div>
               <div class="fg"><label class="fl">Image URL</label><input class="fi" type="text" value="${escapeAttr(file.imageUrl)}" onchange="updateFileField('${chapterId}','${fileId}','imageUrl', this.value)" /></div>
               <div class="fg"><label class="fl">Upload Image</label><input class="fi" type="file" accept="image/png,image/jpeg,image/gif,image/webp" onchange="uploadFileImage(this.files[0], '${chapterId}', '${fileId}'); this.value=''" /></div>
               <div class="fg"><label class="fl">Image Alt Text</label><input class="fi" type="text" value="${escapeAttr(file.imageAlt)}" onchange="updateFileField('${chapterId}','${fileId}','imageAlt', this.value)" /></div>

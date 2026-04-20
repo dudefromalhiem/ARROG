@@ -298,7 +298,7 @@ async function migrateSeededPagesToFirestore() {
     return;
   }
 
-  const ok = confirm('Migrate seeded pages into Firestore pages collection? Existing slug matches will be skipped.');
+  const ok = confirm('Move starter pages into the live page collection? Existing page links will be skipped.');
   if (!ok) return;
 
   if (statusEl) statusEl.textContent = 'Seed migration status: scanning existing pages...';
@@ -1504,6 +1504,7 @@ async function refreshRolesDisplay() {
       ROLE_DATA.owners = (d.owners || []).map(e => e.toLowerCase());
       ROLE_DATA.admins = (d.admins || []).map(e => e.toLowerCase());
       ROLE_DATA.mods = (d.mods || []).map(e => e.toLowerCase());
+      ROLE_DATA.adminAppointments = d.adminAppointments || {};
     }
   } catch(e) { /* keep cached */ }
 
@@ -1548,10 +1549,13 @@ async function addStaffRole() {
   if (kind === 'mod' && ROLE_DATA.mods.includes(email)) { alert('This email is already a Moderator.'); return; }
 
   try {
+    const appointmentStamp = new Date().toISOString();
     if (kind === 'admin') {
       ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
       ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
       ROLE_DATA.admins.push(email);
+      ROLE_DATA.adminAppointments = ROLE_DATA.adminAppointments || {};
+      ROLE_DATA.adminAppointments[email] = appointmentStamp;
     } else {
       ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
       ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
@@ -1561,7 +1565,8 @@ async function addStaffRole() {
     await db.collection('config').doc('roles').set({
       owners: ROLE_DATA.owners,
       admins: ROLE_DATA.admins,
-      mods: ROLE_DATA.mods
+      mods: ROLE_DATA.mods,
+      adminAppointments: ROLE_DATA.adminAppointments || {}
     });
 
     input.value = '';
@@ -1577,11 +1582,13 @@ async function removeStaffRole(kind, email) {
   try {
     if (kind === 'admin') ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
     else ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
+    if (kind === 'admin' && ROLE_DATA.adminAppointments) delete ROLE_DATA.adminAppointments[email];
 
     await db.collection('config').doc('roles').set({
       owners: ROLE_DATA.owners,
       admins: ROLE_DATA.admins,
-      mods: ROLE_DATA.mods
+      mods: ROLE_DATA.mods,
+      adminAppointments: ROLE_DATA.adminAppointments || {}
     });
     alert((kind === 'admin' ? 'Admin' : 'Moderator') + ' access revoked for ' + email);
     await refreshRolesDisplay();

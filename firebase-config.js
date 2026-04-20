@@ -278,7 +278,7 @@ if (document.readyState === 'loading') {
 // Bootstrap — only used if Firestore config/roles doesn't exist yet
 const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
 const BOOTSTRAP_OWNER_SET = new Set(_BOOTSTRAP.map(email => String(email || '').toLowerCase()));
-let ROLE_DATA = { owners: [], admins: [], mods: [] };
+let ROLE_DATA = { owners: [], admins: [], mods: [], adminAppointments: {} };
 let GUILD_PERMISSIONS = {};
 let SITE_STATE = { esdLocked: false, esdActivatedBy: '', esdActivatedAt: null };
 let rolesReadyResolved = false;
@@ -306,6 +306,7 @@ const rolesReady = (async () => {
       ROLE_DATA.owners = (d.owners || []).map(e => e.toLowerCase());
       ROLE_DATA.admins = (d.admins || []).map(e => e.toLowerCase());
       ROLE_DATA.mods = (d.mods || []).map(e => e.toLowerCase());
+      ROLE_DATA.adminAppointments = d.adminAppointments || {};
     }
     
     if (permsDoc.exists) {

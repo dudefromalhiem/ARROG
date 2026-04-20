@@ -19,6 +19,19 @@
     .comment-meta { font-size:.72rem; color: var(--wht-f); display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
     .comment-content { font-size:.9rem; color: var(--wht-m); line-height:1.65; white-space: pre-wrap; }
     .comment-actions { margin-top:8px; }
+    .comment-media { display:grid; gap:10px; margin-top:10px; }
+    .comment-media-item { display:block; border:1px solid var(--blk-m); background: rgba(255,255,255,0.02); padding:8px; text-decoration:none; color: var(--wht-m); }
+    .comment-media-item img, .comment-media-item video { width:100%; max-width:100%; height:auto; display:block; }
+    .comment-report-panel { border:1px solid var(--red-d); background: rgba(139,0,0,0.08); padding:12px; margin-bottom:12px; }
+    .comment-report-panel.hidden { display:none; }
+    .community-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:14px; margin-top:24px; }
+    .community-panel { border:1px solid var(--blk-m); background: var(--blk-b); padding:12px; }
+    .community-panel .comments-title { margin-bottom:10px; font-size:.9rem; }
+    .community-results { display:grid; gap:8px; margin-top:10px; }
+    .community-result { border:1px solid var(--blk-m); padding:8px 10px; background: rgba(255,255,255,0.02); cursor:pointer; }
+    .community-result.on { border-color: var(--red-b); }
+    .community-meta { font-size:.75rem; color: var(--wht-f); margin-top:6px; line-height:1.5; }
+    @media (max-width: 920px) { .community-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -110,12 +123,67 @@ render.mount('archive-viewer');</pre>
         <label class="fl" for="comment-input">Leave a comment</label>
         <textarea class="fta" id="comment-input" maxlength="1200" placeholder="Sign in to comment on this page."></textarea>
       </div>
+      <div class="fg" style="margin-bottom:8px">
+        <label class="fl" for="comment-media">Attach media</label>
+        <input class="fi" id="comment-media" type="file" accept="image/*,video/*,audio/*" multiple />
+        <div class="comments-status" id="comment-media-status" style="margin-top:6px">Images, audio, or video can be attached.</div>
+      </div>
       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
         <span class="comments-status" id="comment-compose-status">Comments are tied to your guild account.</span>
         <button class="btn btn-s" id="comment-submit-btn" type="button">Post Comment</button>
       </div>
     </div>
+    <div class="comment-report-panel hidden" id="comment-report-panel">
+      <div class="comments-title" style="font-size:.85rem;margin-bottom:8px">Report Comment</div>
+      <div class="comments-status" id="comment-report-target">No comment selected.</div>
+      <div class="fg" style="margin:10px 0">
+        <label class="fl" for="comment-report-reason">Reason</label>
+        <textarea class="fta" id="comment-report-reason" maxlength="500" placeholder="Explain why this comment should be reviewed."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-s" id="comment-report-submit-btn" type="button">Submit Report</button>
+        <button class="btn btn-s" id="comment-report-cancel-btn" type="button">Cancel</button>
+      </div>
+    </div>
     <div class="comment-list" id="comment-list"></div>
+  </section>
+
+  <section id="community-section" class="section hidden comments-wrap">
+    <div class="comments-head">
+      <div class="comments-title">Profile & Messages</div>
+      <div class="comments-status" id="community-status">Sign in to use direct messages, block, and reports.</div>
+    </div>
+
+    <div class="community-grid">
+      <div class="community-panel">
+        <div class="comments-title">Your Profile</div>
+        <div id="community-profile-card" class="community-meta"></div>
+      </div>
+
+      <div class="community-panel">
+        <div class="comments-title">Direct Message</div>
+        <div class="fg" style="margin-bottom:8px">
+          <label class="fl" for="dm-search">Find user</label>
+          <input class="fi" id="dm-search" type="text" placeholder="Search a username or email" />
+        </div>
+        <div class="community-results" id="dm-search-results"></div>
+        <div class="fg" style="margin-top:12px;margin-bottom:8px">
+          <label class="fl" for="dm-message">Message</label>
+          <textarea class="fta" id="dm-message" maxlength="1200" placeholder="Write a direct message"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-p" id="dm-send-btn" type="button">Send Message</button>
+          <button class="btn btn-s" id="dm-block-btn" type="button">Block Selected</button>
+          <button class="btn btn-s" id="dm-report-btn" type="button">Report Selected</button>
+        </div>
+        <div class="community-meta" id="dm-status">Select a user to begin.</div>
+      </div>
+
+      <div class="community-panel">
+        <div class="comments-title">Selected Profile</div>
+        <div id="selected-profile-card" class="community-meta">No user selected.</div>
+      </div>
+    </div>
   </section>
 
 </main>
@@ -138,6 +206,7 @@ render.mount('archive-viewer');</pre>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="seed-data.js"></script>
 <script>
@@ -148,7 +217,9 @@ render.mount('archive-viewer');</pre>
 
 document.addEventListener('DOMContentLoaded', async () => {
   configureCommentsApiBase();
+  configureSocialApiBase();
   bindCommentComposerEvents();
+  bindCommunityEvents();
 
   const params = new URLSearchParams(window.location.search);
   let pageId = params.get('id');
@@ -251,6 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await rolesReady;
     currentCommentUser = user || null;
     currentCommentUserIsAdmin = !!(user && isAdmin(user.email));
+    currentCommentUserCanModerate = !!(user && isModerator(user.email));
     const navAuth = document.getElementById('nav-auth');
     if (user) {
       const displayLabel = user.displayName || 'Agent';
@@ -274,7 +346,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (composeStatus) composeStatus.textContent = 'Sign in to post comments.';
     }
 
+    const communitySection = document.getElementById('community-section');
+    if (communitySection) communitySection.classList.toggle('hidden', !user);
+    renderCommunityProfile(user);
+    if (!user) {
+      currentSocialUser = null;
+      currentSocialUsers = [];
+      renderSelectedSocialUser(null);
+      renderSocialSearchResults([]);
+    }
+
     updateCommentComposerAuthState();
+    updateCommunityState();
     renderComments();
   });
 });
@@ -282,7 +365,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 let commentsApiBase = '/api/comments';
 let currentCommentUser = null;
 let currentCommentUserIsAdmin = false;
+let currentCommentUserCanModerate = false;
 let currentComments = [];
+let selectedCommentReportId = '';
+let socialApiBase = '/api/social';
+let currentSocialUser = null;
+let currentSocialUsers = [];
+
+function configureSocialApiBase() {
+  try {
+    const host = String(window.location.hostname || '').toLowerCase();
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const isFile = window.location.protocol === 'file:';
+    socialApiBase = (isLocal || isFile)
+      ? 'https://redoakguild.vercel.app/api/social'
+      : '/api/social';
+  } catch (_err) {
+    socialApiBase = '/api/social';
+  }
+}
 
 function configureCommentsApiBase() {
   try {
@@ -300,6 +401,23 @@ function configureCommentsApiBase() {
 function bindCommentComposerEvents() {
   const btn = document.getElementById('comment-submit-btn');
   if (btn) btn.addEventListener('click', submitComment);
+  const reportBtn = document.getElementById('comment-report-submit-btn');
+  if (reportBtn) reportBtn.addEventListener('click', submitCommentReport);
+  const cancelBtn = document.getElementById('comment-report-cancel-btn');
+  if (cancelBtn) cancelBtn.addEventListener('click', closeCommentReportPanel);
+  const mediaInput = document.getElementById('comment-media');
+  if (mediaInput) mediaInput.addEventListener('change', updateCommentMediaSelection);
+}
+
+function bindCommunityEvents() {
+  const search = document.getElementById('dm-search');
+  const sendBtn = document.getElementById('dm-send-btn');
+  const blockBtn = document.getElementById('dm-block-btn');
+  const reportBtn = document.getElementById('dm-report-btn');
+  if (search) search.addEventListener('input', () => fetchSocialUsers(search.value));
+  if (sendBtn) sendBtn.addEventListener('click', sendDirectMessage);
+  if (blockBtn) blockBtn.addEventListener('click', blockSelectedUser);
+  if (reportBtn) reportBtn.addEventListener('click', reportSelectedUser);
 }
 
 function getCommentsPageRef() {
@@ -313,6 +431,7 @@ function getCommentsPageRef() {
 function updateCommentComposerAuthState() {
   const input = document.getElementById('comment-input');
   const btn = document.getElementById('comment-submit-btn');
+  const mediaInput = document.getElementById('comment-media');
   const pageRef = getCommentsPageRef();
   const hasTarget = !!(pageRef.pageId || pageRef.slug);
   const canWrite = !!currentCommentUser && hasTarget;
@@ -324,6 +443,7 @@ function updateCommentComposerAuthState() {
       : (!hasTarget ? 'Comments unavailable for this page.' : 'Sign in to comment on this page.');
   }
   if (btn) btn.disabled = !canWrite;
+  if (mediaInput) mediaInput.disabled = !canWrite;
 }
 
 function formatCommentDate(value) {
@@ -343,8 +463,73 @@ function escapeCommentHtml(value) {
 
 function canDeleteComment(comment) {
   if (!comment) return false;
-  if (currentCommentUserIsAdmin) return true;
+  if (currentCommentUserCanModerate) return true;
   return !!currentCommentUser && String(comment.authorUid || '') === String(currentCommentUser.uid || '');
+}
+
+function renderCommentMedia(mediaList) {
+  if (!Array.isArray(mediaList) || !mediaList.length) return '';
+  return '<div class="comment-media">' + mediaList.map(item => {
+    const url = escapeCommentHtml(item.url || '');
+    const label = escapeCommentHtml(item.name || item.type || 'attachment');
+    const type = String(item.type || '').toLowerCase();
+    if (type.startsWith('image/')) {
+      return '<a class="comment-media-item" href="' + url + '" target="_blank" rel="noopener noreferrer"><img src="' + url + '" alt="' + label + '" loading="lazy" decoding="async" /></a>';
+    }
+    if (type.startsWith('video/')) {
+      return '<div class="comment-media-item"><video controls src="' + url + '"></video><div style="margin-top:6px;font-size:.75rem;color:var(--wht-f)">' + label + '</div></div>';
+    }
+    if (type.startsWith('audio/')) {
+      return '<div class="comment-media-item"><audio controls src="' + url + '" style="width:100%"></audio><div style="margin-top:6px;font-size:.75rem;color:var(--wht-f)">' + label + '</div></div>';
+    }
+    return '<a class="comment-media-item" href="' + url + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+  }).join('') + '</div>';
+}
+
+function openCommentReportPanel(commentId, authorName) {
+  selectedCommentReportId = String(commentId || '').trim();
+  const panel = document.getElementById('comment-report-panel');
+  const target = document.getElementById('comment-report-target');
+  const reason = document.getElementById('comment-report-reason');
+  if (!panel || !target) return;
+  target.textContent = selectedCommentReportId ? ('Reporting comment by ' + (authorName || 'Agent') + '.') : 'No comment selected.';
+  if (reason) reason.value = '';
+  panel.classList.toggle('hidden', !selectedCommentReportId);
+}
+
+function closeCommentReportPanel() {
+  selectedCommentReportId = '';
+  const panel = document.getElementById('comment-report-panel');
+  const target = document.getElementById('comment-report-target');
+  const reason = document.getElementById('comment-report-reason');
+  if (reason) reason.value = '';
+  if (target) target.textContent = 'No comment selected.';
+  if (panel) panel.classList.add('hidden');
+}
+
+function updateCommentMediaSelection() {
+  const input = document.getElementById('comment-media');
+  const status = document.getElementById('comment-media-status');
+  const files = Array.from(input && input.files ? input.files : []);
+  if (status) status.textContent = files.length ? files.map(file => file.name).join(', ') : 'Images, audio, or video can be attached.';
+}
+
+async function uploadCommentMediaFiles(files) {
+  if (!files || !files.length) return [];
+  if (!storage || !auth.currentUser) throw new Error('Media uploads require an active signed-in session.');
+
+  const uploads = [];
+  const limit = Math.min(files.length, 4);
+  for (let index = 0; index < limit; index++) {
+    const file = files[index];
+    const safeName = String(file.name || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = 'uploads/' + auth.currentUser.uid + '/comments/' + Date.now() + '-' + index + '-' + safeName;
+    const ref = storage.ref(filePath);
+    const snapshot = await ref.put(file, { contentType: file.type || 'application/octet-stream' });
+    const url = await snapshot.ref.getDownloadURL();
+    uploads.push({ url, path: filePath, name: file.name || safeName, type: file.type || '' });
+  }
+  return uploads;
 }
 
 function renderComments() {
@@ -360,6 +545,7 @@ function renderComments() {
 
   host.innerHTML = currentComments.map(c => {
     const deletable = canDeleteComment(c);
+    const canReport = !!currentCommentUser;
     return '<article class="comment-item">' +
       '<div class="comment-meta">' +
         '<span>' + escapeCommentHtml(c.authorName || 'Agent') + '</span>' +
@@ -367,8 +553,12 @@ function renderComments() {
         '<span>' + escapeCommentHtml(formatCommentDate(c.createdAt)) + '</span>' +
       '</div>' +
       '<div class="comment-content">' + escapeCommentHtml(c.content || '') + '</div>' +
+      renderCommentMedia(c.media || []) +
       (deletable
         ? '<div class="comment-actions"><button class="btn btn-sm btn-d" type="button" onclick="deleteComment(\'' + escapeCommentHtml(c.id || '') + '\')">Delete</button></div>'
+        : '') +
+      (canReport
+        ? '<div class="comment-actions"><button class="btn btn-sm btn-s" type="button" data-comment-id="' + escapeCommentHtml(c.id || '') + '" data-comment-author="' + escapeCommentHtml(c.authorName || 'Agent') + '" onclick="openCommentReportPanel(this.dataset.commentId, this.dataset.commentAuthor)">Report</button></div>'
         : '') +
     '</article>';
   }).join('');
@@ -418,8 +608,10 @@ async function loadCommentsForCurrentPage() {
 async function submitComment() {
   const input = document.getElementById('comment-input');
   const composeStatus = document.getElementById('comment-compose-status');
+  const mediaInput = document.getElementById('comment-media');
   const text = String(input && input.value || '').trim();
   const pageRef = getCommentsPageRef();
+  const mediaFiles = Array.from(mediaInput && mediaInput.files ? mediaInput.files : []);
 
   if (!text) {
     if (composeStatus) composeStatus.textContent = 'Write a comment before posting.';
@@ -432,6 +624,7 @@ async function submitComment() {
 
   try {
     if (composeStatus) composeStatus.textContent = 'Posting comment...';
+    const media = mediaFiles.length ? await uploadCommentMediaFiles(mediaFiles) : [];
     const response = await fetch(commentsApiBase, {
       method: 'POST',
       headers: await getCommentsAuthHeaders(),
@@ -440,17 +633,54 @@ async function submitComment() {
         slug: pageRef.slug,
         pageTitle: pageRef.pageTitle,
         content: text,
-        authorName: currentCommentUser?.displayName || ''
+        authorName: currentCommentUser?.displayName || '',
+        media
       })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Could not post comment.');
 
     if (input) input.value = '';
+    if (mediaInput) mediaInput.value = '';
+    updateCommentMediaSelection();
     if (composeStatus) composeStatus.textContent = 'Comment posted.';
     await loadCommentsForCurrentPage();
   } catch (err) {
     if (composeStatus) composeStatus.textContent = 'Post failed: ' + err.message;
+  }
+}
+
+async function submitCommentReport() {
+  const reasonInput = document.getElementById('comment-report-reason');
+  const composeStatus = document.getElementById('comment-compose-status');
+  const reason = String(reasonInput && reasonInput.value || '').trim();
+  if (!selectedCommentReportId) {
+    if (composeStatus) composeStatus.textContent = 'Select a comment to report.';
+    return;
+  }
+  if (!reason) {
+    if (composeStatus) composeStatus.textContent = 'Enter a reason for the report.';
+    return;
+  }
+
+  try {
+    if (composeStatus) composeStatus.textContent = 'Submitting report...';
+    const response = await fetch(commentsApiBase, {
+      method: 'POST',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({
+        action: 'report',
+        id: selectedCommentReportId,
+        reason
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not submit report.');
+    if (reasonInput) reasonInput.value = '';
+    closeCommentReportPanel();
+    if (composeStatus) composeStatus.textContent = 'Report submitted for review.';
+  } catch (err) {
+    if (composeStatus) composeStatus.textContent = 'Report failed: ' + err.message;
   }
 }
 
@@ -471,6 +701,224 @@ async function deleteComment(id) {
     await loadCommentsForCurrentPage();
   } catch (err) {
     alert('Delete failed: ' + err.message);
+  }
+}
+
+function renderCommunityProfile(user) {
+  const host = document.getElementById('community-profile-card');
+  if (!host) return;
+  if (!user) {
+    host.innerHTML = 'Sign in to view your profile.';
+    return;
+  }
+
+  const role = isOwner(user.email) ? 'owner' : (isAdmin(user.email) ? 'admin' : (isModerator(user.email) ? 'moderator' : 'user'));
+  host.innerHTML = [
+    '<div><strong>' + escapeHtml(user.displayName || 'Agent') + '</strong></div>',
+    '<div>' + escapeHtml(user.email || '') + '</div>',
+    '<div>Role: ' + escapeHtml(role) + '</div>'
+  ].join('');
+}
+
+function renderSelectedSocialUser(user) {
+  const host = document.getElementById('selected-profile-card');
+  const status = document.getElementById('dm-status');
+  if (!host) return;
+  if (!user) {
+    host.textContent = 'No user selected.';
+    if (status) status.textContent = 'Select a user to begin.';
+    return;
+  }
+
+  host.innerHTML = [
+    '<div><strong>' + escapeHtml(user.displayName || 'Agent') + '</strong></div>',
+    '<div>' + escapeHtml(user.email || '') + '</div>',
+    '<div>Role: ' + escapeHtml(user.role || 'user') + '</div>'
+  ].join('');
+  if (status) status.textContent = 'Ready to message ' + (user.displayName || 'Agent') + '.';
+}
+
+function renderSocialSearchResults(users) {
+  const host = document.getElementById('dm-search-results');
+  if (!host) return;
+  currentSocialUsers = Array.isArray(users) ? users : [];
+  if (!currentSocialUsers.length) {
+    host.innerHTML = '<div class="community-meta">No matching users found.</div>';
+    return;
+  }
+
+  host.innerHTML = currentSocialUsers.map(user => {
+    const selected = currentSocialUser && currentSocialUser.uid === user.uid ? ' on' : '';
+    return '<button type="button" class="community-result' + selected + '" data-uid="' + escapeHtml(user.uid || '') + '" data-name="' + escapeHtml(user.displayName || '') + '" data-email="' + escapeHtml(user.email || '') + '" data-role="' + escapeHtml(user.role || 'user') + '" onclick="chooseSocialUser(this.dataset.uid, this.dataset.name, this.dataset.email, this.dataset.role)">' +
+      '<div><strong>' + escapeHtml(user.displayName || 'Agent') + '</strong></div>' +
+      '<div class="community-meta">' + escapeHtml(user.email || '') + ' • ' + escapeHtml(user.role || 'user') + '</div>' +
+    '</button>';
+  }).join('');
+}
+
+function updateCommunityState() {
+  const status = document.getElementById('community-status');
+  const search = document.getElementById('dm-search');
+  const message = document.getElementById('dm-message');
+  const sendBtn = document.getElementById('dm-send-btn');
+  const blockBtn = document.getElementById('dm-block-btn');
+  const reportBtn = document.getElementById('dm-report-btn');
+  const canUse = !!currentCommentUser;
+
+  if (status) {
+    status.textContent = canUse
+      ? 'Search for a user, then send a message, block them, or report them.'
+      : 'Sign in to use direct messages, block, and reports.';
+  }
+
+  [search, message, sendBtn, blockBtn, reportBtn].forEach(element => {
+    if (element) element.disabled = !canUse;
+  });
+}
+
+function chooseSocialUser(uid, displayName, email, role) {
+  currentSocialUser = {
+    uid: String(uid || '').trim(),
+    displayName: String(displayName || '').trim(),
+    email: String(email || '').trim(),
+    role: String(role || 'user').trim()
+  };
+  renderSelectedSocialUser(currentSocialUser);
+  renderSocialSearchResults(currentSocialUsers);
+}
+
+async function fetchSocialUsers(queryText) {
+  const results = document.getElementById('dm-search-results');
+  if (!results) return;
+  if (!currentCommentUser) {
+    results.innerHTML = '<div class="community-meta">Sign in to search users.</div>';
+    return;
+  }
+
+  const query = String(queryText || '').trim();
+  if (!query) {
+    results.innerHTML = '<div class="community-meta">Type at least one character to search users.</div>';
+    return;
+  }
+
+  try {
+    const response = await fetch(socialApiBase + '?type=searchUsers&q=' + encodeURIComponent(query), {
+      headers: await getCommentsAuthHeaders()
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not search users.');
+    renderSocialSearchResults(Array.isArray(data.users) ? data.users : []);
+  } catch (err) {
+    results.innerHTML = '<div class="community-meta">Search failed: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+async function sendDirectMessage() {
+  const status = document.getElementById('dm-status');
+  const messageInput = document.getElementById('dm-message');
+  if (!currentCommentUser) {
+    if (status) status.textContent = 'Sign in to send messages.';
+    return;
+  }
+  if (!currentSocialUser || !currentSocialUser.uid) {
+    if (status) status.textContent = 'Select a user first.';
+    return;
+  }
+
+  const text = String(messageInput && messageInput.value || '').trim();
+  if (!text) {
+    if (status) status.textContent = 'Write a message before sending.';
+    return;
+  }
+
+  try {
+    if (status) status.textContent = 'Sending message...';
+    const response = await fetch(socialApiBase, {
+      method: 'POST',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({
+        action: 'message',
+        recipientUid: currentSocialUser.uid,
+        text
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not send message.');
+    if (messageInput) messageInput.value = '';
+    if (status) status.textContent = 'Message sent to ' + (currentSocialUser.displayName || 'Agent') + '.';
+  } catch (err) {
+    if (status) status.textContent = 'Message failed: ' + err.message;
+  }
+}
+
+async function blockSelectedUser() {
+  const status = document.getElementById('dm-status');
+  if (!currentCommentUser) {
+    if (status) status.textContent = 'Sign in to block users.';
+    return;
+  }
+  if (!currentSocialUser || !currentSocialUser.uid) {
+    if (status) status.textContent = 'Select a user first.';
+    return;
+  }
+
+  const reason = prompt('Reason for blocking this user (optional):', '');
+  if (reason === null) return;
+
+  try {
+    if (status) status.textContent = 'Blocking user...';
+    const response = await fetch(socialApiBase, {
+      method: 'POST',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({
+        action: 'block',
+        targetUid: currentSocialUser.uid,
+        reason
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not block user.');
+    if (status) status.textContent = 'User blocked.';
+  } catch (err) {
+    if (status) status.textContent = 'Block failed: ' + err.message;
+  }
+}
+
+async function reportSelectedUser() {
+  const status = document.getElementById('dm-status');
+  if (!currentCommentUser) {
+    if (status) status.textContent = 'Sign in to report users.';
+    return;
+  }
+  if (!currentSocialUser || !currentSocialUser.uid) {
+    if (status) status.textContent = 'Select a user first.';
+    return;
+  }
+
+  const reason = prompt('Reason for reporting this user:', '');
+  if (reason === null) return;
+  const trimmed = String(reason || '').trim();
+  if (!trimmed) {
+    if (status) status.textContent = 'Report cancelled.';
+    return;
+  }
+
+  try {
+    if (status) status.textContent = 'Submitting report...';
+    const response = await fetch(socialApiBase, {
+      method: 'POST',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({
+        action: 'report',
+        targetUid: currentSocialUser.uid,
+        reason: trimmed
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not submit report.');
+    if (status) status.textContent = 'User report submitted.';
+  } catch (err) {
+    if (status) status.textContent = 'Report failed: ' + err.message;
   }
 }
 

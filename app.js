@@ -618,6 +618,25 @@ function renderNews(items) {
   }).join('');
 }
 
+function renderAdminRoster(items) {
+  const grid = document.getElementById('admin-roster-grid');
+  if (!grid) return;
+  if (!Array.isArray(items) || !items.length) {
+    grid.innerHTML = '<div class="card"><div class="card-t">No public roster available</div><div class="card-b">The current administration list could not be loaded.</div></div>';
+    return;
+  }
+
+  grid.innerHTML = items.map(item => {
+    const name = item.displayName || 'Agent';
+    const date = item.appointedAt ? new Date(item.appointedAt).toLocaleDateString() : '—';
+    return `
+    <div class="card">
+      <div class="card-t">${name}</div>
+      <div class="card-b">Appointed ${date}</div>
+    </div>`;
+  }).join('');
+}
+
 function renderNewest(items) {
   const feed = document.getElementById('newest-feed');
   feed.innerHTML = items.map(p => {
@@ -671,6 +690,7 @@ function loadData() {
   // Render fallbacks immediately so content is always visible
   renderFeatured(FALLBACK_ANOMALIES);
   renderNews(FALLBACK_NEWS);
+  renderAdminRoster([]);
   initCarousel(FALLBACK_ART);
   renderNewest(FALLBACK_NEWEST);
 
@@ -688,6 +708,11 @@ function loadData() {
     db.collection('news').orderBy('date', 'desc').limit(10).get()
       .then(function (snap) { if (!snap.empty) renderNews(snap.docs.map(function (d) { return d.data(); })); })
       .catch(function (_e) { });
+
+    fetch('/api/social?type=admins')
+      .then(function (response) { return response.ok ? response.json() : Promise.reject(new Error('Roster unavailable.')); })
+      .then(function (data) { if (Array.isArray(data.admins)) renderAdminRoster(data.admins); })
+      .catch(function (_e) { renderAdminRoster([]); });
 
     db.collection('artworks').where('displayInSpotlight', '==', true).get()
       .then(function (snap) { if (!snap.empty) initCarousel(snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })); })

@@ -30,6 +30,23 @@ function normalizeText(text, maxLen = 1200) {
   return String(text || '').replace(/\s+/g, ' ').trim().slice(0, maxLen);
 }
 
+function normalizeMediaItem(item) {
+  if (!item || typeof item !== 'object') return null;
+  const url = normalizeText(item.url || '', 1000);
+  if (!url) return null;
+  return {
+    url,
+    path: normalizeText(item.path || '', 500),
+    name: normalizeText(item.name || '', 200),
+    type: normalizeText(item.type || '', 120)
+  };
+}
+
+function normalizeMediaArray(media) {
+  if (!Array.isArray(media)) return [];
+  return media.map(normalizeMediaItem).filter(Boolean).slice(0, 4);
+}
+
 function toPlainValue(value) {
   if (!value) return value;
   if (typeof value.toDate === 'function' && typeof value.seconds === 'number') {
@@ -83,6 +100,62 @@ async function isAdminUser(db, uid, email) {
   return owners.map(owner => String(owner || '').toLowerCase()).includes(normalizedEmail);
 }
 
+async function isStaffUser(db, uid, email) {
+  const normalizedEmail = String(email || '').toLowerCase();
+  if (BOOTSTRAP_OWNERS.has(normalizedEmail)) return true;
+
+  const userDoc = await db.collection('users').doc(uid).get();
+  if (userDoc.exists) {
+    const userData = userDoc.data() || {};
+    if (userData.isAdmin === true || userData.role === 'admin' || userData.role === 'mod') return true;
+  }
+
+  const rolesDoc = await db.collection('config').doc('roles').get();
+  if (!rolesDoc.exists) return false;
+  const roleData = rolesDoc.data() || {};
+  const admins = Array.isArray(roleData.admins) ? roleData.admins : [];
+  const mods = Array.isArray(roleData.mods) ? roleData.mods : [];
+  const owners = Array.isArray(roleData.owners) ? roleData.owners : [];
+  return [...admins, ...mods, ...owners].map(value => String(value || '').toLowerCase()).includes(normalizedEmail);
+}
+
+async function storeCommentReport(db, actor, body) {
+  const id = normalizeText(body.id || '', 128);
+  const reason = normalizeText(body.reason || '', 500);
+  if (!id) {
+    return { statusCode: 400, payload: { error: 'Missing comment id.' } };
+  }
+  if (!reason) {
+    return { statusCode: 400, payload: { error: 'Report reason cannot be empty.' } };
+  }
+
+  const ref = db.collection('comments').doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    return { statusCode: 404, payload: { error: 'Comment not found.' } };
+  }
+
+  const commentData = doc.data() || {};
+  await db.collection('commentReports').add({
+    commentId: id,
+    pageId: commentData.pageId || '',
+    slug: commentData.slug || '',
+    pageTitle: commentData.pageTitle || '',
+    reason,
+    reporterUid: actor.uid,
+    reporterEmail: actor.email,
+    reporterName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
+    status: 'open',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  const reportsSnap = await db.collection('commentReports').where('commentId', '==', id).get();
+  await ref.set({ reportCount: reportsSnap.size, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+
+  return { statusCode: 200, payload: { ok: true, reportCount: reportsSnap.size } };
+}
+
 async function listComments(db, pageId, slug) {
   let query = db.collection('comments');
   if (pageId) {
@@ -122,10 +195,18 @@ module.exports = async function handler(req, res) {
 
     if (method === 'POST') {
       const body = req.body || {};
+      const action = normalizeText(body.action || '', 20).toLowerCase();
+
+      if (action === 'report') {
+        const reportResult = await storeCommentReport(db, actor, body);
+        return sendJson(res, reportResult.statusCode, reportResult.payload);
+      }
+
       const pageId = normalizeText(body.pageId || '', 128);
       const slug = normalizeText(body.slug || '', 160);
       const pageTitle = normalizeText(body.pageTitle || '', 220);
       const content = normalizeText(body.content || '', 1200);
+      const media = normalizeMediaArray(body.media || []);
 
       if (!pageId && !slug) {
         return sendJson(res, 400, { error: 'Missing page reference.' });
@@ -139,6 +220,7 @@ module.exports = async function handler(req, res) {
         slug,
         pageTitle,
         content,
+        media,
         authorUid: actor.uid,
         authorEmail: actor.email,
         authorName: normalizeText(body.authorName || actor.name || actor.email.split('@')[0] || 'Agent', 120),
@@ -162,7 +244,7 @@ module.exports = async function handler(req, res) {
       if (!doc.exists) return sendJson(res, 404, { error: 'Comment not found.' });
 
       const data = doc.data() || {};
-      const adminAccess = await isAdminUser(db, actor.uid, actor.email);
+      const adminAccess = await isStaffUser(db, actor.uid, actor.email);
       const isAuthor = String(data.authorUid || '') === actor.uid;
       if (!adminAccess && !isAuthor) {
         return sendJson(res, 403, { error: 'Forbidden.' });
