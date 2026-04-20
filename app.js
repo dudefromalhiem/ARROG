@@ -639,6 +639,10 @@ let carouselTimer = null;
 
 function initCarousel(items) {
   carouselItems = items;
+  if (carouselTimer) {
+    clearInterval(carouselTimer);
+    carouselTimer = null;
+  }
   const track = document.getElementById('carousel-track');
   const dots = document.getElementById('carousel-dots');
   track.innerHTML = items.map(a => `
@@ -648,7 +652,7 @@ function initCarousel(items) {
     `<button class="carousel-dot ${i === 0 ? 'on' : ''}" onclick="goSlide(${i})"></button>`
   ).join('');
   updateCarousel();
-  carouselTimer = setInterval(() => { carouselIdx = (carouselIdx + 1) % items.length; updateCarousel(); }, 5000);
+  carouselTimer = setInterval(() => { carouselIdx = (carouselIdx + 1) % items.length; updateCarousel(); }, 8000);
 }
 
 function goSlide(i) { carouselIdx = i; updateCarousel(); }
