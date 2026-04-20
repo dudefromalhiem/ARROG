@@ -2,12 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Database Seeding Terminal</title>
   <link rel="stylesheet" href="style.css" />
   <style>
     body { padding: 40px; }
     .log-box { background: #111; border: 1px solid #333; padding: 20px; font-family: monospace; color: #0f0; max-height: 400px; overflow-y: auto; margin-top: 20px; }
     .log-line { margin-bottom: 4px; }
+    @media (max-width: 768px) {
+      body { padding: 16px; }
+      .log-box { padding: 12px; max-height: 52vh; }
+      #seed-btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
