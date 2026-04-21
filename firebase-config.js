@@ -233,23 +233,46 @@ function bindGlobalNavUX() {
   const toggle = document.querySelector('.nav-toggle');
   if (!header || !nav || !toggle) return;
 
+  const isMobileViewport = () => window.matchMedia('(max-width: 768px)').matches;
+
   const collapseKey = 'rog.nav.band.collapsed';
   const applyCollapseState = () => {
-    const collapsed = localStorage.getItem(collapseKey) === '1';
+    const collapsed = !isMobileViewport() && localStorage.getItem(collapseKey) === '1';
     header.classList.toggle('is-collapsed', collapsed);
     if (collapsed) nav.classList.remove('open');
     toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   };
 
+  const syncToggleMode = () => {
+    if (isMobileViewport()) {
+      toggle.textContent = '\u2630';
+      toggle.setAttribute('aria-label', 'Open or close navigation menu');
+      toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
+      header.classList.remove('is-collapsed');
+      localStorage.removeItem(collapseKey);
+    } else {
+      toggle.textContent = '';
+      toggle.setAttribute('aria-label', 'Collapse or expand navigation band');
+      toggle.setAttribute('aria-expanded', header.classList.contains('is-collapsed') ? 'false' : 'true');
+      nav.classList.remove('open');
+    }
+  };
+
   toggle.removeAttribute('onclick');
-  toggle.textContent = '';
-  toggle.setAttribute('aria-label', 'Collapse or expand navigation band');
-  toggle.setAttribute('aria-expanded', header.classList.contains('is-collapsed') ? 'false' : 'true');
   toggle.setAttribute('aria-controls', 'nav');
+  syncToggleMode();
 
   toggle.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
+
+    if (isMobileViewport()) {
+      const nextOpen = !nav.classList.contains('open');
+      nav.classList.toggle('open', nextOpen);
+      toggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+      return;
+    }
+
     const nextCollapsed = !header.classList.contains('is-collapsed');
     header.classList.toggle('is-collapsed', nextCollapsed);
     localStorage.setItem(collapseKey, nextCollapsed ? '1' : '0');
@@ -275,9 +298,15 @@ function bindGlobalNavUX() {
   });
 
   const observer = new MutationObserver(() => {
-    toggle.setAttribute('aria-expanded', header.classList.contains('is-collapsed') ? 'false' : 'true');
+    if (isMobileViewport()) {
+      toggle.setAttribute('aria-expanded', nav.classList.contains('open') ? 'true' : 'false');
+    } else {
+      toggle.setAttribute('aria-expanded', header.classList.contains('is-collapsed') ? 'false' : 'true');
+    }
   });
   observer.observe(header, { attributes: true, attributeFilter: ['class'] });
+
+  window.addEventListener('resize', syncToggleMode, { passive: true });
 
   applyCollapseState();
 }
