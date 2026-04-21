@@ -128,7 +128,7 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .nav a:hover,.nav a.active{color:var(--red-b);border-bottom-color:var(--red-b);text-decoration:none}
 .nav-btn{font-family:var(--font-m);font-size:.68rem;padding:7px 12px;border:1px solid var(--red-d);background:transparent;color:var(--red-b);cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:all var(--tr);min-height:36px}
 .nav-btn:hover{background:var(--red);color:var(--wht)}
-.nav-toggle{position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);width:15px;height:8px;min-width:15px;min-height:8px;padding:0;border:0;background:transparent;color:transparent;cursor:pointer;z-index:260;line-height:1;font-size:0}
+.nav-toggle{position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);width:15px;height:8px;min-width:15px;min-height:8px;padding:0;border:0;background:transparent;color:transparent;cursor:pointer;z-index:260;line-height:1;font-size:0;display:none}
 .nav-toggle::before{content:'';display:block;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:8px solid var(--red-b);transition:transform .22s ease,opacity .22s ease}
 .nav-toggle:hover::before,.nav-toggle:focus-visible::before{opacity:.85}
 .hdr.is-collapsed .nav-toggle::before{transform:rotate(180deg)}
@@ -161,7 +161,7 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
   .nav a:hover,.nav a.active{border-bottom-color:var(--red-b);background:rgba(139,0,0,.08)}
   .nav-btn{display:block;width:100%;text-align:left;min-height:44px;padding:14px 16px;margin:0;border:none;border-bottom:1px solid var(--blk-m);background:transparent;color:var(--red-b)}
   .nav-btn:hover{background:rgba(139,0,0,.08)}
-  .nav-toggle{position:static;width:44px;height:44px;min-width:44px;min-height:44px;padding:8px;border:0;background:transparent;color:var(--red-b);cursor:pointer;z-index:260;line-height:1;font-size:24px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;margin-left:auto}
+  .nav-toggle{position:static;width:44px;height:44px;min-width:44px;min-height:44px;padding:8px;border:0;background:transparent;color:var(--red-b);cursor:pointer;z-index:260;font-size:24px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;margin-left:auto;line-height:1}
   .nav-toggle::before{display:none}
   .nav-toggle:active{background:rgba(139,0,0,.1)}
   .user-menu{width:100%}
