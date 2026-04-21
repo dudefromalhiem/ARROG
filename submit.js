@@ -1612,32 +1612,51 @@ function switchMode(mode) {
 
 function selectTemplate(tpl) {
   currentTemplate = tpl;
+  if (!tpl) return;
+  
   ['anomaly', 'tale', 'artwork', 'guide'].forEach(t => {
     const card = document.getElementById('tpl-' + t);
     const fields = document.getElementById('tpl-fields-' + t);
-    if (card) card.classList.toggle('active', t === tpl);
-    if (fields) fields.classList.toggle('hidden', t !== tpl);
+    if (card) {
+      if (t === tpl) {
+        card.classList.add('active');
+      } else {
+        card.classList.remove('active');
+      }
+    }
+    if (fields) {
+      if (t === tpl) {
+        fields.classList.remove('hidden');
+      } else {
+        fields.classList.add('hidden');
+      }
+    }
   });
 
   // Auto-set the type dropdown
   const typeMap = { anomaly: 'Anomaly', tale: 'Tale', artwork: 'Artwork' };
-  if (tpl === 'guide') {
-    const currentType = String(document.getElementById('sf-type').value || '').trim();
-    document.getElementById('sf-type').value = currentType === 'Lore' ? 'Lore' : 'Guide';
-  } else {
-    document.getElementById('sf-type').value = typeMap[tpl] || 'Anomaly';
+  const typeEl = document.getElementById('sf-type');
+  if (typeEl) {
+    if (tpl === 'guide') {
+      const currentType = String(typeEl.value || '').trim();
+      typeEl.value = currentType === 'Lore' ? 'Lore' : 'Guide';
+    } else {
+      typeEl.value = typeMap[tpl] || 'Anomaly';
+    }
   }
 
   // Update Title label and placeholder based on type
   const titleLabel = document.getElementById('lbl-title');
   const titleInput = document.getElementById('sf-title');
-  if (tpl === 'anomaly') {
-    titleLabel.textContent = 'Title (must begin with anomaly designation)';
-    titleInput.placeholder = 'e.g. ROS-0001: Sample Title';
-  } else {
-    titleLabel.textContent = 'Title';
-    const placeholders = { tale: 'e.g. The Hollow Mirror', artwork: 'e.g. Sketch of ROG-088', guide: 'e.g. Containment Protocols' };
-    titleInput.placeholder = placeholders[tpl] || 'Enter a title';
+  if (titleLabel && titleInput) {
+    if (tpl === 'anomaly') {
+      titleLabel.textContent = 'Title (must begin with anomaly designation)';
+      titleInput.placeholder = 'e.g. ROS-0001: Sample Title';
+    } else {
+      titleLabel.textContent = 'Title';
+      const placeholders = { tale: 'e.g. The Hollow Mirror', artwork: 'e.g. Sketch of ROG-088', guide: 'e.g. Containment Protocols' };
+      titleInput.placeholder = placeholders[tpl] || 'Enter a title';
+    }
   }
 
   if (tpl === 'guide') {

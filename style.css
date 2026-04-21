@@ -154,11 +154,14 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
   .hdr{padding:10px 0 12px}
   .hdr-brand{max-width:56%}
   .hdr-title{font-size:.92rem;letter-spacing:1.2px}
-  .nav{display:flex;position:static;width:auto;background:transparent;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:12px;margin-left:10px;padding-right:4px}
-  .nav li{width:auto}
-  .nav a,.nav-btn{display:block;width:auto;text-align:left}
-  .nav-btn{min-height:44px;padding:10px 14px}
-  .nav-toggle{bottom:-12px}
+  .nav{display:none;position:absolute;top:100%;left:0;right:0;width:100%;background:var(--blk-s);border-top:1px solid var(--red-d);border-bottom:1px solid var(--red-d);flex-direction:column;gap:0;margin-left:0;padding:0;z-index:250}
+  .nav.open{display:flex}
+  .nav li{width:100%;display:flex;justify-content:stretch}
+  .nav a{display:block;width:100%;text-align:left;padding:14px 16px;border-bottom:1px solid var(--blk-m);border-bottom-color:transparent;transition:all var(--tr)}
+  .nav a:hover,.nav a.active{border-bottom-color:var(--red-b);background:rgba(139,0,0,.08)}
+  .nav-btn{display:block;width:100%;text-align:left;min-height:44px;padding:14px 16px;margin:0;border:none;border-bottom:1px solid var(--blk-m);background:transparent;color:var(--red-b)}
+  .nav-btn:hover{background:rgba(139,0,0,.08)}
+  .nav-toggle{bottom:-12px;display:block}
   .user-menu{width:100%}
   .user-menu-panel{position:static;min-width:0;margin-top:8px;width:100%;padding:10px}
   .user-menu-trigger{width:100%;justify-content:space-between}

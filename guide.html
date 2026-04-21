@@ -23,9 +23,11 @@
     .doc-table th { background: var(--blk); color: var(--wht); text-transform: uppercase; letter-spacing: 1px; }
     .doc-table tr:nth-child(even) { background: rgba(139,0,0,0.08); }
     .classified-stamp { color: var(--red-b); font-family: var(--font-h); font-size: 2rem; border: 3px solid var(--red-b); display: inline-block; padding: 8px 16px; transform: rotate(-5deg); margin-bottom: 24px; opacity: 0.8; }
-    .guide-state { max-width: 800px; margin: 40px auto 0; background: var(--blk-c); color: var(--wht-m); padding: 24px; border: 1px solid var(--red-d); box-shadow: 0 0 20px rgba(0,0,0,0.35); text-align: center; font-family: var(--font-m); }
+    .guide-state { max-width: 800px; margin: 40px auto 0; background: var(--blk-c); color: var(--wht-m); padding: 24px; border: 1px solid var(--red-d); box-shadow: 0 0 20px rgba(0,0,0,0.35); text-align: center; font-family: var(--font-m); transition: opacity 0.3s ease; }
     .guide-state .guide-state-title { font-family: var(--font-h); font-size: 1.3rem; letter-spacing: 2px; color: var(--wht); margin-bottom: 10px; text-transform: uppercase; }
-    .guide-state.hidden { display: none; }
+    .guide-state.hidden { display: none; visibility: hidden; opacity: 0; pointer-events: none; }
+    #guide-static-wrap { opacity: 1; transition: opacity 0.3s ease; }
+    #guide-static-wrap.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -36,11 +38,15 @@
       <img src="logo.png" alt="ROG" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
-        <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
+      <li><a href="guide.html">Guide</a></li>
       <li><a href="explore.html">Explore</a></li>
+      <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
     </ul>
   </div>
 </header>
