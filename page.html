@@ -1209,6 +1209,21 @@ function buildPageDocument(html, css, imageUrls, imageAssets, mediaUrls, mediaAs
   const wrapped = htmlWithUploads.includes('class="page-shell"')
     ? htmlWithUploads
     : '<div class="page-shell"><section class="page-section">' + htmlWithUploads + '</section></div>';
+  const documentMarkup = document.createElement('div');
+  documentMarkup.innerHTML = wrapped;
+  documentMarkup.querySelectorAll('a[href]').forEach(anchor => {
+    const href = String(anchor.getAttribute('href') || '').trim();
+    const isInternalAnchor = href.startsWith('#') || (/^[^:]+#/.test(href) && !/^https?:\/\//i.test(href));
+    if (isInternalAnchor) {
+      const hashIndex = href.indexOf('#');
+      if (hashIndex >= 0) {
+        anchor.setAttribute('href', href.slice(hashIndex));
+      }
+      anchor.removeAttribute('target');
+      anchor.removeAttribute('rel');
+    }
+  });
+  const normalizedWrapped = documentMarkup.innerHTML;
   const safeCss = normalizePageCss(css || '');
 
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
@@ -1216,7 +1231,7 @@ function buildPageDocument(html, css, imageUrls, imageAssets, mediaUrls, mediaAs
     '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}figure{margin:0 0 14px}figcaption{margin-top:8px;font-size:.82rem;color:#c3c3c3;line-height:1.5}' +
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
     safeCss.replace(/<\/style>/gi, '') +
-    '</style></head><body>' + wrapped + '</body></html>';
+    '</style></head><body>' + normalizedWrapped + '</body></html>';
 }
 
 function normalizePageCss(css) {

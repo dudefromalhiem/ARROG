@@ -207,6 +207,10 @@ function buildGuideDocument(html, css) {
     const href = String(anchor.getAttribute('href') || '').trim();
     const isInternalAnchor = href.startsWith('#') || (/^[^:]+#/.test(href) && !/^https?:\/\//i.test(href));
     if (isInternalAnchor) {
+      const hashIndex = href.indexOf('#');
+      if (hashIndex >= 0) {
+        anchor.setAttribute('href', href.slice(hashIndex));
+      }
       anchor.removeAttribute('target');
       anchor.removeAttribute('rel');
     }
