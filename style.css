@@ -161,7 +161,9 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
   .nav a:hover,.nav a.active{border-bottom-color:var(--red-b);background:rgba(139,0,0,.08)}
   .nav-btn{display:block;width:100%;text-align:left;min-height:44px;padding:14px 16px;margin:0;border:none;border-bottom:1px solid var(--blk-m);background:transparent;color:var(--red-b)}
   .nav-btn:hover{background:rgba(139,0,0,.08)}
-  .nav-toggle{bottom:-12px;display:block}
+  .nav-toggle{position:static;width:44px;height:44px;min-width:44px;min-height:44px;padding:8px;border:0;background:transparent;color:var(--red-b);cursor:pointer;z-index:260;line-height:1;font-size:24px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;margin-left:auto}
+  .nav-toggle::before{display:none}
+  .nav-toggle:active{background:rgba(139,0,0,.1)}
   .user-menu{width:100%}
   .user-menu-panel{position:static;min-width:0;margin-top:8px;width:100%;padding:10px}
   .user-menu-trigger{width:100%;justify-content:space-between}
