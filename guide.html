@@ -233,6 +233,57 @@ function buildGuideDocument(html, css) {
     '</style></head><body>' + normalizedHtml + '</body></html>';
 }
 
+function bindGuideIframeAnchorScrolling(frame) {
+  if (!frame || frame.__anchorScrollBound) return;
+  frame.__anchorScrollBound = true;
+
+  const attach = () => {
+    let doc;
+    try {
+      doc = frame.contentDocument;
+    } catch (err) {
+      return;
+    }
+    if (!doc || doc.__anchorScrollBound) return;
+    doc.__anchorScrollBound = true;
+
+    doc.addEventListener('click', event => {
+      const anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      if (!anchor) return;
+
+      const href = String(anchor.getAttribute('href') || '').trim();
+      if (!href) return;
+
+      let url;
+      try {
+        url = new URL(href, frame.contentWindow.location.href);
+      } catch (err) {
+        return;
+      }
+
+      const isSameDocument = href.startsWith('#') || (
+        url.origin === frame.contentWindow.location.origin &&
+        url.pathname === frame.contentWindow.location.pathname &&
+        url.search === frame.contentWindow.location.search
+      );
+
+      if (!isSameDocument) return;
+
+      const hash = url.hash || (href.startsWith('#') ? href : '');
+      if (!hash) return;
+
+      const target = doc.getElementById(decodeURIComponent(hash.slice(1)));
+      if (!target) return;
+
+      event.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, true);
+  };
+
+  frame.addEventListener('load', attach);
+  attach();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await rolesReady;
   auth.onAuthStateChanged(async user => {
@@ -252,7 +303,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const loading = document.getElementById('guide-loading');
       dynamic.classList.remove('hidden');
       dynamic.innerHTML = '<iframe id="guide-frame" title="Guide content" sandbox="allow-same-origin" style="width:100%;min-height:1200px;border:1px solid var(--red-d);background:#000"></iframe>';
-      document.getElementById('guide-frame').srcdoc = buildGuideDocument(doc.htmlContent || '', doc.cssContent || '');
+      const guideFrame = document.getElementById('guide-frame');
+      guideFrame.srcdoc = buildGuideDocument(doc.htmlContent || '', doc.cssContent || '');
+      bindGuideIframeAnchorScrolling(guideFrame);
       staticWrap.classList.add('hidden');
       if (loading) loading.classList.add('hidden');
       return;

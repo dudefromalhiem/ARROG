@@ -341,6 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const frame = document.getElementById('pv-frame');
     const htmlDoc = buildPageDocument(page.htmlContent, page.cssContent || '', page.imageUrls || [], page.imageAssets || [], page.mediaUrls || [], page.mediaAssets || []);
     frame.srcdoc = htmlDoc;
+    bindIframeAnchorScrolling(frame);
 
     // Show viewer
     document.getElementById('page-loading').classList.add('hidden');
@@ -1241,6 +1242,57 @@ function buildPageDocument(html, css, imageUrls, imageAssets, mediaUrls, mediaAs
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
     safeCss.replace(/<\/style>/gi, '') +
     '</style></head><body>' + normalizedWrapped + '</body></html>';
+}
+
+function bindIframeAnchorScrolling(frame) {
+  if (!frame || frame.__anchorScrollBound) return;
+  frame.__anchorScrollBound = true;
+
+  const attach = () => {
+    let doc;
+    try {
+      doc = frame.contentDocument;
+    } catch (err) {
+      return;
+    }
+    if (!doc || doc.__anchorScrollBound) return;
+    doc.__anchorScrollBound = true;
+
+    doc.addEventListener('click', event => {
+      const anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      if (!anchor) return;
+
+      const href = String(anchor.getAttribute('href') || '').trim();
+      if (!href) return;
+
+      let url;
+      try {
+        url = new URL(href, frame.contentWindow.location.href);
+      } catch (err) {
+        return;
+      }
+
+      const isSameDocument = href.startsWith('#') || (
+        url.origin === frame.contentWindow.location.origin &&
+        url.pathname === frame.contentWindow.location.pathname &&
+        url.search === frame.contentWindow.location.search
+      );
+
+      if (!isSameDocument) return;
+
+      const hash = url.hash || (href.startsWith('#') ? href : '');
+      if (!hash) return;
+
+      const target = doc.getElementById(decodeURIComponent(hash.slice(1)));
+      if (!target) return;
+
+      event.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, true);
+  };
+
+  frame.addEventListener('load', attach);
+  attach();
 }
 
 function normalizePageCss(css) {
