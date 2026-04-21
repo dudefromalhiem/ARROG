@@ -15,6 +15,9 @@
     .profile-warning { border:1px solid var(--red-g); background: rgba(139,0,0,.12); color: var(--wht); font-weight: 700; padding: 10px 12px; margin-bottom: 12px; }
     .profile-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .profile-status { font-size:.8rem; color:var(--wht-f); margin-top:8px; }
+    .profile-view-actions { margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap; }
+    .profile-view-actions.hidden { display:none; }
+    .profile-readonly { opacity:.85; }
     @media (max-width: 880px) { .profile-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -33,7 +36,7 @@
       <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
       <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
-      <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
     </ul>
   </div>
 </header>
@@ -41,17 +44,17 @@
 <main class="wrap profile-shell" id="main-content">
   <div class="section">
     <div class="section-hd">Profile</div>
-    <div class="profile-warning">Any user with inappropriate profile images will be banned.</div>
+    <div class="profile-warning" id="profile-warning">Any user with inappropriate profile images will be banned.</div>
 
     <div class="profile-grid">
       <div class="profile-card">
         <div class="card-t">Profile Picture</div>
         <img id="profile-avatar" class="profile-avatar" src="logo.png" alt="Profile picture" loading="lazy" decoding="async" />
-        <div class="fg">
+        <div class="fg" id="profile-upload-group">
           <label class="fl" for="profile-picture">Upload picture</label>
           <input class="fi" id="profile-picture" type="file" accept="image/*" />
         </div>
-        <div class="profile-actions">
+        <div class="profile-actions" id="profile-upload-actions">
           <button class="btn btn-p" id="profile-upload-btn" type="button">Upload</button>
         </div>
       </div>
@@ -69,6 +72,12 @@
         <div class="profile-actions">
           <button class="btn btn-p" id="profile-save-btn" type="button">Save Profile</button>
           <a class="btn btn-s" href="index.html">Back Home</a>
+        </div>
+        <div class="profile-view-actions hidden" id="profile-view-actions">
+          <button class="btn btn-p" id="profile-add-friend-btn" type="button">Add Friend</button>
+          <button class="btn btn-s" id="profile-message-btn" type="button">Message</button>
+          <button class="btn btn-s" id="profile-report-btn" type="button">Report</button>
+          <button class="btn btn-d" id="profile-block-btn" type="button">Block</button>
         </div>
         <div class="profile-status" id="profile-status">Sign in to update your profile.</div>
       </div>
@@ -88,6 +97,17 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
+let socialApiBase = '/api/social';
+let currentProfileUid = '';
+let viewedProfileData = null;
+
+function configureSocialApiBase() {
+  const host = String(window.location.hostname || '').toLowerCase();
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  const isFile = window.location.protocol === 'file:';
+  socialApiBase = (isLocal || isFile) ? 'https://redoakguild.vercel.app/api/social' : '/api/social';
+}
+
 function setProfileStatus(message, isError) {
   const el = document.getElementById('profile-status');
   if (!el) return;
@@ -175,6 +195,118 @@ async function loadProfile(user) {
   }
 }
 
+async function loadPublicProfile(uid) {
+  const targetUid = String(uid || '').trim();
+  if (!targetUid) throw new Error('Missing profile target.');
+  const base = new URL(socialApiBase, window.location.origin);
+  base.searchParams.set('type', 'profile');
+  base.searchParams.set('uid', targetUid);
+  const response = await fetch(base.toString(), { method: 'GET' });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Could not load profile.');
+  return payload.profile || null;
+}
+
+function applyProfileMode(isEditable, viewerSignedIn) {
+  const username = document.getElementById('profile-username');
+  const bio = document.getElementById('profile-bio');
+  const saveBtn = document.getElementById('profile-save-btn');
+  const uploadGroup = document.getElementById('profile-upload-group');
+  const uploadActions = document.getElementById('profile-upload-actions');
+  const viewActions = document.getElementById('profile-view-actions');
+  const warning = document.getElementById('profile-warning');
+
+  if (username) {
+    username.readOnly = !isEditable;
+    username.classList.toggle('profile-readonly', !isEditable);
+  }
+  if (bio) {
+    bio.readOnly = !isEditable;
+    bio.classList.toggle('profile-readonly', !isEditable);
+  }
+  if (saveBtn) saveBtn.style.display = isEditable ? 'inline-block' : 'none';
+  if (uploadGroup) uploadGroup.style.display = isEditable ? 'block' : 'none';
+  if (uploadActions) uploadActions.style.display = isEditable ? 'flex' : 'none';
+  if (viewActions) {
+    viewActions.classList.toggle('hidden', isEditable);
+    Array.from(viewActions.querySelectorAll('button')).forEach(btn => {
+      btn.disabled = !viewerSignedIn;
+    });
+  }
+  if (warning) {
+    warning.textContent = isEditable
+      ? 'Any user with inappropriate profile images will be banned.'
+      : 'Viewing public profile. Sign in to use profile actions.';
+  }
+}
+
+function openMessageToViewedProfile() {
+  if (!viewedProfileData || !viewedProfileData.uid) return;
+  localStorage.setItem('dmRecipientUid', viewedProfileData.uid);
+  localStorage.setItem('dmRecipientName', viewedProfileData.displayName || 'Guild Member');
+  location.href = 'messaging.html?to=' + encodeURIComponent(viewedProfileData.uid);
+}
+
+async function postProfileAction(action, extraPayload) {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Sign in required.');
+  const token = await user.getIdToken();
+  const response = await fetch(socialApiBase, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(Object.assign({ action: action, targetUid: viewedProfileData?.uid || '' }, extraPayload || {}))
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Action failed.');
+  return payload;
+}
+
+async function addFriendFromProfile() {
+  try {
+    setProfileStatus('Sending friend request...', false);
+    const result = await postProfileAction('addfriend', {});
+    if (result && result.alreadyPending) {
+      setProfileStatus('Friend request already pending.', false);
+    } else {
+      setProfileStatus('Friend request sent.', false);
+    }
+  } catch (err) {
+    setProfileStatus('Add friend failed: ' + err.message, true);
+  }
+}
+
+async function reportFromProfile() {
+  const reason = prompt('Reason for reporting this user:', '');
+  if (reason === null) return;
+  const trimmed = String(reason || '').trim();
+  if (!trimmed) {
+    setProfileStatus('Report cancelled.', false);
+    return;
+  }
+  try {
+    setProfileStatus('Submitting report...', false);
+    await postProfileAction('report', { reason: trimmed });
+    setProfileStatus('Report submitted.', false);
+  } catch (err) {
+    setProfileStatus('Report failed: ' + err.message, true);
+  }
+}
+
+async function blockFromProfile() {
+  const reason = prompt('Reason for blocking this user (optional):', '');
+  if (reason === null) return;
+  try {
+    setProfileStatus('Blocking user...', false);
+    await postProfileAction('block', { reason: String(reason || '').trim() });
+    setProfileStatus('User blocked.', false);
+  } catch (err) {
+    setProfileStatus('Block failed: ' + err.message, true);
+  }
+}
+
 async function saveProfile() {
   const user = auth.currentUser;
   if (!user) {
@@ -248,25 +380,64 @@ async function uploadProfilePicture() {
 
 auth.onAuthStateChanged(async user => {
   const navAuth = document.getElementById('nav-auth');
+  const messagingLink = document.getElementById('messaging-link');
   const submitLink = document.getElementById('submit-link');
   const adminLink = document.getElementById('admin-link');
+  const queryUid = String(new URLSearchParams(window.location.search).get('uid') || '').trim();
+  const viewingOther = !!queryUid && (!user || queryUid !== user.uid);
+  currentProfileUid = queryUid || (user ? user.uid : '');
 
   if (!user) {
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    if (messagingLink) messagingLink.classList.add('hidden');
     if (submitLink) submitLink.classList.add('hidden');
     if (adminLink) adminLink.classList.add('hidden');
-    setProfileStatus('Please sign in to edit your profile.', true);
+    if (!viewingOther) {
+      applyProfileMode(false, false);
+      setProfileStatus('Please sign in to edit your profile.', true);
+      return;
+    }
+    try {
+      viewedProfileData = await loadPublicProfile(queryUid);
+      document.getElementById('profile-username').value = viewedProfileData.displayName || '';
+      document.getElementById('profile-bio').value = viewedProfileData.bio || '';
+      document.getElementById('profile-avatar').src = viewedProfileData.photoURL || 'logo.png';
+      applyProfileMode(false, false);
+      setProfileStatus('Viewing profile of ' + (viewedProfileData.displayName || 'Agent') + '.', false);
+    } catch (err) {
+      setProfileStatus('Could not load profile: ' + err.message, true);
+    }
     return;
   }
 
   navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
+  if (messagingLink) messagingLink.classList.remove('hidden');
   if (submitLink) submitLink.classList.remove('hidden');
   if (adminLink) adminLink.classList.toggle('hidden', !isAdmin(user.email));
-  await loadProfile(user);
+  if (viewingOther) {
+    try {
+      viewedProfileData = await loadPublicProfile(queryUid);
+      document.getElementById('profile-username').value = viewedProfileData.displayName || '';
+      document.getElementById('profile-bio').value = viewedProfileData.bio || '';
+      document.getElementById('profile-avatar').src = viewedProfileData.photoURL || 'logo.png';
+      applyProfileMode(false, true);
+      setProfileStatus('Viewing profile of ' + (viewedProfileData.displayName || 'Agent') + '.', false);
+    } catch (err) {
+      setProfileStatus('Could not load profile: ' + err.message, true);
+    }
+  } else {
+    applyProfileMode(true, true);
+    await loadProfile(user);
+  }
 });
 
+configureSocialApiBase();
 document.getElementById('profile-save-btn')?.addEventListener('click', saveProfile);
 document.getElementById('profile-upload-btn')?.addEventListener('click', uploadProfilePicture);
+document.getElementById('profile-message-btn')?.addEventListener('click', openMessageToViewedProfile);
+document.getElementById('profile-add-friend-btn')?.addEventListener('click', addFriendFromProfile);
+document.getElementById('profile-report-btn')?.addEventListener('click', reportFromProfile);
+document.getElementById('profile-block-btn')?.addEventListener('click', blockFromProfile);
 </script>
 </body>
 </html>

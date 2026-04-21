@@ -115,6 +115,19 @@ async function fetchUsersByEmails(db, emails) {
   return byEmail;
 }
 
+async function fetchUsersByUids(db, uids) {
+  const normalized = [...new Set((uids || []).map(uid => String(uid || '').trim()).filter(Boolean))];
+  const byUid = new Map();
+  if (!normalized.length) return byUid;
+
+  const docs = await Promise.all(normalized.map(uid => db.collection('users').doc(uid).get()));
+  docs.forEach(doc => {
+    if (!doc.exists) return;
+    byUid.set(doc.id, { id: doc.id, ...toPlainValue(doc.data() || {}) });
+  });
+  return byUid;
+}
+
 async function listPublicAdmins(db) {
   const roles = await getRolesData(db);
   const adminEmails = Array.isArray(roles.admins) ? roles.admins.map(value => String(value || '').toLowerCase()) : [];
@@ -151,9 +164,36 @@ async function searchUsers(db, queryText) {
       uid: String(user.uid || user.id || ''),
       displayName: normalizeText(user.displayName || user.email || 'Agent', 120),
       email: String(user.email || '').toLowerCase(),
-      role: String(user.role || 'user')
+      role: String(user.role || 'user'),
+      photoURL: normalizeText(user.photoURL || '', 1200)
     }))
     .filter(user => user.uid);
+}
+
+async function getPublicProfileByUid(db, uid) {
+  const targetUid = normalizeText(uid || '', 128);
+  if (!targetUid) {
+    const err = new Error('Missing target user.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const doc = await db.collection('users').doc(targetUid).get();
+  if (!doc.exists) {
+    const err = new Error('Target user not found.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const data = doc.data() || {};
+  return {
+    uid: String(data.uid || doc.id || ''),
+    displayName: normalizeText(data.displayName || data.email || 'Agent', 120),
+    email: String(data.email || '').toLowerCase(),
+    role: String(data.role || 'user'),
+    bio: normalizeText(data.bio || '', 500),
+    photoURL: normalizeText(data.photoURL || '', 1200)
+  };
 }
 
 async function checkBlock(db, blockerUid, blockedUid) {
@@ -250,20 +290,94 @@ async function sendMessage(db, actor, body) {
 async function listInbox(db, actor) {
   const snap = await db.collection('dmThreads').where('participants', 'array-contains', actor.uid).get();
   const threads = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const peerUids = [...new Set(
+    threads
+      .map(thread => (Array.isArray(thread.participants) ? thread.participants : []).find(uid => uid !== actor.uid) || '')
+      .filter(Boolean)
+  )];
+  const userMap = await fetchUsersByUids(db, peerUids);
+
   threads.sort((a, b) => {
     const sa = Number(a?.lastMessageAt?.seconds || a?.updatedAt?.seconds || a?.createdAt?.seconds || 0);
     const sb = Number(b?.lastMessageAt?.seconds || b?.updatedAt?.seconds || b?.createdAt?.seconds || 0);
     return sb - sa;
   });
-  return threads.map(thread => ({
-    id: thread.id,
-    participants: thread.participants || [],
-    participantNames: thread.participantNames || [],
-    lastMessagePreview: thread.lastMessagePreview || '',
-    lastMessageBy: thread.lastMessageBy || '',
-    ownerConversationOpen: thread.ownerConversationOpen === true,
-    updatedAt: formatTimestamp(thread.updatedAt || thread.lastMessageAt || thread.createdAt)
-  }));
+  return threads.map(thread => {
+    const participants = Array.isArray(thread.participants) ? thread.participants : [];
+    const peerUid = participants.find(uid => uid !== actor.uid) || '';
+    const peerData = userMap.get(peerUid) || {};
+    const peerIndex = participants.indexOf(peerUid);
+    const peerNameFromThread = Array.isArray(thread.participantNames) ? thread.participantNames[peerIndex] : '';
+
+    return {
+      id: thread.id,
+      participants,
+      participantNames: thread.participantNames || [],
+      lastMessagePreview: thread.lastMessagePreview || '',
+      lastMessageBy: thread.lastMessageBy || '',
+      ownerConversationOpen: thread.ownerConversationOpen === true,
+      updatedAt: formatTimestamp(thread.updatedAt || thread.lastMessageAt || thread.createdAt),
+      peer: {
+        uid: String(peerUid || ''),
+        displayName: normalizeText(peerData.displayName || peerNameFromThread || peerData.email || 'Guild Member', 120),
+        email: String(peerData.email || '').toLowerCase(),
+        role: String(peerData.role || 'user'),
+        photoURL: normalizeText(peerData.photoURL || '', 1200)
+      }
+    };
+  });
+}
+
+async function addFriendRequest(db, actor, body) {
+  const targetUid = normalizeText(body.targetUid || '', 128);
+  const note = normalizeText(body.note || '', 300);
+  if (!targetUid) {
+    return { statusCode: 400, payload: { error: 'Missing target user.' } };
+  }
+  if (targetUid === actor.uid) {
+    return { statusCode: 400, payload: { error: 'You cannot add yourself.' } };
+  }
+
+  const [targetSnap, senderSnap] = await Promise.all([
+    db.collection('users').doc(targetUid).get(),
+    db.collection('users').doc(actor.uid).get()
+  ]);
+  if (!targetSnap.exists) {
+    return { statusCode: 404, payload: { error: 'Target user not found.' } };
+  }
+  if (await checkBlock(db, actor.uid, targetUid) || await checkBlock(db, targetUid, actor.uid)) {
+    return { statusCode: 403, payload: { error: 'Friend request blocked between these accounts.' } };
+  }
+
+  const senderData = senderSnap.exists ? (senderSnap.data() || {}) : {};
+  const targetData = targetSnap.data() || {};
+  const requestId = makeThreadId(actor.uid, targetUid);
+  const requestRef = db.collection('friendRequests').doc(requestId);
+  const requestSnap = await requestRef.get();
+  if (requestSnap.exists) {
+    const existing = requestSnap.data() || {};
+    if (String(existing.status || '').toLowerCase() === 'pending') {
+      return { statusCode: 200, payload: { ok: true, alreadyPending: true } };
+    }
+  }
+
+  await requestRef.set({
+    requestId,
+    requesterUid: actor.uid,
+    requesterEmail: actor.email,
+    requesterName: normalizeText(senderData.displayName || actor.name || actor.email.split('@')[0] || 'Agent', 120),
+    requesterPhotoURL: normalizeText(senderData.photoURL || '', 1200),
+    targetUid,
+    targetEmail: String(targetData.email || '').toLowerCase(),
+    targetName: normalizeText(targetData.displayName || targetData.email || 'Agent', 120),
+    targetPhotoURL: normalizeText(targetData.photoURL || '', 1200),
+    note,
+    status: 'pending',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { statusCode: 200, payload: { ok: true, requestId } };
 }
 
 async function readThreadMessages(db, actor, peerUid) {
@@ -391,6 +505,11 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 200, { admins });
     }
 
+    if (method === 'GET' && type === 'profile') {
+      const profile = await getPublicProfileByUid(db, req.query?.uid || '');
+      return sendJson(res, 200, { profile });
+    }
+
     const actor = await verifyUser(req);
 
     if (method === 'GET' && type === 'searchusers') {
@@ -428,6 +547,11 @@ module.exports = async function handler(req, res) {
 
       if (action === 'report') {
         const result = await reportUser(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'addfriend') {
+        const result = await addFriendRequest(db, actor, body);
         return sendJson(res, result.statusCode, result.payload);
       }
 

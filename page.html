@@ -18,7 +18,11 @@
     .comment-toolbar button { padding:4px 8px; font-size:.72rem; line-height:1.2; }
     .comment-list { display:grid; gap:10px; }
     .comment-item { border:1px solid var(--blk-m); background: var(--blk-b); padding:10px; }
-    .comment-meta { font-size:.72rem; color: var(--wht-f); display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+    .comment-head { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
+    .comment-avatar { width:34px; height:34px; border-radius:50%; border:1px solid var(--red-d); object-fit:cover; background:#111; flex:0 0 auto; }
+    .comment-meta { font-size:.72rem; color: var(--wht-f); display:flex; gap:8px; flex-wrap:wrap; margin-bottom:2px; }
+    .comment-author-link { color: var(--wht); font-weight:700; text-decoration:none; }
+    .comment-author-link:hover { color: var(--red-b); text-decoration:underline; }
     .comment-content { font-size:.9rem; color: var(--wht-m); line-height:1.65; white-space: normal; }
     .comment-content .comment-spoiler { display:inline-block; background:#141414; color:transparent; border:1px solid var(--red-d); padding:0 6px; cursor:pointer; user-select:none; }
     .comment-content .comment-spoiler::after { content:'Spoiler'; color:var(--red-b); letter-spacing:.6px; text-transform:uppercase; font-size:.66rem; }
@@ -757,12 +761,25 @@ function renderComments() {
     const editable = canEditComment(c);
     const canReport = !!currentCommentUser;
     const editedIndicator = c.editedAt ? '<span style="font-size:.7rem;color:var(--wht-f);margin-left:8px">(edited ' + escapeCommentHtml(formatCommentDate(c.editedAt)) + ')</span>' : '';
+    const authorName = escapeCommentHtml(c.authorName || 'Agent');
+    const authorUid = escapeCommentHtml(c.authorUid || '');
+    const authorPhoto = escapeCommentHtml(c.authorPhotoURL || 'logo.png');
+    const profileHref = c.authorUid ? ('profile.html?uid=' + encodeURIComponent(c.authorUid || '')) : '';
+    const authorLabel = profileHref
+      ? ('<a class="comment-author-link" href="' + escapeCommentHtml(profileHref) + '">' + authorName + '</a>')
+      : ('<span class="comment-author-link">' + authorName + '</span>');
     return '<article class="comment-item">' +
-      '<div class="comment-meta">' +
-        '<span>' + escapeCommentHtml(c.authorName || 'Agent') + '</span>' +
-        '<span>|</span>' +
-        '<span>' + escapeCommentHtml(formatCommentDate(c.createdAt)) + '</span>' +
-        editedIndicator +
+      '<div class="comment-head">' +
+        '<img class="comment-avatar" src="' + authorPhoto + '" alt="' + authorName + '" loading="lazy" decoding="async" />' +
+        '<div style="min-width:0;flex:1">' +
+          '<div class="comment-meta">' +
+            authorLabel +
+            '<span>|</span>' +
+            '<span>' + escapeCommentHtml(formatCommentDate(c.createdAt)) + '</span>' +
+            editedIndicator +
+          '</div>' +
+          (authorUid ? '<div class="community-meta" style="margin-top:0">UID: ' + authorUid + '</div>' : '') +
+        '</div>' +
       '</div>' +
       '<div class="comment-content">' + renderCommentRichText(c.content || '') + '</div>' +
       renderCommentMedia(c.media || []) +

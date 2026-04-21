@@ -23,6 +23,9 @@
     .msg-item:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--red-m); }
     .msg-item.active { background: rgba(139, 0, 0, 0.1); border-color: var(--red-b); }
     .msg-item-name { font-size: 0.9rem; color: var(--wht-b); font-weight: bold; display: flex; align-items: center; gap: 8px; }
+    .msg-item-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1px solid var(--red-d); background: #111; }
+    .msg-item-profile-link { margin-left:auto; font-size:.68rem; text-transform: uppercase; letter-spacing: .8px; color: var(--red-b); text-decoration:none; }
+    .msg-item-profile-link:hover { text-decoration: underline; }
     .msg-item-status { width: 8px; height: 8px; background: var(--wht-f); border-radius: 50%; flex-shrink: 0; }
     .msg-item-status.online { background: #4ade80; }
     .msg-item-preview { font-size: 0.75rem; color: var(--wht-d); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -244,12 +247,19 @@ async function apiPost(body) {
 }
 
 function extractPeer(thread) {
+  if (thread && thread.peer && thread.peer.uid) {
+    return {
+      peerUid: String(thread.peer.uid || ''),
+      peerName: String(thread.peer.displayName || 'Guild Member'),
+      peerPhotoURL: String(thread.peer.photoURL || '')
+    };
+  }
   const participants = Array.isArray(thread.participants) ? thread.participants : [];
   const names = Array.isArray(thread.participantNames) ? thread.participantNames : [];
   const peerUid = participants.find(uid => uid !== currentUser.uid) || '';
   const peerIndex = participants.indexOf(peerUid);
   const peerName = names[peerIndex] || 'Guild Member';
-  return { peerUid, peerName };
+  return { peerUid, peerName, peerPhotoURL: '' };
 }
 
 function setTab(tab) {
@@ -322,8 +332,9 @@ function renderFriends() {
   list.innerHTML = rows.map(row => {
     const isActive = row.peer.peerUid === currentPeerUid;
     const preview = escapeHtml(String(row.thread.lastMessagePreview || 'No messages yet'));
+    const avatar = escapeHtml(row.peer.peerPhotoURL || 'logo.png');
     return '<button type="button" class="msg-item ' + (isActive ? 'active' : '') + '" data-peer-uid="' + escapeHtml(row.peer.peerUid) + '" data-peer-name="' + escapeHtml(row.peer.peerName) + '">' +
-      '<div class="msg-item-name"><span class="msg-item-status"></span>' + escapeHtml(row.peer.peerName) + '</div>' +
+      '<div class="msg-item-name"><span class="msg-item-status"></span><img class="msg-item-avatar" src="' + avatar + '" alt="' + escapeHtml(row.peer.peerName) + '" loading="lazy" decoding="async" /><a href="profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '" data-open-profile="1" style="color:var(--wht-b);text-decoration:none">' + escapeHtml(row.peer.peerName) + '</a><a class="msg-item-profile-link" href="profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '" data-open-profile="1">Profile</a></div>' +
       '<div class="msg-item-preview">' + preview + '</div>' +
       '<div class="msg-item-time">' + escapeHtml(formatDateTime(row.thread.updatedAt)) + '</div>' +
     '</button>';
@@ -523,6 +534,11 @@ function bindUiEvents() {
   });
 
   document.getElementById('msg-friends-list')?.addEventListener('click', (event) => {
+    const openProfile = event.target.closest('[data-open-profile]');
+    if (openProfile) {
+      event.stopPropagation();
+      return;
+    }
     const target = event.target.closest('[data-peer-uid]');
     if (!target) return;
     openChat(target.getAttribute('data-peer-uid') || '', target.getAttribute('data-peer-name') || 'Guild Member');

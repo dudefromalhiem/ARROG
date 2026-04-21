@@ -189,6 +189,30 @@ async function listComments(db, pageId, slug, actor) {
     }
   }
 
+  const authorUids = [...new Set(comments.map(entry => String(entry?.data?.authorUid || '')).filter(Boolean))];
+  if (authorUids.length) {
+    const authorDocs = await Promise.all(authorUids.map(uid => db.collection('users').doc(uid).get()));
+    const authorMap = new Map();
+    authorDocs.forEach(doc => {
+      if (!doc.exists) return;
+      authorMap.set(doc.id, doc.data() || {});
+    });
+
+    comments = comments.map(entry => {
+      const data = entry && entry.data ? entry.data : {};
+      const uid = String(data.authorUid || '');
+      const profile = authorMap.get(uid) || {};
+      return {
+        ...entry,
+        data: {
+          ...data,
+          authorName: normalizeText(data.authorName || profile.displayName || data.authorEmail || 'Agent', 120),
+          authorPhotoURL: normalizeText(data.authorPhotoURL || profile.photoURL || '', 1200)
+        }
+      };
+    });
+  }
+
   comments.sort((a, b) => {
     const sa = Number(a && a.data && a.data.createdAt && a.data.createdAt.seconds || 0);
     const sb = Number(b && b.data && b.data.createdAt && b.data.createdAt.seconds || 0);
@@ -239,6 +263,9 @@ module.exports = async function handler(req, res) {
         return sendJson(res, 400, { error: 'Comment cannot be empty.' });
       }
 
+      const userDoc = await db.collection('users').doc(actor.uid).get();
+      const userData = userDoc.exists ? (userDoc.data() || {}) : {};
+
       const payload = {
         pageId,
         slug,
@@ -247,7 +274,8 @@ module.exports = async function handler(req, res) {
         media,
         authorUid: actor.uid,
         authorEmail: actor.email,
-        authorName: normalizeText(body.authorName || actor.name || actor.email.split('@')[0] || 'Agent', 120),
+        authorName: normalizeText(body.authorName || userData.displayName || actor.name || actor.email.split('@')[0] || 'Agent', 120),
+        authorPhotoURL: normalizeText(userData.photoURL || '', 1200),
         status: 'active',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
