@@ -1214,7 +1214,16 @@ function buildPageDocument(html, css, imageUrls, imageAssets, mediaUrls, mediaAs
   documentMarkup.querySelectorAll('a[href]').forEach(anchor => {
     const href = String(anchor.getAttribute('href') || '').trim();
     const isInternalAnchor = href.startsWith('#') || (/^[^:]+#/.test(href) && !/^https?:\/\//i.test(href));
-    if (isInternalAnchor) {
+    const sameOriginAnchor = (() => {
+      if (!/^https?:\/\//i.test(href) || !href.includes('#')) return false;
+      try {
+        const url = new URL(href, window.location.href);
+        return url.origin === window.location.origin && url.pathname === window.location.pathname;
+      } catch (err) {
+        return false;
+      }
+    })();
+    if (isInternalAnchor || sameOriginAnchor) {
       const hashIndex = href.indexOf('#');
       if (hashIndex >= 0) {
         anchor.setAttribute('href', href.slice(hashIndex));
