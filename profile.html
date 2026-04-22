@@ -35,7 +35,6 @@
       <li><a href="explore.html">Explore</a></li>
       <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
-      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="location.href='index.html'">Sign In</button></li>
     </ul>
   </div>
@@ -382,7 +381,8 @@ auth.onAuthStateChanged(async user => {
   const navAuth = document.getElementById('nav-auth');
   const messagingLink = document.getElementById('messaging-link');
   const submitLink = document.getElementById('submit-link');
-  const adminLink = document.getElementById('admin-link');
+  const nav = document.getElementById('nav');
+  let adminLink = nav ? nav.querySelector('#admin-link') : null;
   const queryUid = String(new URLSearchParams(window.location.search).get('uid') || '').trim();
   const viewingOther = !!queryUid && (!user || queryUid !== user.uid);
   currentProfileUid = queryUid || (user ? user.uid : '');
@@ -391,7 +391,7 @@ auth.onAuthStateChanged(async user => {
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     if (messagingLink) messagingLink.classList.add('hidden');
     if (submitLink) submitLink.classList.add('hidden');
-    if (adminLink) adminLink.classList.add('hidden');
+    if (adminLink) adminLink.remove();
     if (!viewingOther) {
       applyProfileMode(false, false);
       setProfileStatus('Please sign in to edit your profile.', true);
@@ -413,7 +413,19 @@ auth.onAuthStateChanged(async user => {
   navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
   if (messagingLink) messagingLink.classList.remove('hidden');
   if (submitLink) submitLink.classList.remove('hidden');
-  if (adminLink) adminLink.classList.toggle('hidden', !isAdmin(user.email));
+  if (nav) {
+    if (isAdmin(user.email)) {
+      if (!adminLink) {
+        adminLink = document.createElement('li');
+        adminLink.id = 'admin-link';
+        adminLink.innerHTML = '<a href="admin.html">Admin</a>';
+        const authLi = nav.querySelector('#nav-auth');
+        nav.insertBefore(adminLink, authLi || null);
+      }
+    } else if (adminLink) {
+      adminLink.remove();
+    }
+  }
   if (viewingOther) {
     try {
       viewedProfileData = await loadPublicProfile(queryUid);

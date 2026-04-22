@@ -22,7 +22,6 @@
       <li><a href="explore.html">Explore</a></li>
       <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
-      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
     </ul>
   </div>
@@ -150,7 +149,8 @@ function loadAdminRoster() {
 auth.onAuthStateChanged(async function (user) {
   const navAuth = document.getElementById('nav-auth');
   const submitLink = document.getElementById('submit-link');
-  const adminLink = document.getElementById('admin-link');
+  const nav = document.getElementById('nav');
+  let adminLink = nav ? nav.querySelector('#admin-link') : null;
   const messagingLink = document.getElementById('messaging-link');
 
   if (user) {
@@ -158,15 +158,25 @@ auth.onAuthStateChanged(async function (user) {
     navAuth.innerHTML = renderUserMenuHTML(displayLabel);
     if (submitLink) submitLink.classList.remove('hidden');
     if (messagingLink) messagingLink.classList.remove('hidden');
-    if (adminLink) {
+    if (nav) {
       const isAdminUser = await getUserAdminFlag(user);
-      adminLink.classList.toggle('hidden', !isAdminUser);
+      if (isAdminUser) {
+        if (!adminLink) {
+          adminLink = document.createElement('li');
+          adminLink.id = 'admin-link';
+          adminLink.innerHTML = '<a href="admin.html">Admin</a>';
+          const authLi = nav.querySelector('#nav-auth');
+          nav.insertBefore(adminLink, authLi || null);
+        }
+      } else if (adminLink) {
+        adminLink.remove();
+      }
     }
   } else {
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     if (submitLink) submitLink.classList.add('hidden');
     if (messagingLink) messagingLink.classList.add('hidden');
-    if (adminLink) adminLink.classList.add('hidden');
+    if (adminLink) adminLink.remove();
   }
 });
 

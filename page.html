@@ -94,7 +94,6 @@
       <li><a href="explore.html">Explore</a></li>
       <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
       <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
-      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
       <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
     </ul>
   </div>
@@ -416,13 +415,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const navAuth = document.getElementById('nav-auth');
     const messagingLink = document.getElementById('messaging-link');
     const submitLink = document.getElementById('submit-link');
-    const adminLink = document.getElementById('admin-link');
+    const nav = document.getElementById('nav');
+    let adminLink = nav ? nav.querySelector('#admin-link') : null;
     if (user) {
       const displayLabel = user.displayName || 'Agent';
       navAuth.innerHTML = renderUserMenuHTML(displayLabel);
       if (messagingLink) messagingLink.classList.remove('hidden');
       if (submitLink) submitLink.classList.remove('hidden');
-      if (adminLink) adminLink.classList.toggle('hidden', !isAdmin(user.email));
+      if (nav) {
+        if (isAdmin(user.email)) {
+          if (!adminLink) {
+            adminLink = document.createElement('li');
+            adminLink.id = 'admin-link';
+            adminLink.innerHTML = '<a href="admin.html">Admin</a>';
+            const authLi = nav.querySelector('#nav-auth');
+            nav.insertBefore(adminLink, authLi || null);
+          }
+        } else if (adminLink) {
+          adminLink.remove();
+        }
+      }
       
       // Inject admin actions
       let actionsDiv = document.getElementById('pv-actions');
@@ -442,7 +454,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (composeStatus) composeStatus.textContent = 'Sign in to post comments.';
       if (messagingLink) messagingLink.classList.add('hidden');
       if (submitLink) submitLink.classList.add('hidden');
-      if (adminLink) adminLink.classList.add('hidden');
+      if (adminLink) adminLink.remove();
     }
 
     const communitySection = document.getElementById('community-section');
