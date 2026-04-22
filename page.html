@@ -1310,7 +1310,8 @@ async function toggleUpvote() {
   }
 
   const targetDocId = await resolveUpvoteTargetDocId();
-  if (!targetDocId) {
+  const targetSlug = String(window.__pageSlug || '').trim();
+  if (!targetDocId && !targetSlug) {
     alert('Upvotes are not available for this page.');
     return;
   }
@@ -1333,8 +1334,8 @@ async function toggleUpvote() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        pageId: targetDocId,
-        pageSlug: window.__pageSlug || '',
+        pageId: targetDocId || '',
+        pageSlug: targetSlug,
         pageType: 'Anomaly'
       })
     });

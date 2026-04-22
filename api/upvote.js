@@ -47,7 +47,8 @@ async function verifyUser(req) {
  * 
  * Request body:
  * {
- *   pageId: string (required) - Firestore document ID of the page
+ *   pageId: string (optional) - Firestore document ID of the page
+ *   pageSlug: string (optional) - Page slug, used when pageId is unavailable
  *   pageType: string (required) - Must be "Anomaly"
  * }
  * 
@@ -86,10 +87,13 @@ module.exports = async (req, res) => {
 
     // Parse and validate request body
     const pageId = String(req.body?.pageId || '').trim();
+    const pageSlug = String(req.body?.pageSlug || '').trim().toLowerCase();
     const pageType = String(req.body?.pageType || '').trim();
 
-    if (!security.validateId(pageId)) {
-      return security.sendError(res, 400, 'Invalid pageId format.');
+    const hasValidPageId = pageId && security.validateId(pageId);
+    const hasValidSlug = /^[a-z0-9-]{1,120}$/.test(pageSlug);
+    if (!hasValidPageId && !hasValidSlug) {
+      return security.sendError(res, 400, 'Invalid page target. Provide pageId or pageSlug.');
     }
 
     // Only allow upvotes for anomalies
@@ -100,23 +104,42 @@ module.exports = async (req, res) => {
     const app = initAdmin();
     const db = admin.firestore(app);
 
-    // Check if page exists and is an anomaly
-    const pageDoc = await db.collection('pages').doc(pageId).get();
-    if (!pageDoc.exists) {
-      return security.sendError(res, 404, 'Page not found.');
+    // Resolve page by ID first, then slug fallback.
+    let resolvedPageId = hasValidPageId ? pageId : '';
+    let pageDoc = null;
+
+    if (hasValidPageId) {
+      const byId = await db.collection('pages').doc(pageId).get();
+      if (byId.exists) {
+        pageDoc = byId;
+      }
     }
 
-    const pageData = pageDoc.data();
-    if (pageData.type !== 'Anomaly') {
+    if (!pageDoc && hasValidSlug) {
+      const bySlug = await db.collection('pages').where('slug', '==', pageSlug).limit(1).get();
+      if (!bySlug.empty) {
+        pageDoc = bySlug.docs[0];
+        resolvedPageId = pageDoc.id;
+      }
+    }
+
+    if (!pageDoc || !pageDoc.exists || !resolvedPageId) {
+      return security.sendError(res, 404, 'Page not found for upvote target.');
+    }
+
+    const pageData = pageDoc.data() || {};
+    if (String(pageData.type || '').toLowerCase() !== 'anomaly') {
       return security.sendError(res, 400, 'Upvotes are only available for anomaly pages.');
     }
 
     // Check if page is approved
-    if (pageData.approvalStatus !== 'approved') {
+    const approvalStatus = String(pageData.approvalStatus || '').toLowerCase();
+    const hasLegacyApproval = !!pageData.approvedAt || !!pageData.approvedBy;
+    if (approvalStatus && approvalStatus !== 'approved' && !hasLegacyApproval) {
       return security.sendError(res, 400, 'Cannot upvote unapproved pages.');
     }
 
-    const upvoteRef = db.collection('pages').doc(pageId).collection('upvotes').doc(user.uid);
+    const upvoteRef = db.collection('pages').doc(resolvedPageId).collection('upvotes').doc(user.uid);
     const upvoteSnapshot = await upvoteRef.get();
     const currentlyUpvoted = upvoteSnapshot.exists;
 
@@ -135,11 +158,11 @@ module.exports = async (req, res) => {
     }
 
     // Get updated upvote count
-    const upvotesSnapshot = await db.collection('pages').doc(pageId).collection('upvotes').get();
+    const upvotesSnapshot = await db.collection('pages').doc(resolvedPageId).collection('upvotes').get();
     const upvoteCount = upvotesSnapshot.size;
 
     // Update the denormalized upvoteCount field on the page for quick queries
-    await db.collection('pages').doc(pageId).update({
+    await db.collection('pages').doc(resolvedPageId).update({
       upvoteCount: upvoteCount,
       upvoteCountUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
