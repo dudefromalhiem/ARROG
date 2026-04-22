@@ -750,8 +750,8 @@ render.mount('submission-terminal');</pre>
           <button class="btn btn-p" type="button" data-add-block="image">+ Image</button>
           <button class="btn btn-p" type="button" data-add-block="audio">+ Audio</button>
           <button class="btn btn-p" type="button" data-add-block="video">+ Video</button>
-          <button class="btn btn-s" type="button" id="doc-media-reorder-toggle" aria-pressed="false">Media Drag Reorder: Off</button>
           <button class="btn btn-p" type="button" data-add-block="quote">+ Quote</button>
+
           <button class="btn btn-p" type="button" data-add-block="list">+ List</button>
           <button class="btn btn-p" type="button" data-add-block="code">+ Code</button>
           <button class="btn btn-p" type="button" data-add-block="divider">+ Divider</button>
@@ -811,6 +811,10 @@ render.mount('submission-terminal');</pre>
       </div>
       <iframe class="preview-frame" id="preview-frame" sandbox="allow-same-origin allow-scripts" csp="default-src 'none'; style-src 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; connect-src https:;" title="Live preview of your page"></iframe>
     </div>
+
+    <!-- ═══ UPLOADED ASSETS PREVIEW ═══ -->
+    <div id="external-asset-preview" class="hidden"></div>
+
 
     <!-- ═══ SUBMIT ═══ -->
     <div class="submit-bar">

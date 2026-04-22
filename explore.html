@@ -165,6 +165,7 @@
   let universeSearchTimer = null;
   const UNIVERSE_CACHE_KEY = 'rog.explore.cache.v1';
   const UNIVERSE_CACHE_TTL_MS = 3 * 60 * 1000;
+  let isLoadError = false;
 
   function escapeHtml(value) {
     const text = String(value == null ? '' : value);
@@ -240,30 +241,6 @@
       }
     } catch (_cacheErr) { }
 
-    const seenByType = {
-      Anomaly: new Set(),
-      Tale: new Set(),
-      Artwork: new Set(),
-      Lore: new Set()
-    };
-
-    // Load from PAGE_SEED first so the universe remains visible even before Firestore migration
-    if (typeof PAGE_SEED !== 'undefined') {
-      PAGE_SEED.forEach(p => {
-        if (!universeData[p.type]) return;
-        const key = String(p.slug || p.title || '').toLowerCase();
-        if (key && seenByType[p.type] && seenByType[p.type].has(key)) return;
-        if (key && seenByType[p.type]) seenByType[p.type].add(key);
-        universeData[p.type].push({
-          id: p.slug || p.title,
-          slug: p.slug,
-          title: p.title,
-          type: p.type,
-          excerpt: p.anomalyDescription ? p.anomalyDescription : buildSnippet(p.htmlContent),
-          img: getImgSrc(p.htmlContent)
-        });
-      });
-    }
 
     // Load from Firestore
     try {
@@ -292,6 +269,7 @@
       });
     } catch(e) {
       console.warn("Could not fetch from Firestore.", e);
+      isLoadError = true;
     }
 
     try {
@@ -338,7 +316,11 @@
     }
 
     if (items.length === 0) {
-      grid.innerHTML = '<div class="no-results">No ' + type.toLowerCase() + 's found matching criteria.</div>';
+      if (isLoadError) {
+        grid.innerHTML = '<div class="no-results" style="color:var(--red-b);border-color:var(--red-d)">Failed to access databanks. Connection lost.</div>';
+      } else {
+        grid.innerHTML = '<div class="no-results">No ' + type.toLowerCase() + 's found matching criteria.</div>';
+      }
       return;
     }
 

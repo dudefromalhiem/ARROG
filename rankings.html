@@ -213,6 +213,7 @@ let filterAuthor = '';
 let searchTimeout = null;
 let sortedColumn = 'upvotes';
 let sortDirection = 'desc';
+let isLoadError = false;
 
 function escapeHtml(text) {
   const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -248,6 +249,7 @@ async function loadAnomalies() {
     } catch (firebaseErr) {
       console.error('Firestore failed:', firebaseErr);
       allAnomalies = [];
+      isLoadError = true;
     }
   }
 
@@ -341,7 +343,14 @@ function renderTable() {
   if (filteredAnomalies.length === 0) {
     if (table) table.style.display = 'none';
     if (emptyState) emptyState.style.display = 'block';
-    if (status) status.textContent = 'No anomalies found.';
+    if (status) {
+      if (isLoadError) {
+        status.innerHTML = '<span style="color:var(--red-b)">Failed to fetch anomalies.</span>';
+        emptyState.innerHTML = '<div style="color:var(--red-b)">The connection to the database failed.</div>';
+      } else {
+        status.textContent = 'No anomalies found.';
+      }
+    }
     if (pagination) pagination.style.display = 'none';
     return;
   }

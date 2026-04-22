@@ -479,42 +479,8 @@ async function updateAuthUI(user) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// PLACEHOLDER DATA (used when Firestore isn't configured yet)
+// CACHING UTILS
 // ═════════════════════════════════════════════════════════════
-
-const FALLBACK_ANOMALIES = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.filter(p => p.type === 'Anomaly').slice(0, 4).map(p => {
-  const parts = p.title.split(': ');
-  return {
-    id: parts[0],
-    title: p.title,
-    type: p.type,
-    slug: p.slug,
-    tags: p.tags,
-    htmlContent: p.htmlContent,
-    excerpt: (p.htmlContent.match(/<p>(.*?)<\/p>/) || [])[1]?.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...' || ''
-  };
-}) : [];
-
-const FALLBACK_NEWS = [
-  { title: 'Guild Archives v2.4 Deployed', body: 'The archive indexing system has been upgraded. All anomaly classifications now support multi-tag filtering.', date: '2026-04-08', imageUrl: 'logo.png' },
-  { title: 'New Containment Protocols for Sector 7G', body: 'Updated containment procedures have been issued for all flora-class anomalies within Sector 7G.', date: '2026-04-05', imageUrl: 'logo.png' },
-  { title: 'Community Art Submission Window Open', body: 'Artists may now submit works for the monthly Art Spotlight rotation. Submissions close on the 25th.', date: '2026-04-01', imageUrl: 'logo.png' },
-];
-
-const FALLBACK_ART = [
-  { id: '1', title: 'The Crimson Threshold', imageUrl: 'logo.png' },
-  { id: '2', title: 'Beneath the Red Oaker', imageUrl: 'logo.png' },
-  { id: '3', title: 'Containment Echo', imageUrl: 'logo.png' },
-];
-
-const FALLBACK_NEWEST = typeof PAGE_SEED !== 'undefined' ? PAGE_SEED.slice().reverse().slice(0, 5).map((p, i) => ({
-  id: p.slug || ('p' + i),
-  title: p.title,
-  type: p.type,
-  slug: p.slug,
-  htmlContent: p.htmlContent,
-  updatedAt: new Date().toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-})) : [];
 const HOME_CACHE_PREFIX = 'rog.home.cache.';
 const HOME_CACHE_TTL_MS = 3 * 60 * 1000;
 
@@ -540,8 +506,19 @@ function setCachedHomeData(key, data) {
 // RENDER FUNCTIONS
 // ═════════════════════════════════════════════════════════════
 
-function renderFeatured(items) {
+function renderFeatured(items, isError = false) {
   const grid = document.getElementById('featured-grid');
+  if (!grid) return;
+
+  if (isError) {
+    grid.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--red-b);grid-column:1/-1">Failed to fetch featured pages.</div>';
+    return;
+  }
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    grid.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--wht-d);grid-column:1/-1">No featured pages available.</div>';
+    return;
+  }
   grid.innerHTML = items.map(item => {
     const hasPage = item.htmlContent || item.slug;
     const href = hasPage
@@ -570,8 +547,19 @@ function sanitizeAssetUrl(url) {
   return '';
 }
 
-function renderNews(items) {
+function renderNews(items, isError = false) {
   const feed = document.getElementById('news-feed');
+  if (!feed) return;
+
+  if (isError) {
+    feed.innerHTML = '<div style="padding:10px;color:var(--red-b)">Failed to fetch latest news.</div>';
+    return;
+  }
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    feed.innerHTML = '<div style="padding:10px;color:var(--wht-d)">No recent news updates.</div>';
+    return;
+  }
   feed.innerHTML = items.map(n => {
     const imageUrl = sanitizeAssetUrl(n.imageUrl);
     const hasImage = !!imageUrl;
@@ -639,8 +627,19 @@ function renderAdminRoster(items) {
   }).join('');
 }
 
-function renderNewest(items) {
+function renderNewest(items, isError = false) {
   const feed = document.getElementById('newest-feed');
+  if (!feed) return;
+
+  if (isError) {
+    feed.innerHTML = '<div style="padding:10px;color:var(--red-b)">Failed to fetch newest archives.</div>';
+    return;
+  }
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    feed.innerHTML = '<div style="padding:10px;color:var(--wht-d)">No new archives detected.</div>';
+    return;
+  }
   feed.innerHTML = items.map(p => {
     const hasPage = !!(p && (p.htmlContent || p.slug || p.id));
     const href = hasPage
@@ -662,20 +661,39 @@ let carouselIdx = 0;
 let carouselItems = [];
 let carouselTimer = null;
 
-function initCarousel(items) {
+function initCarousel(items, isError = false) {
+  const track = document.getElementById('carousel-track');
+  const dots = document.getElementById('carousel-dots');
+  const label = document.getElementById('carousel-label');
+  if (!track) return;
+
+  if (isError) {
+    track.innerHTML = '<div style="padding:40px;text-align:center;color:var(--red-b);width:100%">Failed to fetch art spotlight.</div>';
+    if (dots) dots.innerHTML = '';
+    if (label) label.textContent = '';
+    return;
+  }
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    track.innerHTML = '<div style="padding:40px;text-align:center;color:var(--wht-d);width:100%">No spotlight art available.</div>';
+    if (dots) dots.innerHTML = '';
+    if (label) label.textContent = '';
+    return;
+  }
+
   carouselItems = items;
   if (carouselTimer) {
     clearInterval(carouselTimer);
     carouselTimer = null;
   }
-  const track = document.getElementById('carousel-track');
-  const dots = document.getElementById('carousel-dots');
   track.innerHTML = items.map(a => `
     <div class="carousel-slide"><img src="${a.imageUrl}" alt="${a.title}" loading="lazy" decoding="async" /></div>
   `).join('');
-  dots.innerHTML = items.map((_, i) =>
-    `<button class="carousel-dot ${i === 0 ? 'on' : ''}" onclick="goSlide(${i})"></button>`
-  ).join('');
+  if (dots) {
+    dots.innerHTML = items.map((_, i) =>
+      `<button class="carousel-dot ${i === 0 ? 'on' : ''}" onclick="goSlide(${i})"></button>`
+    ).join('');
+  }
   updateCarousel();
   carouselTimer = setInterval(() => { carouselIdx = (carouselIdx + 1) % items.length; updateCarousel(); }, 8000);
 }
@@ -707,16 +725,10 @@ function openDirectMessage(uid, name) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// DATA LOADING — try Firestore, fall back to placeholders
+// DATA LOADING
 // ═════════════════════════════════════════════════════════════
 
 function loadData() {
-  // Render fallbacks immediately so content is always visible
-  renderFeatured(FALLBACK_ANOMALIES);
-  renderNews(FALLBACK_NEWS);
-  initCarousel(FALLBACK_ART);
-  renderNewest(FALLBACK_NEWEST);
-
   const cachedFeatured = getCachedHomeData('featured');
   if (Array.isArray(cachedFeatured) && cachedFeatured.length) renderFeatured(cachedFeatured);
   const cachedNews = getCachedHomeData('news');
@@ -725,6 +737,8 @@ function loadData() {
   if (Array.isArray(cachedArt) && cachedArt.length) initCarousel(cachedArt);
   const cachedNewest = getCachedHomeData('newest');
   if (Array.isArray(cachedNewest) && cachedNewest.length) renderNewest(cachedNewest);
+  const cachedTopRated = getCachedHomeData('top-rated');
+  if (Array.isArray(cachedTopRated) && cachedTopRated.length) renderTopRatedAnomalies(cachedTopRated);
 
   // Then try to overlay with live Firestore data (non-blocking)
   try {
@@ -771,7 +785,13 @@ function loadData() {
 
     // Load top-rated anomalies
     loadTopRatedAnomalies().catch(function (_e) { });
-  } catch (_e) { /* Firestore not configured — fallbacks already rendered */ }
+  } catch (err) {
+    console.error('Firestore not configured or failed:', err);
+    renderFeatured(null, true);
+    renderNews(null, true);
+    initCarousel(null, true);
+    renderNewest(null, true);
+  }
 }
 
 async function loadTopRatedAnomalies() {
@@ -780,14 +800,27 @@ async function loadTopRatedAnomalies() {
       ? 'https://redoakerguild.vercel.app/api/topAnomalies'
       : '/api/topAnomalies';
 
-    const response = await fetch(apiBase + '?limit=10');
-    const data = await response.json();
+    let data = null;
+    try {
+      const response = await fetch(apiBase + '?limit=10');
+      if (response.ok) {
+        const json = await response.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          data = json.data;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('API topAnomalies fetch failed, falling back to Firestore:', apiErr);
+    }
 
-    if (response.ok && data.success && Array.isArray(data.data)) {
-      renderTopRatedAnomalies(data.data);
-      setCachedHomeData('top-rated', data.data);
-    } else {
-      // Fall back to Firestore query
+    if (data) {
+      renderTopRatedAnomalies(data);
+      setCachedHomeData('top-rated', data);
+      return;
+    }
+
+    // Fall back to Firestore query
+    try {
       const snap = await db.collection('pages')
         .where('type', '==', 'Anomaly')
         .where('status', '==', 'approved')
@@ -799,16 +832,45 @@ async function loadTopRatedAnomalies() {
         const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
         renderTopRatedAnomalies(rows);
         setCachedHomeData('top-rated', rows);
+      } else {
+        throw new Error('No top-rated anomalies found in Firestore');
+      }
+    } catch (fsErr) {
+      console.warn('Firestore upvoteCount query failed, falling back to newest anomalies:', fsErr);
+      // Secondary fallback: newest anomalies if upvoteCount index is missing or query fails
+      try {
+        const snap = await db.collection('pages')
+          .where('type', '==', 'Anomaly')
+          .where('status', '==', 'approved')
+          .orderBy('createdAt', 'desc')
+          .limit(10)
+          .get();
+
+        const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        if (rows.length > 0) {
+          renderTopRatedAnomalies(rows);
+          setCachedHomeData('top-rated', rows);
+        } else {
+          renderTopRatedAnomalies([]); // Shows "No anomalies available"
+        }
+      } catch (finalErr) {
+        throw finalErr; // Re-throw to be caught by the outer catch
       }
     }
   } catch (err) {
     console.error('Failed to load top-rated anomalies:', err);
+    renderTopRatedAnomalies(null, true);
   }
 }
 
-function renderTopRatedAnomalies(anomalies) {
+function renderTopRatedAnomalies(anomalies, isError = false) {
   const grid = document.getElementById('top-rated-grid');
   if (!grid) return;
+
+  if (isError) {
+    grid.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--red-b);grid-column:1/-1">Failed to fetch top rated anomalies.</div>';
+    return;
+  }
 
   if (!anomalies || !Array.isArray(anomalies) || anomalies.length === 0) {
     grid.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--wht-d);grid-column:1/-1">No anomalies available, upvote your favorite anomaly.</div>';

@@ -1842,14 +1842,9 @@ function renderDocBlocks() {
   }
 
   holder.innerHTML = docBlocks.map((block, idx) => {
-    const canDragThisBlock = mediaDragReorderEnabled && isMediaDocBlockType(block.type);
-    const dragHint = canDragThisBlock
-      ? 'Drag to reorder this media block'
-      : 'Enable Media Drag Reorder to drag image/audio/video blocks';
     const head = '<div class="doc-block-head"><strong style="font-size:.8rem;color:var(--wht-b);text-transform:uppercase;letter-spacing:1px">' +
       escapeHtml(block.type) +
       '</strong><div class="doc-block-actions">' +
-      '<button class="btn btn-sm btn-s doc-drag-handle" draggable="' + (canDragThisBlock ? 'true' : 'false') + '" type="button" title="' + dragHint + '" data-action="drag" data-index="' + idx + '"' + (canDragThisBlock ? '' : ' disabled aria-disabled="true"') + '>↕</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="up" data-index="' + idx + '">↑</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="down" data-index="' + idx + '">↓</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="duplicate" data-index="' + idx + '">Clone</button>' +
@@ -1955,36 +1950,7 @@ function initDocumentStudio() {
   const holder = document.getElementById('doc-blocks');
   const formatSelect = document.getElementById('doc-format-select');
   const linkBtn = document.getElementById('doc-link-btn');
-  const mediaReorderToggle = document.getElementById('doc-media-reorder-toggle');
   if (!toolbar || !adders || !holder) return;
-
-  try {
-    mediaDragReorderEnabled = localStorage.getItem(DOC_MEDIA_DRAG_SETTING_KEY) === '1';
-  } catch (_err) {
-    mediaDragReorderEnabled = false;
-  }
-
-  function syncMediaReorderToggle() {
-    if (!mediaReorderToggle) return;
-    mediaReorderToggle.textContent = 'Media Drag Reorder: ' + (mediaDragReorderEnabled ? 'On' : 'Off');
-    mediaReorderToggle.setAttribute('aria-pressed', mediaDragReorderEnabled ? 'true' : 'false');
-    mediaReorderToggle.classList.toggle('btn-p', mediaDragReorderEnabled);
-    mediaReorderToggle.classList.toggle('btn-s', !mediaDragReorderEnabled);
-  }
-
-  if (mediaReorderToggle) {
-    mediaReorderToggle.addEventListener('click', () => {
-      mediaDragReorderEnabled = !mediaDragReorderEnabled;
-      try {
-        localStorage.setItem(DOC_MEDIA_DRAG_SETTING_KEY, mediaDragReorderEnabled ? '1' : '0');
-      } catch (_err) {
-        /* ignore storage write issues */
-      }
-      syncMediaReorderToggle();
-      renderDocBlocks();
-    });
-  }
-  syncMediaReorderToggle();
 
   if (!docBlocks.length) {
     docBlocks = [
@@ -2055,55 +2021,6 @@ function initDocumentStudio() {
     if (action === 'delete') removeDocBlock(index);
   });
 
-  holder.addEventListener('dragstart', e => {
-    const handle = e.target.closest('.doc-drag-handle');
-    if (!handle) return;
-    if (!mediaDragReorderEnabled || handle.disabled) return;
-    const block = handle.closest('.doc-block');
-    if (!block) return;
-    docDragIndex = Number(block.getAttribute('data-index'));
-    if (Number.isFinite(docDragIndex) && isMediaDocBlockType((docBlocks[docDragIndex] || {}).type)) {
-      e.dataTransfer.effectAllowed = 'move';
-      block.style.opacity = '0.45';
-    } else {
-      docDragIndex = -1;
-    }
-  });
-
-  holder.addEventListener('dragend', e => {
-    const block = e.target.closest('.doc-block');
-    if (block) block.style.opacity = '1';
-    docDragIndex = -1;
-    holder.querySelectorAll('.doc-block').forEach(el => el.style.borderColor = '');
-  });
-
-  holder.addEventListener('dragover', e => {
-    if (!mediaDragReorderEnabled || docDragIndex < 0) return;
-    e.preventDefault();
-    const targetBlock = e.target.closest('.doc-block');
-    if (!targetBlock) return;
-    holder.querySelectorAll('.doc-block').forEach(el => el.style.borderColor = '');
-    targetBlock.style.borderColor = 'var(--red-b)';
-  });
-
-  holder.addEventListener('drop', e => {
-    if (!mediaDragReorderEnabled || docDragIndex < 0) return;
-    e.preventDefault();
-    const targetBlock = e.target.closest('.doc-block');
-    if (!targetBlock || !Number.isFinite(docDragIndex) || docDragIndex < 0) return;
-
-    const targetIndex = Number(targetBlock.getAttribute('data-index'));
-    if (!Number.isFinite(targetIndex) || targetIndex === docDragIndex) return;
-
-    const dragged = docBlocks[docDragIndex];
-    if (!dragged || !isMediaDocBlockType(dragged.type)) return;
-
-    const moved = docBlocks.splice(docDragIndex, 1)[0];
-    const insertAt = docDragIndex < targetIndex ? targetIndex : targetIndex;
-    docBlocks.splice(insertAt, 0, moved);
-    renderDocBlocks();
-    schedulePreview();
-  });
 
   function handleBlockValueChange(target) {
     const index = Number(target.getAttribute('data-index'));
@@ -3836,11 +3753,99 @@ function updatePreview() {
   const frame = document.getElementById('preview-frame');
   const sanitized = sanitizeHTML(html);
   const assets = collectUploadedMediaAssets();
-  const htmlWithImages = embedUploadedImagesIfMissing(sanitized, assets.imageAssets);
-  const htmlWithUploads = embedUploadedMediaIfMissing(htmlWithImages, assets.mediaAssets);
-  const wrappedHtml = wrapWithDefaultSchema(htmlWithUploads, document.getElementById('sf-title').value || 'New Classified Document');
+
+  // Update external asset preview section instead of embedding in iframe
+  updateExternalAssetPreview(sanitized, assets);
+
+  const wrappedHtml = wrapWithDefaultSchema(sanitized, document.getElementById('sf-title').value || 'New Classified Document');
   const doc = buildSandboxDocument(wrappedHtml, mergeWithDefaultSchemaCSS(css));
   frame.srcdoc = doc;
+}
+
+function updateExternalAssetPreview(currentHtml, assets) {
+  const container = document.getElementById('external-asset-preview');
+  if (!container) return;
+
+  const imageGallery = getExternalImageGalleryHtml(currentHtml, assets.imageAssets);
+  const mediaGallery = getExternalMediaGalleryHtml(currentHtml, assets.mediaAssets);
+
+  if (!imageGallery && !mediaGallery) {
+    container.innerHTML = '';
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="section" style="margin-top:24px">
+      <div class="section-hd">Uploaded Media Preview</div>
+      <p style="font-size:.75rem;color:var(--wht-d);margin-bottom:16px">
+        These assets are uploaded but not yet used in your page content. They will not be visible to users until you insert them.
+      </p>
+      ${imageGallery}
+      ${mediaGallery}
+    </div>
+  `;
+  container.classList.remove('hidden');
+}
+
+function getExternalImageGalleryHtml(html, imageAssets) {
+  const assets = Array.isArray(imageAssets)
+    ? imageAssets.map(item => typeof item === 'string' ? { url: item, caption: '', alt: '' } : item).filter(item => item && item.url)
+    : [];
+  const urls = assets.map(item => item.url);
+  if (!urls.length) return '';
+
+  const raw = String(html || '');
+  // Filter out assets already used in the content
+  const unusedAssets = assets.filter(asset => !raw.includes(asset.url));
+  if (!unusedAssets.length) return '';
+
+  return `
+    <div class="page-section" style="margin-bottom:20px">
+      <h3>Images</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        ${unusedAssets.map((asset, idx) => `
+          <figure style="margin:0">
+            <a href="${asset.url}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">
+              <img src="${asset.url}" alt="${escapeHtml(asset.alt || ('Uploaded asset ' + (idx + 1)))}" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />
+            </a>
+            ${asset.caption ? `<figcaption style="margin-top:6px;font-size:.75rem;color:#bdbdbd;line-height:1.4">${escapeHtml(asset.caption)}</figcaption>` : ''}
+          </figure>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function getExternalMediaGalleryHtml(html, mediaAssets) {
+  const assets = Array.isArray(mediaAssets) ? mediaAssets.filter(asset => asset && asset.url) : [];
+  if (!assets.length) return '';
+
+  const raw = String(html || '');
+  // Filter out assets already used in the content
+  const unusedAssets = assets.filter(asset => !raw.includes(asset.url));
+  if (!unusedAssets.length) return '';
+
+  return `
+    <div class="page-section">
+      <h3>Audio & Video</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+        ${unusedAssets.map((asset, idx) => {
+          const kind = String(asset.kind || '').toLowerCase();
+          const label = escapeHtml(asset.label || asset.caption || (kind ? kind + ' ' + (idx + 1) : 'Media ' + (idx + 1)));
+          const player = kind === 'video'
+            ? `<video src="${asset.url}" controls playsinline preload="metadata" style="width:100%;display:block;border:1px solid #3a3a3a;background:#111"></video>`
+            : `<audio src="${asset.url}" controls preload="metadata" style="width:100%;display:block"></audio>`;
+          return `
+            <figure style="margin:0">
+              ${player}
+              <figcaption style="margin-top:8px;font-size:.75rem;color:#bdbdbd;line-height:1.4">${label}</figcaption>
+            </figure>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function validateAnomalyDesignation(subtype, rawCode) {
