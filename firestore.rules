@@ -57,6 +57,13 @@ service cloud.firestore {
       // Allow reads for admins, approved pages, or pages without a status field (legacy/seed pages)
       allow read: if isAdminUser() || resource.data.status == 'approved' || !('status' in resource.data);
       allow create, update, delete: if isAdminUser();
+
+      // Upvotes subcollection - allow users to upvote/unvote anomalies via the API
+      match /upvotes/{userId} {
+        allow read: if true;
+        allow create, delete: if isSignedIn() && request.auth.uid == userId;
+        allow update: if false;
+      }
     }
 
     match /submissions/{subId} {

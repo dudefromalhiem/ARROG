@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anomaly Rankings — Red Oaker Guild</title>
+  <meta name="description" content="Browse and rank all approved anomalies by upvote count, anomaly ID, and more." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .rankings-wrap { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+    .rankings-controls { 
+      background: var(--blk-b); border: 2px solid var(--red-d); padding: 20px; 
+      margin-bottom: 32px; border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; 
+    }
+    .ranking-control-group { display: flex; flex-direction: column; gap: 6px; }
+    .ranking-control-label { font-size: .75rem; color: var(--wht-d); text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+    .ranking-select { 
+      padding: 8px 12px; background: var(--blk-p); border: 1px solid var(--red-d); 
+      color: var(--wht); font-family: var(--font-m); cursor: pointer; border-radius: 2px;
+      transition: border-color .2s;
+    }
+    .ranking-select:hover, .ranking-select:focus { border-color: var(--red-b); outline: none; }
+
+    .ranking-search-box { grid-column: 1 / -1; }
+    .ranking-search-input { 
+      width: 100%; padding: 10px 12px; background: var(--blk-p); border: 1px solid var(--red-d); 
+      color: var(--wht); font-family: var(--font-m); border-radius: 2px;
+      transition: border-color .2s;
+    }
+    .ranking-search-input:focus { border-color: var(--red-b); outline: none; }
+
+    .rankings-status { font-size: .8rem; color: var(--wht-f); margin-bottom: 16px; }
+
+    .rankings-table { 
+      width: 100%; border-collapse: collapse; background: var(--blk-s);
+      border: 1px solid var(--red-d);
+    }
+    .rankings-table thead { background: var(--blk-p); border-bottom: 2px solid var(--red-d); }
+    .rankings-table th { 
+      padding: 12px; text-align: left; font-family: var(--font-d); 
+      color: var(--red-b); text-transform: uppercase; letter-spacing: 1px; font-size: .8rem;
+      cursor: pointer; user-select: none; transition: background .2s;
+    }
+    .rankings-table th:hover { background: var(--blk-c); }
+    .rankings-table th.sortable::after { content: ' ↕'; opacity: 0.5; }
+    .rankings-table th.sorted-asc::after { content: ' ↑'; opacity: 1; color: var(--red-g); }
+    .rankings-table th.sorted-desc::after { content: ' ↓'; opacity: 1; color: var(--red-g); }
+
+    .rankings-table td { 
+      padding: 12px; border-bottom: 1px solid var(--blk-p); 
+      color: var(--wht-m); font-size: .9rem;
+    }
+    .rankings-table tbody tr:hover { background: var(--blk-p); }
+    .rankings-table a { color: var(--red-b); text-decoration: none; }
+    .rankings-table a:hover { color: var(--red-g); text-decoration: underline; }
+
+    .rank-number { 
+      font-family: var(--font-d); font-weight: bold; color: var(--red-b); 
+      min-width: 30px; text-align: center;
+    }
+    .rank-upvotes { 
+      font-family: var(--font-d); color: var(--red-b); font-weight: bold; 
+      text-align: center; min-width: 50px;
+    }
+
+    .empty-state { 
+      text-align: center; padding: 40px; color: var(--wht-f); 
+      background: rgba(255,255,255,0.02); border: 1px dashed var(--red-d);
+    }
+
+    .pagination { 
+      display: flex; gap: 8px; justify-content: center; align-items: center; 
+      margin-top: 32px; flex-wrap: wrap;
+    }
+    .pagination button { 
+      padding: 8px 12px; background: var(--blk-p); border: 1px solid var(--red-d); 
+      color: var(--wht); cursor: pointer; border-radius: 2px; transition: all .2s;
+    }
+    .pagination button:hover:not(:disabled) { border-color: var(--red-b); background: var(--blk-c); }
+    .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pagination .page-info { font-size: .85rem; color: var(--wht-d); }
+
+    @media (max-width: 960px) {
+      .rankings-controls { grid-template-columns: 1fr; }
+      .rankings-table { font-size: .85rem; }
+      .rankings-table th, .rankings-table td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <a href="index.html" class="hdr-brand">
+      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+      <span class="hdr-title">Red Oaker Guild</span>
+    </a>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <ul class="nav" id="nav">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="guide.html">Guide</a></li>
+      <li><a href="explore.html">Explore</a></li>
+      <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
+      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+      <li id="admin-link" class="hidden"><a href="admin.html">Admin</a></li>
+      <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap rankings-wrap">
+  <div style="margin-bottom:32px">
+    <h1 style="margin-bottom:8px">Anomaly Rankings</h1>
+    <p style="color:var(--wht-d);font-size:.9rem">
+      View all approved anomalies ranked by community upvotes. Sort by upvote count, anomaly ID, or title to discover highly-regarded entries.
+    </p>
+  </div>
+
+  <!-- Controls -->
+  <div class="rankings-controls">
+    <div class="ranking-control-group">
+      <label class="ranking-control-label">Sort By</label>
+      <select class="ranking-select" id="sort-by" onchange="applyFilters()">
+        <option value="upvotes-desc">Highest Upvotes</option>
+        <option value="upvotes-asc">Lowest Upvotes</option>
+        <option value="id-asc">Anomaly ID (A-Z)</option>
+        <option value="id-desc">Anomaly ID (Z-A)</option>
+        <option value="title-asc">Title (A-Z)</option>
+        <option value="title-desc">Title (Z-A)</option>
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+      </select>
+    </div>
+
+    <div class="ranking-control-group">
+      <label class="ranking-control-label">Filter by Author</label>
+      <select class="ranking-select" id="filter-author" onchange="applyFilters()">
+        <option value="">All Authors</option>
+        <option value="loading">Loading...</option>
+      </select>
+    </div>
+
+    <div class="ranking-control-group">
+      <label class="ranking-control-label">Items Per Page</label>
+      <select class="ranking-select" id="items-per-page" onchange="applyFilters()">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+    </div>
+
+    <div class="ranking-search-box">
+      <label class="ranking-control-label">Search by Title or ID</label>
+      <input 
+        type="text" 
+        class="ranking-search-input" 
+        id="search-query" 
+        placeholder="Search by title, anomaly ID (ROS-0001), author..." 
+        onkeyup="debounceSearch()"
+      />
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="rankings-status" id="rankings-status">Loading anomalies...</div>
+
+  <!-- Table -->
+  <table class="rankings-table" id="rankings-table" style="display:none">
+    <thead>
+      <tr>
+        <th style="width: 50px; text-align: center;" class="sortable" onclick="toggleSort('rank')">Rank</th>
+        <th class="sortable" onclick="toggleSort('title')">Title</th>
+        <th style="width: 120px; text-align: center;" class="sortable" onclick="toggleSort('upvotes')">Upvotes</th>
+        <th style="width: 120px;" class="sortable" onclick="toggleSort('id')">Anomaly ID</th>
+        <th style="width: 140px;" class="sortable" onclick="toggleSort('author')">Author</th>
+      </tr>
+    </thead>
+    <tbody id="rankings-tbody"></tbody>
+  </table>
+
+  <!-- Empty State -->
+  <div class="empty-state" id="empty-state" style="display:none">No anomalies match your filters.</div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination" style="display:none">
+    <button id="prev-btn" onclick="previousPage()" disabled>← Previous</button>
+    <span class="page-info"><span id="current-page">1</span> / <span id="total-pages">1</span></span>
+    <button id="next-btn" onclick="nextPage()" disabled>Next →</button>
+  </div>
+</main>
+
+<footer class="ftr" style="margin-top:60px">
+  <div class="ftr-in">
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Anomaly Rankings</p>
+  </div>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="seed-data.js"></script>
+
+<script>
+let allAnomalies = [];
+let filteredAnomalies = [];
+let currentPage = 1;
+let itemsPerPage = 25;
+let currentSortBy = 'upvotes-desc';
+let searchQuery = '';
+let filterAuthor = '';
+let searchTimeout = null;
+let sortedColumn = 'upvotes';
+let sortDirection = 'desc';
+
+function escapeHtml(text) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return String(text || '').replace(/[&<>"']/g, m => map[m]);
+}
+
+async function loadAnomalies() {
+  try {
+    const status = document.getElementById('rankings-status');
+    if (status) status.textContent = 'Loading anomalies...';
+
+    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'https://redoakerguild.vercel.app/api/allAnomalies'
+      : '/api/allAnomalies';
+
+    const response = await fetch(apiBase);
+    const data = await response.json();
+
+    if (response.ok && data.success && Array.isArray(data.data)) {
+      allAnomalies = data.data;
+    } else {
+      throw new Error('Failed to load anomalies from API');
+    }
+  } catch (err) {
+    console.error('API failed, falling back to Firestore:', err);
+    try {
+      const snap = await db.collection('pages')
+        .where('type', '==', 'Anomaly')
+        .where('approvalStatus', '==', 'approved')
+        .get();
+
+      allAnomalies = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    } catch (firebaseErr) {
+      console.error('Firestore failed:', firebaseErr);
+      allAnomalies = [];
+    }
+  }
+
+  populateAuthorFilter();
+  applyFilters();
+}
+
+function populateAuthorFilter() {
+  const authors = [...new Set(allAnomalies.map(a => a.authorName).filter(Boolean))].sort();
+  const select = document.getElementById('filter-author');
+  if (select) {
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">All Authors</option>' + 
+      authors.map(author => `<option value="${escapeHtml(author)}">${escapeHtml(author)}</option>`).join('');
+    select.value = currentValue;
+  }
+}
+
+function applyFilters() {
+  currentPage = 1;
+  itemsPerPage = parseInt(document.getElementById('items-per-page').value || '25', 10);
+  currentSortBy = document.getElementById('sort-by').value || 'upvotes-desc';
+  filterAuthor = document.getElementById('filter-author').value || '';
+  
+  filteredAnomalies = allAnomalies.filter(a => {
+    const matchesSearch = !searchQuery || 
+      String(a.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(a.anomalyId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(a.authorName || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesAuthor = !filterAuthor || a.authorName === filterAuthor;
+
+    return matchesSearch && matchesAuthor;
+  });
+
+  sortAnomalies();
+  renderTable();
+}
+
+function sortAnomalies() {
+  const [sortField, sortOrder] = currentSortBy.split('-');
+  
+  filteredAnomalies.sort((a, b) => {
+    let aVal, bVal;
+
+    switch (sortField) {
+      case 'upvotes':
+        aVal = Number(a.upvoteCount || 0);
+        bVal = Number(b.upvoteCount || 0);
+        break;
+      case 'id':
+        aVal = String(a.anomalyId || '').toUpperCase();
+        bVal = String(b.anomalyId || '').toUpperCase();
+        return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      case 'title':
+        aVal = String(a.title || '').toLowerCase();
+        bVal = String(b.title || '').toLowerCase();
+        return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      case 'author':
+        aVal = String(a.authorName || '').toLowerCase();
+        bVal = String(b.authorName || '').toLowerCase();
+        return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      case 'newest':
+        aVal = a.approvedAt && a.approvedAt.seconds ? a.approvedAt.seconds : 0;
+        bVal = b.approvedAt && b.approvedAt.seconds ? b.approvedAt.seconds : 0;
+        return bVal - aVal;
+      case 'oldest':
+        aVal = a.approvedAt && a.approvedAt.seconds ? a.approvedAt.seconds : 0;
+        bVal = b.approvedAt && b.approvedAt.seconds ? b.approvedAt.seconds : 0;
+        return aVal - bVal;
+      default:
+        aVal = Number(a.upvoteCount || 0);
+        bVal = Number(b.upvoteCount || 0);
+    }
+
+    if (sortOrder === 'asc') {
+      return aVal - bVal;
+    } else {
+      return bVal - aVal;
+    }
+  });
+}
+
+function renderTable() {
+  const table = document.getElementById('rankings-table');
+  const tbody = document.getElementById('rankings-tbody');
+  const status = document.getElementById('rankings-status');
+  const emptyState = document.getElementById('empty-state');
+  const pagination = document.getElementById('pagination');
+
+  if (filteredAnomalies.length === 0) {
+    if (table) table.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'block';
+    if (status) status.textContent = 'No anomalies found.';
+    if (pagination) pagination.style.display = 'none';
+    return;
+  }
+
+  if (table) table.style.display = 'table';
+  if (emptyState) emptyState.style.display = 'none';
+  if (status) status.textContent = `Showing ${filteredAnomalies.length} anomal${filteredAnomalies.length === 1 ? 'y' : 'ies'}`;
+
+  const start = (currentPage - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  const pageItems = filteredAnomalies.slice(start, end);
+
+  if (tbody) {
+    tbody.innerHTML = pageItems.map((item, idx) => {
+      const rank = start + idx + 1;
+      const title = String(item.title || '[Untitled]');
+      const anomalyId = String(item.anomalyId || '—');
+      const author = String(item.authorName || 'Unknown Agent');
+      const upvotes = Number(item.upvoteCount || 0);
+      const slug = String(item.slug || '');
+      const url = slug ? `page.html?slug=${encodeURIComponent(slug)}` : '#';
+
+      return `<tr>
+        <td class="rank-number">#${rank}</td>
+        <td><a href="${url}">${escapeHtml(title)}</a></td>
+        <td class="rank-upvotes">▲ ${upvotes}</td>
+        <td><code style="font-size:.85rem">${escapeHtml(anomalyId)}</code></td>
+        <td>${escapeHtml(author)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const totalPages = Math.ceil(filteredAnomalies.length / itemsPerPage);
+  if (pagination) {
+    pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const currPageSpan = document.getElementById('current-page');
+    const totalPagesSpan = document.getElementById('total-pages');
+
+    if (prevBtn) prevBtn.disabled = currentPage === 1;
+    if (nextBtn) nextBtn.disabled = currentPage === totalPages;
+    if (currPageSpan) currPageSpan.textContent = String(currentPage);
+    if (totalPagesSpan) totalPagesSpan.textContent = String(totalPages);
+  }
+}
+
+function toggleSort(field) {
+  if (sortedColumn === field) {
+    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortedColumn = field;
+    sortDirection = field === 'id' ? 'asc' : 'desc';
+  }
+
+  let sortValue = field;
+  if (field === 'rank') sortValue = 'upvotes';
+  currentSortBy = sortValue + '-' + sortDirection;
+
+  applyFilters();
+}
+
+function debounceSearch() {
+  clearTimeout(searchTimeout);
+  searchQuery = document.getElementById('search-query').value || '';
+  searchTimeout = setTimeout(applyFilters, 300);
+}
+
+function nextPage() {
+  const totalPages = Math.ceil(filteredAnomalies.length / itemsPerPage);
+  if (currentPage < totalPages) {
+    currentPage++;
+    renderTable();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function previousPage() {
+  if (currentPage > 1) {
+    currentPage--;
+    renderTable();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+// Auth UI
+auth.onAuthStateChanged(async user => {
+  const navAuth = document.getElementById('nav-auth');
+  const messagingLink = document.getElementById('messaging-link');
+  const submitLink = document.getElementById('submit-link');
+  const adminLink = document.getElementById('admin-link');
+
+  if (user) {
+    const displayLabel = user.displayName || 'Agent';
+    navAuth.innerHTML = `
+      <div class="user-menu" data-user-menu>
+        <button class="nav-btn" style="white-space:nowrap">${escapeHtml(displayLabel)}</button>
+      </div>`;
+    if (messagingLink) messagingLink.classList.remove('hidden');
+    if (submitLink) submitLink.classList.remove('hidden');
+  } else {
+    if (messagingLink) messagingLink.classList.add('hidden');
+    if (submitLink) submitLink.classList.add('hidden');
+  }
+
+  if (adminLink) adminLink.classList.add('hidden');
+});
+
+// Load on init
+document.addEventListener('DOMContentLoaded', loadAnomalies);
+</script>
+</body>
+</html>

@@ -839,7 +839,76 @@ function loadData() {
         }
       })
       .catch(function (_e) { });
+
+    // Load top-rated anomalies
+    loadTopRatedAnomalies().catch(function (_e) { });
   } catch (_e) { /* Firestore not configured — fallbacks already rendered */ }
+}
+
+async function loadTopRatedAnomalies() {
+  try {
+    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'https://redoakerguild.vercel.app/api/topAnomalies'
+      : '/api/topAnomalies';
+
+    const response = await fetch(apiBase + '?limit=10');
+    const data = await response.json();
+
+    if (response.ok && data.success && Array.isArray(data.data)) {
+      renderTopRatedAnomalies(data.data);
+      setCachedHomeData('top-rated', data.data);
+    } else {
+      // Fall back to Firestore query
+      const snap = await db.collection('pages')
+        .where('type', '==', 'Anomaly')
+        .where('approvalStatus', '==', 'approved')
+        .orderBy('upvoteCount', 'desc')
+        .limit(10)
+        .get();
+
+      if (!snap.empty) {
+        const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        renderTopRatedAnomalies(rows);
+        setCachedHomeData('top-rated', rows);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load top-rated anomalies:', err);
+  }
+}
+
+function renderTopRatedAnomalies(anomalies) {
+  const grid = document.getElementById('top-rated-grid');
+  if (!grid) return;
+
+  if (!anomalies || !Array.isArray(anomalies) || anomalies.length === 0) {
+    grid.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--wht-d);grid-column:1/-1">No anomalies have been rated yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = anomalies.map(function (item, index) {
+    const title = String(item.title || '[Untitled]');
+    const excerpt = String(item.slug || '');
+    const upvotes = Number(item.upvoteCount || 0);
+    const slug = String(item.slug || '');
+    const author = String(item.authorName || 'Unknown Agent');
+    const url = slug ? 'page.html?slug=' + encodeURIComponent(slug) : '#';
+
+    return '<a href="' + url + '" style="text-decoration:none;color:inherit">' +
+      '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+          '<div style="flex:1">' +
+            '<div class="card-t">' + escapeHtmlApp(title) + '</div>' +
+            '<div class="card-b" style="font-size:.75rem;color:var(--wht-f)">by ' + escapeHtmlApp(author) + '</div>' +
+          '</div>' +
+          '<div style="font-family:var(--font-d);color:var(--red-b);font-weight:bold;text-align:right">' +
+            '<div style="font-size:1.1rem">▲ ' + upvotes + '</div>' +
+            '<div style="font-size:.65rem;letter-spacing:1px">UPVOTES</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</a>';
+  }).join('');
 }
 
 // ═════════════════════════════════════════════════════════════

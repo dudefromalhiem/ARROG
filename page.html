@@ -34,6 +34,13 @@
     .comment-media-item img, .comment-media-item video { width:100%; max-width:100%; height:auto; display:block; }
     .comment-report-panel { border:1px solid var(--red-d); background: rgba(139,0,0,0.08); padding:12px; margin-bottom:12px; }
     .comment-report-panel.hidden { display:none; }
+    .upvote-section { display:flex; gap:12px; align-items:center; margin-top:20px; margin-bottom:20px; padding:12px; border:1px solid var(--red-d); background: rgba(139,0,0,0.05); border-radius:2px; }
+    .upvote-button { display:flex; align-items:center; gap:6px; padding:8px 16px; border:1px solid var(--red-d); background: rgba(139,0,0,0.12); color: var(--wht); font-family: var(--font-d); letter-spacing:1px; text-transform:uppercase; font-size:.75rem; cursor:pointer; transition: background .2s, border-color .2s; }
+    .upvote-button:hover { border-color: var(--red-b); background: rgba(139,0,0,0.25); }
+    .upvote-button.upvoted { border-color: var(--red-b); background: rgba(139,0,0,0.3); color: var(--red-b); }
+    .upvote-button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .upvote-count { font-family: var(--font-d); letter-spacing:1px; color: var(--wht); font-size:.75rem; min-width:24px; text-align:center; }
+    .upvote-label { color: var(--wht-d); font-size:.7rem; }
     .community-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:14px; margin-top:24px; }
     .community-panel { border:1px solid var(--blk-m); background: var(--blk-b); padding:12px; }
     .community-panel .comments-title { margin-bottom:10px; font-size:.9rem; }
@@ -132,6 +139,20 @@ render.mount('archive-viewer');</pre>
     </div>
     <iframe class="page-viewer-frame" id="pv-frame" sandbox="allow-same-origin" title="Page content"></iframe>
     <div id="pv-actions" class="tc hidden" style="margin-top:24px;"></div>
+  </div>
+
+  <!-- Upvote Section (For Anomalies Only) -->
+  <div id="upvote-section" class="upvote-section hidden" style="justify-content:space-between;">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <button class="upvote-button" id="upvote-btn" title="Upvote this anomaly page" onclick="toggleUpvote()">
+        <span>▲</span>
+        <span>Upvote</span>
+      </button>
+      <span class="upvote-label">This anomaly has</span>
+      <span class="upvote-count" id="upvote-count">0</span>
+      <span class="upvote-label">upvotes</span>
+    </div>
+    <a href="rankings.html" style="color:var(--red-b);text-decoration:none;font-size:.75rem;text-transform:uppercase;letter-spacing:1px;padding:8px 12px;border:1px solid var(--red-d);background:rgba(139,0,0,0.12)">View Rankings →</a>
   </div>
 
   <section id="comments-section" class="section hidden comments-wrap">
@@ -249,6 +270,7 @@ render.mount('archive-viewer');</pre>
 document.addEventListener('DOMContentLoaded', async () => {
   configureCommentsApiBase();
   configureSocialApiBase();
+  configureUpvoteApiBase();
   bindCommentComposerEvents();
   bindCommunityEvents();
 
@@ -348,6 +370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('page-viewer').classList.remove('hidden');
     document.getElementById('comments-section').classList.remove('hidden');
     await loadCommentsForCurrentPage();
+    await loadUpvoteStatus();
 
   } catch (err) {
     console.error('Failed to load page:', err);
@@ -405,6 +428,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateCommentComposerAuthState();
     updateCommunityState();
     renderComments();
+    await loadUpvoteStatus();
   });
 });
 
@@ -1192,6 +1216,108 @@ async function confirmDeleteDocument() {
   } catch (err) {
     alert('Delete failed: ' + err.message);
   }
+}
+
+let upvoteApiBase = '/api/upvote';
+let currentUserHasUpvoted = false;
+let currentUpvoteCount = 0;
+
+function configureUpvoteApiBase() {
+  try {
+    const host = String(window.location.hostname || '').toLowerCase();
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const isFile = window.location.protocol === 'file:';
+    upvoteApiBase = (isLocal || isFile)
+      ? 'https://redoakerguild.vercel.app/api/upvote'
+      : '/api/upvote';
+  } catch (_err) {
+    upvoteApiBase = '/api/upvote';
+  }
+}
+
+async function toggleUpvote() {
+  if (!currentCommentUser) {
+    alert('Sign in to upvote this page.');
+    return;
+  }
+
+  if (!window.__pageDocId) {
+    alert('Upvotes are not available for this page.');
+    return;
+  }
+
+  const btn = document.getElementById('upvote-btn');
+  if (btn) btn.disabled = true;
+
+  try {
+    const token = await currentCommentUser.getIdToken();
+    const response = await fetch(upvoteApiBase, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        pageId: window.__pageDocId,
+        pageType: window.__pageType || 'Anomaly'
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'Upvote operation failed.');
+    }
+
+    currentUserHasUpvoted = data.upvoted || false;
+    currentUpvoteCount = data.upvoteCount || 0;
+    updateUpvoteUI();
+  } catch (err) {
+    alert('Upvote failed: ' + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function loadUpvoteStatus() {
+  if (!window.__pageDocId) return;
+
+  try {
+    const pageDoc = await db.collection('pages').doc(window.__pageDocId).get();
+    if (pageDoc.exists) {
+      const data = pageDoc.data();
+      window.__pageType = data.type || 'Page';
+      currentUpvoteCount = data.upvoteCount || 0;
+
+      // Check if current user has upvoted
+      if (currentCommentUser) {
+        const upvoteRef = await db.collection('pages').doc(window.__pageDocId).collection('upvotes').doc(currentCommentUser.uid).get();
+        currentUserHasUpvoted = upvoteRef.exists;
+      }
+
+      updateUpvoteUI();
+    }
+  } catch (err) {
+    console.error('Failed to load upvote status:', err);
+  }
+}
+
+function updateUpvoteUI() {
+  const section = document.getElementById('upvote-section');
+  const btn = document.getElementById('upvote-btn');
+  const count = document.getElementById('upvote-count');
+
+  // Only show for anomalies
+  if (window.__pageType !== 'Anomaly') {
+    if (section) section.classList.add('hidden');
+    return;
+  }
+
+  if (section) section.classList.remove('hidden');
+  if (btn) {
+    btn.classList.toggle('upvoted', currentUserHasUpvoted);
+    btn.textContent = currentUserHasUpvoted ? '▲ Upvoted' : '▲ Upvote';
+  }
+  if (count) count.textContent = String(currentUpvoteCount);
 }
 
 function showError() {
