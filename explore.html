@@ -268,7 +268,7 @@
     // Load from Firestore
     try {
       if (!db || typeof db.collection !== 'function') throw new Error('Firestore unavailable');
-      const snap = await db.collection('pages').where('approvalStatus', '==', 'approved').limit(300).get();
+      const snap = await db.collection('pages').where('status', '==', 'approved').limit(300).get();
       snap.docs.forEach(doc => {
         const d = doc.data();
         const normalizedType = String(d.type || '').trim() === 'Lore' ? 'Lore' : d.type;

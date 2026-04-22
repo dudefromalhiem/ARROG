@@ -203,9 +203,9 @@ module.exports = async (req, res) => {
     }
 
     // Check if page is approved
-    const approvalStatus = String(pageData.approvalStatus || '').toLowerCase();
+    const status = String(pageData.status || '').toLowerCase();
     const hasLegacyApproval = !!pageData.approvedAt || !!pageData.approvedBy;
-    if (approvalStatus && approvalStatus !== 'approved' && !hasLegacyApproval) {
+    if (status && status !== 'approved' && !hasLegacyApproval) {
       return security.sendError(res, 400, 'Cannot upvote unapproved pages.');
     }
 
