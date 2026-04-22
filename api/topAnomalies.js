@@ -62,37 +62,16 @@ module.exports = async (req, res) => {
     const db = admin.firestore(app);
 
     // Query approved anomalies sorted by upvoteCount descending
-    const snapshot = await db.collection('pages')
-      .where('type', '==', 'Anomaly')
-      .where('status', '==', 'approved')
-      .orderBy('upvoteCount', 'desc')
-      .limit(limit)
-      .get();
-
-    const data = snapshot.docs.map(doc => {
-      const d = doc.data();
-      return {
-        id: doc.id,
-        title: d.title || '[Untitled]',
-        slug: d.slug || '',
-        type: d.type || 'Anomaly',
-        upvoteCount: d.upvoteCount || 0,
-        authorName: d.authorName || 'Unknown Agent',
-        approvedAt: d.approvedAt || d.createdAt || null
-      };
-    });
-    
-    // Fallback: If no upvoted anomalies found (or field missing/query failed), 
-    // fall back to newest anomalies to ensure the grid isn't empty.
-    if (data.length === 0) {
-      const fallbackSnapshot = await db.collection('pages')
+    let data = [];
+    try {
+      const snapshot = await db.collection('pages')
         .where('type', '==', 'Anomaly')
         .where('status', '==', 'approved')
-        .orderBy('createdAt', 'desc')
+        .orderBy('upvoteCount', 'desc')
         .limit(limit)
         .get();
-        
-      data.push(...fallbackSnapshot.docs.map(doc => {
+
+      data = snapshot.docs.map(doc => {
         const d = doc.data();
         return {
           id: doc.id,
@@ -103,7 +82,76 @@ module.exports = async (req, res) => {
           authorName: d.authorName || 'Unknown Agent',
           approvedAt: d.approvedAt || d.createdAt || null
         };
-      }));
+      });
+    } catch (err) {
+      console.warn('Firestore upvoteCount query failed in API, falling back to in-memory sort:', err.message);
+      // Resilience Fallback: Fetch all approved anomalies and sort in memory
+      // This is safe for small-to-medium collections and avoids 500 errors if indexes are missing.
+      const snapshot = await db.collection('pages')
+        .where('type', '==', 'Anomaly')
+        .where('status', '==', 'approved')
+        .get();
+
+      data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          title: d.title || '[Untitled]',
+          slug: d.slug || '',
+          type: d.type || 'Anomaly',
+          upvoteCount: d.upvoteCount || 0,
+          authorName: d.authorName || 'Unknown Agent',
+          approvedAt: d.approvedAt || d.createdAt || null
+        };
+      });
+
+      // Sort by upvoteCount desc, then by date desc
+      data.sort((a, b) => {
+        const upA = a.upvoteCount || 0;
+        const upB = b.upvoteCount || 0;
+        if (upB !== upA) return upB - upA;
+        return 0; // secondary sort could be date here if desired
+      });
+
+      // Apply limit
+      data = data.slice(0, limit);
+    }
+    
+    // Final Fallback: If still no anomalies found, fall back to newest anomalies
+    if (data.length === 0) {
+      try {
+        const fallbackSnapshot = await db.collection('pages')
+          .where('type', '==', 'Anomaly')
+          .where('status', '==', 'approved')
+          .orderBy('createdAt', 'desc')
+          .limit(limit)
+          .get();
+          
+        data.push(...fallbackSnapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            title: d.title || '[Untitled]',
+            slug: d.slug || '',
+            type: d.type || 'Anomaly',
+            upvoteCount: d.upvoteCount || 0,
+            authorName: d.authorName || 'Unknown Agent',
+            approvedAt: d.approvedAt || d.createdAt || null
+          };
+        }));
+      } catch (fallbackErr) {
+        console.warn('Secondary fallback failed:', fallbackErr.message);
+        // Last resort: fetch without orderBy
+        const lastSnap = await db.collection('pages')
+          .where('type', '==', 'Anomaly')
+          .where('status', '==', 'approved')
+          .limit(limit)
+          .get();
+        data.push(...lastSnap.docs.map(doc => {
+          const d = doc.data();
+          return { id: doc.id, title: d.title || '[Untitled]', slug: d.slug || '', type: d.type || 'Anomaly', upvoteCount: d.upvoteCount || 0, authorName: d.authorName || 'Unknown Agent', approvedAt: d.approvedAt || d.createdAt || null };
+        }));
+      }
     }
 
     return security.sendJson(res, 200, {

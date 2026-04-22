@@ -742,26 +742,51 @@ function loadData() {
 
   // Then try to overlay with live Firestore data (non-blocking)
   try {
+    // 1. Featured Pages
     db.collection('pages').where('featured', '==', true).orderBy('createdAt', 'desc').limit(4).get()
       .then(function (snap) {
-        if (!snap.empty) {
-          const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-          renderFeatured(rows);
-          setCachedHomeData('featured', rows);
-          return;
-        }
+        const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        renderFeatured(rows);
+        setCachedHomeData('featured', rows);
       })
-      .catch(function (_e) { });
+      .catch(function (err) {
+        console.warn('Featured query failed, trying fallback:', err.message);
+        // Fallback: Fetch without orderBy if index is missing
+        db.collection('pages').where('featured', '==', true).limit(10).get()
+          .then(function (snap) {
+            const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+            rows.sort((a, b) => (new Date(b.createdAt || 0)) - (new Date(a.createdAt || 0)));
+            renderFeatured(rows.slice(0, 4));
+            setCachedHomeData('featured', rows.slice(0, 4));
+          })
+          .catch(function (finalErr) {
+            console.error('Final featured fallback failed:', finalErr);
+            renderFeatured(null, true);
+          });
+      });
 
+    // 2. Site News
     db.collection('news').orderBy('date', 'desc').limit(10).get()
       .then(function (snap) {
-        if (!snap.empty) {
-          const rows = snap.docs.map(function (d) { return d.data(); });
-          renderNews(rows);
-          setCachedHomeData('news', rows);
-        }
+        const rows = snap.docs.map(function (d) { return d.data(); });
+        renderNews(rows);
+        setCachedHomeData('news', rows);
       })
-      .catch(function (_e) { });
+      .catch(function (err) {
+        console.warn('News query failed, trying fallback:', err.message);
+        // Fallback: Fetch all and sort if index on "date" is missing or different field name
+        db.collection('news').get()
+          .then(function (snap) {
+            const rows = snap.docs.map(function (d) { return d.data(); });
+            rows.sort((a, b) => (new Date(b.date || b.createdAt || 0)) - (new Date(a.date || a.createdAt || 0)));
+            renderNews(rows.slice(0, 10));
+            setCachedHomeData('news', rows.slice(0, 10));
+          })
+          .catch(function (finalErr) {
+            console.error('Final news fallback failed:', finalErr);
+            renderNews(null, true);
+          });
+      });
 
     db.collection('artworks').where('displayInSpotlight', '==', true).get()
       .then(function (snap) {
@@ -821,24 +846,35 @@ async function loadTopRatedAnomalies() {
 
     // Fall back to Firestore query
     try {
-      const snap = await db.collection('pages')
-        .where('type', '==', 'Anomaly')
-        .where('status', '==', 'approved')
-        .orderBy('upvoteCount', 'desc')
-        .limit(10)
-        .get();
+      let rows = [];
+      try {
+        const snap = await db.collection('pages')
+          .where('type', '==', 'Anomaly')
+          .where('status', '==', 'approved')
+          .orderBy('upvoteCount', 'desc')
+          .limit(10)
+          .get();
 
-      if (!snap.empty) {
-        const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        if (!snap.empty) {
+          rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        }
+      } catch (innerErr) {
+        console.warn('Firestore upvoteCount query failed, falling back to in-memory sort:', innerErr.message);
+        // Resilient Fallback: Get all and sort in memory
+        const snap = await db.collection('pages')
+          .where('type', '==', 'Anomaly')
+          .where('status', '==', 'approved')
+          .get();
+        rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        rows.sort((a, b) => (b.upvoteCount || 0) - (a.upvoteCount || 0));
+        rows = rows.slice(0, 10);
+      }
+
+      if (rows.length > 0) {
         renderTopRatedAnomalies(rows);
         setCachedHomeData('top-rated', rows);
       } else {
-        throw new Error('No top-rated anomalies found in Firestore');
-      }
-    } catch (fsErr) {
-      console.warn('Firestore upvoteCount query failed, falling back to newest anomalies:', fsErr);
-      // Secondary fallback: newest anomalies if upvoteCount index is missing or query fails
-      try {
+        // Try newest anomalies as a secondary fallback
         const snap = await db.collection('pages')
           .where('type', '==', 'Anomaly')
           .where('status', '==', 'approved')
@@ -846,16 +882,17 @@ async function loadTopRatedAnomalies() {
           .limit(10)
           .get();
 
-        const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-        if (rows.length > 0) {
-          renderTopRatedAnomalies(rows);
-          setCachedHomeData('top-rated', rows);
+        const newestRows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        if (newestRows.length > 0) {
+          renderTopRatedAnomalies(newestRows);
+          setCachedHomeData('top-rated', newestRows);
         } else {
           renderTopRatedAnomalies([]); // Shows "No anomalies available"
         }
-      } catch (finalErr) {
-        throw finalErr; // Re-throw to be caught by the outer catch
       }
+    } catch (fsErr) {
+      console.error('All Firestore fallback attempts failed for top anomalies:', fsErr);
+      throw fsErr;
     }
   } catch (err) {
     console.error('Failed to load top-rated anomalies:', err);
