@@ -143,7 +143,7 @@ module.exports = async (req, res) => {
     const app = initAdmin();
     const db = admin.firestore(app);
 
-    // Resolve page by ID first, then slug fallback.
+    // Resolve page by ID first, then slug-as-ID, then slug fallback.
     let resolvedPageId = hasValidPageId ? pageId : '';
     let pageDoc = null;
 
@@ -154,18 +154,35 @@ module.exports = async (req, res) => {
       }
     }
 
+    // NEW: Try direct slug-as-ID lookup (Fast path for seeded/synced pages)
     if (!pageDoc && hasValidSlug) {
-      const bySlug = await db.collection('pages').where('slug', '==', pageSlug).limit(1).get();
-      if (!bySlug.empty) {
-        pageDoc = bySlug.docs[0];
-        resolvedPageId = pageDoc.id;
+      const bySlugId = await db.collection('pages').doc(pageSlug.toLowerCase()).get();
+      if (bySlugId.exists) {
+        pageDoc = bySlugId;
+        resolvedPageId = bySlugId.id;
       }
     }
 
     if (!pageDoc && hasValidSlug) {
-      const pagesWithContent = await db.collection('pages').where('type', '==', 'Anomaly').get();
-      const targetSlug = pageSlug;
-      const matchedDoc = pagesWithContent.docs.find(doc => {
+      const bySlugQuery = await db.collection('pages').where('slug', '==', pageSlug.toLowerCase()).limit(1).get();
+      if (!bySlugQuery.empty) {
+        pageDoc = bySlugQuery.docs[0];
+        resolvedPageId = pageDoc.id;
+      }
+    }
+
+    // Fallback: search all anomalies if the specific ones missed (e.g. slight slug variation in DB)
+    if (!pageDoc && hasValidSlug) {
+      // Try both 'Anomaly' and 'anomaly' cases for broad compatibility
+      const snapshots = await Promise.all([
+        db.collection('pages').where('type', '==', 'Anomaly').get(),
+        db.collection('pages').where('type', '==', 'anomaly').get()
+      ]);
+      
+      const allDocs = [...snapshots[0].docs, ...snapshots[1].docs];
+      const targetSlug = pageSlug.toLowerCase();
+      
+      const matchedDoc = allDocs.find(doc => {
         const docData = doc.data() || {};
         return pageKeyMatches(docData.slug || '', targetSlug) || pageKeyMatches(doc.id || '', targetSlug);
       });

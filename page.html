@@ -359,10 +359,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
+    let pageDataFromSeed = null;
     if (!page && typeof PAGE_SEED !== 'undefined') {
       const seedItem = PAGE_SEED.find(p => (pageId && p.id === pageId) || (slug && p.slug === slug));
       if (seedItem) {
         page = { ...seedItem, ...(pageDocData || {}), createdAt: (pageDocData && pageDocData.createdAt) || { seconds: Date.now() / 1000 } };
+        pageDataFromSeed = seedItem;
+        page.fromSeed = true;
       }
     }
 
@@ -370,15 +373,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       const aliasSeed = PAGE_SEED.find(item => pageKeyMatches(item.slug || '', slug) || pageKeyMatches(item.title || '', slug));
       if (aliasSeed) {
         page = { ...aliasSeed, createdAt: { seconds: Date.now() / 1000 } };
+        pageDataFromSeed = aliasSeed;
+        page.fromSeed = true;
       }
     }
     
     if (!page) { showError(); return; }
     
     window.__pageDocId = docId;
+    window.__pageId = docId; // Alias for consistency
     window.__pageSlug = page.slug || slug || '';
     window.__pageTitle = page.title || '';
     window.__pageType = page.type || 'Page';
+
+    // TRIGGER AUTO-SYNC: If this is a seeded anomaly not yet in the database, init it now.
+    if (pageDataFromSeed && !docId && window.__pageType === 'Anomaly') {
+      triggerSyncIfSeed(pageDataFromSeed);
+    }
 
     // Update page title + meta
     document.title = page.title + ' — Red Oaker Guild';
@@ -1415,12 +1426,42 @@ async function toggleUpvote() {
   }
 }
 
+async function triggerSyncIfSeed(pageData) {
+  if (!pageData || pageData.type !== 'Anomaly') return;
+  if (window.__pageId) return; // Already in DB
+  
+  // Use session storage to avoid spamming the sync API on every refresh
+  const syncKey = `synced_${pageData.slug}`;
+  if (sessionStorage.getItem(syncKey)) return;
+
+  console.log('[Sync] Initializing seed page in database:', pageData.slug);
+  try {
+    const res = await fetch('/api/sync-seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pageData)
+    });
+    const result = await res.json();
+    if (result.ok) {
+      console.log('[Sync] Success. Page ID:', result.id);
+      window.__pageId = result.id;
+      sessionStorage.setItem(syncKey, 'true');
+      // Refresh upvote UI now that we have an ID
+      loadUpvoteStatus();
+    }
+  } catch (err) {
+    console.error('[Sync] Failed to initialize page:', err);
+  }
+}
+
 async function loadUpvoteStatus() {
   const targetDocId = await resolveUpvoteTargetDocId();
   
-  // Call update UI anyway to handle visibility for seed pages
+  // Update UI visibility
   updateUpvoteUI();
 
+  // If no ID yet and it's a seed page, it might be mid-sync or needs sync. 
+  // We'll return for now; the sync trigger will recall this.
   if (!targetDocId) return;
 
   try {
