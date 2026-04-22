@@ -346,12 +346,30 @@ document.addEventListener('DOMContentLoaded', async () => {
           page = docData;
         }
       }
+
+      if (!page) {
+        const aliasSnap = await db.collection('pages').where('type', '==', 'Anomaly').get();
+        const aliasDoc = aliasSnap.docs.find(doc => pageKeyMatches((doc.data() || {}).slug || '', slug) || pageKeyMatches(doc.id || '', slug));
+        if (aliasDoc) {
+          const aliasData = aliasDoc.data() || {};
+          pageDocData = aliasData;
+          docId = aliasDoc.id;
+          page = aliasData;
+        }
+      }
     }
 
     if (!page && typeof PAGE_SEED !== 'undefined') {
       const seedItem = PAGE_SEED.find(p => (pageId && p.id === pageId) || (slug && p.slug === slug));
       if (seedItem) {
         page = { ...seedItem, ...(pageDocData || {}), createdAt: (pageDocData && pageDocData.createdAt) || { seconds: Date.now() / 1000 } };
+      }
+    }
+
+    if (!page && typeof PAGE_SEED !== 'undefined') {
+      const aliasSeed = PAGE_SEED.find(item => pageKeyMatches(item.slug || '', slug) || pageKeyMatches(item.title || '', slug));
+      if (aliasSeed) {
+        page = { ...aliasSeed, createdAt: { seconds: Date.now() / 1000 } };
       }
     }
     
@@ -1271,6 +1289,22 @@ let upvoteApiBase = '/api/upvote';
 let currentUserHasUpvoted = false;
 let currentUpvoteCount = 0;
 
+function getAnonymousVoteKey() {
+  try {
+    const storageKey = 'rog_anon_vote_id';
+    let voteId = localStorage.getItem(storageKey);
+    if (!voteId) {
+      voteId = (crypto && typeof crypto.randomUUID === 'function')
+        ? crypto.randomUUID()
+        : ('anon-' + Math.random().toString(36).slice(2) + Date.now().toString(36));
+      localStorage.setItem(storageKey, voteId);
+    }
+    return 'anon:' + voteId;
+  } catch (_err) {
+    return 'anon:' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+}
+
 async function resolveUpvoteTargetDocId() {
   if (window.__pageDocId) return window.__pageDocId;
 
@@ -1290,6 +1324,33 @@ async function resolveUpvoteTargetDocId() {
   return '';
 }
 
+function normalizePageKey(value) {
+  const compact = String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const match = compact.match(/^([a-z]+)(\d+)([a-z]*)$/i);
+  if (!match) {
+    return { compact };
+  }
+
+  return {
+    compact,
+    prefix: match[1],
+    number: Number(match[2]),
+    suffix: match[3] || ''
+  };
+}
+
+function pageKeyMatches(a, b) {
+  const left = normalizePageKey(a);
+  const right = normalizePageKey(b);
+  if (!left.compact || !right.compact) return false;
+  if (left.compact === right.compact) return true;
+  if (left.prefix && right.prefix && left.prefix === right.prefix && left.number === right.number) {
+    if (!left.suffix && !right.suffix) return true;
+    return left.suffix === right.suffix;
+  }
+  return false;
+}
+
 function configureUpvoteApiBase() {
   try {
     const host = String(window.location.hostname || '').toLowerCase();
@@ -1304,17 +1365,14 @@ function configureUpvoteApiBase() {
 }
 
 async function toggleUpvote() {
-  if (!currentCommentUser) {
-    alert('Sign in to upvote this page.');
-    return;
-  }
-
   const targetDocId = await resolveUpvoteTargetDocId();
   const targetSlug = String(window.__pageSlug || '').trim();
   if (!targetDocId && !targetSlug) {
     alert('Upvotes are not available for this page.');
     return;
   }
+
+  const voteKey = currentCommentUser ? currentCommentUser.uid : getAnonymousVoteKey();
 
   const btn = document.getElementById('upvote-btn');
   const typeValue = String(window.__pageType || '').trim().toLowerCase();
@@ -1326,17 +1384,19 @@ async function toggleUpvote() {
   if (btn) btn.disabled = true;
 
   try {
-    const token = await currentCommentUser.getIdToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (currentCommentUser) {
+      headers.Authorization = 'Bearer ' + await currentCommentUser.getIdToken();
+    }
+
     const response = await fetch(upvoteApiBase, {
       method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({
         pageId: targetDocId || '',
         pageSlug: targetSlug,
-        pageType: 'Anomaly'
+        pageType: 'Anomaly',
+        voteKey: voteKey
       })
     });
 
@@ -1367,10 +1427,9 @@ async function loadUpvoteStatus() {
       currentUpvoteCount = data.upvoteCount || 0;
 
       // Check if current user has upvoted
-      if (currentCommentUser) {
-        const upvoteRef = await db.collection('pages').doc(targetDocId).collection('upvotes').doc(currentCommentUser.uid).get();
-        currentUserHasUpvoted = upvoteRef.exists;
-      }
+      const voteKey = currentCommentUser ? currentCommentUser.uid : getAnonymousVoteKey();
+      const upvoteRef = await db.collection('pages').doc(targetDocId).collection('upvotes').doc(voteKey).get();
+      currentUserHasUpvoted = upvoteRef.exists;
 
       updateUpvoteUI();
     }

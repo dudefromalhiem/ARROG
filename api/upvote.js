@@ -40,6 +40,39 @@ async function verifyUser(req) {
   };
 }
 
+function normalizeVoteKey(value) {
+  return String(value || '').trim();
+}
+
+function normalizePageKey(value) {
+  const compact = String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const match = compact.match(/^([a-z]+)(\d+)([a-z]*)$/i);
+  if (!match) {
+    return { compact };
+  }
+
+  return {
+    compact,
+    prefix: match[1],
+    number: Number(match[2]),
+    suffix: match[3] || ''
+  };
+}
+
+function pageKeyMatches(a, b) {
+  const left = normalizePageKey(a);
+  const right = normalizePageKey(b);
+
+  if (!left.compact || !right.compact) return false;
+  if (left.compact === right.compact) return true;
+  if (left.prefix && right.prefix && left.prefix === right.prefix && left.number === right.number) {
+    if (!left.suffix && !right.suffix) return true;
+    return left.suffix === right.suffix;
+  }
+
+  return false;
+}
+
 /**
  * POST /api/upvote.js
  * 
@@ -72,16 +105,22 @@ module.exports = async (req, res) => {
       return security.sendError(res, 413, 'Request payload too large');
     }
 
-    // Verify authentication
+    // Verify authentication or accept an anonymous browser vote key.
     let user;
     try {
       user = await verifyUser(req);
     } catch (err) {
-      return security.sendError(res, 401, err.message);
+      user = null;
+    }
+
+    const anonymousVoteKey = normalizeVoteKey(req.body?.voteKey || req.headers['x-rog-vote-key']);
+    const voteKey = user ? user.uid : anonymousVoteKey;
+    if (!voteKey) {
+      return security.sendError(res, 401, 'Sign in or provide a vote key to upvote.');
     }
 
     // Rate limit per user (100 upvotes per hour)
-    if (security.enforceRateLimit(req, res, `upvote:${user.uid}`, { limit: 100, windowMs: 3600000 })) {
+    if (security.enforceRateLimit(req, res, `upvote:${voteKey}`, { limit: 100, windowMs: 3600000 })) {
       return;
     }
 
@@ -123,6 +162,20 @@ module.exports = async (req, res) => {
       }
     }
 
+    if (!pageDoc && hasValidSlug) {
+      const pagesWithContent = await db.collection('pages').where('type', '==', 'Anomaly').get();
+      const targetSlug = pageSlug;
+      const matchedDoc = pagesWithContent.docs.find(doc => {
+        const docData = doc.data() || {};
+        return pageKeyMatches(docData.slug || '', targetSlug) || pageKeyMatches(doc.id || '', targetSlug);
+      });
+
+      if (matchedDoc) {
+        pageDoc = matchedDoc;
+        resolvedPageId = matchedDoc.id;
+      }
+    }
+
     if (!pageDoc || !pageDoc.exists || !resolvedPageId) {
       return security.sendError(res, 404, 'Page not found for upvote target.');
     }
@@ -139,7 +192,7 @@ module.exports = async (req, res) => {
       return security.sendError(res, 400, 'Cannot upvote unapproved pages.');
     }
 
-    const upvoteRef = db.collection('pages').doc(resolvedPageId).collection('upvotes').doc(user.uid);
+    const upvoteRef = db.collection('pages').doc(resolvedPageId).collection('upvotes').doc(voteKey);
     const upvoteSnapshot = await upvoteRef.get();
     const currentlyUpvoted = upvoteSnapshot.exists;
 
@@ -151,8 +204,9 @@ module.exports = async (req, res) => {
     } else {
       // Add upvote
       await upvoteRef.set({
-        userId: user.uid,
-        email: user.email,
+        userId: voteKey,
+        email: user ? user.email : '',
+        anonymous: !user,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
