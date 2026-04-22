@@ -94,7 +94,7 @@ function pageKeyMatches(a, b) {
  * }
  */
 module.exports = async (req, res) => {
-  return security.secureHandler(req, res, null, async (req, res) => {
+  return security.secureHandler(req, res, security.getRequestIp(req), async (req, res) => {
     // Handle method check
     if (req.method !== 'POST') {
       return security.sendError(res, 405, 'Method not allowed. Use POST.');
@@ -127,7 +127,7 @@ module.exports = async (req, res) => {
     // Parse and validate request body
     const pageId = String(req.body?.pageId || '').trim();
     const pageSlug = String(req.body?.pageSlug || '').trim().toLowerCase();
-    const pageType = String(req.body?.pageType || '').trim();
+    const pageType = String(req.body?.pageType || '').trim().toLowerCase();
 
     const hasValidPageId = pageId && security.validateId(pageId);
     const hasValidSlug = /^[a-z0-9-]{1,120}$/.test(pageSlug);
@@ -136,7 +136,7 @@ module.exports = async (req, res) => {
     }
 
     // Only allow upvotes for anomalies
-    if (pageType !== 'Anomaly') {
+    if (pageType !== 'anomaly' && !pageType.includes('anomaly')) {
       return security.sendError(res, 400, 'Upvotes are only available for anomaly pages.');
     }
 

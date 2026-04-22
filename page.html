@@ -1395,7 +1395,7 @@ async function toggleUpvote() {
       body: JSON.stringify({
         pageId: targetDocId || '',
         pageSlug: targetSlug,
-        pageType: 'Anomaly',
+        pageType: typeValue || 'anomaly',
         voteKey: voteKey
       })
     });
@@ -1417,6 +1417,10 @@ async function toggleUpvote() {
 
 async function loadUpvoteStatus() {
   const targetDocId = await resolveUpvoteTargetDocId();
+  
+  // Call update UI anyway to handle visibility for seed pages
+  updateUpvoteUI();
+
   if (!targetDocId) return;
 
   try {
