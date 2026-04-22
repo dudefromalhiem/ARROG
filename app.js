@@ -7,7 +7,6 @@
 // ── State ─────────────────────────────────────────────────────
 let currentUser = null;
 let currentRole = "user";
-let authMode = "login"; // login | register
 let terminalInterval = null;
 let terminalStartedAt = 0;
 let terminalEndTimer = null;
@@ -404,92 +403,7 @@ function showClearanceWelcomeWhenReady(role) {
   tryShow();
 }
 
-// ═════════════════════════════════════════════════════════════
-// AUTH UI
-// ═════════════════════════════════════════════════════════════
-
-function updateForgotPasswordVisibility() {
-  const button = document.getElementById('auth-forgot-password');
-  if (button) button.classList.toggle('hidden', authMode !== 'login');
-}
-
-function openAuth() { document.getElementById('auth-modal').classList.remove('hidden'); updateForgotPasswordVisibility(); }
-function closeAuth() { document.getElementById('auth-modal').classList.add('hidden'); document.getElementById('auth-err').classList.add('hidden'); }
-
-function toggleAuthMode() {
-  authMode = authMode === 'login' ? 'register' : 'login';
-  document.getElementById('auth-title').textContent = authMode === 'login' ? 'Sign In' : 'Register';
-  document.getElementById('auth-tog-text').textContent = authMode === 'login' ? 'No account? ' : 'Already registered? ';
-  document.getElementById('auth-tog-link').textContent = authMode === 'login' ? 'Register here' : 'Sign in';
-  updateForgotPasswordVisibility();
-}
-
-function showAuthError(msg) {
-  const el = document.getElementById('auth-err');
-  el.textContent = msg;
-  el.classList.remove('hidden');
-}
-
-async function handleAuth() {
-  const email = document.getElementById('auth-email').value;
-  const pass = document.getElementById('auth-pass').value;
-  if (!auth || typeof auth.signInWithEmailAndPassword !== 'function') {
-    showAuthError('Authentication is not initialized yet. Refresh the page and try again.');
-    return;
-  }
-  try {
-    if (authMode === 'login') {
-      await auth.signInWithEmailAndPassword(email, pass);
-    } else {
-      await auth.createUserWithEmailAndPassword(email, pass);
-    }
-    closeAuth();
-  } catch (e) { showAuthError(e.message); }
-}
-
-async function handleForgotPassword() {
-  const emailField = document.getElementById('auth-email');
-  const email = String(emailField && emailField.value ? emailField.value : '').trim();
-  if (!auth || typeof auth.sendPasswordResetEmail !== 'function') {
-    showAuthError('Password reset is unavailable because authentication is not initialized. Refresh the page and try again.');
-    return;
-  }
-  if (!email) {
-    showAuthError('Enter the email address for the account you want to recover.');
-    return;
-  }
-
-  try {
-    await auth.sendPasswordResetEmail(email);
-    alert('Password reset email sent. Check your inbox and spam folder.');
-  } catch (e) {
-    showAuthError(e.message || 'Could not send password reset email.');
-  }
-}
-
-async function handleGoogle() {
-  if (!auth || typeof auth.signInWithPopup !== 'function') {
-    showAuthError('Google sign-in is unavailable because authentication is not initialized. Refresh the page and try again.');
-    return;
-  }
-  const provider = new firebase.auth.GoogleAuthProvider();
-  try {
-    await auth.signInWithPopup(provider);
-    closeAuth();
-  } catch (e) {
-    const code = e && e.code ? e.code : '';
-    if (code === 'auth/popup-blocked' || code === 'auth/web-storage-unsupported') {
-      try {
-        await auth.signInWithRedirect(provider);
-        return;
-      } catch (redirectErr) {
-        showAuthError(redirectErr.message || 'Google sign-in failed.');
-        return;
-      }
-    }
-    showAuthError(e.message || 'Google sign-in failed.');
-  }
-}
+// Authentication UI handlers have been moved to firebase-config.js for universal availability.
 
 async function updateAuthUI(user) {
   await rolesReady;

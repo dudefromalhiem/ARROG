@@ -105,18 +105,17 @@ module.exports = async (req, res) => {
       return security.sendError(res, 413, 'Request payload too large');
     }
 
-    // Verify authentication or accept an anonymous browser vote key.
+    // Verify authentication. Anonymous upvoting is disabled to prevent spam.
     let user;
     try {
       user = await verifyUser(req);
     } catch (err) {
-      user = null;
+      return security.sendError(res, 401, 'Please sign in to upvote anomalies.');
     }
 
-    const anonymousVoteKey = normalizeVoteKey(req.body?.voteKey || req.headers['x-rog-vote-key']);
-    const voteKey = user ? user.uid : anonymousVoteKey;
+    const voteKey = user.uid;
     if (!voteKey) {
-      return security.sendError(res, 401, 'Sign in or provide a vote key to upvote.');
+      return security.sendError(res, 401, 'Invalid user session. Please sign in again.');
     }
 
     // Rate limit per user (100 upvotes per hour)

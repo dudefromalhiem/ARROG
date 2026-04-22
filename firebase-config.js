@@ -13,6 +13,9 @@ const firebaseConfig = {
   measurementId: "G-WLR20NDRQL"
 };
 
+// Global Auth State
+if (typeof window.authMode === 'undefined') window.authMode = 'login';
+
 firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
@@ -113,6 +116,140 @@ if (!document.getElementById('page-loader')) {
     </div>
   `;
   document.body.prepend(loader);
+}
+
+// ── AUTH MODAL INJECTION ─────────────────────────────────────
+if (!document.getElementById('auth-modal')) {
+  const modal = document.createElement('div');
+  modal.id = 'auth-modal';
+  modal.className = 'auth-ov hidden';
+  modal.innerHTML = `
+    <div class="auth-box">
+      <button class="auth-x" onclick="closeAuth()">✕</button>
+      <h2 id="auth-title">Sign In</h2>
+      <p class="auth-err hidden" id="auth-err"></p>
+      <div class="fg">
+        <input class="fi" id="auth-email" type="email" placeholder="Email address" />
+      </div>
+      <div class="fg">
+        <input class="fi" id="auth-pass" type="password" placeholder="Password" />
+      </div>
+      <button class="btn btn-p" style="width:100%" onclick="handleAuth()">&gt;&gt; Access Terminal</button>
+      <button class="btn btn-s" id="auth-forgot-password" style="width:100%;margin-top:8px" onclick="handleForgotPassword()">Forgot Password?</button>
+      <button class="btn btn-s" style="width:100%;margin-top:8px" onclick="handleGoogle()">Sign In with Google</button>
+      <div class="auth-tog">
+        <span id="auth-tog-text">No account? </span>
+        <a onclick="toggleAuthMode()" id="auth-tog-link">Register here</a>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// ── AUTH HANDLERS ────────────────────────────────────────────
+function updateForgotPasswordVisibility() {
+  const button = document.getElementById('auth-forgot-password');
+  if (button) button.classList.toggle('hidden', window.authMode !== 'login');
+}
+
+function openAuth() {
+  const modal = document.getElementById('auth-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    updateForgotPasswordVisibility();
+  }
+}
+
+function closeAuth() {
+  const modal = document.getElementById('auth-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    const err = document.getElementById('auth-err');
+    if (err) err.classList.add('hidden');
+  }
+}
+
+function toggleAuthMode() {
+  window.authMode = window.authMode === 'login' ? 'register' : 'login';
+  const title = document.getElementById('auth-title');
+  const togText = document.getElementById('auth-tog-text');
+  const togLink = document.getElementById('auth-tog-link');
+  if (title) title.textContent = window.authMode === 'login' ? 'Sign In' : 'Register';
+  if (togText) togText.textContent = window.authMode === 'login' ? 'No account? ' : 'Already registered? ';
+  if (togLink) togLink.textContent = window.authMode === 'login' ? 'Register here' : 'Sign in';
+  updateForgotPasswordVisibility();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-err');
+  if (el) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+}
+
+async function handleAuth() {
+  const emailEl = document.getElementById('auth-email');
+  const passEl = document.getElementById('auth-pass');
+  if (!emailEl || !passEl) return;
+  const email = emailEl.value;
+  const pass = passEl.value;
+
+  if (!auth || typeof auth.signInWithEmailAndPassword !== 'function') {
+    showAuthError('Authentication is not initialized. Refresh and try again.');
+    return;
+  }
+  try {
+    if (window.authMode === 'login') {
+      await auth.signInWithEmailAndPassword(email, pass);
+    } else {
+      await auth.createUserWithEmailAndPassword(email, pass);
+    }
+    closeAuth();
+  } catch (e) { showAuthError(e.message); }
+}
+
+async function handleForgotPassword() {
+  const emailField = document.getElementById('auth-email');
+  const email = String(emailField && emailField.value ? emailField.value : '').trim();
+  if (!auth || typeof auth.sendPasswordResetEmail !== 'function') {
+    showAuthError('Password reset is unavailable. Refresh and try again.');
+    return;
+  }
+  if (!email) {
+    showAuthError('Enter your email address first.');
+    return;
+  }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    alert('Password reset email sent. Check your inbox.');
+  } catch (e) {
+    showAuthError(e.message || 'Could not send reset email.');
+  }
+}
+
+async function handleGoogle() {
+  if (!auth || typeof auth.signInWithPopup !== 'function') {
+    showAuthError('Google sign-in is unavailable. Refresh and try again.');
+    return;
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    await auth.signInWithPopup(provider);
+    closeAuth();
+  } catch (e) {
+    const code = e && e.code ? e.code : '';
+    if (code === 'auth/popup-blocked' || code === 'auth/web-storage-unsupported') {
+      try {
+        await auth.signInWithRedirect(provider);
+        return;
+      } catch (err) {
+        showAuthError(err.message || 'Google sign-in failed.');
+        return;
+      }
+    }
+    showAuthError(e.message || 'Google sign-in failed.');
+  }
 }
 
 function completeAuthBootstrap() {
@@ -538,8 +675,7 @@ async function syncSharedNav(user) {
       }
     }
   } else {
-    const onHome = normalizedCurrentPath() === 'index.html' && typeof openAuth === 'function';
-    navAuth.innerHTML = onHome
+    navAuth.innerHTML = typeof openAuth === 'function'
       ? '<button class="nav-btn" onclick="openAuth()">Sign In</button>'
       : '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     if (submitLink) submitLink.classList.add('hidden');
