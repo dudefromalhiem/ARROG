@@ -321,22 +321,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     let page, docId;
+    let pageDocData = null;
 
     if (pageId) {
       // Direct Firestore ID lookup
       const doc = await db.collection('pages').doc(pageId).get();
-      if (doc.exists && doc.data().htmlContent) {
-        page = doc.data();
+      if (doc.exists) {
+        const docData = doc.data() || {};
+        pageDocData = docData;
         docId = doc.id;
+        if (docData.htmlContent || docData.content) {
+          page = docData;
+        }
       }
     } else if (slug) {
       // Slug-based lookup
       const snap = await db.collection('pages').where('slug', '==', slug).limit(1).get();
       if (!snap.empty) {
         const doc = snap.docs[0];
-        if (doc.data().htmlContent || doc.data().content) {
-          page = doc.data();
-          docId = doc.id;
+        const docData = doc.data() || {};
+        pageDocData = docData;
+        docId = doc.id;
+        if (docData.htmlContent || docData.content) {
+          page = docData;
         }
       }
     }
@@ -344,7 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!page && typeof PAGE_SEED !== 'undefined') {
       const seedItem = PAGE_SEED.find(p => (pageId && p.id === pageId) || (slug && p.slug === slug));
       if (seedItem) {
-        page = { ...seedItem, createdAt: { seconds: Date.now() / 1000 } };
+        page = { ...seedItem, ...(pageDocData || {}), createdAt: (pageDocData && pageDocData.createdAt) || { seconds: Date.now() / 1000 } };
       }
     }
     
@@ -1264,6 +1271,25 @@ let upvoteApiBase = '/api/upvote';
 let currentUserHasUpvoted = false;
 let currentUpvoteCount = 0;
 
+async function resolveUpvoteTargetDocId() {
+  if (window.__pageDocId) return window.__pageDocId;
+
+  const slug = String(window.__pageSlug || '').trim();
+  if (!slug) return '';
+
+  try {
+    const snap = await db.collection('pages').where('slug', '==', slug).limit(1).get();
+    if (!snap.empty) {
+      window.__pageDocId = snap.docs[0].id;
+      return window.__pageDocId;
+    }
+  } catch (err) {
+    console.error('Could not resolve upvote target by slug:', err);
+  }
+
+  return '';
+}
+
 function configureUpvoteApiBase() {
   try {
     const host = String(window.location.hostname || '').toLowerCase();
@@ -1283,7 +1309,8 @@ async function toggleUpvote() {
     return;
   }
 
-  if (!window.__pageDocId) {
+  const targetDocId = await resolveUpvoteTargetDocId();
+  if (!targetDocId) {
     alert('Upvotes are not available for this page.');
     return;
   }
@@ -1306,7 +1333,8 @@ async function toggleUpvote() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        pageId: window.__pageDocId,
+        pageId: targetDocId,
+        pageSlug: window.__pageSlug || '',
         pageType: 'Anomaly'
       })
     });
@@ -1327,10 +1355,11 @@ async function toggleUpvote() {
 }
 
 async function loadUpvoteStatus() {
-  if (!window.__pageDocId) return;
+  const targetDocId = await resolveUpvoteTargetDocId();
+  if (!targetDocId) return;
 
   try {
-    const pageDoc = await db.collection('pages').doc(window.__pageDocId).get();
+    const pageDoc = await db.collection('pages').doc(targetDocId).get();
     if (pageDoc.exists) {
       const data = pageDoc.data();
       window.__pageType = data.type || 'Page';
@@ -1338,7 +1367,7 @@ async function loadUpvoteStatus() {
 
       // Check if current user has upvoted
       if (currentCommentUser) {
-        const upvoteRef = await db.collection('pages').doc(window.__pageDocId).collection('upvotes').doc(currentCommentUser.uid).get();
+        const upvoteRef = await db.collection('pages').doc(targetDocId).collection('upvotes').doc(currentCommentUser.uid).get();
         currentUserHasUpvoted = upvoteRef.exists;
       }
 
