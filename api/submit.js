@@ -532,6 +532,7 @@ module.exports = async function handler(req, res) {
           approvedAt: admin.firestore.FieldValue.serverTimestamp(),
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          upvoteCount: 0,
           featured: false,
           status: 'approved'
         });

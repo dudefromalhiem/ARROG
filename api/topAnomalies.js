@@ -81,6 +81,30 @@ module.exports = async (req, res) => {
         approvedAt: d.approvedAt || d.createdAt || null
       };
     });
+    
+    // Fallback: If no upvoted anomalies found (or field missing/query failed), 
+    // fall back to newest anomalies to ensure the grid isn't empty.
+    if (data.length === 0) {
+      const fallbackSnapshot = await db.collection('pages')
+        .where('type', '==', 'Anomaly')
+        .where('status', '==', 'approved')
+        .orderBy('createdAt', 'desc')
+        .limit(limit)
+        .get();
+        
+      data.push(...fallbackSnapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          title: d.title || '[Untitled]',
+          slug: d.slug || '',
+          type: d.type || 'Anomaly',
+          upvoteCount: d.upvoteCount || 0,
+          authorName: d.authorName || 'Unknown Agent',
+          approvedAt: d.approvedAt || d.createdAt || null
+        };
+      }));
+    }
 
     return security.sendJson(res, 200, {
       success: true,
