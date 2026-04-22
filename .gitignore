@@ -7,3 +7,24 @@ Thumbs.db
 .idea/
 
 # Build artifacts (none needed — this is a static site)
+
+# Documentation - locally useful, not version controlled
+API_SECURITY*.md
+README_DEV.md
+
+# Environment variables - CRITICAL - never commit!
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Temporary files
+*.swp
+*.swo
+*~
