@@ -57,7 +57,7 @@ module.exports = async (req, res) => {
     // Query all approved anomalies
     const snapshot = await db.collection('pages')
       .where('type', '==', 'Anomaly')
-      .where('approvalStatus', '==', 'approved')
+      .where('status', '==', 'approved')
       .get();
 
     const data = snapshot.docs.map(doc => {

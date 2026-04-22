@@ -64,7 +64,7 @@ module.exports = async (req, res) => {
     // Query approved anomalies sorted by upvoteCount descending
     const snapshot = await db.collection('pages')
       .where('type', '==', 'Anomaly')
-      .where('approvalStatus', '==', 'approved')
+      .where('status', '==', 'approved')
       .orderBy('upvoteCount', 'desc')
       .limit(limit)
       .get();

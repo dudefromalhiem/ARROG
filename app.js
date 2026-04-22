@@ -876,7 +876,7 @@ async function loadTopRatedAnomalies() {
       // Fall back to Firestore query
       const snap = await db.collection('pages')
         .where('type', '==', 'Anomaly')
-        .where('approvalStatus', '==', 'approved')
+        .where('status', '==', 'approved')
         .orderBy('upvoteCount', 'desc')
         .limit(10)
         .get();
@@ -897,7 +897,7 @@ function renderTopRatedAnomalies(anomalies) {
   if (!grid) return;
 
   if (!anomalies || !Array.isArray(anomalies) || anomalies.length === 0) {
-    grid.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--wht-d);grid-column:1/-1">No anomalies have been rated yet.</div>';
+    grid.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--wht-d);grid-column:1/-1">No anomalies available, upvote your favorite anomaly.</div>';
     return;
   }
 

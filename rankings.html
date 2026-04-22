@@ -180,7 +180,7 @@
   </table>
 
   <!-- Empty State -->
-  <div class="empty-state" id="empty-state" style="display:none">No anomalies match your filters.</div>
+  <div class="empty-state" id="empty-state" style="display:none">No anomalies available, upvote your favorite anomaly.</div>
 
   <!-- Pagination -->
   <div class="pagination" id="pagination" style="display:none">
@@ -241,7 +241,7 @@ async function loadAnomalies() {
     try {
       const snap = await db.collection('pages')
         .where('type', '==', 'Anomaly')
-        .where('approvalStatus', '==', 'approved')
+        .where('status', '==', 'approved')
         .get();
 
       allAnomalies = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
