@@ -37,6 +37,11 @@ const UPLOAD_STALL_TIMEOUT_MS = 300000;
 const ALLOWED_STORAGE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 const ALLOWED_STORAGE_AUDIO_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4']);
 const ALLOWED_STORAGE_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg', 'video/x-matroska']);
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+  'audio/mpeg', 'audio/wav', 'audio/mp4',
+  'video/mp4', 'video/webm'
+]);
 const BASE_TAG_OPTIONS = [
   'object', 'animal', 'humanoid', 'plant', 'artifact', 'document', 'digital',
   'memetic', 'cognitohazard', 'spatial', 'temporal', 'biological', 'dangerous',
@@ -51,6 +56,7 @@ let submissionApiBase = '/api/submit';
 let hasUnsavedEditorChanges = false;
 let submitAutosaveEnabled = true;
 let currentUserCanAccessLore = false;
+let lastSubmitAttemptAt = 0;
 const nativeSubmitAlert = window.alert.bind(window);
 let submitAlertModal = null;
 
@@ -3145,6 +3151,12 @@ function enqueueUpload(file, kind) {
     return;
   }
 
+  const fileType = String(file && file.type || '').toLowerCase();
+  if (!ALLOWED_UPLOAD_MIME_TYPES.has(fileType)) {
+    alert('Unsupported file type: ' + (file && file.name ? file.name : 'selected file') + '.');
+    return;
+  }
+
   if (kind === 'image' && !isAllowedStorageImage(file)) {
     alert('Only PNG, JPG, GIF, and WebP images can be uploaded.');
     return;
@@ -3249,7 +3261,7 @@ async function runQueuedUpload(record) {
     scheduleSubmissionAssetSync();
 
     const msg = (record.kind === 'image' ? 'Image upload failed: ' : 'Media upload failed: ') + (err.message || code || 'Unknown error');
-    console.error('[Upload] Failed:', msg);
+    if (window.rogLogger) rogLogger.error('[Upload] Failed:', msg);
     alert(msg);
   } finally {
     if (progressWrap && uploadWorkers <= 1 && uploadQueue.length === 0) {
@@ -3722,7 +3734,15 @@ function copyImageUrl(id, buttonEl) {
 // ═════════════════════════════════════════════════════════════
 
 function sanitizeHTML(html) {
-  let clean = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  const source = String(html || '');
+  if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+    return window.DOMPurify.sanitize(source, {
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover']
+    });
+  }
+
+  let clean = source.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   clean = clean.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '');
   clean = clean.replace(/javascript\s*:/gi, 'blocked:');
   clean = clean.replace(/<\s*\/?\s*(iframe|object|embed|applet|meta|link)\b[^>]*>/gi, '');
@@ -3860,6 +3880,13 @@ async function shouldBypassSubmissionReview() {
 async function submitPage() {
   if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
 
+  const now = Date.now();
+  if (now - lastSubmitAttemptAt < 500) {
+    alert('Please wait a moment before submitting again.');
+    return;
+  }
+  lastSubmitAttemptAt = now;
+
   let title = document.getElementById('sf-title').value.trim();
   const selectedType = document.getElementById('sf-type').value;
   const type = getCanonicalType(selectedType);
@@ -3950,7 +3977,7 @@ async function submitPage() {
         return;
       }
     } catch(e) {
-      console.warn("Title uniqueness check skipped:", e);
+      if (window.rogLogger) rogLogger.warn('Title uniqueness check skipped:', e);
     }
   }
 
@@ -3977,7 +4004,7 @@ async function submitPage() {
         return;
       }
     } catch(e) {
-      console.warn("Uniqueness check skipped due to missing composite index.", e);
+      if (window.rogLogger) rogLogger.warn('Uniqueness check skipped due to missing composite index.', e);
     }
   }
 

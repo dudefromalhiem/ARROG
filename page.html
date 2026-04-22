@@ -34,13 +34,40 @@
     .comment-media-item img, .comment-media-item video { width:100%; max-width:100%; height:auto; display:block; }
     .comment-report-panel { border:1px solid var(--red-d); background: rgba(139,0,0,0.08); padding:12px; margin-bottom:12px; }
     .comment-report-panel.hidden { display:none; }
-    .upvote-section { display:flex; gap:12px; align-items:center; margin-top:20px; margin-bottom:20px; padding:12px; border:1px solid var(--red-d); background: rgba(139,0,0,0.05); border-radius:2px; }
-    .upvote-button { display:flex; align-items:center; gap:6px; padding:8px 16px; border:1px solid var(--red-d); background: rgba(139,0,0,0.12); color: var(--wht); font-family: var(--font-d); letter-spacing:1px; text-transform:uppercase; font-size:.75rem; cursor:pointer; transition: background .2s, border-color .2s; }
+    .upvote-section {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 22px;
+      margin-bottom: 24px;
+      padding: 16px;
+      border: 1px solid var(--red-b);
+      border-left: 4px solid var(--red-b);
+      background: linear-gradient(90deg, rgba(139,0,0,0.20), rgba(139,0,0,0.06));
+      box-shadow: 0 0 0 1px rgba(139,0,0,0.18), 0 10px 24px rgba(0,0,0,0.28);
+      border-radius: 3px;
+    }
+    .upvote-section.hidden { display: none; }
+    .upvote-content { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+    .upvote-eyebrow {
+      font-size: .66rem;
+      color: var(--red-b);
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      border: 1px solid var(--red-d);
+      background: rgba(0,0,0,0.28);
+      padding: 4px 8px;
+    }
+    .upvote-button { display:flex; align-items:center; gap:6px; padding:10px 18px; border:1px solid var(--red-d); background: rgba(139,0,0,0.18); color: var(--wht); font-family: var(--font-d); letter-spacing:1px; text-transform:uppercase; font-size:.78rem; cursor:pointer; transition: background .2s, border-color .2s, transform .2s; }
     .upvote-button:hover { border-color: var(--red-b); background: rgba(139,0,0,0.25); }
+    .upvote-button:active { transform: translateY(1px); }
     .upvote-button.upvoted { border-color: var(--red-b); background: rgba(139,0,0,0.3); color: var(--red-b); }
     .upvote-button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .upvote-count { font-family: var(--font-d); letter-spacing:1px; color: var(--wht); font-size:.75rem; min-width:24px; text-align:center; }
-    .upvote-label { color: var(--wht-d); font-size:.7rem; }
+    .upvote-count { font-family: var(--font-d); letter-spacing:1px; color: var(--wht); font-size:.9rem; min-width:24px; text-align:center; }
+    .upvote-label { color: var(--wht-d); font-size:.74rem; }
+    .upvote-rank-link { color:var(--red-b);text-decoration:none;font-size:.75rem;text-transform:uppercase;letter-spacing:1px;padding:8px 12px;border:1px solid var(--red-d);background:rgba(139,0,0,0.12); }
+    .upvote-rank-link:hover { border-color: var(--red-b); background: rgba(139,0,0,0.24); }
     .community-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:14px; margin-top:24px; }
     .community-panel { border:1px solid var(--blk-m); background: var(--blk-b); padding:12px; }
     .community-panel .comments-title { margin-bottom:10px; font-size:.9rem; }
@@ -142,8 +169,9 @@ render.mount('archive-viewer');</pre>
   </div>
 
   <!-- Upvote Section (For Anomalies Only) -->
-  <div id="upvote-section" class="upvote-section hidden" style="justify-content:space-between;">
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+  <div id="upvote-section" class="upvote-section hidden" aria-live="polite">
+    <div class="upvote-content">
+      <span class="upvote-eyebrow">Anomaly rating</span>
       <button class="upvote-button" id="upvote-btn" title="Upvote this anomaly page" onclick="toggleUpvote()">
         <span>▲</span>
         <span>Upvote</span>
@@ -152,7 +180,7 @@ render.mount('archive-viewer');</pre>
       <span class="upvote-count" id="upvote-count">0</span>
       <span class="upvote-label">upvotes</span>
     </div>
-    <a href="rankings.html" style="color:var(--red-b);text-decoration:none;font-size:.75rem;text-transform:uppercase;letter-spacing:1px;padding:8px 12px;border:1px solid var(--red-d);background:rgba(139,0,0,0.12)">View Rankings →</a>
+    <a href="rankings.html" class="upvote-rank-link">View Rankings →</a>
   </div>
 
   <section id="comments-section" class="section hidden comments-wrap">
@@ -326,6 +354,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.__pageDocId = docId;
     window.__pageSlug = page.slug || slug || '';
     window.__pageTitle = page.title || '';
+    window.__pageType = page.type || 'Page';
 
     // Update page title + meta
     document.title = page.title + ' — Red Oaker Guild';
@@ -369,6 +398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('page-loading').classList.add('hidden');
     document.getElementById('page-viewer').classList.remove('hidden');
     document.getElementById('comments-section').classList.remove('hidden');
+    updateUpvoteUI();
     await loadCommentsForCurrentPage();
     await loadUpvoteStatus();
 
@@ -1247,6 +1277,12 @@ async function toggleUpvote() {
   }
 
   const btn = document.getElementById('upvote-btn');
+  const typeValue = String(window.__pageType || '').trim().toLowerCase();
+  const isAnomalyPage = typeValue === 'anomaly' || typeValue.includes('anomaly');
+  if (!isAnomalyPage) {
+    alert('Upvotes are only available on anomaly pages.');
+    return;
+  }
   if (btn) btn.disabled = true;
 
   try {
@@ -1259,7 +1295,7 @@ async function toggleUpvote() {
       },
       body: JSON.stringify({
         pageId: window.__pageDocId,
-        pageType: window.__pageType || 'Anomaly'
+        pageType: 'Anomaly'
       })
     });
 
@@ -1305,9 +1341,11 @@ function updateUpvoteUI() {
   const section = document.getElementById('upvote-section');
   const btn = document.getElementById('upvote-btn');
   const count = document.getElementById('upvote-count');
+  const typeValue = String(window.__pageType || '').trim().toLowerCase();
+  const isAnomalyPage = typeValue === 'anomaly' || typeValue.includes('anomaly');
 
   // Only show for anomalies
-  if (window.__pageType !== 'Anomaly') {
+  if (!isAnomalyPage) {
     if (section) section.classList.add('hidden');
     return;
   }

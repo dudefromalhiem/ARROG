@@ -508,10 +508,25 @@ async function updateAuthUI(user) {
     const isAdminUser = await getUserAdminFlag(user);
     navAuth.innerHTML = renderUserMenuHTML(displayLabel) + exitEsdButton;
     if (submitLink) submitLink.classList.remove('hidden');
-      if (messagingLink) messagingLink.classList.remove('hidden');
+    if (messagingLink) messagingLink.classList.remove('hidden');
     if (document.getElementById('footer-submit-link')) document.getElementById('footer-submit-link').classList.remove('hidden');
     if (document.getElementById('footer-messaging-link')) document.getElementById('footer-messaging-link').classList.remove('hidden');
-    if (adminLink) adminLink.classList.toggle('hidden', !isAdminUser);
+    if (isAdminUser) {
+      if (!adminLink) {
+        const nav = document.getElementById('nav');
+        const authLi = document.getElementById('nav-auth');
+        if (nav && authLi) {
+          const li = document.createElement('li');
+          li.id = 'admin-link';
+          li.innerHTML = '<a href="admin.html">Admin</a>';
+          nav.insertBefore(li, authLi);
+        }
+      } else {
+        adminLink.classList.remove('hidden');
+      }
+    } else if (adminLink) {
+      adminLink.remove();
+    }
     // upsert user doc
     db.collection('users').doc(user.uid).set({
       uid: user.uid, email: user.email,
@@ -532,7 +547,7 @@ async function updateAuthUI(user) {
     currentUser = null;
     currentRole = 'guest';
     navAuth.innerHTML = '<button class="nav-btn" onclick="openAuth()">Sign In</button>';
-    adminLink.classList.add('hidden');
+    if (adminLink) adminLink.remove();
     if (submitLink) submitLink.classList.add('hidden');
     if (messagingLink) messagingLink.classList.add('hidden');
     if (document.getElementById('footer-submit-link')) document.getElementById('footer-submit-link').classList.add('hidden');

@@ -19,6 +19,26 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = typeof firebase.storage === 'function' ? firebase.storage() : null;
 
+if (typeof auth.setPersistence === 'function') {
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+}
+
+const isProductionHost = !/localhost|127\.0\.0\.1/i.test(String(location.hostname || '')) && location.protocol !== 'file:';
+const rogLogger = {
+  debug: (...args) => { if (!isProductionHost) console.debug(...args); },
+  info: (...args) => { if (!isProductionHost) console.info(...args); },
+  warn: (...args) => { if (!isProductionHost) console.warn(...args); },
+  error: (...args) => console.error(...args)
+};
+
+window.rogLogger = rogLogger;
+
+if (isProductionHost) {
+  console.log = () => {};
+  console.info = () => {};
+  console.debug = () => {};
+}
+
 if (!storage) {
   console.warn('[Firebase] Storage SDK not loaded on this page. Auth and Firestore remain available.');
 }
@@ -26,11 +46,80 @@ if (!storage) {
 if (!document.getElementById('auth-pending-style')) {
   const style = document.createElement('style');
   style.id = 'auth-pending-style';
-  style.textContent = `html.auth-pending .hdr { visibility: hidden; }`;
+  style.textContent = `
+    html.auth-pending .hdr { visibility: hidden; }
+    html.auth-pending .page-loader { display: flex; }
+    .page-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: rgba(0, 0, 0, 0.96);
+      color: var(--wht);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      backdrop-filter: blur(2px);
+    }
+    .page-loader.hidden { opacity: 0; pointer-events: none; transition: opacity .22s ease; }
+    .page-loader-card {
+      width: min(560px, 100%);
+      border: 1px solid var(--red-d);
+      background: linear-gradient(180deg, rgba(18,18,18,.98), rgba(6,6,6,.98));
+      padding: 18px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.02), 0 14px 50px rgba(0,0,0,.5);
+    }
+    .page-loader-title {
+      font-family: var(--font-h);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--red-b);
+      margin-bottom: 12px;
+    }
+    .page-loader-lines { display: grid; gap: 10px; }
+    .page-loader-bar {
+      height: 12px;
+      border-radius: 8px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.05) 63%);
+      background-size: 400% 100%;
+      animation: loaderShimmer 1.15s ease-in-out infinite;
+    }
+    .page-loader-bar.short { width: 42%; }
+    .page-loader-bar.mid { width: 72%; }
+    @keyframes loaderShimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0 0; }
+    }
+  `;
   document.head.appendChild(style);
 }
 
 document.documentElement.classList.add('auth-pending');
+
+if (!document.getElementById('page-loader')) {
+  const loader = document.createElement('div');
+  loader.id = 'page-loader';
+  loader.className = 'page-loader';
+  loader.setAttribute('role', 'status');
+  loader.setAttribute('aria-live', 'polite');
+  loader.innerHTML = `
+    <div class="page-loader-card">
+      <div class="page-loader-title">Loading secure interface...</div>
+      <div class="page-loader-lines">
+        <div class="page-loader-bar short"></div>
+        <div class="page-loader-bar mid"></div>
+        <div class="page-loader-bar"></div>
+      </div>
+    </div>
+  `;
+  document.body.prepend(loader);
+}
+
+function completeAuthBootstrap() {
+  const loader = document.getElementById('page-loader');
+  if (loader) loader.classList.add('hidden');
+  document.documentElement.classList.remove('auth-pending');
+}
 
 function waitForReady(promise, timeoutMs = 1200) {
   return Promise.race([
@@ -421,7 +510,7 @@ function clearanceLevelForRole(role) {
 async function syncSharedNav(user) {
   const navAuth = document.getElementById('nav-auth');
   const submitLink = document.getElementById('submit-link');
-  const adminLink = document.getElementById('admin-link');
+  const nav = document.getElementById('nav');
   if (!navAuth) return;
 
   const canExitEsd = !!user && isOwner(user.email) && !!SITE_STATE.esdLocked;
@@ -434,14 +523,28 @@ async function syncSharedNav(user) {
     const isAdminUser = await getUserAdminFlag(user);
     navAuth.innerHTML = renderUserMenuHTML(displayLabel) + exitEsdButton;
     if (submitLink) submitLink.classList.remove('hidden');
-    if (adminLink) adminLink.classList.toggle('hidden', !isAdminUser);
+    if (nav) {
+      let adminLink = nav.querySelector('#admin-link');
+      if (isAdminUser) {
+        if (!adminLink) {
+          adminLink = document.createElement('li');
+          adminLink.id = 'admin-link';
+          adminLink.innerHTML = '<a href="admin.html">Admin</a>';
+          const authLi = nav.querySelector('#nav-auth');
+          nav.insertBefore(adminLink, authLi || null);
+        }
+      } else if (adminLink) {
+        adminLink.remove();
+      }
+    }
   } else {
     const onHome = normalizedCurrentPath() === 'index.html' && typeof openAuth === 'function';
     navAuth.innerHTML = onHome
       ? '<button class="nav-btn" onclick="openAuth()">Sign In</button>'
       : '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
     if (submitLink) submitLink.classList.add('hidden');
-    if (adminLink) adminLink.classList.add('hidden');
+    const adminLink = nav?.querySelector('#admin-link');
+    if (adminLink) adminLink.remove();
   }
 }
 
@@ -475,14 +578,17 @@ async function updateESDState(enabled) {
 async function syncServerAuthCookie(user) {
   const secure = location.protocol === 'https:' ? '; Secure' : '';
   if (!user) {
+    document.cookie = '__session=; Max-Age=0; Path=/; SameSite=Lax' + secure;
     document.cookie = 'rog_id_token=; Max-Age=0; Path=/; SameSite=Lax' + secure;
     return;
   }
   try {
     const token = await user.getIdToken(false);
-    // Keep short-lived token in a first-party cookie so Vercel middleware can gate /admin.
+    // Keep short-lived token in first-party cookies so Vercel middleware can gate protected routes.
+    document.cookie = '__session=' + token + '; Max-Age=3600; Path=/; SameSite=Lax' + secure;
     document.cookie = 'rog_id_token=' + token + '; Max-Age=3600; Path=/; SameSite=Lax' + secure;
   } catch (_err) {
+    document.cookie = '__session=; Max-Age=0; Path=/; SameSite=Lax' + secure;
     document.cookie = 'rog_id_token=; Max-Age=0; Path=/; SameSite=Lax' + secure;
   }
 }
@@ -525,15 +631,15 @@ auth.onAuthStateChanged(async user => {
     await syncServerAuthCookie(user);
     await syncSharedNav(user);
     applySiteAccessGate(user);
-    document.documentElement.classList.remove('auth-pending');
+    completeAuthBootstrap();
 
     Promise.allSettled([rolesReady, siteStateReady]).then(() => {
       SITE_STATE.esdLocked = !!SITE_STATE.esdLocked;
       syncSharedNav(user);
       applySiteAccessGate(user);
-    }).catch(err => console.warn('[Auth] Error after roles ready:', err));
+    }).catch(err => rogLogger.warn('[Auth] Error after roles ready:', err));
   } catch (err) {
-    console.error('[Auth State] Error in auth listener:', err);
-    document.documentElement.classList.remove('auth-pending');
+    rogLogger.error('[Auth State] Error in auth listener:', err);
+    completeAuthBootstrap();
   }
 });

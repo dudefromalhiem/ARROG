@@ -65,6 +65,16 @@
     .msg-request-btn.reject:hover { background: var(--red-d); color: var(--wht-b); }
     .msg-notification { background: rgba(139, 0, 0, 0.15); border: 1px solid var(--red-d); padding: 12px; margin-bottom: 8px; border-radius: 2px; font-size: 0.85rem; color: var(--wht-m); }
     .msg-no-selection { display: flex; align-items: center; justify-content: center; color: var(--wht-d); font-style: italic; text-align: center; }
+    .msg-auth-skeleton { display:none; margin-top:20px; border:1px solid var(--red-d); background: linear-gradient(180deg, rgba(14,14,14,.95), rgba(8,8,8,.98)); padding:18px; }
+    .auth-pending .msg-auth-skeleton { display:block; }
+    .auth-pending .msg-container { display:none; }
+    .msg-auth-grid { display:grid; grid-template-columns: 280px 1fr; gap:20px; min-height: calc(100vh - 260px); }
+    .msg-auth-stack { display:grid; gap:10px; }
+    .msg-auth-pulse { height:12px; border-radius:999px; background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.05) 63%); background-size:400% 100%; animation: msgPulse 1.15s ease-in-out infinite; }
+    .msg-auth-pulse.short { width:40%; }
+    .msg-auth-pulse.mid { width:70%; }
+    .msg-auth-card { border:1px solid var(--blk-m); padding:14px; background:rgba(255,255,255,0.02); }
+    @keyframes msgPulse { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
     
     @media (max-width: 920px) {
       .msg-container { grid-template-columns: 1fr; }
@@ -101,6 +111,27 @@
   <div style="margin-bottom: 24px;">
     <h1 style="font-size: 1.8rem; color: var(--wht-b); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 2px;">Guild Messaging</h1>
     <p style="font-size: 0.9rem; color: var(--wht-d);">Connect with other Guild members, manage friend requests, and stay updated with notifications.</p>
+  </div>
+
+  <div class="msg-auth-skeleton" id="msg-auth-skeleton" aria-hidden="true">
+    <div class="msg-auth-grid">
+      <div class="msg-auth-card">
+        <div class="msg-auth-stack">
+          <div class="msg-auth-pulse short"></div>
+          <div class="msg-auth-pulse"></div>
+          <div class="msg-auth-pulse mid"></div>
+          <div class="msg-auth-pulse"></div>
+        </div>
+      </div>
+      <div class="msg-auth-card">
+        <div class="msg-auth-stack">
+          <div class="msg-auth-pulse mid"></div>
+          <div class="msg-auth-pulse"></div>
+          <div class="msg-auth-pulse"></div>
+          <div class="msg-auth-pulse short"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="msg-container">
@@ -448,6 +479,9 @@ async function refreshInbox() {
 
 async function sendMessage() {
   if (!currentPeerUid) return;
+  const now = Date.now();
+  if (now - (window.__rogLastMessageSendAt || 0) < 500) return;
+  window.__rogLastMessageSendAt = now;
   const input = document.getElementById('msg-input');
   const sendBtn = document.getElementById('msg-send-btn');
   const text = String(input && input.value || '').trim();

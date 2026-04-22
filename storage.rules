@@ -7,17 +7,20 @@ service firebase.storage {
 
     function isAllowedImageUpload() {
       return request.resource.size <= 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*') &&
         request.resource.contentType in ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
     }
 
     function isAllowedAudioUpload() {
       return request.resource.size <= 10 * 1024 * 1024 &&
-        request.resource.contentType.matches('audio/.*');
+        request.resource.contentType.matches('audio/.*') &&
+        request.resource.contentType in ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/aac', 'audio/ogg'];
     }
 
     function isAllowedVideoUpload() {
       return request.resource.size <= 25 * 1024 * 1024 &&
-        request.resource.contentType.matches('video/.*');
+        request.resource.contentType.matches('video/.*') &&
+        request.resource.contentType in ['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg'];
     }
 
     match /{allPaths=**} {

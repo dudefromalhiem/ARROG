@@ -150,6 +150,34 @@ async function listPublicAdmins(db) {
   });
 }
 
+async function enforceMessageRateLimit(db, uid) {
+  const metaRef = db.collection('rateLimits').doc(uid);
+  const now = Date.now();
+  const windowMs = 60 * 60 * 1000;
+
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(metaRef);
+    const data = snap.exists ? (snap.data() || {}) : {};
+    const lastReset = data.messageLastReset && typeof data.messageLastReset.toMillis === 'function'
+      ? data.messageLastReset.toMillis()
+      : 0;
+    const expired = !lastReset || (now - lastReset) >= windowMs;
+    const count = expired ? 0 : Number(data.messageCount || 0);
+
+    if (count >= 30) {
+      const err = new Error('Message limit reached. Please slow down and try again later.');
+      err.statusCode = 429;
+      throw err;
+    }
+
+    tx.set(metaRef, {
+      messageCount: count + 1,
+      messageLastReset: expired ? admin.firestore.Timestamp.fromMillis(now) : data.messageLastReset,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  });
+}
+
 async function searchUsers(db, queryText) {
   const query = normalizeText(queryText || '', 80).toLowerCase();
   if (!query) return [];
@@ -233,6 +261,8 @@ async function sendMessage(db, actor, body) {
   if (!text) {
     return { statusCode: 400, payload: { error: 'Message cannot be empty.' } };
   }
+
+  await enforceMessageRateLimit(db, actor.uid);
 
   const [roles, recipientSnap, senderSnap] = await Promise.all([
     getRolesData(db),

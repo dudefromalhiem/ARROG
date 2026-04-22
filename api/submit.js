@@ -292,29 +292,29 @@ function buildSubmissionPayload(body, actor) {
 }
 
 async function enforceRateLimit(db, uid, ip) {
-  const metaRef = db.collection('submissions_meta').doc(uid);
+  const metaRef = db.collection('rateLimits').doc(uid);
   const now = Date.now();
-  const windowMs = 24 * 60 * 60 * 1000;
+  const windowMs = 60 * 60 * 1000;
 
   await db.runTransaction(async tx => {
     const snap = await tx.get(metaRef);
     const data = snap.exists ? (snap.data() || {}) : {};
-    const windowStart = data.windowStart && typeof data.windowStart.toMillis === 'function'
-      ? data.windowStart.toMillis()
+    const lastReset = data.lastReset && typeof data.lastReset.toMillis === 'function'
+      ? data.lastReset.toMillis()
       : 0;
-    const expired = !windowStart || (now - windowStart) >= windowMs;
-    const count = expired ? 0 : Number(data.count || 0);
+    const expired = !lastReset || (now - lastReset) >= windowMs;
+    const count = expired ? 0 : Number(data.submissionCount || 0);
 
-    if (count >= 3) {
-      const err = new Error('Submission limit reached. Try again tomorrow.');
+    if (count >= 10) {
+      const err = new Error('Submission limit reached. Try again later.');
       err.statusCode = 429;
       throw err;
     }
 
     tx.set(metaRef, {
-      count: count + 1,
-      windowStart: expired ? admin.firestore.Timestamp.fromMillis(now) : data.windowStart,
-      lastIp: ip,
+      submissionCount: count + 1,
+      lastReset: expired ? admin.firestore.Timestamp.fromMillis(now) : data.lastReset,
+      lastSubmissionIp: ip,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   });

@@ -183,6 +183,24 @@
       margin-bottom: 20px;
       border-radius: 4px;
     }
+      .load-skeleton {
+        display:grid;
+        gap:10px;
+        margin-top:14px;
+      }
+      .load-skeleton .pulse {
+        height:12px;
+        border-radius:999px;
+        background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.05) 63%);
+        background-size: 400% 100%;
+        animation: loaderPulse 1.15s ease-in-out infinite;
+      }
+      .load-skeleton .pulse.short { width: 38%; }
+      .load-skeleton .pulse.mid { width: 68%; }
+      @keyframes loaderPulse {
+        0% { background-position: 100% 0; }
+        100% { background-position: 0 0; }
+      }
     .guidebook h2 {
       font-family: var(--font-h);
       font-size: 1.1rem;
@@ -272,6 +290,12 @@
     <p class="load-copy">
       Verifying credentials with the Guild central server.
     </p>
+    <div class="load-skeleton" aria-hidden="true">
+      <div class="pulse short"></div>
+      <div class="pulse mid"></div>
+      <div class="pulse"></div>
+      <div class="pulse mid"></div>
+    </div>
     <pre class="load-monocode" aria-hidden="true">// ROG SUBMISSION LINK
   const session = await gateway.open('workshop');
 const profile = await session.identify(agentFingerprint);
@@ -828,6 +852,7 @@ render.mount('submission-terminal');</pre>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="firebase-config.js"></script>
 <script src="seed-data.js"></script>
 <script src="submit.js"></script>

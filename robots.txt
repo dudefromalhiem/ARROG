@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin
+Disallow: /submit
+Disallow: /messaging
+
+Sitemap: https://redoakguild.vercel.app/sitemap.xml
