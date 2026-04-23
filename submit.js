@@ -346,6 +346,23 @@ const DOC_DEFAULT_CSS = `
 .doc-editor-page .align-left { text-align: left; }
 .doc-editor-page .align-center { text-align: center; }
 .doc-editor-page .align-right { text-align: right; }
+.doc-editor-page .doc-image-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin: 22px 0;
+}
+.doc-editor-page .doc-image-row .doc-image-wrap {
+  flex: 1 1 300px;
+  margin: 0;
+}
+.doc-editor-page .doc-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 22px 0;
+}
 .doc-editor-page blockquote {
   border-left: 3px solid #8b0000;
   background: #101010;
@@ -956,6 +973,11 @@ async function saveDraft(options = {}) {
     draftTrigger: trigger,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    // Preserve structured data for Studio/Template modes
+    docBlocks: docBlocks,
+    currentMode: currentMode,
+    currentTemplate: currentTemplate,
+    subsectionCounters: subsectionCounters,
   };
 
   draftSaveInFlight = true;
@@ -1011,10 +1033,26 @@ async function continueDraftSubmission(id) {
     const tags = Array.isArray(draft.tags) ? draft.tags : [];
     setSelectedTags(tags);
 
-    // Drafts are re-opened in code mode to preserve exact authored markup.
-    switchMode('code');
-    document.getElementById('sf-html').value = draft.htmlContent || DEFAULT_NEW_PAGE_HTML;
-    document.getElementById('sf-css').value = draft.cssContent || '';
+    // Restore structured state
+    docBlocks = Array.isArray(draft.docBlocks) ? JSON.parse(JSON.stringify(draft.docBlocks)) : [];
+    currentMode = draft.currentMode || 'code';
+    currentTemplate = draft.currentTemplate || 'anomaly';
+    if (draft.subsectionCounters) {
+      subsectionCounters = { ...draft.subsectionCounters };
+    }
+
+    if (currentMode === 'doc') {
+      switchMode('doc');
+      // No need to set sf-html/sf-css here as Document Studio renders from docBlocks
+    } else if (currentMode === 'template') {
+      switchMode('template');
+      if (currentTemplate) selectTemplate(currentTemplate);
+      // Template fields are usually built from DOM, but we should at least restore the mode
+    } else {
+      switchMode('code');
+      document.getElementById('sf-html').value = draft.htmlContent || DEFAULT_NEW_PAGE_HTML;
+      document.getElementById('sf-css').value = draft.cssContent || '';
+    }
 
     const draftAssets = Array.isArray(draft.imageAssets) && draft.imageAssets.length
       ? draft.imageAssets
@@ -1734,6 +1772,13 @@ function selectTemplate(tpl) {
     setGuideSectionsFixedStructure();
   }
 
+  if (tpl === 'artwork') {
+    const list = document.getElementById('tf-art-images-list');
+    if (list && list.children.length === 0) {
+      addArtworkImage();
+    }
+  }
+
   schedulePreview();
 }
 
@@ -1801,6 +1846,34 @@ function removeSubsection(type, n) {
   schedulePreview();
 }
 
+let artworkImageCounter = 0;
+function addArtworkImage() {
+  artworkImageCounter++;
+  const n = artworkImageCounter;
+  const list = document.getElementById('tf-art-images-list');
+  if (!list) return;
+
+  const div = document.createElement('div');
+  div.className = 'doc-image-entry';
+  div.id = 'art-img-' + n;
+  div.style.marginBottom = '12px';
+  div.innerHTML =
+    '<div class="doc-image-entry-row">' +
+      '<div style="flex:1"><label class="fl">Image ' + n + '</label><select class="fi art-img-select">' + getUploadedImageOptions('') + '</select></div>' +
+      '<div style="flex:1"><label class="fl">URL</label><input class="fi art-img-url" placeholder="https://..." /></div>' +
+      '<button class="btn btn-sm btn-d" onclick="removeArtworkImage(' + n + ')" style="margin-top:20px;height:32px">✕</button>' +
+    '</div>';
+  
+  list.appendChild(div);
+  div.querySelectorAll('select, input').forEach(el => el.addEventListener('input', schedulePreview));
+}
+
+function removeArtworkImage(n) {
+  const el = document.getElementById('art-img-' + n);
+  if (el) el.remove();
+  schedulePreview();
+}
+
 // ═════════════════════════════════════════════════════════════
 // TEMPLATE → HTML/CSS GENERATION
 // ═════════════════════════════════════════════════════════════
@@ -1816,7 +1889,7 @@ function buildTemplateHTML() {
 function createDocBlock(type) {
   if (type === 'title') return { type: 'title', text: '' };
   if (type === 'text') return { type: 'text', html: '' };
-  if (type === 'image') return { type: 'image', url: '', caption: '', align: 'center', width: '' };
+  if (type === 'image') return { type: 'image', images: [{ url: '', caption: '' }], layout: 'stack', align: 'center', width: '' };
   if (type === 'audio') return { type: 'audio', url: '', label: '' };
   if (type === 'video') return { type: 'video', url: '', label: '', poster: '' };
   if (type === 'quote') return { type: 'quote', text: '', source: '' };
@@ -1922,16 +1995,42 @@ function renderDocBlocks() {
     } else if (block.type === 'text') {
       body = '<div class="doc-editable" contenteditable="true" data-field="html" data-index="' + idx + '">' + (block.html || '') + '</div>';
     } else if (block.type === 'image') {
-      const imageSrc = block.url && isValidImageSrc(block.url)
-        ? '<img class="doc-image-preview" src="' + escapeAttr(block.url) + '" alt="Selected" style="' + buildImageRenderStyle(block.width) + '" />'
-        : '';
-      body = '<div class="doc-grid-2">' +
-        '<div><label class="fl">Uploaded Images</label><select class="fi" data-field="uploadSelect" data-index="' + idx + '">' + getUploadedImageOptions(block.url || '') + '</select></div>' +
-        '<div><label class="fl">Image URL</label><input class="fi" data-field="url" data-index="' + idx + '" value="' + escapeAttr(block.url || '') + '" placeholder="https://..." /></div>' +
-        '<div><label class="fl">Caption</label><input class="fi" data-field="caption" data-index="' + idx + '" value="' + escapeAttr(block.caption || '') + '" placeholder="Optional caption" /></div>' +
-        '<div><label class="fl">Alignment</label><select class="fi" data-field="align" data-index="' + idx + '"><option value="left"' + (block.align === 'left' ? ' selected' : '') + '>Left</option><option value="center"' + (block.align !== 'left' && block.align !== 'right' ? ' selected' : '') + '>Center</option><option value="right"' + (block.align === 'right' ? ' selected' : '') + '>Right</option></select></div>' +
-        '<div><label class="fl">Image Width</label><input class="fi" data-field="width" data-index="' + idx + '" value="' + escapeAttr(block.width || '') + '" placeholder="auto, 80%, 420px" /></div>' +
-      '</div>' + imageSrc;
+      const images = block.images || (block.url ? [{ url: block.url, caption: block.caption || '' }] : []);
+      const layout = block.layout || 'stack';
+      
+      let imagesHtml = '';
+      images.forEach((img, iIdx) => {
+        const preview = img.url && isValidImageSrc(img.url)
+          ? '<img class="doc-image-preview-mini" src="' + escapeAttr(img.url) + '" />'
+          : '';
+        imagesHtml += '<div class="doc-image-entry" data-img-index="' + iIdx + '">' +
+          '<div class="doc-image-entry-row">' +
+            '<div style="flex:1"><label class="fl">Image ' + (iIdx + 1) + '</label><select class="fi" data-field="imageSelect" data-index="' + idx + '" data-img-index="' + iIdx + '">' + getUploadedImageOptions(img.url || '') + '</select></div>' +
+            '<div style="flex:1"><label class="fl">URL</label><input class="fi" data-field="imageUrl" data-index="' + idx + '" data-img-index="' + iIdx + '" value="' + escapeAttr(img.url || '') + '" /></div>' +
+            '<button class="btn btn-sm btn-d" type="button" data-action="removeImage" data-index="' + idx + '" data-img-index="' + iIdx + '" style="margin-top:20px;height:32px">✕</button>' +
+          '</div>' +
+          '<div class="fg"><label class="fl">Caption</label><input class="fi" data-field="imageCaption" data-index="' + idx + '" data-img-index="' + iIdx + '" value="' + escapeAttr(img.caption || '') + '" /></div>' +
+          preview +
+        '</div>';
+      });
+
+      body = '<div class="doc-image-block-settings">' +
+        '<div class="doc-grid-3">' +
+          '<div><label class="fl">Layout</label><select class="fi" data-field="layout" data-index="' + idx + '">' +
+            '<option value="stack"' + (layout === 'stack' ? ' selected' : '') + '>Stacked (Column)</option>' +
+            '<option value="row"' + (layout === 'row' ? ' selected' : '') + '>Side-by-Side (Row)</option>' +
+            '<option value="grid"' + (layout === 'grid' ? ' selected' : '') + '>Grid</option>' +
+          '</select></div>' +
+          '<div><label class="fl">Alignment</label><select class="fi" data-field="align" data-index="' + idx + '">' +
+            '<option value="left"' + (block.align === 'left' ? ' selected' : '') + '>Left</option>' +
+            '<option value="center"' + (block.align !== 'left' && block.align !== 'right' ? ' selected' : '') + '>Center</option>' +
+            '<option value="right"' + (block.align === 'right' ? ' selected' : '') + '>Right</option>' +
+          '</select></div>' +
+          '<div><label class="fl">Max Width</label><input class="fi" data-field="width" data-index="' + idx + '" value="' + escapeAttr(block.width || '') + '" placeholder="auto, 100%, 800px" /></div>' +
+        '</div>' +
+        '<div class="doc-image-list">' + imagesHtml + '</div>' +
+        '<button class="btn btn-sm btn-s" type="button" data-action="addImage" data-index="' + idx + '" style="margin-top:8px">+ Add Another Image</button>' +
+      '</div>';
     } else if (block.type === 'audio') {
       const preview = block.url
         ? '<audio src="' + escapeAttr(block.url) + '" controls preload="metadata" style="width:100%;display:block;margin-top:8px"></audio>'
@@ -2080,10 +2179,30 @@ function initDocumentStudio() {
     if (!actionBtn) return;
     const index = Number(actionBtn.getAttribute('data-index'));
     const action = actionBtn.getAttribute('data-action');
+
     if (action === 'up') moveDocBlock(index, -1);
     if (action === 'down') moveDocBlock(index, 1);
     if (action === 'duplicate') duplicateDocBlock(index);
     if (action === 'delete') removeDocBlock(index);
+
+    if (action === 'addImage') {
+      if (!docBlocks[index].images) {
+        docBlocks[index].images = docBlocks[index].url ? [{ url: docBlocks[index].url, caption: docBlocks[index].caption || '' }] : [];
+        delete docBlocks[index].url;
+        delete docBlocks[index].caption;
+      }
+      docBlocks[index].images.push({ url: '', caption: '' });
+      renderDocBlocks();
+      schedulePreview();
+    }
+    if (action === 'removeImage') {
+      const iIdx = Number(actionBtn.getAttribute('data-img-index'));
+      if (docBlocks[index].images && docBlocks[index].images[iIdx]) {
+        docBlocks[index].images.splice(iIdx, 1);
+        renderDocBlocks();
+        schedulePreview();
+      }
+    }
   });
 
 
@@ -2099,9 +2218,52 @@ function initDocumentStudio() {
     }
 
     const value = target.value;
+    const iIdx = Number(target.getAttribute('data-img-index'));
+
+    if (field === 'layout') {
+      docBlocks[index].layout = value;
+      schedulePreview();
+      return;
+    }
+
+    if (field === 'imageSelect') {
+      if (!docBlocks[index].images) {
+        docBlocks[index].images = docBlocks[index].url ? [{ url: docBlocks[index].url, caption: docBlocks[index].caption || '' }] : [];
+        delete docBlocks[index].url;
+        delete docBlocks[index].caption;
+      }
+      docBlocks[index].images[iIdx].url = value;
+      renderDocBlocks();
+      schedulePreview();
+      return;
+    }
+
+    if (field === 'imageUrl') {
+      if (!docBlocks[index].images) {
+        docBlocks[index].images = docBlocks[index].url ? [{ url: docBlocks[index].url, caption: docBlocks[index].caption || '' }] : [];
+        delete docBlocks[index].url;
+        delete docBlocks[index].caption;
+      }
+      docBlocks[index].images[iIdx].url = value;
+      renderDocBlocks();
+      schedulePreview();
+      return;
+    }
+
+    if (field === 'imageCaption') {
+      if (!docBlocks[index].images) {
+        docBlocks[index].images = docBlocks[index].url ? [{ url: docBlocks[index].url, caption: docBlocks[index].caption || '' }] : [];
+        delete docBlocks[index].url;
+        delete docBlocks[index].caption;
+      }
+      docBlocks[index].images[iIdx].caption = value;
+      schedulePreview();
+      return;
+    }
+
     if (field === 'uploadSelect') {
       docBlocks[index].url = value;
-      updateDocImagePreviewInBlock(target.closest('.doc-block'), value);
+      renderDocBlocks();
       schedulePreview();
       return;
     }
@@ -2115,11 +2277,7 @@ function initDocumentStudio() {
 
     if (field === 'url') {
       docBlocks[index][field] = value;
-      if (docBlocks[index].type === 'image') {
-        updateDocImagePreviewInBlock(target.closest('.doc-block'), value);
-      } else {
-        renderDocBlocks();
-      }
+      renderDocBlocks();
       schedulePreview();
       return;
     }
@@ -2161,11 +2319,26 @@ function buildDocumentModeHTML() {
       parts.push('<div class="doc-rich">' + (block.html || '') + '</div>');
       return;
     }
-    if (block.type === 'image' && isValidImageSrc(block.url)) {
+    if (block.type === 'image') {
+      const images = block.images || (block.url ? [{ url: block.url, caption: block.caption || '' }] : []);
+      if (images.length === 0) return;
+
+      const layout = block.layout || 'stack';
+      const layoutClass = layout === 'row' ? 'doc-image-row' : (layout === 'grid' ? 'doc-image-grid' : 'doc-image-stack');
       const align = (block.align === 'left' || block.align === 'right') ? block.align : 'center';
-      const captionText = (block.caption || 'Document image').trim();
-      const caption = block.caption ? '<figcaption>' + escapeHtml(block.caption) + '</figcaption>' : '';
-      parts.push('<figure class="doc-image-wrap align-' + align + '"><img src="' + escapeAttr(block.url) + '" alt="' + escapeAttr(captionText) + '" loading="lazy" decoding="async" />' + caption + '</figure>');
+      
+      let html = '<div class="doc-image-container ' + layoutClass + ' align-' + align + '"';
+      if (block.width) html += ' style="max-width:' + block.width + '"';
+      html += '>\n';
+      
+      images.forEach(img => {
+        if (!img.url) return;
+        const caption = img.caption ? '<figcaption>' + escapeHtml(img.caption) + '</figcaption>' : '';
+        html += '  <figure><img src="' + escapeAttr(img.url) + '" alt="' + escapeAttr(img.caption || 'Document image') + '" loading="lazy" decoding="async" />' + caption + '</figure>\n';
+      });
+      
+      html += '</div>';
+      parts.push(html);
       return;
     }
     if (block.type === 'audio' && String(block.url || '').trim()) {
@@ -2488,16 +2661,27 @@ function buildTaleTemplate() {
 }
 
 function buildArtworkTemplate() {
-  const imgUrl = document.getElementById('tf-art-img').value;
   const artist = document.getElementById('tf-art-artist').value.trim();
   const medium = document.getElementById('tf-art-medium').value.trim();
   const desc = document.getElementById('tf-art-desc').value.trim();
 
   let html = '<div class="art-showcase">\n';
   html += '  <h1>' + escapeHtml(document.getElementById('sf-title').value.trim() || 'Untitled') + '</h1>\n';
-  if (imgUrl) {
-    html += '  <div class="art-frame"><img src="' + imgUrl + '" alt="Artwork" /></div>\n';
+  
+  const imgEntries = document.querySelectorAll('#tf-art-images-list .doc-image-entry');
+  if (imgEntries.length > 0) {
+    html += '  <div class="art-gallery">\n';
+    imgEntries.forEach(entry => {
+      const sel = entry.querySelector('.art-img-select');
+      const url = entry.querySelector('.art-img-url');
+      const finalUrl = (sel && sel.value) || (url && url.value) || '';
+      if (finalUrl) {
+        html += '    <div class="art-frame"><img src="' + escapeAttr(finalUrl) + '" alt="Artwork" /></div>\n';
+      }
+    });
+    html += '  </div>\n';
   }
+
   html += '  <div class="art-info">\n';
   if (artist) html += '    <div class="art-artist">By ' + escapeHtml(artist) + '</div>\n';
   if (medium) html += '    <div class="art-medium">' + escapeHtml(medium) + '</div>\n';
@@ -2513,14 +2697,20 @@ function buildArtworkTemplate() {
   margin-bottom: 24px;
   letter-spacing: 2px;
 }
+.art-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 32px;
+}
 .art-frame {
   background: #111111;
-  padding: 24px;
+  padding: 16px;
   border: 1px solid #3a3a3a;
-  margin-bottom: 24px;
   display: inline-block;
 }
-.art-frame img { max-width: 100%; max-height: 600px; }
+.art-frame img { max-width: 100%; max-height: 500px; display: block; }
 .art-info { max-width: 600px; margin: 0 auto; text-align: left; }
 .art-artist { font-size: 1rem; color: #8b0000; font-weight: 700; margin-bottom: 4px; }
 .art-medium { font-size: .85rem; color: #c7c7c7; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; }
@@ -3423,9 +3613,13 @@ function insertUploadedAssetIntoCurrentEditor(kind, url, label) {
       return;
     }
     const block = createDocBlock(kind);
-    block.url = url;
-    if (kind === 'image') block.caption = label || '';
-    if (kind === 'audio' || kind === 'video') block.label = label || '';
+    if (kind === 'image') {
+      block.images = [{ url: url, caption: label || '' }];
+      block.layout = 'stack';
+    } else {
+      block.url = url;
+      if (kind === 'audio' || kind === 'video') block.label = label || '';
+    }
     docBlocks.push(block);
     renderDocBlocks();
     schedulePreview();
@@ -3690,6 +3884,19 @@ function refreshMediaSelectors() {
 }
 
 function refreshDocumentImagePickers() {
+  document.querySelectorAll('#doc-blocks select[data-field="imageSelect"]').forEach(selectEl => {
+    const index = Number(selectEl.getAttribute('data-index'));
+    const iIdx = Number(selectEl.getAttribute('data-img-index'));
+    const block = docBlocks[index];
+    if (block && block.images && block.images[iIdx]) {
+      const selected = block.images[iIdx].url || '';
+      selectEl.innerHTML = getUploadedImageOptions(selected);
+      if (selected && Array.from(selectEl.options).some(option => option.value === selected)) {
+        selectEl.value = selected;
+      }
+    }
+  });
+  // Handle old-style or media blocks if they exist
   document.querySelectorAll('#doc-blocks select[data-field="uploadSelect"]').forEach(selectEl => {
     const index = Number(selectEl.getAttribute('data-index'));
     const selected = Number.isFinite(index) && docBlocks[index] ? (docBlocks[index].url || '') : '';

@@ -686,10 +686,10 @@ render.mount('submission-terminal');</pre>
       <!-- Artwork Template Fields -->
       <div class="section hidden" style="margin-bottom:24px" id="tpl-fields-artwork">
         <div class="section-hd">Artwork Details</div>
-        <div class="fg"><label class="fl">Featured Image</label>
-          <select class="fi" id="tf-art-img">
-            <option value="">Upload an image above first</option>
-          </select>
+        <div class="fg">
+          <label class="fl">Artwork Images</label>
+          <div id="tf-art-images-list"></div>
+          <button class="btn btn-s" onclick="addArtworkImage()" style="margin-top:8px">+ Add Image</button>
         </div>
         <div class="fg"><label class="fl">Artist Name</label><input class="fi" id="tf-art-artist" placeholder="Your name or handle" /></div>
         <div class="fg"><label class="fl">Medium / Technique</label><input class="fi" id="tf-art-medium" placeholder="e.g. Digital painting, Ink on paper" /></div>
