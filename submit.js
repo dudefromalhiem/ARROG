@@ -2226,38 +2226,21 @@ function initDocumentStudio() {
       return;
     }
 
-    if (field === 'imageSelect') {
+    if (field === 'imageSelect' || field === 'imageUrl' || field === 'imageCaption') {
       if (!docBlocks[index].images) {
         docBlocks[index].images = docBlocks[index].url ? [{ url: docBlocks[index].url, caption: docBlocks[index].caption || '' }] : [];
         delete docBlocks[index].url;
         delete docBlocks[index].caption;
       }
-      docBlocks[index].images[iIdx].url = value;
-      renderDocBlocks();
-      schedulePreview();
-      return;
-    }
-
-    if (field === 'imageUrl') {
-      if (!docBlocks[index].images) {
-        docBlocks[index].images = docBlocks[index].url ? [{ url: docBlocks[index].url, caption: docBlocks[index].caption || '' }] : [];
-        delete docBlocks[index].url;
-        delete docBlocks[index].caption;
+      if (docBlocks[index].images[iIdx]) {
+        if (field === 'imageSelect' || field === 'imageUrl') {
+          docBlocks[index].images[iIdx].url = value;
+          renderDocBlocks();
+        } else {
+          docBlocks[index].images[iIdx].caption = value;
+        }
+        schedulePreview();
       }
-      docBlocks[index].images[iIdx].url = value;
-      renderDocBlocks();
-      schedulePreview();
-      return;
-    }
-
-    if (field === 'imageCaption') {
-      if (!docBlocks[index].images) {
-        docBlocks[index].images = docBlocks[index].url ? [{ url: docBlocks[index].url, caption: docBlocks[index].caption || '' }] : [];
-        delete docBlocks[index].url;
-        delete docBlocks[index].caption;
-      }
-      docBlocks[index].images[iIdx].caption = value;
-      schedulePreview();
       return;
     }
 
