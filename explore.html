@@ -42,10 +42,11 @@
     .exp-card-excerpt { font-size: .85rem; color: var(--wht-m); line-height: 1.6; flex-grow: 1; margin-bottom: 16px; }
     
     /* Artwork variation */
-    .exp-art-card { padding: 0; background: #000; overflow: hidden; position: relative; }
-    .exp-art-card img { width: 100%; height: 200px; object-fit: cover; opacity: 0.7; transition: opacity 0.3s; }
-    .exp-art-card:hover img { opacity: 1; }
-    .exp-art-info { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.9)); padding: 16px; }
+    .exp-art-card { padding: 0; background: var(--blk-c); overflow: hidden; position: relative; display: flex; flex-direction: column; border: 1px solid var(--blk-d); }
+    .exp-art-card img { width: 100%; height: 260px; object-fit: cover; opacity: 0.8; transition: all 0.3s ease; border-bottom: 1px solid var(--blk-m); }
+    .exp-art-card:hover img { opacity: 1; transform: scale(1.03); }
+    .exp-art-info { padding: 16px; background: var(--blk-b); flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; border-top: 1px solid var(--red-d); }
+    .exp-art-info .exp-card-title { margin: 0; font-size: 0.95rem; letter-spacing: 1px; color: var(--wht-b); }
     
     .no-results { text-align: center; color: var(--wht-d); padding: 40px; font-style: italic; background: rgba(255,255,255,0.02); border: 1px dashed var(--blk-m); }
 
@@ -366,9 +367,9 @@
       
       if (type === 'Artwork' && i.img) {
         return `<a class="exp-card exp-art-card" href="${href}" style="text-decoration:none">
-               <img src="${safeImg}" alt="${safeTitle}" loading="lazy" decoding="async" />
+               <div style="overflow:hidden;height:260px"><img src="${safeImg}" alt="${safeTitle}" loading="lazy" decoding="async" /></div>
                <div class="exp-art-info">
-                 <div class="exp-card-title" style="margin:0">${safeTitle}</div>
+                 <div class="exp-card-title">${safeTitle}</div>
                </div></a>`;
       }
 

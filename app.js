@@ -665,6 +665,8 @@ function initCarousel(items, isError = false) {
   const track = document.getElementById('carousel-track');
   const dots = document.getElementById('carousel-dots');
   const label = document.getElementById('carousel-label');
+  const btnPrev = document.getElementById('carousel-prev');
+  const btnNext = document.getElementById('carousel-next');
   if (!track) return;
 
   if (isError) {
@@ -682,23 +684,52 @@ function initCarousel(items, isError = false) {
   }
 
   carouselItems = items;
-  if (carouselTimer) {
-    clearInterval(carouselTimer);
-    carouselTimer = null;
-  }
-  track.innerHTML = items.map(a => `
-    <div class="carousel-slide"><img src="${a.imageUrl}" alt="${a.title}" loading="lazy" decoding="async" /></div>
-  `).join('');
+  resetCarouselTimer();
+
+  track.innerHTML = items.map(a => {
+    const href = a.slug ? 'page.html?slug=' + encodeURIComponent(a.slug) : (a.pageUrl || '#');
+    return `<div class="carousel-slide"><a href="${href}"><img src="${a.imageUrl}" alt="${a.title}" loading="lazy" decoding="async" /></a></div>`;
+  }).join('');
+
   if (dots) {
     dots.innerHTML = items.map((_, i) =>
       `<button class="carousel-dot ${i === 0 ? 'on' : ''}" onclick="goSlide(${i})"></button>`
     ).join('');
   }
+
+  if (btnPrev) btnPrev.onclick = () => goPrev();
+  if (btnNext) btnNext.onclick = () => goNext();
+
   updateCarousel();
-  carouselTimer = setInterval(() => { carouselIdx = (carouselIdx + 1) % items.length; updateCarousel(); }, 8000);
 }
 
-function goSlide(i) { carouselIdx = i; updateCarousel(); }
+function resetCarouselTimer() {
+  if (carouselTimer) clearInterval(carouselTimer);
+  if (carouselItems.length > 1) {
+    carouselTimer = setInterval(() => {
+      carouselIdx = (carouselIdx + 1) % carouselItems.length;
+      updateCarousel();
+    }, 8000);
+  }
+}
+
+function goNext() {
+  carouselIdx = (carouselIdx + 1) % carouselItems.length;
+  updateCarousel();
+  resetCarouselTimer();
+}
+
+function goPrev() {
+  carouselIdx = (carouselIdx - 1 + carouselItems.length) % carouselItems.length;
+  updateCarousel();
+  resetCarouselTimer();
+}
+
+function goSlide(i) {
+  carouselIdx = i;
+  updateCarousel();
+  resetCarouselTimer();
+}
 
 function updateCarousel() {
   document.getElementById('carousel-track').style.transform = `translateX(-${carouselIdx * 100}%)`;
@@ -821,28 +852,9 @@ function loadData() {
 
 async function loadTopRatedAnomalies() {
   try {
-    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      ? 'https://redoakerguild.vercel.app/api/topAnomalies'
-      : '/api/topAnomalies';
+    // Reverted to pure client-side Firestore query
 
-    let data = null;
-    try {
-      const response = await fetch(apiBase + '?limit=10');
-      if (response.ok) {
-        const json = await response.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          data = json.data;
-        }
-      }
-    } catch (apiErr) {
-      console.warn('API topAnomalies fetch failed, falling back to Firestore:', apiErr);
-    }
 
-    if (data) {
-      renderTopRatedAnomalies(data);
-      setCachedHomeData('top-rated', data);
-      return;
-    }
 
     // Fall back to Firestore query
     try {
