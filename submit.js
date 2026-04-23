@@ -7,7 +7,7 @@ let uploadedImages = [];
 let uploadedMediaFiles = [];
 let currentUserForSubmit = null;
 let previewDebounce = null;
-let currentMode = 'template'; // 'template' | 'doc' | 'code'
+let currentMode = 'doc'; // 'template' | 'doc' | 'code'
 let currentTemplate = 'anomaly'; // 'anomaly' | 'tale' | 'artwork' | 'guide'
 let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
 let docBlocks = [];
@@ -329,57 +329,72 @@ const DEFAULT_NEW_PAGE_HTML = `<div class="page-shell">
 </div>`;
 
 const DOC_DEFAULT_CSS = `
-.doc-editor-page { max-width: 860px; margin: 0 auto; }
+.doc-editor-page { max-width: 860px; margin: 0 auto; padding-bottom: 40px; }
 .doc-editor-page .doc-title-main {
   font-family: var(--font-d);
   text-transform: uppercase;
   letter-spacing: 3px;
   color: #f2f2f2;
-  margin-bottom: 18px;
+  margin: 30px 0 20px 0;
+  border-bottom: 2px solid #333;
+  padding-bottom: 10px;
 }
-.doc-editor-page .doc-rich, .doc-editor-page p { color: #d8d8d8; margin-bottom: 14px; }
-.doc-editor-page h2 { color: #f2f2f2; margin-bottom: 10px; letter-spacing: 2px; text-transform: uppercase; }
-.doc-editor-page h3 { color: #d7d7d7; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; }
-.doc-editor-page .doc-image-wrap { margin: 22px 0; }
-.doc-editor-page .doc-image-wrap img { max-width: 100%; border: 1px solid #3a3a3a; background: #111111; }
-.doc-editor-page .doc-image-wrap figcaption { margin-top: 8px; color: #c7c7c7; font-size: .85rem; }
+.doc-editor-page .doc-rich, .doc-editor-page p { color: #d8d8d8; margin-bottom: 16px; line-height: 1.6; }
+.doc-editor-page h2 { color: #f2f2f2; margin: 24px 0 12px 0; letter-spacing: 2px; text-transform: uppercase; border-left: 4px solid #8b0000; padding-left: 15px; }
+.doc-editor-page h3 { color: #d7d7d7; margin: 20px 0 10px 0; letter-spacing: 1px; text-transform: uppercase; }
+
+.doc-editor-page .doc-image-container { margin: 24px 0; width: 100%; }
+.doc-editor-page .doc-image-wrap, .doc-editor-page figure { margin-bottom: 20px; }
+.doc-editor-page .doc-image-wrap img, .doc-editor-page figure img { max-width: 100%; height: auto; border: 1px solid #3a3a3a; background: #0b0b0b; display: block; }
+.doc-editor-page .doc-image-wrap figcaption, .doc-editor-page figure figcaption { margin-top: 10px; color: #aaa; font-size: .85rem; font-style: italic; line-height: 1.4; }
+
 .doc-editor-page .align-left { text-align: left; }
 .doc-editor-page .align-center { text-align: center; }
 .doc-editor-page .align-right { text-align: right; }
+
 .doc-editor-page .doc-image-row {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 16px;
   justify-content: center;
-  margin: 22px 0;
 }
-.doc-editor-page .doc-image-row .doc-image-wrap {
+.doc-editor-page .doc-image-row .doc-image-wrap, .doc-editor-page .doc-image-row figure {
   flex: 1 1 300px;
   margin: 0;
+  max-width: calc(50% - 8px);
 }
 .doc-editor-page .doc-image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
-  margin: 22px 0;
 }
+.doc-editor-page .doc-image-grid .doc-image-wrap, .doc-editor-page .doc-image-grid figure {
+  margin: 0;
+}
+
 .doc-editor-page blockquote {
   border-left: 3px solid #8b0000;
-  background: #101010;
-  padding: 14px 18px;
-  color: #d7d7d7;
-  margin: 20px 0;
+  background: rgba(139, 0, 0, 0.05);
+  padding: 16px 20px;
+  color: #e0e0e0;
+  margin: 24px 0;
+  font-style: italic;
 }
-.doc-editor-page blockquote footer { margin-top: 8px; color: #c7c7c7; font-size: .85rem; }
-.doc-editor-page hr { border: none; border-top: 1px dashed #4a4a4a; margin: 24px 0; }
+.doc-editor-page blockquote footer { margin-top: 10px; color: #999; font-size: .85rem; text-align: right; }
+.doc-editor-page hr { border: none; border-top: 1px solid #333; margin: 32px 0; }
 .doc-editor-page pre {
-  margin: 20px 0;
-  padding: 14px;
-  border: 1px solid #333;
-  background: #0f0f0f;
-  color: #f2f2f2;
+  margin: 24px 0;
+  padding: 16px;
+  border: 1px solid #2a2a2a;
+  background: #050505;
+  color: #00ff41;
   overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
 }
+.doc-editor-page ul, .doc-editor-page ol { margin: 16px 0 16px 30px; color: #d8d8d8; }
+.doc-editor-page li { margin-bottom: 8px; }
 `;
 
 // ═════════════════════════════════════════════════════════════
@@ -712,7 +727,7 @@ function applyEntryProfile(profileKey) {
   if (banner) banner.textContent = 'Mode: ' + profile.label;
 
   showSubmitEditor(true);
-  switchMode('template');
+  switchMode('doc');
   document.getElementById('sf-type').value = profile.type;
   if (profile.template) selectTemplate(profile.template);
 
@@ -935,11 +950,12 @@ async function saveDraft(options = {}) {
     }
   }
 
-  const shouldSave = confirm('Do you want to save this draft now?');
-  if (!shouldSave) {
-    setDraftStatus('Draft save canceled.');
-    return null;
-  }
+  /* Removed confirm to improve draft persistence reliability */
+  // const shouldSave = confirm('Do you want to save this draft now?');
+  // if (!shouldSave) {
+  //   setDraftStatus('Draft save canceled.');
+  //   return null;
+  // }
 
   const uploadedUrls = uploadedAssets.imageAssets.map(asset => asset.url);
   const uploadedMediaUrls = uploadedAssets.mediaAssets.map(asset => asset.url);
@@ -1702,10 +1718,8 @@ function onAnomalyCodeInput() {
 // ═════════════════════════════════════════════════════════════
 
 function switchMode(mode) {
+  // Relaxed restrictions: Allow Document Studio for all types including Guide/Lore
   const type = document.getElementById('sf-type').value;
-  if ((type === 'Guide' || type === 'Lore') && mode !== 'template') {
-    mode = 'template';
-  }
   currentMode = mode;
   document.getElementById('mode-template').classList.toggle('active', mode === 'template');
   document.getElementById('mode-doc').classList.toggle('active', mode === 'doc');
@@ -2319,7 +2333,7 @@ function buildDocumentModeHTML() {
       images.forEach(img => {
         if (!img.url) return;
         const caption = img.caption ? '<figcaption>' + escapeHtml(img.caption) + '</figcaption>' : '';
-        html += '  <figure><img src="' + escapeAttr(img.url) + '" alt="' + escapeAttr(img.caption || 'Document image') + '" loading="lazy" decoding="async" />' + caption + '</figure>\n';
+        html += '  <figure class="doc-image-wrap"><img src="' + escapeAttr(img.url) + '" alt="' + escapeAttr(img.caption || 'Document image') + '" loading="lazy" decoding="async" />' + caption + '</figure>\n';
       });
       
       html += '</div>';

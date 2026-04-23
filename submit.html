@@ -476,12 +476,12 @@ render.mount('submission-terminal');</pre>
 
     <!-- ═══ MODE SELECTOR ═══ -->
     <div class="mode-selector" id="mode-selector">
-      <button class="mode-btn active" type="button" id="mode-template" onclick="switchMode('template')">
+      <button class="mode-btn" type="button" id="mode-template" onclick="switchMode('template')">
         <div class="mode-icon">◈</div>
         <div class="mode-label">Template Builder</div>
         <div class="mode-desc">No coding required — fill in the form</div>
       </button>
-      <button class="mode-btn" type="button" id="mode-doc" onclick="switchMode('doc')">
+      <button class="mode-btn active" type="button" id="mode-doc" onclick="switchMode('doc')">
         <div class="mode-icon">▦</div>
         <div class="mode-label">Document Studio</div>
         <div class="mode-desc">Word-like visual editor with draggable-style blocks</div>
@@ -600,7 +600,7 @@ render.mount('submission-terminal');</pre>
     <!-- ════════════════════════════════════════════════════════ -->
     <!-- TEMPLATE BUILDER MODE                                   -->
     <!-- ════════════════════════════════════════════════════════ -->
-    <div id="template-mode">
+    <div id="template-mode" class="hidden">
 
       <div class="section" style="margin-bottom:24px">
         <div class="section-hd">Template Source</div>
@@ -734,7 +734,7 @@ render.mount('submission-terminal');</pre>
     <!-- ════════════════════════════════════════════════════════ -->
     <!-- DOCUMENT STUDIO MODE                                    -->
     <!-- ════════════════════════════════════════════════════════ -->
-    <div id="doc-mode" class="hidden">
+    <div id="doc-mode">
       <div class="section" style="margin-bottom:24px">
         <div class="section-hd">Document Studio</div>
         <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
