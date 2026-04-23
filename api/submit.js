@@ -297,6 +297,7 @@ function buildSubmissionPayload(body, actor) {
     status: String(payload.status || 'pending').trim(),
     currentMode: String(payload.currentMode || '').trim(),
     draftTrigger: String(payload.draftTrigger || '').trim(),
+    docBlocks: Array.isArray(payload.docBlocks) ? payload.docBlocks : [],
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     submittedAt: admin.firestore.FieldValue.serverTimestamp()
   };

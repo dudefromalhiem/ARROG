@@ -1093,6 +1093,7 @@ async function continueDraftSubmission(id) {
     }));
     renderImageList();
     renderMediaList();
+    renderDocBlocks();
     refreshImageSelectors();
 
     updateTypeSpecificUI();
@@ -1712,6 +1713,7 @@ function switchMode(mode) {
   document.getElementById('template-mode').classList.toggle('hidden', mode !== 'template');
   document.getElementById('doc-mode').classList.toggle('hidden', mode !== 'doc');
   document.getElementById('code-mode').classList.toggle('hidden', mode !== 'code');
+  if (mode === 'doc') renderDocBlocks();
   schedulePreview();
 }
 
@@ -3595,15 +3597,30 @@ function insertUploadedAssetIntoCurrentEditor(kind, url, label) {
       schedulePreview();
       return;
     }
-    const block = createDocBlock(kind);
+
     if (kind === 'image') {
+      const lastBlock = docBlocks.length > 0 ? docBlocks[docBlocks.length - 1] : null;
+      if (lastBlock && lastBlock.type === 'image') {
+        if (!lastBlock.images) {
+          lastBlock.images = lastBlock.url ? [{ url: lastBlock.url, caption: lastBlock.caption || '' }] : [];
+          delete lastBlock.url;
+          delete lastBlock.caption;
+        }
+        lastBlock.images.push({ url: url, caption: label || '' });
+        renderDocBlocks();
+        schedulePreview();
+        return;
+      }
+      const block = createDocBlock('image');
       block.images = [{ url: url, caption: label || '' }];
       block.layout = 'stack';
+      docBlocks.push(block);
     } else {
+      const block = createDocBlock(kind);
       block.url = url;
       if (kind === 'audio' || kind === 'video') block.label = label || '';
+      docBlocks.push(block);
     }
-    docBlocks.push(block);
     renderDocBlocks();
     schedulePreview();
     return;
