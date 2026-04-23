@@ -37,6 +37,27 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function maxClearanceForActor() {
+      return isOwnerUser() ? 6 : (isAdminUser() ? 5 : 4);
+    }
+
+    function hasValidRequestedClearance() {
+      return !('clearanceLevel' in request.resource.data) ||
+        (
+          request.resource.data.clearanceLevel is int &&
+          request.resource.data.clearanceLevel >= 1 &&
+          request.resource.data.clearanceLevel <= 6
+        );
+    }
+
+    function requestedClearanceWithinLimit() {
+      return hasValidRequestedClearance() &&
+        (
+          !('clearanceLevel' in request.resource.data) ||
+          request.resource.data.clearanceLevel <= maxClearanceForActor()
+        );
+    }
+
     // Check if the owner has delegated a specific permission to admins.
     // Returns true if the config/permissions doc has the given key set to true.
     function adminHasDelegation(permissionKey) {
@@ -56,7 +77,8 @@ service cloud.firestore {
     match /pages/{pageId} {
       // Allow reads for admins, approved pages, or pages without a status field (legacy/seed pages)
       allow read: if isAdminUser() || resource.data.status == 'approved' || !('status' in resource.data);
-      allow create, update, delete: if isAdminUser();
+      allow create, update: if isAdminUser() && requestedClearanceWithinLimit();
+      allow delete: if isAdminUser();
 
       // Upvotes subcollection - allow users to upvote/unvote anomalies via the API
       match /upvotes/{userId} {
@@ -69,14 +91,16 @@ service cloud.firestore {
     match /submissions/{subId} {
       allow create: if isSignedIn() &&
         request.resource.data.authorUid == request.auth.uid &&
-        (request.resource.data.status == 'pending' || request.resource.data.status == 'draft');
+        (request.resource.data.status == 'pending' || request.resource.data.status == 'draft') &&
+        requestedClearanceWithinLimit();
       allow read: if isAdminUser() || (isSignedIn() && resource.data.authorUid == request.auth.uid);
       // Allow the original author to update their own draft submissions
-      allow update: if isAdminUser() ||
+      allow update: if (isAdminUser() && requestedClearanceWithinLimit()) ||
         (isSignedIn() &&
          resource.data.authorUid == request.auth.uid &&
          resource.data.status == 'draft' &&
-         request.resource.data.status == 'draft');
+         request.resource.data.status == 'draft' &&
+         requestedClearanceWithinLimit());
       allow delete: if isAdminUser();
     }
 

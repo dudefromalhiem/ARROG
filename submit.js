@@ -57,12 +57,29 @@ let hasUnsavedEditorChanges = false;
 let submitAutosaveEnabled = true;
 let currentUserCanAccessLore = false;
 let lastSubmitAttemptAt = 0;
+let maxSubmitClearanceLevel = 4;
 const nativeSubmitAlert = window.alert.bind(window);
 let submitAlertModal = null;
 
 const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
 const DOC_MEDIA_DRAG_SETTING_KEY = 'rog-doc-media-drag-enabled';
 const DRAFT_AUTOSAVE_MIN_WORDS = 150;
+
+function normalizeClearanceLevel(value, fallback = 2) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.min(6, parsed));
+}
+
+function enforceSubmitClearanceSelection(requestedValue) {
+  const select = document.getElementById('sf-clearance');
+  const requested = normalizeClearanceLevel(requestedValue, 2);
+  const allowed = Math.min(maxSubmitClearanceLevel, requested);
+  if (select) {
+    select.value = String(allowed);
+  }
+  return allowed;
+}
 
 function closeSubmitAlertModal() {
   if (submitAlertModal) {
@@ -352,6 +369,48 @@ const DOC_DEFAULT_CSS = `
 // AUTH GATE
 // ═════════════════════════════════════════════════════════════
 
+async function setClearanceLimits(user) {
+  if (!user) return;
+  
+  const isOwnerUser = isOwner(user.email);
+  const isAdminUser = await getUserAdminFlag(user);
+  
+  let maxLevel = 4; // Default for normal users
+  if (isOwnerUser) {
+    maxLevel = 6;
+  } else if (isAdminUser) {
+    maxLevel = 5;
+  }
+  maxSubmitClearanceLevel = maxLevel;
+  
+  const clearanceSelect = document.getElementById('sf-clearance');
+  const limitNote = document.getElementById('clearance-limit-note');
+  
+  if (clearanceSelect) {
+    // Limit options above the user's role ceiling.
+    Array.from(clearanceSelect.options).forEach(option => {
+      const level = normalizeClearanceLevel(option.value, 2);
+      const blocked = level > maxLevel;
+      option.disabled = blocked;
+      option.hidden = blocked;
+      option.style.display = blocked ? 'none' : '';
+    });
+
+    const currentValue = normalizeClearanceLevel(clearanceSelect.value, maxLevel);
+    clearanceSelect.value = String(Math.min(currentValue, maxLevel));
+  }
+  
+  if (limitNote) {
+    if (isOwnerUser) {
+      limitNote.textContent = 'Your role allows up to Level 6.';
+    } else if (isAdminUser) {
+      limitNote.textContent = 'Your role allows up to Level 5.';
+    } else {
+      limitNote.textContent = 'Your role allows up to Level 4.';
+    }
+  }
+}
+
 auth.onAuthStateChanged(async user => {
   document.getElementById('submit-loading').classList.add('hidden');
   const navAuth = document.getElementById('nav-auth');
@@ -364,6 +423,7 @@ auth.onAuthStateChanged(async user => {
     setDraftStatus('Draft autosave is idle.');
     configureSubmissionApiBase();
     setLoreWorkshopVisibility(true);
+    await setClearanceLimits(user);
     initializeSubmitEditModeFromUrl();
     initializeReconstructionPrefillFromUrl();
 
@@ -870,6 +930,8 @@ async function saveDraft(options = {}) {
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title || 'Untitled Draft');
   const mergedCSS = mergeWithDefaultSchemaCSS(content.cssContent || '');
 
+  const clearanceLevel = enforceSubmitClearanceSelection(document.getElementById('sf-clearance').value);
+
   const draftPayload = {
     title: title || 'Untitled Draft',
     anomalyId: anomalyId,
@@ -885,6 +947,7 @@ async function saveDraft(options = {}) {
     imageAssets: uploadedAssets.imageAssets,
     mediaUrls: uploadedMediaUrls,
     mediaAssets: uploadedAssets.mediaAssets,
+    clearanceLevel: clearanceLevel,
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
@@ -943,6 +1006,7 @@ async function continueDraftSubmission(id) {
     document.getElementById('sf-slug').value = draft.slug || '';
     document.getElementById('sf-anomaly-subtype').value = draft.anomalySubtype || '';
     document.getElementById('sf-anomaly-code').value = draft.anomalyId || '';
+    enforceSubmitClearanceSelection(draft.clearanceLevel || maxSubmitClearanceLevel);
 
     const tags = Array.isArray(draft.tags) ? draft.tags : [];
     setSelectedTags(tags);
@@ -1150,6 +1214,7 @@ async function initializeSubmitEditModeFromUrl() {
     document.getElementById('sf-title').value = page.title || '';
     document.getElementById('sf-type').value = getDisplayTypeForEditor(page.type || 'Anomaly', page.anomalySubtype || '');
     document.getElementById('sf-slug').value = page.slug || '';
+    enforceSubmitClearanceSelection(page.clearanceLevel || maxSubmitClearanceLevel);
 
     const tags = Array.isArray(page.tags) ? page.tags : [];
     setSelectedTags(tags);
@@ -2564,6 +2629,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const chooseBtn = document.getElementById('choose-images-btn');
   const uploadStatus = document.getElementById('upload-status');
   const editorShell = document.getElementById('submit-editor-shell');
+  const clearanceSelect = document.getElementById('sf-clearance');
+
+  if (clearanceSelect) {
+    clearanceSelect.addEventListener('change', () => {
+      enforceSubmitClearanceSelection(clearanceSelect.value);
+    });
+  }
 
   function openFilePicker() {
     input.click();
@@ -4052,6 +4124,8 @@ async function submitPage() {
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
   const isAdminUser = await getUserAdminFlag(currentUserForSubmit);
 
+  const clearanceLevel = enforceSubmitClearanceSelection(document.getElementById('sf-clearance').value);
+
   const submission = {
     title: title,
     anomalyId: anomalyId,
@@ -4067,6 +4141,7 @@ async function submitPage() {
     imageAssets: uploadedAssets.imageAssets,
     mediaUrls: uploadedAssets.mediaAssets.map(asset => asset.url),
     mediaAssets: uploadedAssets.mediaAssets,
+    clearanceLevel: clearanceLevel,
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
@@ -4149,6 +4224,7 @@ function resetSubmitForm() {
   document.getElementById('sf-anomaly-subtype').value = '';
   document.getElementById('sf-anomaly-code').value = '';
   setDesignationLock(false);
+  enforceSubmitClearanceSelection(maxSubmitClearanceLevel);
   document.getElementById('sf-slug').value = '';
   document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
   document.getElementById('sf-css').value = '';

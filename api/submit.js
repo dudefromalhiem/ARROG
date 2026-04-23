@@ -212,19 +212,31 @@ async function verifyUser(req) {
 
 const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem@gmail.com']);
 
-async function isAdminUser(db, uid, email) {
+async function resolveActorAccessProfile(db, uid, email) {
   const normalizedEmail = String(email || '').toLowerCase();
-  if (BOOTSTRAP_OWNERS.has(normalizedEmail)) return true;
+  if (BOOTSTRAP_OWNERS.has(normalizedEmail)) {
+    return { role: 'owner', isOwner: true, isAdmin: true, maxClearance: 6 };
+  }
 
+  let isAdmin = false;
   const userDoc = await db.collection('users').doc(uid).get();
   if (userDoc.exists && userDoc.data() && userDoc.data().isAdmin === true) {
-    return true;
+    isAdmin = true;
   }
 
   const rolesDoc = await db.collection('config').doc('roles').get();
-  if (!rolesDoc.exists) return false;
-  const owners = Array.isArray(rolesDoc.data()?.owners) ? rolesDoc.data().owners : [];
-  return owners.map(owner => String(owner || '').toLowerCase()).includes(normalizedEmail);
+  const owners = rolesDoc.exists && Array.isArray(rolesDoc.data()?.owners) ? rolesDoc.data().owners : [];
+  const isOwner = owners.map(owner => String(owner || '').toLowerCase()).includes(normalizedEmail);
+
+  if (isOwner) {
+    return { role: 'owner', isOwner: true, isAdmin: true, maxClearance: 6 };
+  }
+
+  if (isAdmin) {
+    return { role: 'admin', isOwner: false, isAdmin: true, maxClearance: 5 };
+  }
+
+  return { role: 'user', isOwner: false, isAdmin: false, maxClearance: 4 };
 }
 
 function stripUndefined(data) {
@@ -253,6 +265,7 @@ function buildSubmissionPayload(body, actor) {
   const cssContent = sanitizeCssOrThrow(payload.cssContent || '');
   const anomalySubtype = String(payload.anomalySubtype || '').toUpperCase().trim();
   const anomalyId = String(payload.anomalyId || '').toUpperCase().trim();
+  const clearanceLevel = Number.parseInt(String(payload.clearanceLevel || 2), 10);
   const normalizedPayload = {
     title,
     anomalyId,
@@ -277,6 +290,7 @@ function buildSubmissionPayload(body, actor) {
       : [],
     mediaUrls: Array.isArray(payload.mediaUrls) ? payload.mediaUrls.filter(Boolean).map(String) : [],
     mediaAssets: normalizeMediaAssets(payload.mediaAssets),
+    clearanceLevel: Number.isFinite(clearanceLevel) ? Math.max(1, Math.min(6, clearanceLevel)) : 2,
     authorUid: actor.uid,
     authorEmail: actor.email,
     authorName: String(payload.authorName || actor.name || actor.email.split('@')[0] || 'Agent').trim(),
@@ -289,6 +303,18 @@ function buildSubmissionPayload(body, actor) {
 
   validateSubmissionMediaOrThrow(normalizedPayload);
   return normalizedPayload;
+}
+
+function enforceRequestedClearanceOrThrow(payload, actorProfile) {
+  const requested = Number.parseInt(String(payload.clearanceLevel || 2), 10);
+  const normalized = Number.isFinite(requested) ? Math.max(1, Math.min(6, requested)) : 2;
+  const maxClearance = Number(actorProfile && actorProfile.maxClearance || 4);
+  if (normalized > maxClearance) {
+    const err = new Error('Requested clearance exceeds role maximum.');
+    err.statusCode = 403;
+    throw err;
+  }
+  payload.clearanceLevel = normalized;
 }
 
 async function enforceRateLimit(db, uid, ip) {
@@ -370,6 +396,8 @@ module.exports = async function handler(req, res) {
     const app = initAdmin();
     const db = admin.firestore(app);
     const actor = await verifyUser(req);
+    const actorProfile = await resolveActorAccessProfile(db, actor.uid, actor.email);
+    const adminAccess = actorProfile.isAdmin;
     const method = String(req.method || 'GET').toUpperCase();
 
     if (method === 'GET') {
@@ -380,7 +408,6 @@ module.exports = async function handler(req, res) {
           return sendJson(res, 404, { error: 'Submission not found.' });
         }
         const data = doc.data() || {};
-        const adminAccess = await isAdminUser(db, actor.uid, actor.email);
         if (!adminAccess && data.authorUid !== actor.uid) {
           return sendJson(res, 403, { error: 'Forbidden.' });
         }
@@ -403,7 +430,6 @@ module.exports = async function handler(req, res) {
       if (!doc.exists) return sendJson(res, 404, { error: 'Submission not found.' });
 
       const data = doc.data() || {};
-      const adminAccess = await isAdminUser(db, actor.uid, actor.email);
       if (!adminAccess && data.authorUid !== actor.uid) {
         return sendJson(res, 403, { error: 'Forbidden.' });
       }
@@ -420,7 +446,6 @@ module.exports = async function handler(req, res) {
     const action = String(body.action || 'submit').trim();
     const submissionId = String(body.submissionId || body.id || '').trim();
     const submissionRef = submissionId ? db.collection('submissions').doc(submissionId) : db.collection('submissions').doc();
-    const adminAccess = await isAdminUser(db, actor.uid, actor.email);
 
     if (action === 'patch-assets') {
       if (!submissionId) return sendJson(res, 400, { error: 'Missing submission id.' });
@@ -477,6 +502,7 @@ module.exports = async function handler(req, res) {
     if (action === 'draft') {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = 'draft';
+      enforceRequestedClearanceOrThrow(payload, actorProfile);
 
       if (submissionId) {
         const existing = await submissionRef.get();
@@ -495,6 +521,7 @@ module.exports = async function handler(req, res) {
     if (action === 'submit' || action === 'publish') {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = action === 'publish' ? 'approved' : 'pending';
+      enforceRequestedClearanceOrThrow(payload, actorProfile);
 
       validateAnomalyPayloadOrThrow(payload, { enforceTitlePrefix: true });
 
@@ -525,6 +552,7 @@ module.exports = async function handler(req, res) {
           imageAssets: payload.imageAssets,
           mediaUrls: payload.mediaUrls,
           mediaAssets: payload.mediaAssets,
+          clearanceLevel: payload.clearanceLevel,
           authorUid: actor.uid,
           authorEmail: actor.email,
           authorName: payload.authorName,
@@ -555,6 +583,7 @@ module.exports = async function handler(req, res) {
             type: payload.type,
             contentFamily: payload.contentFamily,
             legacySection: 'Archived History',
+            clearanceLevel: payload.clearanceLevel,
             authenticityNote: 'Documents that contradict first Legacy records created by owners/admins are considered false.',
             summary: extractPlainTextExcerpt(payload.htmlContent || payload.title || '', 240),
             tags: payload.tags,

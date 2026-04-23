@@ -229,12 +229,45 @@
     renderGridSkeleton('grid-art');
     renderGridSkeleton('grid-history');
 
+    const seenByType = { Anomaly: new Set(), Tale: new Set(), Artwork: new Set(), Lore: new Set() };
+
+    // Load from seed data first
+    if (typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)) {
+      PAGE_SEED.forEach(seed => {
+        const normalizedType = String(seed.type || '').trim() === 'Lore' ? 'Lore' : seed.type;
+        if (!universeData[normalizedType]) return;
+        const key = String(seed.slug || seed.title || seed.id || '').toLowerCase();
+        if (key && seenByType[normalizedType].has(key)) return;
+        if (key) seenByType[normalizedType].add(key);
+        
+        const displayExcerpt = seed.type === 'Anomaly' && seed.anomalyDescription 
+          ? seed.anomalyDescription 
+          : buildSnippet(seed.htmlContent);
+        
+        universeData[normalizedType].push({
+          id: seed.id,
+          slug: seed.slug,
+          title: seed.title,
+          type: normalizedType,
+          excerpt: displayExcerpt,
+          img: getImgSrc(seed.htmlContent)
+        });
+      });
+    }
+
     try {
       const cachedRaw = sessionStorage.getItem(UNIVERSE_CACHE_KEY);
       if (cachedRaw) {
         const cached = JSON.parse(cachedRaw);
         if (cached && cached.ts && (Date.now() - cached.ts) < UNIVERSE_CACHE_TTL_MS && cached.data) {
           universeData = cached.data;
+          Object.keys(universeData).forEach(type => {
+            const items = Array.isArray(universeData[type]) ? universeData[type] : [];
+            items.forEach(item => {
+              const key = String(item.slug || item.title || item.id || '').toLowerCase();
+              if (key && seenByType[type]) seenByType[type].add(key);
+            });
+          });
           seedSearchSuggestions();
           renderAll();
         }
