@@ -192,15 +192,41 @@ async function renderAdminBootstrap(user) {
 }
 
 auth.onAuthStateChanged(async user => {
-  if (!rolesReadyResolved) {
-    document.getElementById('admin-loading').classList.remove('hidden');
-    await rolesReady;
+  const adminLoading = document.getElementById('admin-loading');
+  const adminDenied = document.getElementById('admin-denied');
+  const adminPanel = document.getElementById('admin-panel');
+
+  const showAdminDenied = (message) => {
+    if (adminLoading) adminLoading.classList.add('hidden');
+    if (adminPanel) {
+      adminPanel.classList.add('hidden');
+      adminPanel.style.display = 'none';
+    }
+    if (adminDenied) {
+      adminDenied.classList.remove('hidden');
+      adminDenied.style.display = 'block';
+      const deniedHeading = adminDenied.querySelector('.section-hd');
+      const deniedBody = adminDenied.querySelector('p');
+      if (deniedHeading) deniedHeading.textContent = 'Access Denied';
+      if (deniedBody && message) deniedBody.textContent = message;
+    }
+  };
+
+  try {
+    if (!rolesReadyResolved) {
+      if (adminLoading) adminLoading.classList.remove('hidden');
+      await rolesReady;
+    }
+    if (!user) {
+      await renderAdminBootstrap(null);
+      return;
+    }
+    await renderAdminBootstrap(user);
+  } catch (err) {
+    const logger = window.rogLogger || console;
+    if (typeof logger.error === 'function') logger.error('[Admin Auth] Bootstrap failed:', err);
+    showAdminDenied('Secure link could not be established. Refresh and sign in again.');
   }
-  if (!user) {
-    await renderAdminBootstrap(null);
-    return;
-  }
-  await renderAdminBootstrap(user);
 });
 
 // ── Tab Switching ─────────────────────────────────────────────

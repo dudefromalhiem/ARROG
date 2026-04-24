@@ -449,44 +449,67 @@ async function setClearanceLimits(user) {
 }
 
 auth.onAuthStateChanged(async user => {
-  document.getElementById('submit-loading').classList.add('hidden');
+  const submitLoading = document.getElementById('submit-loading');
+  const submitDenied = document.getElementById('submit-denied');
+  const submitPanel = document.getElementById('submit-panel');
   const navAuth = document.getElementById('nav-auth');
-  if (user) {
-    currentUserForSubmit = user;
-    submitAutosaveEnabled = loadSubmitAutosaveSetting(user);
-    document.getElementById('submit-denied').classList.add('hidden');
-    document.getElementById('submit-panel').classList.remove('hidden');
-    navAuth.innerHTML = renderSubmitUserMenu(user);
-    setDraftStatus('Draft autosave is idle.');
-    configureSubmissionApiBase();
-    setLoreWorkshopVisibility(true);
-    await setClearanceLimits(user);
-    initializeSubmitEditModeFromUrl();
-    initializeReconstructionPrefillFromUrl();
 
-    const params = new URLSearchParams(window.location.search);
-    const isForcedEditor = !!(params.get('editId') || params.get('editSlug') || params.get('reconstruct') === '1');
-    const entryProfile = String(params.get('entry') || '').toLowerCase();
-    const view = String(params.get('view') || '').toLowerCase();
-
-    if (isForcedEditor) {
-      showSubmitEditor(true);
-    } else if (view === 'history') {
-      openSubmissionHistoryView();
-    } else if (view === 'drafts') {
-      openSubmissionDraftsView();
-    } else if (ENTRY_PROFILES[entryProfile]) {
-      applyEntryProfile(entryProfile);
-    } else {
-      showSubmitEditor(false);
+  const showSubmitDenied = (message) => {
+    if (submitLoading) submitLoading.classList.add('hidden');
+    if (submitPanel) submitPanel.classList.add('hidden');
+    if (submitDenied) {
+      submitDenied.classList.remove('hidden');
+      const deniedText = submitDenied.querySelector('p');
+      if (deniedText && message) deniedText.textContent = message;
     }
-  } else {
+    if (navAuth) {
+      navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    }
+  };
+
+  try {
+    if (submitLoading) submitLoading.classList.add('hidden');
+
+    if (user) {
+      currentUserForSubmit = user;
+      submitAutosaveEnabled = loadSubmitAutosaveSetting(user);
+      if (submitDenied) submitDenied.classList.add('hidden');
+      if (submitPanel) submitPanel.classList.remove('hidden');
+      if (navAuth) navAuth.innerHTML = renderSubmitUserMenu(user);
+      setDraftStatus('Draft autosave is idle.');
+      configureSubmissionApiBase();
+      setLoreWorkshopVisibility(true);
+      await setClearanceLimits(user);
+      initializeSubmitEditModeFromUrl();
+      initializeReconstructionPrefillFromUrl();
+
+      const params = new URLSearchParams(window.location.search);
+      const isForcedEditor = !!(params.get('editId') || params.get('editSlug') || params.get('reconstruct') === '1');
+      const entryProfile = String(params.get('entry') || '').toLowerCase();
+      const view = String(params.get('view') || '').toLowerCase();
+
+      if (isForcedEditor) {
+        showSubmitEditor(true);
+      } else if (view === 'history') {
+        openSubmissionHistoryView();
+      } else if (view === 'drafts') {
+        openSubmissionDraftsView();
+      } else if (ENTRY_PROFILES[entryProfile]) {
+        applyEntryProfile(entryProfile);
+      } else {
+        showSubmitEditor(false);
+      }
+      return;
+    }
+
     currentUserForSubmit = null;
     currentUserCanAccessLore = false;
     activeDraftId = null;
-    document.getElementById('submit-denied').classList.remove('hidden');
-    document.getElementById('submit-panel').classList.add('hidden');
-    navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    showSubmitDenied('You must be signed in to create pages. Sign in on the main page first.');
+  } catch (err) {
+    const logger = window.rogLogger || console;
+    if (typeof logger.error === 'function') logger.error('[Submit Auth] Bootstrap failed:', err);
+    showSubmitDenied('Secure link could not be established. Refresh and sign in again.');
   }
 });
 
@@ -4127,7 +4150,6 @@ function updatePreview() {
       document.getElementById('sf-title').value || 'New Classified Document',
       document.getElementById('sf-clearance').value
     );
-    wrapWithDefaultSchema(String(s.htmlContent || ''), s.title || 'Rejected Submission', s.clearanceLevel),
   const doc = buildSandboxDocument(wrappedHtml, mergeWithDefaultSchemaCSS(css));
   frame.srcdoc = doc;
   bindPreviewAnchorScrolling(frame);
