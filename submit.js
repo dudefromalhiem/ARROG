@@ -58,6 +58,7 @@ let submitAutosaveEnabled = true;
 let currentUserCanAccessLore = false;
 let lastSubmitAttemptAt = 0;
 let maxSubmitClearanceLevel = 4;
+let draftAutoSaveQueued = false;
 const nativeSubmitAlert = window.alert.bind(window);
 let submitAlertModal = null;
 
@@ -493,6 +494,17 @@ window.addEventListener('beforeunload', event => {
   }
 });
 
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    flushDraftAutoSave('visibilitychange');
+  }
+});
+
+window.addEventListener('pagehide', event => {
+  if (event && event.persisted) return;
+  flushDraftAutoSave('pagehide');
+});
+
 function getTagOptions() {
   return [...BASE_TAG_OPTIONS, ...customTagOptions];
 }
@@ -515,6 +527,12 @@ function loadSubmitAutosaveSetting(user) {
   return true;
 }
 
+function clearDraftAutoSaveState() {
+  clearTimeout(draftAutoSaveTimer);
+  draftAutoSaveTimer = null;
+  draftAutoSaveQueued = false;
+}
+
 function setSubmitAutosaveSetting(value) {
   const normalized = String(value || '').toLowerCase();
   submitAutosaveEnabled = normalized !== 'off';
@@ -526,6 +544,32 @@ function setSubmitAutosaveSetting(value) {
     // Storage unavailable. Keep runtime value.
   }
   setDraftStatus(submitAutosaveEnabled ? 'Draft autosave is enabled.' : 'Draft autosave is disabled.');
+}
+
+function getSameDocumentAnchorTarget(href, currentHref) {
+  if (window.RogBrowserCompatHelpers && typeof window.RogBrowserCompatHelpers.getSameDocumentAnchorTarget === 'function') {
+    return window.RogBrowserCompatHelpers.getSameDocumentAnchorTarget(href, currentHref);
+  }
+
+  const rawHref = String(href || '').trim();
+  if (!rawHref || !rawHref.includes('#')) return null;
+
+  try {
+    const baseHref = String(currentHref || window.location.href || '').trim();
+    if (!baseHref) return null;
+    const currentUrl = new URL(baseHref, baseHref);
+    const targetUrl = new URL(rawHref, currentUrl.href);
+    const sameDocument = rawHref.startsWith('#') || (
+      targetUrl.origin === currentUrl.origin &&
+      targetUrl.pathname === currentUrl.pathname
+    );
+    if (!sameDocument) return null;
+    const hash = targetUrl.hash || (rawHref.startsWith('#') ? rawHref : '');
+    if (!hash || hash === '#') return null;
+    return decodeURIComponent(hash.slice(1));
+  } catch (_err) {
+    return null;
+  }
 }
 
 function renderSubmitUserMenu(user) {
@@ -793,8 +837,27 @@ function scheduleDraftAutoSave() {
   clearTimeout(draftAutoSaveTimer);
   setDraftStatus('Draft changes detected. Autosaving...');
   draftAutoSaveTimer = setTimeout(() => {
-    saveDraft({ silent: true, trigger: 'autosave' });
+    flushDraftAutoSave('autosave');
   }, 2500);
+}
+
+async function flushDraftAutoSave(trigger = 'autosave') {
+  if (suppressDraftAutoSave || !currentUserForSubmit || !submitAutosaveEnabled) return null;
+
+  clearTimeout(draftAutoSaveTimer);
+  draftAutoSaveTimer = null;
+
+  if (draftSaveInFlight) {
+    draftAutoSaveQueued = true;
+    return activeDraftId;
+  }
+
+  if (!hasUnsavedEditorChanges && trigger !== 'manual') {
+    return activeDraftId;
+  }
+
+  draftAutoSaveQueued = false;
+  return saveDraft({ silent: true, trigger: trigger });
 }
 
 function extractWordCountFromHtml(html) {
@@ -1016,6 +1079,12 @@ async function saveDraft(options = {}) {
     return null;
   } finally {
     draftSaveInFlight = false;
+    if (draftAutoSaveQueued && hasUnsavedEditorChanges && currentUserForSubmit && submitAutosaveEnabled) {
+      draftAutoSaveQueued = false;
+      queueMicrotask(() => {
+        flushDraftAutoSave('queued-autosave');
+      });
+    }
   }
 }
 
@@ -1576,11 +1645,6 @@ function updateTypeSpecificUI() {
   if (anomalyRow) anomalyRow.classList.toggle('hidden', !isAnomalyFamilyType(type));
 
   const isGuide = type === 'Guide' || type === 'Lore';
-  const modeDoc = document.getElementById('mode-doc');
-  const modeCode = document.getElementById('mode-code');
-
-  if (modeDoc) modeDoc.disabled = isGuide;
-  if (modeCode) modeCode.disabled = isGuide;
 
   if (isGuide) {
     switchMode('template');
@@ -4053,6 +4117,43 @@ function updatePreview() {
   const wrappedHtml = wrapWithDefaultSchema(sanitized, document.getElementById('sf-title').value || 'New Classified Document');
   const doc = buildSandboxDocument(wrappedHtml, mergeWithDefaultSchemaCSS(css));
   frame.srcdoc = doc;
+  bindPreviewAnchorScrolling(frame);
+}
+
+function bindPreviewAnchorScrolling(frame) {
+  if (!frame || frame.__anchorScrollBound) return;
+  frame.__anchorScrollBound = true;
+
+  const attach = () => {
+    let doc;
+    try {
+      doc = frame.contentDocument;
+    } catch (_err) {
+      return;
+    }
+    if (!doc || doc.__anchorScrollBound) return;
+    doc.__anchorScrollBound = true;
+
+    doc.addEventListener('click', event => {
+      const anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      if (!anchor) return;
+
+      const href = String(anchor.getAttribute('href') || '').trim();
+      if (!href) return;
+
+      const targetId = getSameDocumentAnchorTarget(href, frame.contentWindow.location.href);
+      if (!targetId) return;
+
+      const target = doc.getElementById(targetId);
+      if (!target) return;
+
+      event.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, true);
+  };
+
+  frame.addEventListener('load', attach);
+  attach();
 }
 
 function updateExternalAssetPreview(currentHtml, assets) {
@@ -4388,7 +4489,7 @@ async function submitPage() {
         removeDraft: !!activeDraftId
       });
       alert('Page updated successfully.');
-      clearTimeout(draftAutoSaveTimer);
+      clearDraftAutoSaveState();
       submitEditTarget = null;
       activeDraftId = null;
       hasUnsavedEditorChanges = false;
@@ -4439,6 +4540,7 @@ function resetSubmitForm() {
   suppressDraftAutoSave = true;
   submitEditTarget = null;
   activeDraftId = null;
+  clearDraftAutoSaveState();
   document.getElementById('sf-title').value = '';
   document.getElementById('sf-type').value = 'Anomaly';
   setSelectedTags([]);

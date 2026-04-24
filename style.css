@@ -127,6 +127,7 @@ hr{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--red
 .nav a{font-family:var(--font-m);font-size:.8rem;text-transform:uppercase;letter-spacing:2px;color:var(--wht-d);padding:10px 0;border-bottom:2px solid transparent;transition:all var(--tr)}
 .nav a:hover,.nav a.active{color:var(--red-b);border-bottom-color:var(--red-b);text-decoration:none}
 .nav-btn{font-family:var(--font-m);font-size:.68rem;padding:7px 12px;border:1px solid var(--red-d);background:transparent;color:var(--red-b);cursor:pointer;text-transform:uppercase;letter-spacing:.8px;transition:all var(--tr);min-height:36px}
+.nav-btn,.btn,.file-tile,.upvote-button,.back-to-top,.community-result{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .nav-btn:hover{background:var(--red);color:var(--wht)}
 .nav-toggle{position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);width:15px;height:8px;min-width:15px;min-height:8px;padding:0;border:0;background:transparent;color:transparent;cursor:pointer;z-index:260;line-height:1;font-size:0;display:block}
 .nav-toggle::before{content:'';display:block;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:8px solid var(--red-b);transition:transform .22s ease,opacity .22s ease}

@@ -140,6 +140,9 @@
       text-decoration: none;
       color: inherit;
       display: block;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .file-card:hover,
     .file-card:focus-visible {
@@ -219,6 +222,7 @@
       z-index: 3;
       transition: opacity 0.16s ease;
       background: #000;
+      pointer-events: none;
     }
     .file-card:hover .file-hover,
     .file-card:focus-visible .file-hover {
@@ -250,6 +254,7 @@
       letter-spacing: 1px;
       line-height: 1.45;
       padding: 10px;
+      pointer-events: none;
     }
     .legacy-editor {
       border: 2px solid var(--red-d);
@@ -584,7 +589,19 @@
     };
   }
 
+  function dedupeById(items) {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : []).filter(item => {
+      const id = String(item && item.id || '');
+      if (!id) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }
+
   function normalizeChapter(chapter) {
+    const files = dedupeById(Array.isArray(chapter && chapter.files) ? chapter.files.map(normalizeFile) : []);
     return {
       id: String(chapter && chapter.id || ''),
       title: String(chapter && chapter.title || 'Chapter'),
@@ -592,12 +609,13 @@
       compartment: String(chapter && chapter.compartment || ''),
       rangeStart: String(chapter && chapter.rangeStart || ''),
       rangeEnd: String(chapter && chapter.rangeEnd || ''),
-      files: Array.isArray(chapter && chapter.files) ? chapter.files.map(normalizeFile) : []
+      files: files
     };
   }
 
   function normalizeLegacyData(raw) {
     const base = { ...LEGACY_DEFAULT, ...(raw || {}) };
+    const chapters = dedupeById(Array.isArray(base.chapters) ? base.chapters.map(normalizeChapter) : []);
     return {
       title: String(base.title || LEGACY_DEFAULT.title),
       subtitle: String(base.subtitle || LEGACY_DEFAULT.subtitle),
@@ -605,7 +623,7 @@
       foundation: String(base.foundation || ''),
       priorOwners: String(base.priorOwners || ''),
       currentOwner: String(base.currentOwner || ''),
-      chapters: Array.isArray(base.chapters) ? base.chapters.map(normalizeChapter) : []
+      chapters: chapters
     };
   }
 

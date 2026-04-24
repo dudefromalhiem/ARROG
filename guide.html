@@ -7,6 +7,7 @@
   <meta name="description" content="Official orientation and classification guide for new Red Oaker Guild members." />
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="style.css" />
+  <script src="browser-compat-helpers.js"></script>
   <style>
     .guide-toolbar { display:flex; justify-content:flex-end; margin-bottom:16px; }
     .doc-wrap { max-width: 800px; margin: 40px auto; background: var(--blk-c); color: var(--wht-m); padding: 40px; border: 1px solid var(--red-d); box-shadow: 0 0 20px rgba(0,0,0,0.5); font-family: var(--font-m); }
@@ -253,25 +254,12 @@ function bindGuideIframeAnchorScrolling(frame) {
       const href = String(anchor.getAttribute('href') || '').trim();
       if (!href) return;
 
-      let url;
-      try {
-        url = new URL(href, frame.contentWindow.location.href);
-      } catch (err) {
-        return;
-      }
+      const targetId = window.RogBrowserCompatHelpers && typeof window.RogBrowserCompatHelpers.getSameDocumentAnchorTarget === 'function'
+        ? window.RogBrowserCompatHelpers.getSameDocumentAnchorTarget(href, frame.contentWindow.location.href)
+        : null;
+      if (!targetId) return;
 
-      const isSameDocument = href.startsWith('#') || (
-        url.origin === frame.contentWindow.location.origin &&
-        url.pathname === frame.contentWindow.location.pathname &&
-        url.search === frame.contentWindow.location.search
-      );
-
-      if (!isSameDocument) return;
-
-      const hash = url.hash || (href.startsWith('#') ? href : '');
-      if (!hash) return;
-
-      const target = doc.getElementById(decodeURIComponent(hash.slice(1)));
+      const target = doc.getElementById(targetId);
       if (!target) return;
 
       event.preventDefault();
