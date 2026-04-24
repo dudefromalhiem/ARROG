@@ -103,9 +103,6 @@ function getAuthToken(request) {
   const sessionCookie = getCookieValue(cookieHeader, '__session');
   if (sessionCookie) return sessionCookie;
 
-  const legacyCookie = getCookieValue(cookieHeader, 'rog_id_token');
-  if (legacyCookie) return legacyCookie;
-
   return '';
 }
 

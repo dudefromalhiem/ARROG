@@ -40,10 +40,6 @@ async function verifyUser(req) {
   };
 }
 
-function normalizeVoteKey(value) {
-  return String(value || '').trim();
-}
-
 function normalizePageKey(value) {
   const compact = String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const match = compact.match(/^([a-z]+)(\d+)([a-z]*)$/i);
@@ -221,8 +217,6 @@ module.exports = async (req, res) => {
       // Add upvote
       await upvoteRef.set({
         userId: voteKey,
-        email: user ? user.email : '',
-        anonymous: !user,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }

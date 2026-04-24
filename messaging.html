@@ -109,7 +109,7 @@
 <main class="wrap">
   <div style="margin-bottom: 24px;">
     <h1 style="font-size: 1.8rem; color: var(--wht-b); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 2px;">Guild Messaging</h1>
-    <p style="font-size: 0.9rem; color: var(--wht-d);">Connect with other Guild members, manage friend requests, and stay updated with notifications.</p>
+    <p style="font-size: 0.9rem; color: var(--wht-d);">Connect with other Guild members, start new conversations, and stay updated with notifications.</p>
   </div>
 
   <div class="msg-auth-skeleton" id="msg-auth-skeleton" aria-hidden="true">
@@ -138,25 +138,25 @@
     <div class="msg-sidebar">
       <!-- Tabs -->
       <div class="msg-tabs">
-        <button class="msg-tab-btn active" type="button" data-tab="friends">Friends</button>
-        <button class="msg-tab-btn" type="button" data-tab="requests">Requests</button>
+        <button class="msg-tab-btn active" type="button" data-tab="friends">Conversations</button>
+        <button class="msg-tab-btn" type="button" data-tab="requests">Directory</button>
         <button class="msg-tab-btn" type="button" data-tab="notifications">Alerts <span class="msg-notifications-badge" id="notif-count" style="display: none;">0</span></button>
       </div>
 
       <!-- Search -->
-      <input type="text" class="msg-search" id="msg-search" placeholder="Search friends..." />
+      <input type="text" class="msg-search" id="msg-search" placeholder="Search conversations or members..." />
 
       <!-- Friends Tab -->
       <div id="tab-friends" class="msg-list-wrapper">
         <div class="msg-list" id="msg-friends-list">
-          <div class="msg-empty">No friends yet. Add friends to start messaging!</div>
+          <div class="msg-empty">No conversations yet. Start one from the directory.</div>
         </div>
       </div>
 
       <!-- Requests Tab -->
       <div id="tab-requests" class="msg-list-wrapper" style="display: none;">
         <div id="msg-requests-area">
-          <div class="msg-empty">No pending requests.</div>
+          <div class="msg-empty">Search for a member to start a conversation.</div>
         </div>
       </div>
 
@@ -185,7 +185,7 @@
         </div>
         <div id="msg-no-selection" class="msg-no-selection">
           <div>
-            <p style="margin-bottom: 8px;">Select a friend or open a direct message request to start chatting.</p>
+            <p style="margin-bottom: 8px;">Select a conversation or start one from the directory.</p>
             <p style="font-size: 0.8rem; color: var(--wht-f);">Your conversations are private and secure.</p>
           </div>
         </div>
@@ -345,7 +345,7 @@ function renderFriends() {
   const list = document.getElementById('msg-friends-list');
   if (!list) return;
   if (!inboxThreads.length) {
-    list.innerHTML = '<div class="msg-empty">No friends yet. Add friends to start messaging!</div>';
+    list.innerHTML = '<div class="msg-empty">No conversations yet. Start one from the directory.</div>';
     return;
   }
   const q = String(document.getElementById('msg-search')?.value || '').toLowerCase().trim();
@@ -355,7 +355,7 @@ function renderFriends() {
   }).filter(row => !q || row.peer.peerName.toLowerCase().includes(q));
 
   if (!rows.length) {
-    list.innerHTML = '<div class="msg-empty">No friends yet. Add friends to start messaging!</div>';
+    list.innerHTML = '<div class="msg-empty">No matching conversations found.</div>';
     return;
   }
 
@@ -376,7 +376,7 @@ async function renderRequests() {
   if (!area) return;
   const query = String(document.getElementById('msg-search')?.value || '').trim();
   if (query.length < 2) {
-    area.innerHTML = '<div class="msg-empty">No pending requests.</div>';
+    area.innerHTML = '<div class="msg-empty">Search for a member to start a conversation.</div>';
     return;
   }
 
@@ -384,20 +384,20 @@ async function renderRequests() {
     const result = await apiGet('searchusers', { q: query });
     const users = (result.users || []).filter(u => u.uid && u.uid !== currentUser.uid).slice(0, 20);
     if (!users.length) {
-      area.innerHTML = '<div class="msg-empty">No pending requests.</div>';
+      area.innerHTML = '<div class="msg-empty">No matching members found.</div>';
       return;
     }
     area.innerHTML = users.map(u => {
       return '<div class="msg-request-card">' +
         '<div class="msg-request-header">' +
           '<span class="msg-request-name">' + escapeHtml(u.displayName || 'Guild Member') + '</span>' +
-          '<div class="msg-request-actions"><button type="button" class="msg-request-btn" data-request-uid="' + escapeHtml(u.uid) + '" data-request-name="' + escapeHtml(u.displayName || 'Guild Member') + '">Request Message</button></div>' +
+          '<div class="msg-request-actions"><button type="button" class="msg-request-btn" data-request-uid="' + escapeHtml(u.uid) + '" data-request-name="' + escapeHtml(u.displayName || 'Guild Member') + '">Start Chat</button></div>' +
         '</div>' +
-        '<p style="font-size:0.8rem;color:var(--wht-f);">Wants to message you</p>' +
+        '<p style="font-size:0.8rem;color:var(--wht-f);">Open a direct conversation with this member.</p>' +
       '</div>';
     }).join('');
   } catch (_err) {
-    area.innerHTML = '<div class="msg-empty">No pending requests.</div>';
+    area.innerHTML = '<div class="msg-empty">Could not load the member directory.</div>';
   }
 }
 
@@ -543,8 +543,6 @@ async function reportMessageFromButton(button) {
 
 async function startRequest(uid, name) {
   await openChat(uid, name);
-  const input = document.getElementById('msg-input');
-  if (input && !input.value) input.value = 'Message request';
 }
 
 function bindUiEvents() {

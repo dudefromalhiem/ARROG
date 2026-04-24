@@ -983,7 +983,7 @@ function extractDescriptionFromHTML(html) {
 
 async function approveSubmission(id) {
   if (!canModerateSubmissions()) {
-    alert('Moderator access is required to approve submissions.');
+    alert('Admin access is required to approve submissions.');
     return;
   }
   if (!confirm('Approve this submission and publish it to the site?')) return;
@@ -1052,7 +1052,7 @@ function showRejectForm(id) {
 
 async function rejectSubmission(id, reason) {
   if (!canModerateSubmissions()) {
-    alert('Moderator access is required to reject submissions.');
+    alert('Admin access is required to reject submissions.');
     return;
   }
   try {

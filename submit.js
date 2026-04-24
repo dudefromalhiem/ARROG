@@ -1612,7 +1612,7 @@ function updateUploadZoneCopy() {
 
   if (hint) {
     hint.textContent = mediaEnabled
-      ? 'Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, Lore, and Legacy submissions.'
+      ? 'Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, and Lore submissions.'
       : 'Images are available for all page types. Audio and video are disabled for this submission type.';
   }
 }
@@ -2933,7 +2933,7 @@ function handleFiles(files) {
     }
 
     if ((kind === 'audio' || kind === 'video') && !isMediaEnabled) {
-      alert('Audio and video uploads are available only for Tale, Anomaly, Guide, and Legacy submissions.');
+      alert('Audio and video uploads are available only for Tale, Anomaly, Guide, and Lore submissions.');
       return;
     }
 
@@ -4334,7 +4334,7 @@ async function submitPage() {
 
   const uploadedAssets = collectUploadedMediaAssets();
   if (!isMediaEnabledSubmissionType(type) && uploadedAssets.mediaAssets.length) {
-    alert('Audio and video files can only be attached to Tale, Anomaly, Guide, and Legacy submissions.');
+    alert('Audio and video files can only be attached to Tale, Anomaly, Guide, and Lore submissions.');
     btn.textContent = '>> Submit for Review';
     btn.disabled = false;
     return;

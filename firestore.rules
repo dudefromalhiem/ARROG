@@ -82,7 +82,7 @@ service cloud.firestore {
 
       // Upvotes subcollection - allow users to upvote/unvote anomalies via the API
       match /upvotes/{userId} {
-        allow read: if true;
+        allow read: if isAdminUser() || (isSignedIn() && request.auth.uid == userId);
         allow create, delete: if isSignedIn() && request.auth.uid == userId;
         allow update: if false;
       }

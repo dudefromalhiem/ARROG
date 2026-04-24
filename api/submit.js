@@ -90,7 +90,7 @@ function validateSubmissionMediaOrThrow(payload) {
   const mediaAssets = normalizeMediaAssets(payload.mediaAssets);
   const mediaKinds = new Set(mediaAssets.map(asset => asset.kind));
   const normalizedType = String(payload.type || '').trim().toLowerCase();
-  const mediaEnabledTypes = new Set(['tale', 'anomaly', 'guide', 'legacy']);
+  const mediaEnabledTypes = new Set(['tale', 'anomaly', 'guide', 'legacy', 'lore']);
   const requiresMediaGate = !mediaEnabledTypes.has(normalizedType);
 
   if (imageAssets.length > 5) {

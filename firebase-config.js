@@ -715,17 +715,14 @@ async function syncServerAuthCookie(user) {
   const secure = location.protocol === 'https:' ? '; Secure' : '';
   if (!user) {
     document.cookie = '__session=; Max-Age=0; Path=/; SameSite=Lax' + secure;
-    document.cookie = 'rog_id_token=; Max-Age=0; Path=/; SameSite=Lax' + secure;
     return;
   }
   try {
     const token = await user.getIdToken(false);
     // Keep short-lived token in first-party cookies so Vercel middleware can gate protected routes.
     document.cookie = '__session=' + token + '; Max-Age=3600; Path=/; SameSite=Lax' + secure;
-    document.cookie = 'rog_id_token=' + token + '; Max-Age=3600; Path=/; SameSite=Lax' + secure;
   } catch (_err) {
     document.cookie = '__session=; Max-Age=0; Path=/; SameSite=Lax' + secure;
-    document.cookie = 'rog_id_token=; Max-Age=0; Path=/; SameSite=Lax' + secure;
   }
 }
 

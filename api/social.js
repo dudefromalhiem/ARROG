@@ -191,8 +191,6 @@ async function searchUsers(db, queryText) {
     .map(user => ({
       uid: String(user.uid || user.id || ''),
       displayName: normalizeText(user.displayName || user.email || 'Agent', 120),
-      email: String(user.email || '').toLowerCase(),
-      role: String(user.role || 'user'),
       photoURL: normalizeText(user.photoURL || '', 1200)
     }))
     .filter(user => user.uid);
