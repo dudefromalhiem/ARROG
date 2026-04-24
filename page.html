@@ -19,6 +19,8 @@
     .comment-toolbar button { padding:4px 8px; font-size:.72rem; line-height:1.2; }
     .comment-list { display:grid; gap:10px; }
     .comment-item { border:1px solid var(--blk-m); background: var(--blk-b); padding:10px; }
+    .comment-thread { display:grid; gap:10px; }
+    .comment-replies { margin-left: 16px; padding-left: 12px; border-left: 1px solid var(--blk-m); display:grid; gap:10px; }
     .comment-head { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
     .comment-avatar { width:34px; height:34px; border-radius:50%; border:1px solid var(--red-d); object-fit:cover; background:#111; flex:0 0 auto; }
     .comment-meta { font-size:.72rem; color: var(--wht-f); display:flex; gap:8px; flex-wrap:wrap; margin-bottom:2px; }
@@ -35,6 +37,7 @@
     .comment-media-item img, .comment-media-item video { width:100%; max-width:100%; height:auto; display:block; }
     .comment-report-panel { border:1px solid var(--red-d); background: rgba(139,0,0,0.08); padding:12px; margin-bottom:12px; }
     .comment-report-panel.hidden { display:none; }
+    .comment-reply-note { margin-top:6px; font-size:.75rem; color: var(--wht-f); }
     .upvote-section {
       display: flex;
       gap: 14px;
@@ -277,7 +280,7 @@ render.mount('archive-viewer');</pre>
     </ul>
     <p class="ftr-copy">
       &copy; 2026 Red Oaker Guild — All rights reserved.<br>
-      <span style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-2 CLEARANCE REQUIRED</span>
+      <span id="page-clearance-banner" style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-2 CLEARANCE REQUIRED</span>
     </p>
   </div>
 </footer>
@@ -434,6 +437,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('page-loading').classList.add('hidden');
     document.getElementById('page-viewer').classList.remove('hidden');
     document.getElementById('comments-section').classList.remove('hidden');
+    const clearanceBanner = document.getElementById('page-clearance-banner');
+    if (clearanceBanner) clearanceBanner.textContent = formatClearanceBanner(page.clearanceLevel);
     updateUpvoteUI();
     await loadCommentsForCurrentPage();
     await loadUpvoteStatus();
@@ -505,6 +510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     updateCommentComposerAuthState();
+    updateCommentComposerMode();
     updateCommunityState();
     renderComments();
     await loadUpvoteStatus();
@@ -620,6 +626,12 @@ function escapeCommentHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function formatClearanceBanner(value) {
+  const level = Number.parseInt(String(value || 2), 10);
+  const safeLevel = Number.isFinite(level) ? Math.max(1, Math.min(6, level)) : 2;
+  return 'CLASSIFIED // LEVEL-' + safeLevel + ' CLEARANCE REQUIRED';
+}
+
 function wrapSelectedText(input, openTag, closeTag) {
   if (!input) return;
   const start = Number(input.selectionStart || 0);
@@ -666,6 +678,38 @@ function canEditComment(comment) {
 }
 
 let editingCommentId = null;
+let replyingCommentId = '';
+let replyingCommentAuthor = '';
+
+function updateCommentComposerMode() {
+  const submitBtn = document.getElementById('comment-submit-btn');
+  const cancelBtn = document.getElementById('comment-cancel-btn');
+  const status = document.getElementById('comment-compose-status');
+
+  if (submitBtn) {
+    submitBtn.textContent = editingCommentId ? 'Save Changes' : (replyingCommentId ? 'Post Reply' : 'Post Comment');
+  }
+  if (cancelBtn) {
+    const shouldShow = !!editingCommentId || !!replyingCommentId;
+    cancelBtn.style.display = shouldShow ? 'block' : 'none';
+    cancelBtn.textContent = editingCommentId ? 'Cancel Edit' : 'Cancel Reply';
+  }
+  if (status && currentCommentUser) {
+    if (editingCommentId) {
+      status.textContent = 'Editing comment. Click Save to update, or click Cancel to discard.';
+    } else if (replyingCommentId) {
+      status.textContent = 'Replying to ' + (replyingCommentAuthor || 'Agent') + '. Click Cancel to stop replying.';
+    } else {
+      status.textContent = 'Comments are tied to your guild account.';
+    }
+  }
+}
+
+function clearCommentReplyTarget() {
+  replyingCommentId = '';
+  replyingCommentAuthor = '';
+  updateCommentComposerMode();
+}
 
 function startEditComment(id) {
   const commentId = String(id || '').trim();
@@ -675,9 +719,8 @@ function startEditComment(id) {
   if (!comment) return;
 
   editingCommentId = commentId;
+  clearCommentReplyTarget();
   const input = document.getElementById('comment-input');
-  const submitBtn = document.getElementById('comment-submit-btn');
-  const cancelBtn = document.getElementById('comment-cancel-btn');
   
   if (input) {
     input.value = comment.content || '';
@@ -686,17 +729,7 @@ function startEditComment(id) {
     input.style.borderColor = 'var(--red-b)';
   }
 
-  if (submitBtn) {
-    submitBtn.textContent = 'Save Changes';
-  }
-
-  if (cancelBtn) {
-    cancelBtn.style.display = 'block';
-  }
-
-  // Update status message
-  const status = document.getElementById('comment-compose-status');
-  if (status) status.textContent = 'Editing comment. Click Save to update, or click Cancel to discard.';
+  updateCommentComposerMode();
 }
 
 async function saveCommentEdit() {
@@ -733,10 +766,7 @@ async function saveCommentEdit() {
       input.classList.remove('editing-comment');
       input.style.borderColor = '';
     }
-    const submitBtn = document.getElementById('comment-submit-btn');
-    if (submitBtn) submitBtn.textContent = 'Post Comment';
-    const cancelBtn = document.getElementById('comment-cancel-btn');
-    if (cancelBtn) cancelBtn.style.display = 'none';
+    updateCommentComposerMode();
     if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">✓</span> Comment updated.';
     await loadCommentsForCurrentPage();
   } catch (err) {
@@ -748,16 +778,13 @@ function cancelCommentEdit() {
   editingCommentId = null;
   const input = document.getElementById('comment-input');
   const status = document.getElementById('comment-compose-status');
-  const submitBtn = document.getElementById('comment-submit-btn');
-  const cancelBtn = document.getElementById('comment-cancel-btn');
   
   if (input) {
     input.value = '';
     input.classList.remove('editing-comment');
     input.style.borderColor = '';
   }
-  if (submitBtn) submitBtn.textContent = 'Post Comment';
-  if (cancelBtn) cancelBtn.style.display = 'none';
+  clearCommentReplyTarget();
   if (status) status.textContent = 'Comments are tied to your guild account.';
 }
 
@@ -778,6 +805,91 @@ function renderCommentMedia(mediaList) {
     }
     return '<a class="comment-media-item" href="' + url + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
   }).join('') + '</div>';
+}
+
+function getCommentById(id) {
+  const commentId = String(id || '').trim();
+  if (!commentId) return null;
+  return currentComments.find(comment => String(comment.id || '') === commentId) || null;
+}
+
+function buildCommentTree(comments) {
+  const nodes = Array.isArray(comments)
+    ? comments.map(comment => ({ ...comment, replies: [] }))
+    : [];
+  const byId = new Map(nodes.map(comment => [String(comment.id || ''), comment]));
+  const roots = [];
+
+  nodes.forEach(comment => {
+    const parentId = String(comment.parentId || '').trim();
+    const parent = parentId ? byId.get(parentId) : null;
+    if (parent) parent.replies.push(comment);
+    else roots.push(comment);
+  });
+
+  const sortBranch = branch => {
+    branch.sort((a, b) => {
+      const aSeconds = Number(a?.createdAt?.seconds || 0);
+      const bSeconds = Number(b?.createdAt?.seconds || 0);
+      return aSeconds - bSeconds;
+    });
+    branch.forEach(comment => sortBranch(comment.replies));
+  };
+
+  sortBranch(roots);
+  return roots;
+}
+
+function renderCommentNode(comment, depth = 0) {
+  const deletable = canDeleteComment(comment);
+  const editable = canEditComment(comment);
+  const canReport = !!currentCommentUser;
+  const editedIndicator = comment.editedAt ? '<span style="font-size:.7rem;color:var(--wht-f);margin-left:8px">(edited ' + escapeCommentHtml(formatCommentDate(comment.editedAt)) + ')</span>' : '';
+  const authorName = escapeCommentHtml(comment.authorName || 'Agent');
+  const authorUid = escapeCommentHtml(comment.authorUid || '');
+  const authorPhoto = escapeCommentHtml(comment.authorPhotoURL || 'logo.png');
+  const profileHref = comment.authorUid ? ('profile.html?uid=' + encodeURIComponent(comment.authorUid || '')) : '';
+  const authorLabel = profileHref
+    ? ('<a class="comment-author-link" href="' + escapeCommentHtml(profileHref) + '">' + authorName + '</a>')
+    : ('<span class="comment-author-link">' + authorName + '</span>');
+  const replyAuthor = escapeCommentHtml(comment.authorName || 'Agent');
+  const replies = Array.isArray(comment.replies) && comment.replies.length
+    ? '<div class="comment-replies">' + comment.replies.map(child => renderCommentNode(child, depth + 1)).join('') + '</div>'
+    : '';
+
+  return '<div class="comment-thread" data-depth="' + depth + '">' +
+    '<article class="comment-item">' +
+      '<div class="comment-head">' +
+        '<img class="comment-avatar" src="' + authorPhoto + '" alt="' + authorName + '" loading="lazy" decoding="async" />' +
+        '<div style="min-width:0;flex:1">' +
+          '<div class="comment-meta">' +
+            authorLabel +
+            '<span>|</span>' +
+            '<span>' + escapeCommentHtml(formatCommentDate(comment.createdAt)) + '</span>' +
+            editedIndicator +
+          '</div>' +
+          (authorUid ? '<div class="community-meta" style="margin-top:0">UID: ' + authorUid + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="comment-content">' + renderCommentRichText(comment.content || '') + '</div>' +
+      renderCommentMedia(comment.media || []) +
+      '<div class="comment-actions">' +
+        (currentCommentUser
+          ? '<button class="btn btn-sm btn-s" type="button" data-reply-id="' + escapeCommentHtml(comment.id || '') + '" data-reply-author="' + replyAuthor + '" onclick="startReplyComment(this.dataset.replyId, this.dataset.replyAuthor)">Reply</button>'
+          : '') +
+        (editable
+          ? '<button class="btn btn-sm btn-s" type="button" onclick="startEditComment(\'' + escapeCommentHtml(comment.id || '') + '\')">Edit</button>'
+          : '') +
+        (deletable
+          ? '<button class="btn btn-sm btn-d" type="button" onclick="deleteComment(\'' + escapeCommentHtml(comment.id || '') + '\')">Delete</button>'
+          : '') +
+        (canReport
+          ? '<button class="btn btn-sm btn-s" type="button" data-comment-id="' + escapeCommentHtml(comment.id || '') + '" data-comment-author="' + escapeCommentHtml(comment.authorName || 'Agent') + '" onclick="openCommentReportPanel(this.dataset.commentId, this.dataset.commentAuthor)">Report</button>'
+          : '') +
+      '</div>' +
+    '</article>' +
+    replies +
+  '</div>';
 }
 
 function openCommentReportPanel(commentId, authorName) {
@@ -860,46 +972,7 @@ function renderComments() {
     return;
   }
 
-  host.innerHTML = currentComments.map(c => {
-    const deletable = canDeleteComment(c);
-    const editable = canEditComment(c);
-    const canReport = !!currentCommentUser;
-    const editedIndicator = c.editedAt ? '<span style="font-size:.7rem;color:var(--wht-f);margin-left:8px">(edited ' + escapeCommentHtml(formatCommentDate(c.editedAt)) + ')</span>' : '';
-    const authorName = escapeCommentHtml(c.authorName || 'Agent');
-    const authorUid = escapeCommentHtml(c.authorUid || '');
-    const authorPhoto = escapeCommentHtml(c.authorPhotoURL || 'logo.png');
-    const profileHref = c.authorUid ? ('profile.html?uid=' + encodeURIComponent(c.authorUid || '')) : '';
-    const authorLabel = profileHref
-      ? ('<a class="comment-author-link" href="' + escapeCommentHtml(profileHref) + '">' + authorName + '</a>')
-      : ('<span class="comment-author-link">' + authorName + '</span>');
-    return '<article class="comment-item">' +
-      '<div class="comment-head">' +
-        '<img class="comment-avatar" src="' + authorPhoto + '" alt="' + authorName + '" loading="lazy" decoding="async" />' +
-        '<div style="min-width:0;flex:1">' +
-          '<div class="comment-meta">' +
-            authorLabel +
-            '<span>|</span>' +
-            '<span>' + escapeCommentHtml(formatCommentDate(c.createdAt)) + '</span>' +
-            editedIndicator +
-          '</div>' +
-          (authorUid ? '<div class="community-meta" style="margin-top:0">UID: ' + authorUid + '</div>' : '') +
-        '</div>' +
-      '</div>' +
-      '<div class="comment-content">' + renderCommentRichText(c.content || '') + '</div>' +
-      renderCommentMedia(c.media || []) +
-      '<div class="comment-actions">' +
-        (editable
-          ? '<button class="btn btn-sm btn-s" type="button" onclick="startEditComment(\'' + escapeCommentHtml(c.id || '') + '\')">Edit</button>'
-          : '') +
-        (deletable
-          ? '<button class="btn btn-sm btn-d" type="button" onclick="deleteComment(\'' + escapeCommentHtml(c.id || '') + '\')">Delete</button>'
-          : '') +
-        (canReport
-          ? '<button class="btn btn-sm btn-s" type="button" data-comment-id="' + escapeCommentHtml(c.id || '') + '" data-comment-author="' + escapeCommentHtml(c.authorName || 'Agent') + '" onclick="openCommentReportPanel(this.dataset.commentId, this.dataset.commentAuthor)">Report</button>'
-          : '') +
-      '</div>' +
-    '</article>';
-  }).join('');
+  host.innerHTML = buildCommentTree(currentComments).map(comment => renderCommentNode(comment)).join('');
 
   if (status) status.textContent = currentComments.length + ' comment' + (currentComments.length === 1 ? '' : 's');
 }
@@ -949,6 +1022,9 @@ async function loadCommentsForCurrentPage() {
     currentComments = Array.isArray(data.comments)
       ? data.comments.map(item => ({ id: item.id, ...(item.data || {}) }))
       : [];
+    if (replyingCommentId && !getCommentById(replyingCommentId)) {
+      clearCommentReplyTarget();
+    }
     renderComments();
   } catch (err) {
     currentComments = [];
@@ -986,6 +1062,7 @@ async function submitComment() {
         pageTitle: pageRef.pageTitle,
         content: text,
         authorName: currentCommentUser?.displayName || '',
+        parentId: replyingCommentId || '',
         media
       })
     });
@@ -995,6 +1072,7 @@ async function submitComment() {
     if (input) input.value = '';
     if (mediaInput) mediaInput.value = '';
     updateCommentMediaSelection();
+    clearCommentReplyTarget();
     if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">✓</span> Comment posted.';
     await loadCommentsForCurrentPage();
   } catch (err) {
@@ -1050,10 +1128,31 @@ async function deleteComment(id) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Delete failed.');
+    if (commentId === replyingCommentId) {
+      clearCommentReplyTarget();
+    }
     await loadCommentsForCurrentPage();
   } catch (err) {
     alert('Delete failed: ' + err.message);
   }
+}
+
+function startReplyComment(id, authorName) {
+  const commentId = String(id || '').trim();
+  if (!commentId) return;
+  const comment = getCommentById(commentId);
+  if (!comment) return;
+
+  editingCommentId = null;
+  replyingCommentId = commentId;
+  replyingCommentAuthor = String(authorName || comment.authorName || 'Agent').trim() || 'Agent';
+
+  const input = document.getElementById('comment-input');
+  if (input) {
+    input.focus();
+  }
+
+  updateCommentComposerMode();
 }
 
 function renderCommunityProfile(user) {

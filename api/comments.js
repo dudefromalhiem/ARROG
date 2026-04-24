@@ -47,6 +47,15 @@ function normalizeMediaArray(media) {
   return media.map(normalizeMediaItem).filter(Boolean).slice(0, 4);
 }
 
+function commentReferencesMatch(commentData, pageId, slug) {
+  const data = commentData || {};
+  const commentPageId = String(data.pageId || '').trim();
+  const commentSlug = String(data.slug || '').trim();
+  if (pageId && commentPageId && commentPageId === pageId) return true;
+  if (slug && commentSlug && commentSlug === slug) return true;
+  return false;
+}
+
 function toPlainValue(value) {
   if (!value) return value;
   if (typeof value.toDate === 'function' && typeof value.seconds === 'number') {
@@ -255,12 +264,27 @@ module.exports = async function handler(req, res) {
       const pageTitle = normalizeText(body.pageTitle || '', 220);
       const content = normalizeText(body.content || '', 1200);
       const media = normalizeMediaArray(body.media || []);
+      const parentId = normalizeText(body.parentId || '', 128);
 
       if (!pageId && !slug) {
         return sendJson(res, 400, { error: 'Missing page reference.' });
       }
       if (!content) {
         return sendJson(res, 400, { error: 'Comment cannot be empty.' });
+      }
+
+      let parentComment = null;
+      if (parentId) {
+        const parentRef = db.collection('comments').doc(parentId);
+        const parentDoc = await parentRef.get();
+        if (!parentDoc.exists) {
+          return sendJson(res, 404, { error: 'Parent comment not found.' });
+        }
+
+        parentComment = parentDoc.data() || {};
+        if (!commentReferencesMatch(parentComment, pageId, slug)) {
+          return sendJson(res, 400, { error: 'Parent comment does not belong to this page.' });
+        }
       }
 
       const userDoc = await db.collection('users').doc(actor.uid).get();
@@ -276,6 +300,7 @@ module.exports = async function handler(req, res) {
         authorEmail: actor.email,
         authorName: normalizeText(body.authorName || userData.displayName || actor.name || actor.email.split('@')[0] || 'Agent', 120),
         authorPhotoURL: normalizeText(userData.photoURL || '', 1200),
+        parentId: parentId || '',
         status: 'active',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()

@@ -72,6 +72,10 @@ function normalizeClearanceLevel(value, fallback = 2) {
   return Math.max(1, Math.min(6, parsed));
 }
 
+function buildClearanceSubtitle(clearanceLevel) {
+  return 'Clearance Level ' + normalizeClearanceLevel(clearanceLevel, 2) + ' // Internal Distribution';
+}
+
 function enforceSubmitClearanceSelection(requestedValue) {
   const select = document.getElementById('sf-clearance');
   const requested = normalizeClearanceLevel(requestedValue, 2);
@@ -321,7 +325,7 @@ function applyTypeSubtypeConstraints() {
 const DEFAULT_NEW_PAGE_HTML = `<div class="page-shell">
   <header class="page-header">
     <h1 class="page-title">New Classified Document</h1>
-    <p class="page-subtitle">Clearance Level 2 // Internal Distribution</p>
+    <p class="page-subtitle">${buildClearanceSubtitle(2)}</p>
   </header>
   <section class="page-section">
     <h2>Summary</h2>
@@ -2220,7 +2224,7 @@ function initDocumentStudio() {
       return;
     }
     activeDocEditable.focus();
-    document.execCommand(btn.getAttribute('data-doc-cmd'), false, null);
+    document.execCommand(btn.getAttribute('data-doc-cmd'), false, btn.getAttribute('data-doc-value'));
     schedulePreview();
   });
 
@@ -2458,17 +2462,20 @@ function hasDocumentContent() {
   });
 }
 
-function wrapWithDefaultSchema(html, title) {
+function wrapWithDefaultSchema(html, title, clearanceLevel = 2) {
   const raw = (html || '').trim();
   const safeTitle = escapeHtml((title || '').trim() || 'New Classified Document');
+  const safeClearanceSubtitle = buildClearanceSubtitle(clearanceLevel);
   if (!raw) {
-    return DEFAULT_NEW_PAGE_HTML.replace('New Classified Document', safeTitle);
+    return DEFAULT_NEW_PAGE_HTML
+      .replace('New Classified Document', safeTitle)
+      .replace(buildClearanceSubtitle(2), safeClearanceSubtitle);
   }
   if (raw.includes('class="page-shell"')) return raw;
   return '<div class="page-shell">\n' +
     '  <header class="page-header">\n' +
     '    <h1 class="page-title">' + safeTitle + '</h1>\n' +
-    '    <p class="page-subtitle">Clearance Level 2 // Internal Distribution</p>\n' +
+    '    <p class="page-subtitle">' + safeClearanceSubtitle + '</p>\n' +
     '  </header>\n' + raw + '\n</div>';
 }
 
@@ -2887,6 +2894,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (clearanceSelect) {
     clearanceSelect.addEventListener('change', () => {
       enforceSubmitClearanceSelection(clearanceSelect.value);
+      schedulePreview();
     });
   }
 
@@ -4114,7 +4122,12 @@ function updatePreview() {
   // Update external asset preview section instead of embedding in iframe
   updateExternalAssetPreview(sanitized, assets);
 
-  const wrappedHtml = wrapWithDefaultSchema(sanitized, document.getElementById('sf-title').value || 'New Classified Document');
+  const wrappedHtml = wrapWithDefaultSchema(
+      sanitized,
+      document.getElementById('sf-title').value || 'New Classified Document',
+      document.getElementById('sf-clearance').value
+    );
+    wrapWithDefaultSchema(String(s.htmlContent || ''), s.title || 'Rejected Submission', s.clearanceLevel),
   const doc = buildSandboxDocument(wrappedHtml, mergeWithDefaultSchemaCSS(css));
   frame.srcdoc = doc;
   bindPreviewAnchorScrolling(frame);
@@ -4442,7 +4455,7 @@ async function submitPage() {
   }
   const uploadedUrls = uploadedAssets.imageAssets.map(asset => asset.url);
   const sanitizedHTML = sanitizeHTML(htmlContent);
-  const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title);
+  const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title, clearanceLevel);
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
   const isAdminUser = await getUserAdminFlag(currentUserForSubmit);
 
