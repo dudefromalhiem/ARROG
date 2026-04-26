@@ -53,6 +53,7 @@ let selectedEntryProfile = '';
 let designationLocked = false;
 let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history' | 'drafts'
 let submissionApiBase = '/api/submit';
+const REMOTE_SUBMISSION_API_BASE = 'https://redoakguild.vercel.app/api/submit';
 let hasUnsavedEditorChanges = false;
 let submitAutosaveEnabled = true;
 let currentUserCanAccessLore = false;
@@ -734,8 +735,9 @@ function configureSubmissionApiBase() {
     const host = String(window.location.hostname || '').toLowerCase();
     const isLocal = host === 'localhost' || host === '127.0.0.1';
     const isFile = window.location.protocol === 'file:';
-    if (isLocal || isFile) {
-      submissionApiBase = 'https://redoakguild.vercel.app/api/submit';
+    const isGithubPages = host.endsWith('.github.io');
+    if (isLocal || isFile || isGithubPages) {
+      submissionApiBase = REMOTE_SUBMISSION_API_BASE;
       return;
     }
   } catch (_err) {
@@ -961,11 +963,22 @@ async function getSubmissionApiHeaders() {
 }
 
 async function callSubmissionApi(method, payload = {}, query = '') {
-  const response = await fetch(submissionApiBase + query, {
+  const requestHeaders = await getSubmissionApiHeaders();
+  let response = await fetch(submissionApiBase + query, {
     method: method,
-    headers: await getSubmissionApiHeaders(),
+    headers: requestHeaders,
     body: method === 'GET' ? undefined : JSON.stringify(payload)
   });
+
+  if (!response.ok && response.status === 404 && submissionApiBase === '/api/submit') {
+    // Static hosting (for example GitHub Pages) has no local /api route.
+    submissionApiBase = REMOTE_SUBMISSION_API_BASE;
+    response = await fetch(submissionApiBase + query, {
+      method: method,
+      headers: requestHeaders,
+      body: method === 'GET' ? undefined : JSON.stringify(payload)
+    });
+  }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {

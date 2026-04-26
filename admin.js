@@ -836,10 +836,10 @@ async function loadSubmissions(container) {
     </div>
     <table class="adm-tbl"><thead><tr><th>Title</th><th>Author</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody id="subs-tbody"></tbody></table>
   `;
-  await refreshSubmissions('pending');
+  await refreshSubmissions('all');
 }
 
-let currentSubFilter = 'pending';
+let currentSubFilter = 'all';
 
 async function filterSubmissions(status) {
   currentSubFilter = status;
