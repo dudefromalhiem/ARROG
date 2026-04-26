@@ -547,6 +547,50 @@ function sanitizeAssetUrl(url) {
   return '';
 }
 
+function normalizeAssetKey(url) {
+  const clean = sanitizeAssetUrl(url);
+  if (!clean) return '';
+  try {
+    const u = new URL(clean, window.location.origin);
+    return (u.origin + u.pathname).toLowerCase();
+  } catch (_err) {
+    return clean.toLowerCase().split('?')[0].split('#')[0];
+  }
+}
+
+function buildArtworkPageLinkMap(pageRows) {
+  const map = new Map();
+  (pageRows || []).forEach(page => {
+    const slug = String(page && page.slug ? page.slug : '').trim();
+    if (!slug) return;
+    const imageUrls = [];
+    if (Array.isArray(page.imageUrls)) imageUrls.push(...page.imageUrls);
+    if (Array.isArray(page.imageAssets)) {
+      page.imageAssets.forEach(asset => {
+        if (asset && asset.url) imageUrls.push(asset.url);
+      });
+    }
+    imageUrls.forEach(url => {
+      const key = normalizeAssetKey(url);
+      if (key && !map.has(key)) map.set(key, slug);
+    });
+  });
+  return map;
+}
+
+function attachArtworkLinks(artRows, pageRows) {
+  const byImage = buildArtworkPageLinkMap(pageRows);
+  return (artRows || []).map(row => {
+    const existingSlug = String(row && row.slug ? row.slug : '').trim();
+    const existingPageUrl = String(row && row.pageUrl ? row.pageUrl : '').trim();
+    if (existingSlug || existingPageUrl) return row;
+    const key = normalizeAssetKey(row && row.imageUrl);
+    if (!key) return row;
+    const slug = byImage.get(key);
+    return slug ? Object.assign({}, row, { slug: slug, pageUrl: 'page.html?slug=' + encodeURIComponent(slug) }) : row;
+  });
+}
+
 function renderNews(items, isError = false) {
   const feed = document.getElementById('news-feed');
   if (!feed) return;
@@ -819,10 +863,15 @@ function loadData() {
           });
       });
 
-    db.collection('artworks').where('displayInSpotlight', '==', true).get()
-      .then(function (snap) {
-        if (!snap.empty) {
-          const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+    Promise.all([
+      db.collection('artworks').where('displayInSpotlight', '==', true).get(),
+      db.collection('pages').where('type', '==', 'Artwork').where('status', '==', 'approved').get()
+    ])
+      .then(function ([artSnap, pageSnap]) {
+        if (!artSnap.empty) {
+          const artRows = artSnap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+          const pageRows = pageSnap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+          const rows = attachArtworkLinks(artRows, pageRows);
           initCarousel(rows);
           setCachedHomeData('art', rows);
         }
