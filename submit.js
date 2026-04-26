@@ -4475,13 +4475,12 @@ async function submitPage() {
     btn.disabled = false;
     return;
   }
+  const clearanceLevel = enforceSubmitClearanceSelection(document.getElementById('sf-clearance').value);
   const uploadedUrls = uploadedAssets.imageAssets.map(asset => asset.url);
   const sanitizedHTML = sanitizeHTML(htmlContent);
   const wrappedHTML = wrapWithDefaultSchema(sanitizedHTML, title, clearanceLevel);
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
   const isAdminUser = await getUserAdminFlag(currentUserForSubmit);
-
-  const clearanceLevel = enforceSubmitClearanceSelection(document.getElementById('sf-clearance').value);
 
   const submission = {
     title: title,
