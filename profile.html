@@ -355,12 +355,21 @@ async function uploadProfilePicture() {
     setProfileStatus('Uploading profile picture...', false);
     const optimized = await optimizeProfileImage(file);
     let photoURL = optimized;
+    let storageUploadFailed = false;
+    let storageUploadErrorMessage = '';
 
     if (storage && typeof storage.ref === 'function') {
       const path = 'uploads/' + user.uid + '/profile/avatar.jpg';
       const ref = storage.ref(path);
-      await ref.putString(optimized, 'data_url', { contentType: 'image/jpeg' });
-      photoURL = await ref.getDownloadURL();
+      try {
+        await ref.putString(optimized, 'data_url', { contentType: 'image/jpeg' });
+        photoURL = await ref.getDownloadURL();
+      } catch (storageErr) {
+        // Keep a working profile update path even when Storage rules/env are misconfigured.
+        storageUploadFailed = true;
+        storageUploadErrorMessage = storageErr && storageErr.message ? storageErr.message : 'Storage upload failed.';
+        photoURL = optimized;
+      }
     }
 
     await user.updateProfile({ photoURL: photoURL });
@@ -371,7 +380,11 @@ async function uploadProfilePicture() {
 
     const avatar = document.getElementById('profile-avatar');
     if (avatar) avatar.src = photoURL;
-    setProfileStatus('Profile picture updated.', false);
+    if (storageUploadFailed) {
+      setProfileStatus('Profile picture updated, but cloud upload was denied. Using local optimized image. (' + storageUploadErrorMessage + ')', true);
+    } else {
+      setProfileStatus('Profile picture updated.', false);
+    }
   } catch (err) {
     setProfileStatus('Upload failed: ' + err.message, true);
   }
