@@ -1,4 +1,11 @@
 const admin = require('firebase-admin');
+const MAX_TITLE_LENGTH = 160;
+const MAX_SLUG_LENGTH = 120;
+const MAX_AUTHOR_NAME_LENGTH = 80;
+const MAX_TAG_LENGTH = 32;
+const MAX_TAGS = 24;
+const MAX_HTML_BYTES = 220000;
+const MAX_CSS_BYTES = 80000;
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -34,6 +41,11 @@ function getRequestIp(req) {
 
 function sanitizeHtmlContent(html) {
   let clean = String(html || '');
+  if (Buffer.byteLength(clean, 'utf8') > MAX_HTML_BYTES) {
+    const err = new Error('HTML payload is too large.');
+    err.statusCode = 413;
+    throw err;
+  }
   clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   clean = clean.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '');
   clean = clean.replace(/javascript\s*:/gi, 'blocked:');
@@ -43,6 +55,11 @@ function sanitizeHtmlContent(html) {
 
 function sanitizeCssOrThrow(css) {
   const source = String(css || '');
+  if (Buffer.byteLength(source, 'utf8') > MAX_CSS_BYTES) {
+    const err = new Error('CSS payload is too large.');
+    err.statusCode = 413;
+    throw err;
+  }
   if (/url\s*\(/i.test(source) || /@import\b/i.test(source) || /expression\s*\(/i.test(source)) {
     const err = new Error('CSS may not contain url(), @import, or expression().');
     err.statusCode = 400;
@@ -51,8 +68,30 @@ function sanitizeCssOrThrow(css) {
   return source;
 }
 
+function sanitizePlainText(input, maxLength) {
+  return String(input || '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/[<>`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function sanitizeSlug(input) {
+  return String(input || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, MAX_SLUG_LENGTH);
+}
+
 function normalizeTags(tags) {
-  return Array.isArray(tags) ? tags.map(tag => String(tag || '').trim()).filter(Boolean) : [];
+  if (!Array.isArray(tags)) return [];
+  const normalized = tags
+    .map(tag => sanitizePlainText(tag, MAX_TAG_LENGTH).toLowerCase())
+    .filter(Boolean);
+  return [...new Set(normalized)].slice(0, MAX_TAGS);
 }
 
 function determineContentFamily(type) {
@@ -259,20 +298,20 @@ function toPlainValue(value) {
 
 function buildSubmissionPayload(body, actor) {
   const payload = body && body.submission ? body.submission : body || {};
-  const title = String(payload.title || '').trim();
-  const slug = String(payload.slug || '').trim();
+  const title = sanitizePlainText(payload.title || '', MAX_TITLE_LENGTH);
+  const slug = sanitizeSlug(payload.slug || '');
   const htmlContent = sanitizeHtmlContent(payload.htmlContent || '');
   const cssContent = sanitizeCssOrThrow(payload.cssContent || '');
-  const anomalySubtype = String(payload.anomalySubtype || '').toUpperCase().trim();
-  const anomalyId = String(payload.anomalyId || '').toUpperCase().trim();
+  const anomalySubtype = sanitizePlainText(payload.anomalySubtype || '', 20).toUpperCase();
+  const anomalyId = sanitizePlainText(payload.anomalyId || '', 40).toUpperCase();
   const clearanceLevel = Number.parseInt(String(payload.clearanceLevel || 2), 10);
   const normalizedPayload = {
     title,
     anomalyId,
     anomalySubtype,
-    anomalySubtypeLabel: String(payload.anomalySubtypeLabel || '').trim(),
-    anomalyListKey: String(payload.anomalyListKey || '').trim(),
-    type: String(payload.type || 'Page').trim(),
+    anomalySubtypeLabel: sanitizePlainText(payload.anomalySubtypeLabel || '', 80),
+    anomalyListKey: sanitizePlainText(payload.anomalyListKey || '', 30),
+    type: sanitizePlainText(payload.type || 'Page', 30),
     contentFamily: determineContentFamily(payload.type),
     tags: normalizeTags(payload.tags),
     slug,
@@ -293,7 +332,7 @@ function buildSubmissionPayload(body, actor) {
     clearanceLevel: Number.isFinite(clearanceLevel) ? Math.max(1, Math.min(6, clearanceLevel)) : 2,
     authorUid: actor.uid,
     authorEmail: actor.email,
-    authorName: String(payload.authorName || actor.name || actor.email.split('@')[0] || 'Agent').trim(),
+    authorName: sanitizePlainText(payload.authorName || actor.name || actor.email.split('@')[0] || 'Agent', MAX_AUTHOR_NAME_LENGTH),
     status: String(payload.status || 'pending').trim(),
     currentMode: String(payload.currentMode || '').trim(),
     draftTrigger: String(payload.draftTrigger || '').trim(),
@@ -304,6 +343,24 @@ function buildSubmissionPayload(body, actor) {
 
   validateSubmissionMediaOrThrow(normalizedPayload);
   return normalizedPayload;
+}
+
+function validateSubmissionForPublishOrQueueOrThrow(payload) {
+  if (!payload.title || payload.title.length < 3) {
+    const err = new Error('Submission title is required.');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!payload.slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(payload.slug)) {
+    const err = new Error('A valid slug is required.');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!payload.htmlContent || !String(payload.htmlContent).trim()) {
+    const err = new Error('HTML content is required.');
+    err.statusCode = 400;
+    throw err;
+  }
 }
 
 function enforceRequestedClearanceOrThrow(payload, actorProfile) {
@@ -523,6 +580,7 @@ module.exports = async function handler(req, res) {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = action === 'publish' ? 'approved' : 'pending';
       enforceRequestedClearanceOrThrow(payload, actorProfile);
+      validateSubmissionForPublishOrQueueOrThrow(payload);
 
       validateAnomalyPayloadOrThrow(payload, { enforceTitlePrefix: true });
 

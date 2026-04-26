@@ -58,6 +58,16 @@ service cloud.firestore {
         );
     }
 
+    function hasSafeDisplayName() {
+      return !('displayName' in request.resource.data) ||
+        (
+          request.resource.data.displayName is string &&
+          request.resource.data.displayName.size() > 0 &&
+          request.resource.data.displayName.size() <= 50 &&
+          request.resource.data.displayName.matches('^[^<>`]+$')
+        );
+    }
+
     // Check if the owner has delegated a specific permission to admins.
     // Returns true if the config/permissions doc has the given key set to true.
     function adminHasDelegation(permissionKey) {
@@ -69,8 +79,13 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAdminUser() || isSelf(userId);
-      allow create: if (isAdminUser() || isSelf(userId)) && !request.resource.data.keys().hasAny(['isAdmin']);
-      allow update: if isAdminUser() || (isSelf(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']));
+      allow create: if (isAdminUser() || isSelf(userId)) &&
+        !request.resource.data.keys().hasAny(['isAdmin']) &&
+        hasSafeDisplayName();
+      allow update: if (isAdminUser() && hasSafeDisplayName()) ||
+        (isSelf(userId) &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']) &&
+         hasSafeDisplayName());
       allow delete: if isAdminUser();
     }
 

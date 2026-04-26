@@ -265,6 +265,15 @@ function waitForReady(promise, timeoutMs = 1200) {
   ]);
 }
 
+function sanitizeDisplayNameInput(value) {
+  return String(value || '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/[<>`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 50);
+}
+
 async function changeUsername() {
   const user = auth.currentUser;
   if (!user) {
@@ -276,7 +285,7 @@ async function changeUsername() {
   const newName = prompt('Enter new Username/Display Name:', currentName);
   if (newName === null) return;
 
-  const trimmed = newName.trim();
+  const trimmed = sanitizeDisplayNameInput(newName);
   if (!trimmed) {
     alert('Username cannot be empty.');
     return;
