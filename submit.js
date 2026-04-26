@@ -53,7 +53,10 @@ let selectedEntryProfile = '';
 let designationLocked = false;
 let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history' | 'drafts'
 let submissionApiBase = '/api/submit';
-const REMOTE_SUBMISSION_API_BASE = 'https://redoakguild.vercel.app/api/submit';
+const REMOTE_SUBMISSION_API_BASES = [
+  'https://redoakguild.vercel.app/api/submit',
+  'https://redoakerguild.vercel.app/api/submit'
+];
 let hasUnsavedEditorChanges = false;
 let submitAutosaveEnabled = true;
 let currentUserCanAccessLore = false;
@@ -737,7 +740,7 @@ function configureSubmissionApiBase() {
     const isFile = window.location.protocol === 'file:';
     const isGithubPages = host.endsWith('.github.io');
     if (isLocal || isFile || isGithubPages) {
-      submissionApiBase = REMOTE_SUBMISSION_API_BASE;
+      submissionApiBase = REMOTE_SUBMISSION_API_BASES[0];
       return;
     }
   } catch (_err) {
@@ -972,12 +975,24 @@ async function callSubmissionApi(method, payload = {}, query = '') {
 
   if (!response.ok && response.status === 404 && submissionApiBase === '/api/submit') {
     // Static hosting (for example GitHub Pages) has no local /api route.
-    submissionApiBase = REMOTE_SUBMISSION_API_BASE;
+    submissionApiBase = REMOTE_SUBMISSION_API_BASES[0];
     response = await fetch(submissionApiBase + query, {
       method: method,
       headers: requestHeaders,
       body: method === 'GET' ? undefined : JSON.stringify(payload)
     });
+  }
+
+  if (!response.ok && response.status === 404) {
+    const currentRemoteIndex = REMOTE_SUBMISSION_API_BASES.indexOf(submissionApiBase);
+    if (currentRemoteIndex !== -1 && currentRemoteIndex < REMOTE_SUBMISSION_API_BASES.length - 1) {
+      submissionApiBase = REMOTE_SUBMISSION_API_BASES[currentRemoteIndex + 1];
+      response = await fetch(submissionApiBase + query, {
+        method: method,
+        headers: requestHeaders,
+        body: method === 'GET' ? undefined : JSON.stringify(payload)
+      });
+    }
   }
 
   const data = await response.json().catch(() => ({}));
