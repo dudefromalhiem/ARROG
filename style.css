@@ -1212,7 +1212,7 @@ hr {
 .carousel-view {
   position: relative;
   overflow: hidden;
-  height: px;
+  height: 520px;
 }
 
 .carousel-track {
@@ -2874,8 +2874,8 @@ hr {
     letter-spacing: 2px;
   }
 
-  .carousel {
-    height: 350px;
+  .carousel-view {
+    height: 340px;
   }
 
   .card {
@@ -3099,8 +3099,8 @@ hr {
     min-height: 68svh;
   }
 
-  .carousel {
-    height: 180px;
+  .carousel-view {
+    height: 240px;
   }
 
   .news-tt {
