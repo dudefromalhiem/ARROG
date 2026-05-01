@@ -587,7 +587,7 @@ if (document.readyState === 'loading') {
 
 /* ═══════════════════════════════════════════════════════════════
  *  RBAC — Dynamic role resolution via Firestore (config/roles)
- *  Admin emails are managed by the Owner via the Admin Terminal.
+ *  Admin emails are managed by the Archivist via the Admin Terminal.
  *  Bootstrap owner is a safety-net fallback for initial setup only.
  * ═══════════════════════════════════════════════════════════════ */
 
@@ -720,7 +720,7 @@ async function syncSharedNav(user) {
 
 async function updateESDState(enabled) {
   if (!auth.currentUser || !isOwner(auth.currentUser.email)) {
-    alert('Only the Owner can activate or deactivate ESD.');
+    alert('Only the Archivist can activate or deactivate ESD.');
     return;
   }
 

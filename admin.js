@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
  *  ADMIN.JS — Admin dashboard logic
- *  Full CRUD for Pages, Artworks, News + Owner-only User mgmt
+ *  Full CRUD for Pages, Artworks, News + Archivist-only User mgmt
  * ═══════════════════════════════════════════════════════════════ */
 
 let activeTab = 'pages';
@@ -258,7 +258,7 @@ async function renderAdminBootstrap(user) {
       adminDenied.classList.remove('hidden');
       adminDenied.style.display = 'block';
       adminDenied.querySelector('.section-hd').textContent = 'Insufficient Clearance';
-      adminDenied.querySelector('p').innerHTML = `Your account does not have admin privileges. Contact the Guild Owner.`;
+      adminDenied.querySelector('p').innerHTML = `Your account does not have admin privileges. Contact the Guild Archivist.`;
       adminPanel.classList.add('hidden');
       adminPanel.style.display = 'none';
       navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
@@ -610,7 +610,7 @@ async function saveConfig() {
 
 async function saveDelegationConfig() {
   if (!isOwner(auth.currentUser?.email)) {
-    alert('Only the Owner can save delegation settings.');
+    alert('Only the Archivist can save delegation settings.');
     return;
   }
   const btn = document.getElementById('btn-save-delegation');
@@ -824,7 +824,7 @@ async function deletePage(id) {
   if (!doc.exists) return;
   const p = doc.data() || {};
   if (isGuideType(p.type) && !canManageGuidePages()) {
-    alert('Only the Owner can delete Guide pages.');
+    alert('Only the Archivist can delete Guide pages.');
     return;
   }
 
@@ -1150,7 +1150,7 @@ async function approveSubmission(id) {
     if (!doc.exists) { alert('Submission not found.'); return; }
     const s = doc.data();
     if (isGuideType(s.type) && !canManageGuidePages()) {
-      alert('Only the Owner can approve Guide submissions.');
+      alert('Only the Archivist can approve Guide submissions.');
       return;
     }
     const reviewer = auth.currentUser;

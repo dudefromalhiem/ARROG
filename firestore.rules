@@ -101,7 +101,7 @@ service cloud.firestore {
         );
     }
 
-    // Check if the owner has delegated a specific permission to admins.
+    // Check if the Archivist has delegated a specific permission to admins.
     // Returns true if the config/permissions doc has the given key set to true.
     function adminHasDelegation(permissionKey) {
       return isAdminUser() &&

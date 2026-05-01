@@ -419,13 +419,13 @@ async function updateAuthUI(user) {
     currentUser = user;
     currentRole = resolveRole(user.email);
     const displayLabel = user.displayName || 'Agent';
-    const isAdminUser = await getUserAdminFlag(user);
+    const isOwnerUser = isOwner(user.email);
     navAuth.innerHTML = renderUserMenuHTML(displayLabel) + exitEsdButton;
     if (submitLink) submitLink.classList.remove('hidden');
     if (messagingLink) messagingLink.classList.remove('hidden');
     if (document.getElementById('footer-submit-link')) document.getElementById('footer-submit-link').classList.remove('hidden');
     if (document.getElementById('footer-messaging-link')) document.getElementById('footer-messaging-link').classList.remove('hidden');
-    if (isAdminUser) {
+    if (isOwnerUser) {
       if (!adminLink) {
         const nav = document.getElementById('nav');
         const authLi = document.getElementById('nav-auth');
@@ -454,10 +454,16 @@ async function updateAuthUI(user) {
       adminLink.remove();
     }
     // upsert user doc
+    const role = resolveRole(user.email);
+    const level = role === 'owner' ? 6 : role === 'admin' ? 6 : role === 'mod' ? 5 : role === 'user' ? 3 : 2;
+    const isOwner = role === 'owner';
     db.collection('users').doc(user.uid).set({
       uid: user.uid, email: user.email,
       displayName: user.displayName || '',
-      lastLogin: new Date().toISOString()
+      lastLogin: new Date().toISOString(),
+      level: level,
+      isOwner: isOwner,
+      role: role
     }, { merge: true }).catch(() => { });
 
     if (!clearanceWelcomeShownThisLoad) {

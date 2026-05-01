@@ -241,7 +241,7 @@ async function ensureThreadAccess(db, actor, recipient, roles) {
 
   if (recipientIsOwner && !senderIsOwner && !senderIsAdmin) {
     if (!thread.exists || thread.data.ownerConversationOpen !== true) {
-      const err = new Error('Only admins can message the Owner unless the Owner opens the conversation first.');
+      const err = new Error('Only admins can message the Archivist unless the Archivist opens the conversation first.');
       err.statusCode = 403;
       throw err;
     }

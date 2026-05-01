@@ -97,7 +97,7 @@ function createGuideDoc() {
 
   <section class="page-section guide-section">
     <h2>Clearance Ladder</h2>
-    <p>Level 2 is the minimum authenticated access tier. Level 4 is reserved for moderators. Level 5 is reserved for admins. Level 6 is reserved for the Owner. No Level 1 or Level 3 access is currently active in the live deployment.</p>
+    <p>Level 2 is the minimum authenticated access tier. Level 4 is reserved for moderators. Level 5 is reserved for admins. Level 6 is reserved for the Archivist. No Level 1 or Level 3 access is currently active in the live deployment.</p>
   </section>
 
   <section class="page-section guide-section">
