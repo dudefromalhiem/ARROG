@@ -1879,9 +1879,11 @@ async function refreshRolesDisplay() {
   const renderRoleEditor = (email, role) => {
     const canModify = canEditRole(email, currentEmail);
     if (!canModify) return '';
+    const selectorId = 'role-edit-' + String(email).replace(/[^a-z0-9]/gi, '-');
+    const buttonId = 'role-update-' + String(email).replace(/[^a-z0-9]/gi, '-');
     return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
-      `<select class="fi" id="role-edit-${email.replace(/[^a-z0-9]/gi, '-')}" style="min-width:190px;max-width:260px">${roleOptions}</select>` +
-      `<button class="btn btn-sm btn-p" onclick="updateStaffRole('${email}')">Update Role</button>` +
+      `<select class="fi" id="${selectorId}" style="min-width:190px;max-width:260px" onchange="toggleRoleUpdateButton('${selectorId}','${buttonId}','${role}')">${roleOptions}</select>` +
+      `<button class="btn btn-sm btn-p" id="${buttonId}" onclick="updateStaffRole('${email}')" disabled>Update Role</button>` +
       `<button class="btn btn-sm btn-d" onclick="removeStaffRole('${role}','${email}')">Revoke</button>` +
     '</div>';
   };
@@ -1934,8 +1936,12 @@ async function refreshRolesDisplay() {
 
   Object.entries(ROLE_DATA.userRoles).forEach(([email, role]) => {
     const selectorId = 'role-edit-' + String(email).replace(/[^a-z0-9]/gi, '-');
+    const buttonId = 'role-update-' + String(email).replace(/[^a-z0-9]/gi, '-');
     const picker = document.getElementById(selectorId);
-    if (picker) picker.value = role;
+    if (picker) {
+      picker.value = role;
+      toggleRoleUpdateButton(selectorId, buttonId, role);
+    }
   });
 
   try {
@@ -1963,6 +1969,14 @@ async function refreshRolesDisplay() {
   } catch (err) {
     roleAdminApplications.innerHTML = '<p style="font-size:.82rem;color:var(--red-g)">Could not load admin applications: ' + escapeHtml(err.message) + '</p>';
   }
+}
+
+function toggleRoleUpdateButton(selectId, buttonId, currentRole) {
+  const select = document.getElementById(selectId);
+  const button = document.getElementById(buttonId);
+  if (!select || !button) return;
+  const nextRole = String(select.value || '').trim();
+  button.disabled = !nextRole || nextRole === String(currentRole || '');
 }
 
 async function updateStaffRole(email) {
