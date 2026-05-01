@@ -119,23 +119,22 @@ async function isAdminUser(db, uid, email) {
   return owners.map(owner => String(owner || '').toLowerCase()).includes(normalizedEmail);
 }
 
-async function isStaffUser(db, uid, email) {
+async function isAdminUser(db, uid, email) {
   const normalizedEmail = String(email || '').toLowerCase();
   if (BOOTSTRAP_OWNERS.has(normalizedEmail)) return true;
 
   const userDoc = await db.collection('users').doc(uid).get();
   if (userDoc.exists) {
     const userData = userDoc.data() || {};
-    if (userData.isAdmin === true || userData.role === 'admin' || userData.role === 'mod') return true;
+    if (userData.isAdmin === true || userData.role === 'admin' || userData.role === 'owner') return true;
   }
 
   const rolesDoc = await db.collection('config').doc('roles').get();
   if (!rolesDoc.exists) return false;
   const roleData = rolesDoc.data() || {};
   const admins = Array.isArray(roleData.admins) ? roleData.admins : [];
-  const mods = Array.isArray(roleData.mods) ? roleData.mods : [];
   const owners = Array.isArray(roleData.owners) ? roleData.owners : [];
-  return [...admins, ...mods, ...owners].map(value => String(value || '').toLowerCase()).includes(normalizedEmail);
+  return [...admins, ...owners].map(value => String(value || '').toLowerCase()).includes(normalizedEmail);
 }
 
 async function storeCommentReport(db, actor, body) {
@@ -365,7 +364,7 @@ module.exports = async function handler(req, res) {
       if (!doc.exists) return sendJson(res, 404, { error: 'Comment not found.' });
 
       const data = doc.data() || {};
-      const adminAccess = await isStaffUser(db, actor.uid, actor.email);
+      const adminAccess = await isAdminUser(db, actor.uid, actor.email);
       const isAuthor = String(data.authorUid || '') === actor.uid;
       if (!adminAccess && !isAuthor) {
         return sendJson(res, 403, { error: 'Forbidden.' });
