@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -11,13 +11,13 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Red Oaker Guild" />
-  <meta property="og:title" content="Staff Directory — Red Oaker Guild" />
+  <meta property="og:title" content="Staff Directory - Red Oaker Guild" />
   <meta property="og:description" content="Contact Red Oaker Guild administrators, moderators, and senior archivists." />
   <meta property="og:url" content="https://redoakerguild.com/staff" />
   <meta property="og:image" content="https://redoakerguild.com/logo.png" />
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Staff Directory — Red Oaker Guild" />
+  <meta name="twitter:title" content="Staff Directory - Red Oaker Guild" />
   <meta name="twitter:description" content="Contact Red Oaker Guild administrators, moderators, and senior archivists." />
   <meta name="twitter:image" content="https://redoakerguild.com/logo.png" />
   <!-- Favicon -->
@@ -33,7 +33,7 @@
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">â˜°</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -91,20 +91,20 @@ function escapeHtmlStaff(value) {
 }
 
 function formatDateTime(value) {
-  if (!value) return 'â€”';
+  if (!value) return '—';
   if (typeof value === 'string' || typeof value === 'number') {
     const dt = new Date(value);
-    return Number.isNaN(dt.getTime()) ? 'â€”' : dt.toLocaleString('en-US', {
+    return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleString('en-US', {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   }
   if (typeof value === 'object' && typeof value.seconds === 'number') {
     const dt = new Date(value.seconds * 1000);
-    return Number.isNaN(dt.getTime()) ? 'â€”' : dt.toLocaleString('en-US', {
+    return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleString('en-US', {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   }
-  return 'â€”';
+  return '—';
 }
 
 function openDirectMessage(uid, name) {

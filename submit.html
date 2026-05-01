@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Submit Your Artwork â€” Red Oaker Guild</title>
+  <title>Submit Your Artwork — Red Oaker Guild</title>
   <meta name="description" content="Submit a custom page or artwork to the Red Oaker Guild archive. Use templates or write your own HTML & CSS." />
   <!-- SEO -->
   <meta name="robots" content="index, follow" />
@@ -11,13 +11,13 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Red Oaker Guild" />
-  <meta property="og:title" content="Submit Your Work — Red Oaker Guild" />
+  <meta property="og:title" content="Submit Your Work - Red Oaker Guild" />
   <meta property="og:description" content="Submit a custom anomaly page, artwork, or tale to the Red Oaker Guild archive. Use templates or write your own." />
   <meta property="og:url" content="https://redoakerguild.com/submit" />
   <meta property="og:image" content="https://redoakerguild.com/logo.png" />
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Submit Your Work — Red Oaker Guild" />
+  <meta name="twitter:title" content="Submit Your Work - Red Oaker Guild" />
   <meta name="twitter:description" content="Submit a custom anomaly page, artwork, or tale to the Red Oaker Guild archive. Use templates or write your own." />
   <meta name="twitter:image" content="https://redoakerguild.com/logo.png" />
   <!-- Favicon -->
@@ -280,14 +280,14 @@
 </head>
 <body>
 
-<!-- â•â•â• HEADER â•â•â• -->
+<!-- ═══ HEADER ═══ -->
 <header class="hdr">
   <div class="hdr-in">
     <a href="index.html" class="hdr-brand">
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">â˜°</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -299,7 +299,7 @@
   </div>
 </header>
 
-<!-- â•â•â• MAIN CONTENT â•â•â• -->
+<!-- ═══ MAIN CONTENT ═══ -->
 <main class="wrap">
 
   <!-- Loading State -->
@@ -488,31 +488,31 @@ render.mount('submission-terminal');</pre>
 
     <div id="submit-create-workspace">
 
-    <!-- â•â•â• PAGE HERO â•â•â• -->
+    <!-- ═══ PAGE HERO ═══ -->
     <div class="create-hero">
       <h1>Submit Your Artwork</h1>
     </div>
 
-    <!-- â•â•â• MODE SELECTOR â•â•â• -->
+    <!-- ═══ MODE SELECTOR ═══ -->
     <div class="mode-selector" id="mode-selector">
       <button class="mode-btn" type="button" id="mode-template" onclick="switchMode('template')">
-        <div class="mode-icon">â—ˆ</div>
+        <div class="mode-icon">◈</div>
         <div class="mode-label">Template Builder</div>
-        <div class="mode-desc">No coding required â€” fill in the form</div>
+        <div class="mode-desc">No coding required — fill in the form</div>
       </button>
       <button class="mode-btn active" type="button" id="mode-doc" onclick="switchMode('doc')">
-        <div class="mode-icon">â–¦</div>
+        <div class="mode-icon">▦</div>
         <div class="mode-label">Document Studio</div>
         <div class="mode-desc">Word-like visual editor with draggable-style blocks</div>
       </button>
       <button class="mode-btn" type="button" id="mode-code" onclick="switchMode('code')">
-        <div class="mode-icon">â—‡</div>
+        <div class="mode-icon">◇</div>
         <div class="mode-label">Code Editor</div>
         <div class="mode-desc">Write custom HTML &amp; CSS</div>
       </button>
     </div>
 
-    <!-- â•â•â• PAGE METADATA (shared) â•â•â• -->
+    <!-- ═══ PAGE METADATA (shared) ═══ -->
     <div class="section" style="margin-bottom:24px">
       <div class="section-hd">Page Details</div>
       <div class="g2 mb-md">
@@ -592,7 +592,7 @@ render.mount('submission-terminal');</pre>
       </div>
     </div>
 
-    <!-- â•â•â• IMAGE UPLOAD (shared) â•â•â• -->
+    <!-- ═══ IMAGE UPLOAD (shared) ═══ -->
     <div class="section" style="margin-bottom:24px">
       <div class="section-hd">Asset Uploads</div>
       <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
@@ -601,7 +601,7 @@ render.mount('submission-terminal');</pre>
       </p>
       <input type="file" id="img-input" accept="image/png,image/jpeg,image/gif,image/webp,audio/*,video/*" multiple hidden />
       <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Choose image, audio, or video files to upload">
-        <div class="uz-icon">â¬†</div>
+        <div class="uz-icon">⬆</div>
         <div class="uz-text">Click or drag images, audio, or video here to upload</div>
         <div class="uz-hint">Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, and Legacy submissions.</div>
       </div>
@@ -616,9 +616,9 @@ render.mount('submission-terminal');</pre>
       <div class="img-list" id="media-list" style="margin-top:12px"></div>
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <!-- TEMPLATE BUILDER MODE                                   -->
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <div id="template-mode" class="hidden">
 
       <div class="section" style="margin-bottom:24px">
@@ -639,7 +639,7 @@ render.mount('submission-terminal');</pre>
         <div class="fg">
           <label class="fl">Hero Image</label>
           <select class="fi" id="tf-hero-img">
-            <option value="">None â€” No hero image</option>
+            <option value="">None — No hero image</option>
           </select>
           <span style="font-size:.7rem;color:var(--wht-f)">Upload images above, then select one here.</span>
         </div>
@@ -677,7 +677,7 @@ render.mount('submission-terminal');</pre>
         <div class="fg">
           <label class="fl">Hero Image</label>
           <select class="fi" id="tf-tale-hero">
-            <option value="">None â€” No hero image</option>
+            <option value="">None — No hero image</option>
           </select>
         </div>
         <div class="fg"><label class="fl">Prologue / Opening</label>
@@ -726,7 +726,7 @@ render.mount('submission-terminal');</pre>
         <div class="fg">
           <label class="fl">Hero Image</label>
           <select class="fi" id="tf-guide-hero">
-            <option value="">None â€” No hero image</option>
+            <option value="">None — No hero image</option>
           </select>
         </div>
         <div class="doc-grid-2">
@@ -750,9 +750,9 @@ render.mount('submission-terminal');</pre>
 
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <!-- DOCUMENT STUDIO MODE                                    -->
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <div id="doc-mode">
       <div class="section" style="margin-bottom:24px">
         <div class="section-hd">Document Studio</div>
@@ -768,7 +768,7 @@ render.mount('submission-terminal');</pre>
           <button class="btn btn-s" type="button" data-doc-cmd="foreColor" data-doc-value="#cc0000" title="Crimson" style="border-color:#cc0000;color:#fff;background:rgba(204,0,0,.2)">Crimson</button>
           <button class="btn btn-s" type="button" data-doc-cmd="foreColor" data-doc-value="#d7d7d7" title="Soft Gray" style="border-color:#d7d7d7;color:#f2f2f2;background:rgba(255,255,255,.06)">Gray</button>
           <button class="btn btn-s" type="button" data-doc-cmd="foreColor" data-doc-value="#ffffff" title="White" style="border-color:#ffffff;color:#ffffff;background:rgba(255,255,255,.05)">White</button>
-          <button class="btn btn-s" type="button" data-doc-cmd="insertUnorderedList" title="Bullet List">â€¢ List</button>
+          <button class="btn btn-s" type="button" data-doc-cmd="insertUnorderedList" title="Bullet List">• List</button>
           <button class="btn btn-s" type="button" data-doc-cmd="insertOrderedList" title="Numbered List">1. List</button>
           <button class="btn btn-s" type="button" id="doc-link-btn" title="Insert Link">Link</button>
           <button class="btn btn-s" type="button" data-doc-cmd="removeFormat" title="Clear Formatting">Clear</button>
@@ -797,18 +797,18 @@ render.mount('submission-terminal');</pre>
       </div>
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <!-- CODE EDITOR MODE                                        -->
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <div id="code-mode" class="hidden">
       <div class="section" style="margin-bottom:24px">
         <div class="section-hd">Content Editor</div>
         <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
-          Write fully custom HTML and CSS. <span style="color:var(--red-b)">JavaScript is not allowed</span> â€” only HTML and CSS.
+          Write fully custom HTML and CSS. <span style="color:var(--red-b)">JavaScript is not allowed</span> — only HTML and CSS.
         </p>
         <div class="editor-wrap">
           <div class="editor-pane">
-            <div class="editor-label"><span class="icon">â—ˆ</span> HTML</div>
+            <div class="editor-label"><span class="icon">◈</span> HTML</div>
             <textarea id="sf-html" placeholder="<!-- Write your page HTML here -->
 <div class=&quot;anomaly-header&quot;>
   <h1>ROG-007: The Hollow Mirror</h1>
@@ -821,7 +821,7 @@ render.mount('submission-terminal');</pre>
 </div>"></textarea>
           </div>
           <div class="editor-pane">
-            <div class="editor-label"><span class="icon">â—‡</span> CSS</div>
+            <div class="editor-label"><span class="icon">◇</span> CSS</div>
             <textarea id="sf-css" placeholder="/* Style your page here */
 .anomaly-header {
   text-align: center;
@@ -838,21 +838,21 @@ render.mount('submission-terminal');</pre>
       </div>
     </div>
 
-    <!-- â•â•â• LIVE PREVIEW (both modes) â•â•â• -->
+    <!-- ═══ LIVE PREVIEW (both modes) ═══ -->
     <div class="section preview-shell" style="margin-bottom:24px">
       <div class="section-hd">Live Preview</div>
       <div class="preview-header">
-        <span>Preview â€” HTML + CSS rendered (no JavaScript)</span>
+        <span>Preview — HTML + CSS rendered (no JavaScript)</span>
         <span class="badge">SANDBOXED</span>
       </div>
       <iframe class="preview-frame" id="preview-frame" sandbox="allow-same-origin allow-scripts" csp="default-src 'none'; style-src 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; connect-src https:;" title="Live preview of your page"></iframe>
     </div>
 
-    <!-- â•â•â• UPLOADED ASSETS PREVIEW â•â•â• -->
+    <!-- ═══ UPLOADED ASSETS PREVIEW ═══ -->
     <div id="external-asset-preview" class="hidden"></div>
 
 
-    <!-- â•â•â• SUBMIT â•â•â• -->
+    <!-- ═══ SUBMIT ═══ -->
     <div class="submit-bar">
       <div>
         <span style="font-size:.75rem;color:var(--wht-f)">Your page will appear at: </span>
@@ -867,7 +867,7 @@ render.mount('submission-terminal');</pre>
     </div>
     </div>
 
-    <!-- â•â•â• MY SUBMISSIONS â•â•â• -->
+    <!-- ═══ MY SUBMISSIONS ═══ -->
     <div class="section" id="my-submissions-section">
       <div class="section-hd" id="my-submissions-heading">Your Pages</div>
       <div id="my-submissions">
@@ -879,10 +879,10 @@ render.mount('submission-terminal');</pre>
 
 </main>
 
-<!-- â•â•â• FOOTER â•â•â• -->
+<!-- ═══ FOOTER ═══ -->
 <footer class="ftr">
   <div class="ftr-in">
-    <p class="ftr-copy">&copy; 2026 Red Oaker Guild â€” Submission Terminal</p>
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Submission Terminal</p>
   </div>
 </footer>
 

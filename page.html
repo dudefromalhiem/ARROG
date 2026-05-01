@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Page â€” Red Oaker Guild</title>
+  <title>Page — Red Oaker Guild</title>
   <meta name="description" content="View a community-submitted page in the Red Oaker Guild archive." />
   <!-- SEO -->
   <meta name="robots" content="index, follow" />
@@ -11,13 +11,13 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Red Oaker Guild" />
-  <meta property="og:title" content="Anomaly File — Red Oaker Guild" />
+  <meta property="og:title" content="Anomaly File - Red Oaker Guild" />
   <meta property="og:description" content="View a classified anomaly file, tale, or artwork submitted to the Red Oaker Guild archive." />
   <meta property="og:url" content="https://redoakerguild.com/page" />
   <meta property="og:image" content="https://redoakerguild.com/logo.png" />
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Anomaly File — Red Oaker Guild" />
+  <meta name="twitter:title" content="Anomaly File - Red Oaker Guild" />
   <meta name="twitter:description" content="View a classified anomaly file, tale, or artwork submitted to the Red Oaker Guild archive." />
   <meta name="twitter:image" content="https://redoakerguild.com/logo.png" />
   <!-- Favicon -->
@@ -102,14 +102,14 @@
 </head>
 <body>
 
-<!-- â•â•â• HEADER â•â•â• -->
+<!-- ═══ HEADER ═══ -->
 <header class="hdr">
   <div class="hdr-in">
     <a href="index.html" class="hdr-brand">
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">â˜°</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -121,7 +121,7 @@
   </div>
 </header>
 
-<!-- â•â•â• MAIN CONTENT â•â•â• -->
+<!-- ═══ MAIN CONTENT ═══ -->
 <main class="wrap">
 
   <!-- Loading State -->
@@ -135,7 +135,7 @@
     <span id="breadcrumb-type" style="color:var(--red-b)">Page</span>
     <span>/</span>
     <span id="breadcrumb-title" style="color:var(--wht-m);font-weight:bold">Loading...</span>
-    <a href="explore.html" style="margin-left:auto;color:var(--red-b);text-decoration:none">â† Back to Explore</a>
+    <a href="explore.html" style="margin-left:auto;color:var(--red-b);text-decoration:none">← Back to Explore</a>
   </div>
     <pre class="load-monocode" aria-hidden="true">// ROG ARCHIVE FETCH
 const session = await gateway.open('page-viewer');
@@ -175,7 +175,7 @@ render.mount('archive-viewer');</pre>
   <div id="page-viewer" class="hidden">
     <div class="page-viewer-header">
       <div>
-        <div class="page-viewer-title" id="pv-title">â€”</div>
+        <div class="page-viewer-title" id="pv-title">—</div>
         <div class="page-viewer-meta">
           <span id="pv-type"></span>
           <span id="pv-author"></span>
@@ -194,14 +194,14 @@ render.mount('archive-viewer');</pre>
     <div class="upvote-content">
       <span class="upvote-eyebrow">Anomaly rating</span>
       <button class="upvote-button" id="upvote-btn" title="Upvote this anomaly page" onclick="toggleUpvote()">
-        <span>â–²</span>
+        <span>▲</span>
         <span>Upvote</span>
       </button>
       <span class="upvote-label">This anomaly has</span>
       <span class="upvote-count" id="upvote-count">0</span>
       <span class="upvote-label">upvotes</span>
     </div>
-    <a href="rankings.html" class="upvote-rank-link">View Rankings â†’</a>
+    <a href="rankings.html" class="upvote-rank-link">View Rankings →</a>
   </div>
 
   <section id="comments-section" class="section hidden comments-wrap">
@@ -289,7 +289,7 @@ render.mount('archive-viewer');</pre>
 
 </main>
 
-<!-- â•â•â• FOOTER â•â•â• -->
+<!-- ═══ FOOTER ═══ -->
 <footer class="ftr">
   <div class="ftr-in">
     <ul class="ftr-links">
@@ -297,7 +297,7 @@ render.mount('archive-viewer');</pre>
       <li><a href="submit.html">Submit Your Artwork</a></li>
     </ul>
     <p class="ftr-copy">
-      &copy; 2026 Red Oaker Guild â€” All rights reserved.<br>
+      &copy; 2026 Red Oaker Guild — All rights reserved.<br>
       <span id="page-clearance-banner" style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-2 CLEARANCE REQUIRED</span>
     </p>
   </div>
@@ -311,10 +311,10 @@ render.mount('archive-viewer');</pre>
 <script src="firebase-config.js"></script>
 <script src="seed-data.js"></script>
 <script>
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
- *  PAGE VIEWER â€” Renders approved pages in a sandboxed iframe
+/* ═══════════════════════════════════════════════════════════════
+ *  PAGE VIEWER — Renders approved pages in a sandboxed iframe
  *  Supports: ?id=<firestoreId>, ?slug=<slug>, or /pages/<slug>
- * â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+ * ═══════════════════════════════════════════════════════════════ */
 
 document.addEventListener('DOMContentLoaded', async () => {
   configureCommentsApiBase();
@@ -414,9 +414,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Update page title + meta
-    document.title = page.title + ' â€” Red Oaker Guild';
+    document.title = page.title + ' — Red Oaker Guild';
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.content = page.title + ' â€” ' + (page.type || 'Page') + ' in the Red Oaker Guild archive.';
+    if (metaDesc) metaDesc.content = page.title + ' — ' + (page.type || 'Page') + ' in the Red Oaker Guild archive.';
 
     // Fill metadata bar
     document.getElementById('pv-title').textContent = page.title;
@@ -432,7 +432,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const dateStr = page.approvedAt ? new Date(page.approvedAt.seconds * 1000).toLocaleDateString() :
-                    page.createdAt ? new Date(page.createdAt.seconds * 1000).toLocaleDateString() : 'â€”';
+                    page.createdAt ? new Date(page.createdAt.seconds * 1000).toLocaleDateString() : '—';
     document.getElementById('pv-date').textContent = dateStr;
 
     const tagsEl = document.getElementById('pv-tags');
@@ -785,10 +785,10 @@ async function saveCommentEdit() {
       input.style.borderColor = '';
     }
     updateCommentComposerMode();
-    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">âœ“</span> Comment updated.';
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">✓</span> Comment updated.';
     await loadCommentsForCurrentPage();
   } catch (err) {
-    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">âœ—</span> Save failed: ' + err.message;
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">✗</span> Save failed: ' + err.message;
   }
 }
 
@@ -1091,10 +1091,10 @@ async function submitComment() {
     if (mediaInput) mediaInput.value = '';
     updateCommentMediaSelection();
     clearCommentReplyTarget();
-    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">âœ“</span> Comment posted.';
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">✓</span> Comment posted.';
     await loadCommentsForCurrentPage();
   } catch (err) {
-    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">âœ—</span> Post failed: ' + err.message;
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">✗</span> Post failed: ' + err.message;
   }
 }
 
@@ -1126,9 +1126,9 @@ async function submitCommentReport() {
     if (!response.ok) throw new Error(data.error || 'Could not submit report.');
     if (reasonInput) reasonInput.value = '';
     closeCommentReportPanel();
-    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">âœ“</span> Report submitted for review.';
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:#32cd32">✓</span> Report submitted for review.';
   } catch (err) {
-    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">âœ—</span> Report failed: ' + err.message;
+    if (composeStatus) composeStatus.innerHTML = '<span style="color:var(--red-g)">✗</span> Report failed: ' + err.message;
   }
 }
 
@@ -1220,7 +1220,7 @@ function renderSocialSearchResults(users) {
     const selected = currentSocialUser && currentSocialUser.uid === user.uid ? ' on' : '';
     return '<button type="button" class="community-result' + selected + '" data-uid="' + escapeHtml(user.uid || '') + '" data-name="' + escapeHtml(user.displayName || '') + '" data-email="' + escapeHtml(user.email || '') + '" data-role="' + escapeHtml(user.role || 'user') + '" onclick="chooseSocialUser(this.dataset.uid, this.dataset.name, this.dataset.email, this.dataset.role)">' +
       '<div><strong>' + escapeHtml(user.displayName || 'Agent') + '</strong></div>' +
-      '<div class="community-meta">' + escapeHtml(user.email || '') + ' â€¢ ' + escapeHtml(user.role || 'user') + '</div>' +
+      '<div class="community-meta">' + escapeHtml(user.email || '') + ' • ' + escapeHtml(user.role || 'user') + '</div>' +
     '</button>';
   }).join('');
 }
@@ -1616,7 +1616,7 @@ function updateUpvoteUI() {
   if (section) section.classList.remove('hidden');
   if (btn) {
     btn.classList.toggle('upvoted', currentUserHasUpvoted);
-    btn.textContent = currentUserHasUpvoted ? 'â–² Upvoted' : 'â–² Upvote';
+    btn.textContent = currentUserHasUpvoted ? '▲ Upvoted' : '▲ Upvote';
   }
   if (count) count.textContent = String(currentUpvoteCount);
 }

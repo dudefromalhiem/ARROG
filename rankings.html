@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Anomaly Rankings â€” Red Oaker Guild</title>
+  <title>Anomaly Rankings — Red Oaker Guild</title>
   <meta name="description" content="Browse and rank all approved anomalies by upvote count, anomaly ID, and more." />
   <!-- SEO -->
   <meta name="robots" content="index, follow" />
@@ -11,13 +11,13 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Red Oaker Guild" />
-  <meta property="og:title" content="Anomaly Rankings — Red Oaker Guild" />
+  <meta property="og:title" content="Anomaly Rankings - Red Oaker Guild" />
   <meta property="og:description" content="Browse and rank all approved anomalies by upvote count, anomaly ID, and classification tier." />
   <meta property="og:url" content="https://redoakerguild.com/rankings" />
   <meta property="og:image" content="https://redoakerguild.com/logo.png" />
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Anomaly Rankings — Red Oaker Guild" />
+  <meta name="twitter:title" content="Anomaly Rankings - Red Oaker Guild" />
   <meta name="twitter:description" content="Browse and rank all approved anomalies by upvote count, anomaly ID, and classification tier." />
   <meta name="twitter:image" content="https://redoakerguild.com/logo.png" />
   <!-- Favicon -->
@@ -61,9 +61,9 @@
       cursor: pointer; user-select: none; transition: background .2s;
     }
     .rankings-table th:hover { background: var(--blk-c); }
-    .rankings-table th.sortable::after { content: ' â†•'; opacity: 0.5; }
-    .rankings-table th.sorted-asc::after { content: ' â†‘'; opacity: 1; color: var(--red-g); }
-    .rankings-table th.sorted-desc::after { content: ' â†“'; opacity: 1; color: var(--red-g); }
+    .rankings-table th.sortable::after { content: ' ↕'; opacity: 0.5; }
+    .rankings-table th.sorted-asc::after { content: ' ↑'; opacity: 1; color: var(--red-g); }
+    .rankings-table th.sorted-desc::after { content: ' ↓'; opacity: 1; color: var(--red-g); }
 
     .rankings-table td { 
       padding: 12px; border-bottom: 1px solid var(--blk-p); 
@@ -114,7 +114,7 @@
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">â˜°</button>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -202,15 +202,15 @@
 
   <!-- Pagination -->
   <div class="pagination" id="pagination" style="display:none">
-    <button id="prev-btn" onclick="previousPage()" disabled>â† Previous</button>
+    <button id="prev-btn" onclick="previousPage()" disabled>← Previous</button>
     <span class="page-info"><span id="current-page">1</span> / <span id="total-pages">1</span></span>
-    <button id="next-btn" onclick="nextPage()" disabled>Next â†’</button>
+    <button id="next-btn" onclick="nextPage()" disabled>Next →</button>
   </div>
 </main>
 
 <footer class="ftr" style="margin-top:60px">
   <div class="ftr-in">
-    <p class="ftr-copy">&copy; 2026 Red Oaker Guild â€” Anomaly Rankings</p>
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Anomaly Rankings</p>
   </div>
 </footer>
 
@@ -385,7 +385,7 @@ function renderTable() {
     tbody.innerHTML = pageItems.map((item, idx) => {
       const rank = start + idx + 1;
       const title = String(item.title || '[Untitled]');
-      const anomalyId = String(item.anomalyId || 'â€”');
+      const anomalyId = String(item.anomalyId || '—');
       const author = String(item.authorName || 'Unknown Agent');
       const upvotes = Number(item.upvoteCount || 0);
       const slug = String(item.slug || '');
@@ -394,7 +394,7 @@ function renderTable() {
       return `<tr>
         <td class="rank-number">#${rank}</td>
         <td><a href="${url}">${escapeHtml(title)}</a></td>
-        <td class="rank-upvotes">â–² ${upvotes}</td>
+        <td class="rank-upvotes">▲ ${upvotes}</td>
         <td><code style="font-size:.85rem">${escapeHtml(anomalyId)}</code></td>
         <td>${escapeHtml(author)}</td>
       </tr>`;
