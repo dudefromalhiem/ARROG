@@ -21,16 +21,49 @@ service cloud.firestore {
     }
 
     function isOwnerUser() {
-      return isSignedIn() && (isBootstrapOwner() || isOwnerFromRolesDoc());
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isOwner == true;
     }
 
-    function isAdminUser() {
-      return isSignedIn() && (
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true) ||
-        isBootstrapOwner() ||
-        isOwnerFromRolesDoc()
-      );
+    function getUserLevel() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.level
+        : 2; // Default to Guest level
+    }
+
+    function isContributorGranted() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.contributorGranted == true;
+    }
+
+    function canCreateEditPages() {
+      let level = getUserLevel();
+      let contributorGranted = isContributorGranted();
+      return isOwnerUser() ||
+             level == 6 || // Admin
+             level == 4 || // Contributor
+             (level == 5 && contributorGranted); // Moderator with explicit grant
+    }
+
+    function canModerate() {
+      let level = getUserLevel();
+      return isOwnerUser() || level >= 5; // Moderator or Admin
+    }
+
+    function canManageUsersRoles() {
+      let level = getUserLevel();
+      return isOwnerUser() || level == 6; // Admin
+    }
+
+    function canReadPublicContent() {
+      return true; // Everyone can read public content
+    }
+
+    function canInteractWithContent() {
+      let level = getUserLevel();
+      return isOwnerUser() || level >= 3; // User level or higher
     }
 
     function isSelf(userId) {
@@ -38,7 +71,7 @@ service cloud.firestore {
     }
 
     function maxClearanceForActor() {
-      return isOwnerUser() ? 6 : (isAdminUser() ? 5 : 4);
+      return isOwnerUser() ? 6 : (getUserLevel() >= 6 ? 5 : (getUserLevel() >= 5 ? 4 : 3));
     }
 
     function hasValidRequestedClearance() {
@@ -78,71 +111,94 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isAdminUser() || isSelf(userId);
-      allow create: if (isAdminUser() || isSelf(userId)) &&
-        !request.resource.data.keys().hasAny(['isAdmin']) &&
+      // Allow reads for users who can manage users/roles, or self
+      allow read: if canManageUsersRoles() || isSelf(userId);
+      // Allow create for self (registration) or admins
+      allow create: if (canManageUsersRoles() || isSelf(userId)) &&
+        !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
         hasSafeDisplayName();
-      allow update: if (isAdminUser() && hasSafeDisplayName()) ||
+      // Allow updates: admins can update everything, users can update safe fields only
+      allow update: if canManageUsersRoles() ||
         (isSelf(userId) &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']) &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
          hasSafeDisplayName());
-      allow delete: if isAdminUser();
+      allow delete: if canManageUsersRoles();
     }
 
     match /pages/{pageId} {
-      // Allow reads for admins, approved pages, or pages without a status field (legacy/seed pages)
-      allow read: if isAdminUser() || resource.data.status == 'approved' || !('status' in resource.data);
-      allow create, update: if isAdminUser() && requestedClearanceWithinLimit();
-      allow delete: if isAdminUser();
+      // Allow reads for everyone (public content)
+      allow read: if canReadPublicContent();
+      // Allow create/edit for contributors, admins, or explicitly granted moderators
+      allow create, update: if canCreateEditPages() && requestedClearanceWithinLimit();
+      allow delete: if canModerate();
 
       // Upvotes subcollection - allow users to upvote/unvote anomalies via the API
       match /upvotes/{userId} {
-        allow read: if isAdminUser() || (isSignedIn() && request.auth.uid == userId);
-        allow create, delete: if isSignedIn() && request.auth.uid == userId;
+        allow read: if canManageUsersRoles() || (isSignedIn() && request.auth.uid == userId);
+        allow create, delete: if canInteractWithContent() && request.auth.uid == userId;
         allow update: if false;
       }
     }
 
     match /submissions/{subId} {
-      allow create: if isSignedIn() &&
+      allow create: if canInteractWithContent() &&
         request.resource.data.authorUid == request.auth.uid &&
         (request.resource.data.status == 'pending' || request.resource.data.status == 'draft') &&
         requestedClearanceWithinLimit();
-      allow read: if isAdminUser() || (isSignedIn() && resource.data.authorUid == request.auth.uid);
+      allow read: if canModerate() || (isSignedIn() && resource.data.authorUid == request.auth.uid);
       // Allow the original author to update their own draft submissions
-      allow update: if (isAdminUser() && requestedClearanceWithinLimit()) ||
-        (isSignedIn() &&
+      allow update: if (canModerate() && requestedClearanceWithinLimit()) ||
+        (canInteractWithContent() &&
          resource.data.authorUid == request.auth.uid &&
          resource.data.status == 'draft' &&
          request.resource.data.status == 'draft' &&
          requestedClearanceWithinLimit());
-      allow delete: if isAdminUser();
+      allow delete: if canModerate();
     }
 
     match /artworks/{artworkId} {
-      allow read: if true;
-      allow create, update, delete: if isAdminUser();
+      allow read: if canReadPublicContent();
+      allow create, update, delete: if canModerate();
     }
 
     match /news/{newsId} {
-      allow read: if true;
-      allow create, update, delete: if isAdminUser();
+      allow read: if canReadPublicContent();
+      allow create, update, delete: if canModerate();
     }
 
     match /config/{docId} {
       // All signed-in users can read config (needed for role resolution and ESD state)
       allow read: if isSignedIn();
-      allow write: if isAdminUser();
+      allow write: if canManageUsersRoles();
     }
 
     match /submissions_meta/{uid} {
-      allow read, write: if isAdminUser();
+      allow read, write: if canModerate();
     }
 
     match /legacySheets/{sheetId} {
-      allow read: if true;
-      // Owner can always write. Admins can write ONLY if the owner has delegated this permission.
-      allow create, update, delete: if isOwnerUser() || adminHasDelegation('adminCanEditLegacy');
+      allow read: if canReadPublicContent();
+      // Owner can always write. Moderators and admins can write if owner has delegated this permission.
+      allow create, update, delete: if isOwnerUser() || (canModerate() && adminHasDelegation('adminCanEditLegacy'));
+    }
+
+    // Reports collections - only moderators/admins can read, signed-in users can create
+    match /commentReports/{reportId} {
+      allow read: if canModerate();
+      allow create: if canInteractWithContent();
+      allow update, delete: if false;
+    }
+
+    match /dmReports/{reportId} {
+      allow read: if canModerate();
+      allow create: if canInteractWithContent();
+      allow update, delete: if false;
+    }
+
+    match /pageReports/{reportId} {
+      allow read: if canModerate();
+      allow create: if canInteractWithContent();
+      allow update, delete: if false;
     }
   }
 }

@@ -363,12 +363,21 @@ function showClearanceWelcome(role) {
     lineHeight: '1.6'
   });
 
+  const roleHierarchy = `Role Hierarchy (low → high):
+• Level 2: Guest - View content only
+• Level 3: User - View + comment + interact
+• Level 4: Contributor - Level 3 + create/edit pages
+• Level 5: Moderator - Level 3 + monitor + moderate
+• Level 6: Admin - ALL permissions + manage users/roles
+• Owner: Absolute control above Level 6`;
+
   const welcomeMessage = role === 'guest' ? 'Welcome, Observer' : 'Welcome, Authorized Personnel';
   box.innerHTML =
     `<div style="font-size:clamp(10px,1.2vw,14px);color:rgba(255,255,255,0.4);letter-spacing:4px;margin-bottom:16px;">RED OAKER GUILD // SECURE TERMINAL</div>` +
     `<div style="font-size:clamp(22px,3vw,48px);font-weight:bold;letter-spacing:6px;margin-bottom:8px;">LEVEL ${level}</div>` +
     `<div style="font-size:clamp(14px,2vw,28px);letter-spacing:3px;">CLEARANCE GRANTED</div>` +
-    `<div style="margin-top:20px;font-size:clamp(10px,1.2vw,16px);color:rgba(255,255,255,0.5);">${welcomeMessage}</div>`;
+    `<div style="margin-top:20px;font-size:clamp(10px,1.2vw,16px);color:rgba(255,255,255,0.5);">${welcomeMessage}</div>` +
+    `<div style="margin-top:24px;font-size:clamp(8px,0.8vw,12px);color:rgba(255,255,255,0.3);text-align:left;max-width:400px;margin-left:auto;margin-right:auto;">${roleHierarchy.replace(/\n/g, '<br>')}</div>`;
 
   overlay.appendChild(box);
   document.body.appendChild(overlay);

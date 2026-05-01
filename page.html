@@ -184,7 +184,10 @@ render.mount('archive-viewer');</pre>
           <span id="pv-date"></span>
         </div>
       </div>
-      <div id="pv-tags" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+        <div id="pv-tags" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+        <button id="pv-report-btn" class="btn btn-s hidden" onclick="reportCurrentPage()" style="font-size:.7rem;padding:4px 8px;">Report Page</button>
+      </div>
     </div>
     <iframe class="page-viewer-frame" id="pv-frame" sandbox="allow-same-origin" title="Page content"></iframe>
     <div id="pv-actions" class="tc hidden" style="margin-top:24px;"></div>
@@ -544,6 +547,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             <button class="btn btn-s" onclick="confirmEditDocument('${editHref}')">>> Edit Document</button>
             <button class="btn btn-d" onclick="confirmDeleteDocument()">Delete Document</button>
           </div>`;
+      } else {
+        actionsDiv.classList.add('hidden');
+      }
+
+      // Show report button for authenticated users
+      const reportBtn = document.getElementById('pv-report-btn');
+      if (reportBtn) {
+        reportBtn.classList.toggle('hidden', !user);
       }
     } else {
       const composeStatus = document.getElementById('comment-compose-status');
@@ -1639,7 +1650,7 @@ async function triggerSyncIfSeed(pageData) {
   const syncKey = `synced_${pageData.slug}`;
   if (sessionStorage.getItem(syncKey)) return;
 
-  console.log('[Sync] Initializing seed page in database:', pageData.slug);
+  if (window.rogLogger) rogLogger.info('[Sync] Initializing seed page in database:', pageData.slug);
   try {
     const res = await fetch('/api/sync-seed', {
       method: 'POST',
@@ -1648,14 +1659,14 @@ async function triggerSyncIfSeed(pageData) {
     });
     const result = await res.json();
     if (result.ok) {
-      console.log('[Sync] Success. Page ID:', result.id);
+      if (window.rogLogger) rogLogger.info('[Sync] Success. Page ID:', result.id);
       window.__pageId = result.id;
       sessionStorage.setItem(syncKey, 'true');
       // Refresh upvote UI now that we have an ID
       loadUpvoteStatus();
     }
   } catch (err) {
-    console.error('[Sync] Failed to initialize page:', err);
+    if (window.rogLogger) rogLogger.error('[Sync] Failed to initialize page:', err);
   }
 }
 
@@ -1992,6 +2003,49 @@ function repairDocumentImagesWithUploads(html, imageUrls) {
   });
 
   return wrapper.innerHTML;
+}
+
+async function reportCurrentPage() {
+  if (!currentCommentUser) {
+    alert('Sign in to report pages.');
+    return;
+  }
+
+  const pageTitle = String(window.__pageTitle || document.title || '').trim();
+  const pageId = String(window.__pageDocId || '').trim();
+  const pageSlug = String(window.__pageSlug || '').trim();
+
+  if (!pageId && !pageSlug) {
+    alert('This page cannot be reported.');
+    return;
+  }
+
+  const reason = prompt('Reason for reporting this page:', '');
+  if (reason === null) return;
+  const trimmed = String(reason || '').trim();
+  if (!trimmed) {
+    alert('Report cancelled.');
+    return;
+  }
+
+  try {
+    const response = await fetch(socialApiBase, {
+      method: 'POST',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({
+        action: 'reportpage',
+        pageId,
+        pageSlug,
+        pageTitle,
+        reason: trimmed
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not submit report.');
+    alert('Page report submitted.');
+  } catch (err) {
+    alert('Report failed: ' + err.message);
+  }
 }
 </script>
 </body>

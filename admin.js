@@ -7,21 +7,114 @@ let activeTab = 'pages';
 let adminArtworkUploadUrl = '';
 let adminNewsImageUrl = '';
 let currentUserIsAdminFlag = false;
+let currentUserDoc = null;
+
+// Permission system functions (client-side)
+const PERMISSIONS = {
+  viewContent: { level: 2, description: 'View public content' },
+  comment: { level: 3, description: 'Post comments and interact with content' },
+  interact: { level: 3, description: 'Like, share, and engage with content' },
+  createPages: { level: 4, description: 'Create new pages and content' },
+  editOwnPages: { level: 4, description: 'Edit pages they created' },
+  monitorActivity: { level: 5, description: 'Monitor user activity and reports' },
+  handleViolations: { level: 5, description: 'Review and handle reported violations' },
+  moderateUsers: { level: 5, description: 'Moderate user accounts and content' },
+  moderateContent: { level: 5, description: 'Delete, hide, or modify inappropriate content' },
+  manageUsers: { level: 6, description: 'Create, modify, and delete user accounts' },
+  manageRoles: { level: 6, description: 'Assign and modify user roles and permissions' },
+  manageContent: { level: 6, description: 'Full content management and system administration' },
+  systemAdmin: { level: 6, description: 'System configuration and maintenance' }
+};
+
+function getPermissions(userDoc) {
+  if (!userDoc) {
+    return getPermissionsForLevel(2);
+  }
+
+  const level = userDoc.level || 2;
+  const isOwner = userDoc.isOwner === true;
+  const contributorGranted = userDoc.contributorGranted === true;
+
+  if (isOwner) {
+    return getAllPermissions();
+  }
+
+  let permissions = {};
+
+  if (level >= 2) permissions = { ...permissions, ...getPermissionsForLevel(2) };
+  if (level >= 3) permissions = { ...permissions, ...getPermissionsForLevel(3) };
+
+  if (level === 4 || level === 6 || (level === 5 && contributorGranted)) {
+    permissions = { ...permissions, ...getPermissionsForLevel(4) };
+  }
+
+  if (level >= 5) permissions = { ...permissions, ...getPermissionsForLevel(5) };
+  if (level >= 6) permissions = { ...permissions, ...getPermissionsForLevel(6) };
+
+  return permissions;
+}
+
+function getPermissionsForLevel(level) {
+  const permissions = {};
+  Object.keys(PERMISSIONS).forEach(permKey => {
+    if (PERMISSIONS[permKey].level <= level) {
+      permissions[permKey] = true;
+    }
+  });
+  return permissions;
+}
+
+function getAllPermissions() {
+  const permissions = {};
+  Object.keys(PERMISSIONS).forEach(permKey => {
+    permissions[permKey] = true;
+  });
+  return permissions;
+}
+
+function hasPermission(userDoc, permission) {
+  const permissions = getPermissions(userDoc);
+  return permissions[permission] === true;
+}
+
+function getRoleDisplayName(userDoc) {
+  if (!userDoc) return 'Guest';
+
+  if (userDoc.isOwner) return 'Owner';
+
+  const level = userDoc.level || 2;
+  const roleName = userDoc.roleName || '';
+
+  if (roleName) return roleName;
+
+  const hierarchy = {
+    2: 'Guest',
+    3: 'User',
+    4: 'Contributor',
+    5: 'Moderator',
+    6: 'Admin'
+  };
+
+  return hierarchy[level] || 'Unknown';
+}
 
 function getCurrentRole() {
-  return resolveRole(auth.currentUser?.email || '');
+  return getRoleDisplayName(currentUserDoc);
 }
 
 function isModOnlyRole() {
-  return getCurrentRole() === 'mod';
+  const userDoc = currentUserDoc || {};
+  return (userDoc.level || 2) < 6 && !userDoc.isOwner;
 }
 
 function canModerateSubmissions() {
-  return currentUserIsAdminFlag;
+  const userDoc = currentUserDoc || {};
+  return hasPermission(userDoc, 'moderateContent');
 }
 
 function canDeleteManagedContent() {
-  return currentUserIsAdminFlag;
+  const userDoc = currentUserDoc || {};
+  return hasPermission(userDoc, 'moderateContent');
 }
 
 function isGuideType(type) {
@@ -29,7 +122,8 @@ function isGuideType(type) {
 }
 
 function canManageGuidePages() {
-  return isOwner(auth.currentUser?.email) || adminHasDelegation(auth.currentUser?.email, 'adminCanManageGuides');
+  const userDoc = currentUserDoc || {};
+  return userDoc.isOwner || hasPermission(userDoc, 'manageContent');
 }
 
 function toDataUrl(file) {
@@ -101,7 +195,7 @@ async function optimizeImageToDataUrl(file, maxDim = 1280, maxBytes = 250 * 1024
   return dataUrl;
 }
 
-function applyTabVisibilityForRole(role, hasAdminAccess = false) {
+function applyTabVisibilityForRole(userDoc, hasAdminAccess = false) {
   const pagesTab = document.getElementById('tab-pages');
   const submissionsTab = document.getElementById('tab-submissions');
   const artworksTab = document.getElementById('tab-artworks');
@@ -111,7 +205,7 @@ function applyTabVisibilityForRole(role, hasAdminAccess = false) {
   const rolesTab = document.getElementById('tab-roles');
   const configTab = document.getElementById('tab-config');
 
-  const isModOnly = role === 'mod';
+  const isModOnly = (userDoc?.level || 2) < 6 && !userDoc?.isOwner;
 
   if (pagesTab) pagesTab.classList.toggle('hidden', isModOnly);
   if (submissionsTab) submissionsTab.classList.remove('hidden');
@@ -121,7 +215,7 @@ function applyTabVisibilityForRole(role, hasAdminAccess = false) {
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
   if (usersTab) usersTab.classList.toggle('hidden', !hasAdminAccess);
-  if (rolesTab) rolesTab.classList.toggle('hidden', !(isOwner(auth.currentUser?.email) || adminHasDelegation(auth.currentUser?.email, 'adminCanManageRoles')));
+  if (rolesTab) rolesTab.classList.toggle('hidden', !hasPermission(userDoc, 'manageRoles'));
 
   if (isModOnly && activeTab !== 'submissions') {
     activeTab = 'submissions';
@@ -146,49 +240,68 @@ async function renderAdminBootstrap(user) {
     adminPanel.style.display = 'none';
     adminInfo.textContent = '';
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    currentUserDoc = null;
     return;
   }
 
-  const role = resolveRole(user.email);
-  const isAdminUser = await getUserAdminFlag(user);
-  currentUserIsAdminFlag = isAdminUser;
-  if (!isAdminUser) {
+  try {
+    // Load user document from Firestore
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    currentUserDoc = userDoc.exists ? userDoc.data() : null;
+
+    // Check if user has admin permissions
+    const isAdminUser = hasPermission(currentUserDoc, 'manageUsers') || hasPermission(currentUserDoc, 'manageRoles') || hasPermission(currentUserDoc, 'systemAdmin');
+    currentUserIsAdminFlag = isAdminUser;
+
+    if (!isAdminUser) {
+      adminLoading.classList.add('hidden');
+      adminDenied.classList.remove('hidden');
+      adminDenied.style.display = 'block';
+      adminDenied.querySelector('.section-hd').textContent = 'Insufficient Clearance';
+      adminDenied.querySelector('p').innerHTML = `Your account does not have admin privileges. Contact the Guild Owner.`;
+      adminPanel.classList.add('hidden');
+      adminPanel.style.display = 'none';
+      navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
+      return;
+    }
+
+    adminDenied.classList.add('hidden');
+    adminDenied.style.display = 'none';
+    adminPanel.classList.remove('hidden');
+    adminPanel.style.display = 'block';
+    adminLoading.classList.add('hidden');
+
+    const displayLabel = user.displayName || 'Agent';
+    const roleDisplayName = getRoleDisplayName(currentUserDoc);
+    const level = currentUserDoc?.level || 2;
+
+    adminInfo.innerHTML =
+      `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Role: <span style="color:var(--red-b);text-transform:uppercase">${roleDisplayName}</span> (Level ${level})
+       <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
+    navAuth.innerHTML = renderUserMenuHTML(displayLabel);
+    applyTabVisibilityForRole(currentUserDoc, isAdminUser);
+
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('editId');
+    const editSlug = params.get('editSlug');
+    if (editId && !isModOnlyRole()) {
+      window.location.href = 'submit.html?editId=' + encodeURIComponent(editId);
+      return;
+    } else if (editSlug && !isModOnlyRole()) {
+      window.location.href = 'submit.html?editSlug=' + encodeURIComponent(editSlug);
+      return;
+    }
+
+    loadTab();
+  } catch (error) {
+    console.error('Error loading user document:', error);
     adminLoading.classList.add('hidden');
     adminDenied.classList.remove('hidden');
     adminDenied.style.display = 'block';
-    adminDenied.querySelector('.section-hd').textContent = 'Insufficient Clearance';
-    adminDenied.querySelector('p').innerHTML = `Your account does not have admin privileges. Contact the Guild Owner.`;
-    adminPanel.classList.add('hidden');
-    adminPanel.style.display = 'none';
-    navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
-    return;
+    adminDenied.querySelector('.section-hd').textContent = 'Access Denied';
+    adminDenied.querySelector('p').innerHTML = 'Error loading user permissions. Please try again.';
+    currentUserDoc = null;
   }
-
-  adminDenied.classList.add('hidden');
-  adminDenied.style.display = 'none';
-  adminPanel.classList.remove('hidden');
-  adminPanel.style.display = 'block';
-  adminLoading.classList.add('hidden');
-  const displayLabel = user.displayName || 'Agent';
-  const clearanceLevel = clearanceLevelForRole(role);
-  adminInfo.innerHTML =
-    `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Clearance: <span style="color:var(--red-b);text-transform:uppercase">${role}</span> (Level ${clearanceLevel})
-     <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
-  navAuth.innerHTML = renderUserMenuHTML(displayLabel);
-  applyTabVisibilityForRole(role, isAdminUser);
-
-  const params = new URLSearchParams(window.location.search);
-  const editId = params.get('editId');
-  const editSlug = params.get('editSlug');
-  if (editId && !isModOnlyRole()) {
-    window.location.href = 'submit.html?editId=' + encodeURIComponent(editId);
-    return;
-  } else if (editSlug && !isModOnlyRole()) {
-    window.location.href = 'submit.html?editSlug=' + encodeURIComponent(editSlug);
-    return;
-  }
-
-  loadTab();
 }
 
 auth.onAuthStateChanged(async user => {
@@ -279,9 +392,10 @@ async function loadReports(container) {
   container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading report queues...</p>';
 
   try {
-    const [commentSnap, dmSnap] = await Promise.all([
+    const [commentSnap, dmSnap, pageSnap] = await Promise.all([
       db.collection('commentReports').orderBy('createdAt', 'desc').limit(200).get(),
-      db.collection('dmReports').orderBy('createdAt', 'desc').limit(200).get()
+      db.collection('dmReports').orderBy('createdAt', 'desc').limit(200).get(),
+      db.collection('pageReports').orderBy('createdAt', 'desc').limit(200).get()
     ]);
 
     const rows = [];
@@ -311,6 +425,19 @@ async function loadReports(container) {
         createdAt: data.createdAt && data.createdAt.seconds ? data.createdAt.seconds : 0
       });
     });
+    pageSnap.docs.forEach(doc => {
+      const data = doc.data() || {};
+      rows.push({
+        id: doc.id,
+        type: 'Page',
+        reporter: data.reporterName || data.reporterEmail || 'Unknown',
+        reported: data.pageTitle || data.pageSlug || 'Unknown Page',
+        content: data.pageSlug ? `/${data.pageSlug}` : `(ID: ${data.pageId})`,
+        reason: data.reason || '',
+        status: data.status || 'open',
+        createdAt: data.createdAt && data.createdAt.seconds ? data.createdAt.seconds : 0
+      });
+    });
 
     rows.sort((a, b) => b.createdAt - a.createdAt);
     if (!rows.length) {
@@ -320,10 +447,10 @@ async function loadReports(container) {
 
     container.innerHTML = [
       '<h3 style="margin-bottom:16px">Moderation Reports</h3>',
-      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Review reported comments and direct messages. This segment is admin-only.</p>',
+      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Review reported comments, direct messages, and pages. This segment is admin-only.</p>',
       '<div style="overflow:auto;border:1px solid var(--blk-m)">',
       '<table style="width:100%;border-collapse:collapse;font-size:.8rem">',
-      '<thead><tr style="background:rgba(139,0,0,.16)"><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Type</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reporter</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reported User</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reported Content</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reason</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Status</th></tr></thead>',
+      '<thead><tr style="background:rgba(139,0,0,.16)"><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Type</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reporter</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reported Item</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Content/Link</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reason</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Status</th></tr></thead>',
       '<tbody>',
       rows.map(row => {
         return '<tr>' +
@@ -1548,9 +1675,9 @@ async function refreshUsers() {
     if (snap.empty) { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>'; return; }
     tbody.innerHTML = snap.docs.map(d => {
       const u = d.data();
-      const showEmail = isOwner(auth.currentUser?.email) ? (u.email || '[Not Set]') : '[Redacted]';
-      const liveRole = u.email ? resolveRole(u.email) : (u.role || 'user');
-      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${liveRole}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
+      const showEmail = hasPermission(currentUserDoc, 'manageUsers') ? (u.email || '[Not Set]') : '[Redacted]';
+      const roleDisplayName = getRoleDisplayName(u);
+      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${roleDisplayName}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
     }).join('');
   } catch { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
 }

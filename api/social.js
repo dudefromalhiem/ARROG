@@ -521,6 +521,43 @@ async function reportMessage(db, actor, body) {
   return { statusCode: 200, payload: { ok: true } };
 }
 
+async function reportPage(db, actor, body) {
+  const pageId = normalizeText(body.pageId || '', 128);
+  const pageSlug = normalizeText(body.pageSlug || '', 256);
+  const pageTitle = normalizeText(body.pageTitle || '', 256);
+  const reason = normalizeText(body.reason || '', 500);
+  if (!pageId && !pageSlug) {
+    return { statusCode: 400, payload: { error: 'Missing page identifier.' } };
+  }
+  if (!reason) {
+    return { statusCode: 400, payload: { error: 'Report reason cannot be empty.' } };
+  }
+
+  // Get page data if we have pageId
+  let pageData = {};
+  if (pageId) {
+    const pageDoc = await db.collection('pages').doc(pageId).get();
+    if (pageDoc.exists) {
+      pageData = pageDoc.data() || {};
+    }
+  }
+
+  await db.collection('pageReports').add({
+    pageId: pageId || '',
+    pageSlug: pageSlug || pageData.slug || '',
+    pageTitle: pageTitle || pageData.title || '',
+    reason,
+    reporterUid: actor.uid,
+    reporterEmail: actor.email,
+    reporterName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
+    status: 'open',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  return { statusCode: 200, payload: { ok: true } };
+}
+
 module.exports = async function handler(req, res) {
   try {
     const app = initAdmin();
@@ -585,6 +622,11 @@ module.exports = async function handler(req, res) {
 
       if (action === 'reportmessage') {
         const result = await reportMessage(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'reportpage') {
+        const result = await reportPage(db, actor, body);
         return sendJson(res, result.statusCode, result.payload);
       }
 

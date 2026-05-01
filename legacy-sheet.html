@@ -1176,9 +1176,9 @@
       toggleLegacyEditor(false);
       statusEl.textContent = 'Legacy sheet updated.';
       alert('Legacy sheet saved successfully.');
-      console.log('Legacy sheet saved by:', auth.currentUser.email);
+      if (window.rogLogger) rogLogger.info('Legacy sheet saved by:', auth.currentUser.email);
     } catch (err) {
-      console.error('Save error:', err);
+      if (window.rogLogger) rogLogger.error('Save error:', err);
       statusEl.textContent = 'Save failed: ' + err.code;
       if (err.code === 'permission-denied') {
         alert('Permission denied. Try signing out and signing back in.');
@@ -1239,11 +1239,11 @@
       try { 
         if (typeof rolesReady !== 'undefined') await rolesReady; 
       } catch (_err) { 
-        console.warn('Could not wait for rolesReady:', _err);
+        if (window.rogLogger) rogLogger.warn('Could not wait for rolesReady:', _err);
       }
       
       ownerCanEdit = _legacyUserCheck(user);
-      console.log('Legacy Sheet Auth Check:', { 
+      if (window.rogLogger) rogLogger.debug('Legacy Sheet Auth Check:', { 
         userEmail: user.email, 
         ownerCanEdit, 
         isOwnerFunction: typeof isOwner === 'function' ? 'available' : 'not available',

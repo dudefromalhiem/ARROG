@@ -3322,7 +3322,7 @@ function createUploadTask(ref, file, onProgress, onTaskCreated) {
 
 async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
   const buckets = getStorageBucketCandidates();
-  console.log('[uploadWithBucketFallback] Buckets to try:', buckets);
+  if (window.rogLogger) rogLogger.debug('[uploadWithBucketFallback] Buckets to try:', buckets);
   const retryable = new Set([
     'storage/retry-limit-exceeded',
     'storage/network-request-failed',
@@ -3345,12 +3345,12 @@ async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
     }
 
     const bucket = attempts[i];
-    console.log('[uploadWithBucketFallback] Attempt', i, 'bucket:', bucket || '(default)');
+    if (window.rogLogger) rogLogger.debug('[uploadWithBucketFallback] Attempt', i, 'bucket:', bucket || '(default)');
     let ref;
     try {
       ref = bucket ? getStorageRef(path, bucket) : getStorageRef(path);
     } catch (initErr) {
-      console.error('[uploadWithBucketFallback] Ref init failed:', initErr);
+      if (window.rogLogger) rogLogger.error('[uploadWithBucketFallback] Ref init failed:', initErr);
       errors.push(initErr);
       continue;
     }
@@ -3359,7 +3359,7 @@ async function uploadWithBucketFallback(path, file, uploadRecord, setProgress) {
       const { url } = await createUploadTask(ref, file, setProgress, task => {
         uploadRecord.task = task;
       });
-      console.log('[uploadWithBucketFallback] Upload succeeded');
+      if (window.rogLogger) rogLogger.info('[uploadWithBucketFallback] Upload succeeded');
       return url;
     } catch (err) {
       const code = err && err.code ? err.code : '';
