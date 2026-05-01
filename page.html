@@ -442,10 +442,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       pvAuthor.textContent = 'by ' + authorDisplay;
     }
 
+    const pvApproved = document.getElementById('pv-approved');
     if (page.approvedBy) {
-      document.getElementById('pv-approved').innerHTML = ` <span style="color:var(--wht-d)">|</span> Approved by: <span style="color:var(--red-b)">${escapeCommentHtml(page.approvedBy)}</span> <span style="color:var(--wht-d)">|</span> `;
+      const approvedDisplay = escapeCommentHtml(page.approvedBy);
+      let approvedLink = '<span style="color:var(--red-b)">' + approvedDisplay + '</span>';
+      
+      if (page.approvedByUid) {
+        approvedLink = '<a href="profile.html?uid=' + encodeURIComponent(page.approvedByUid) + '" style="color:var(--red-b);text-decoration:none;">' + approvedDisplay + '</a>';
+      }
+      
+      pvApproved.innerHTML = ` <span style="color:var(--wht-d)">|</span> Approved by: ${approvedLink} <span style="color:var(--wht-d)">|</span> `;
+
+      if (page.approvedByUid) {
+        // Async fetch the latest displayName
+        db.collection('users').doc(page.approvedByUid).get().then(userDoc => {
+          if (userDoc.exists && userDoc.data() && userDoc.data().displayName) {
+            const liveName = escapeCommentHtml(userDoc.data().displayName);
+            const liveLink = '<a href="profile.html?uid=' + encodeURIComponent(page.approvedByUid) + '" style="color:var(--red-b);text-decoration:none;">' + liveName + '</a>';
+            pvApproved.innerHTML = ` <span style="color:var(--wht-d)">|</span> Approved by: ${liveLink} <span style="color:var(--wht-d)">|</span> `;
+          }
+        }).catch(err => console.warn('Could not fetch live approver name:', err));
+      }
     } else {
-      document.getElementById('pv-approved').innerHTML = ' <span style="color:var(--wht-d)">|</span> ';
+      pvApproved.innerHTML = ' <span style="color:var(--wht-d)">|</span> ';
     }
 
     const dateStr = page.approvedAt ? new Date(page.approvedAt.seconds * 1000).toLocaleDateString() :

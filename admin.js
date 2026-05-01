@@ -1042,6 +1042,7 @@ async function approveSubmission(id) {
       authorEmail: s.authorEmail,
       authorName: s.authorName || '',
       approvedBy: reviewer ? (reviewer.displayName || 'Admin') : 'Admin',
+      approvedByUid: reviewer ? reviewer.uid : null,
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdAt: s.submittedAt || firebase.firestore.FieldValue.serverTimestamp(),
       featured: false,
