@@ -3422,3 +3422,207 @@ body::after {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   2026 Refinement Pass: Editorial + Operational Polish
+   ============================================================ */
+.intro {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(204, 0, 0, 0.38);
+  background:
+    linear-gradient(140deg, rgba(204, 0, 0, 0.06), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+}
+
+.intro::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 28%, rgba(255, 255, 255, 0.08) 50%, transparent 72%);
+  transform: translateX(-140%);
+  animation: introSweep 5.8s ease-in-out infinite;
+}
+
+.intro-logo {
+  filter: drop-shadow(0 0 14px rgba(204, 0, 0, 0.35));
+  animation: logoDrift 4.6s ease-in-out infinite;
+}
+
+.legacy-block,
+.warn,
+.create-cta {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.legacy-block::after,
+.warn::after,
+.create-cta::after {
+  content: "";
+  position: absolute;
+  inset: auto -30% -65% -30%;
+  height: 160px;
+  background: radial-gradient(circle at center, rgba(204, 0, 0, 0.2), transparent 65%);
+  pointer-events: none;
+}
+
+.warn {
+  box-shadow: 0 16px 36px rgba(0,0,0,.45), 0 0 0 1px rgba(204,0,0,.16);
+}
+
+.section-hd {
+  position: relative;
+}
+
+.section-hd::after {
+  content: "";
+  display: block;
+  width: 54px;
+  height: 2px;
+  margin-top: 8px;
+  background: linear-gradient(90deg, var(--red-b), transparent);
+}
+
+.card-t {
+  letter-spacing: 1.4px;
+}
+
+.card-b {
+  color: #bdbdbd;
+}
+
+#featured-grid .card,
+#top-rated-grid .card,
+#newest-feed .newest-row,
+#news-feed .news-item {
+  position: relative;
+}
+
+#featured-grid .card::before,
+#top-rated-grid .card::before,
+#news-feed .news-item::before,
+#newest-feed .newest-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid transparent;
+  transition: border-color .24s ease;
+}
+
+#featured-grid .card:hover::before,
+#top-rated-grid .card:hover::before,
+#news-feed .news-item:hover::before,
+#newest-feed .newest-row:hover::before {
+  border-color: rgba(204, 0, 0, 0.35);
+}
+
+.carousel {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+}
+
+.carousel-slide img {
+  transition: transform .9s ease, filter .3s ease;
+}
+
+.carousel-slide a:hover img {
+  transform: scale(1.035);
+  filter: saturate(1.12) contrast(1.02);
+}
+
+.carousel-dot {
+  box-shadow: 0 0 0 1px rgba(255,255,255,.16);
+}
+
+.carousel-dot.on {
+  box-shadow: 0 0 0 1px rgba(204,0,0,.35), 0 0 10px rgba(204,0,0,.45);
+}
+
+/* Operational shells */
+.adm-main,
+.msg-main,
+.profile-card {
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+}
+
+.adm-tbl th {
+  letter-spacing: .9px;
+  text-transform: uppercase;
+  font-size: .75rem;
+}
+
+.adm-tbl tr {
+  transition: background-color .18s ease;
+}
+
+.msg-sidebar,
+.msg-main {
+  backdrop-filter: blur(6px);
+}
+
+.msg-chat-header {
+  border-bottom-color: rgba(255,255,255,.1);
+}
+
+.msg-item.active {
+  box-shadow: 0 0 0 1px rgba(204, 0, 0, .32), 0 0 14px rgba(204, 0, 0, .18);
+}
+
+.msg-input,
+.fi,
+.fse,
+.fta {
+  border-radius: 8px;
+}
+
+.msg-input:focus,
+.fi:focus,
+.fse:focus,
+.fta:focus {
+  box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.22);
+}
+
+.profile-avatar {
+  box-shadow: 0 0 0 2px rgba(255,255,255,.06), 0 0 18px rgba(204,0,0,.25);
+}
+
+/* Micro-motion utility */
+.lift-on-hover {
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.lift-on-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+}
+
+@keyframes introSweep {
+  0%, 100% { transform: translateX(-140%); opacity: 0; }
+  16% { opacity: 0.55; }
+  52% { opacity: 0.2; }
+  70% { transform: translateX(140%); opacity: 0; }
+}
+
+@keyframes logoDrift {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@media (max-width: 980px) {
+  .intro,
+  .legacy-block,
+  .warn,
+  .create-cta,
+  .section {
+    border-radius: 10px;
+  }
+
+  .section-hd::after {
+    width: 44px;
+  }
+}
