@@ -1,11 +1,29 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Guild Archives — Red Oaker Guild</title>
+  <title>Guild Archives â€” Red Oaker Guild</title>
   <meta name="description" content="Official Red Oaker Guild archives: Archon lineage, MRD units, and threat classifications." />
-  <link rel="icon" href="favicon.ico" />
+  <!-- SEO -->
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://redoakerguild.com/archives" />
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Red Oaker Guild" />
+  <meta property="og:title" content="Guild Archives — Red Oaker Guild" />
+  <meta property="og:description" content="Official Red Oaker Guild archives: Archon lineage, MRD units, containment protocols, and threat classifications." />
+  <meta property="og:url" content="https://redoakerguild.com/archives" />
+  <meta property="og:image" content="https://redoakerguild.com/logo.png" />
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Guild Archives — Red Oaker Guild" />
+  <meta name="twitter:description" content="Official Red Oaker Guild archives: Archon lineage, MRD units, containment protocols, and threat classifications." />
+  <meta name="twitter:image" content="https://redoakerguild.com/logo.png" />
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/logo.png" />
   <link rel="stylesheet" href="style.css" />
   <style>
     /* Archive Specific Styles */
@@ -42,7 +60,7 @@
       <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
       <span class="hdr-title">Red Oaker Guild</span>
     </a>
-    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <button class="nav-toggle" onclick="document.getElementById('nav').classList.toggle('open')">â˜°</button>
     <ul class="nav" id="nav">
       <li><a href="index.html">Home</a></li>
       <li><a href="guide.html">Guide</a></li>
@@ -56,7 +74,7 @@
 
 <main class="wrap" style="padding-top: 40px">
   <div class="intro" style="margin-bottom: 40px">
-    <div class="intro-cl">● Official Archive Hub ● Clearance Level 2 Required ●</div>
+    <div class="intro-cl">â— Official Archive Hub â— Clearance Level 2 Required â—</div>
     <h1 class="intro-t" style="font-size: 2.5rem">Guild Clinical Archives</h1>
     <p class="intro-sub">The following data is extracted from the Primary Site's central database. Any redistribution of this material outside of authorized Guild channels is grounds for immediate Level-4 disciplinary action.</p>
   </div>
@@ -109,7 +127,7 @@
 
 <footer class="ftr">
   <div class="ftr-in">
-    <p class="ftr-copy">&copy; 2026 Red Oaker Guild — Archive Dept.</p>
+    <p class="ftr-copy">&copy; 2026 Red Oaker Guild â€” Archive Dept.</p>
   </div>
 </footer>
 
@@ -120,14 +138,14 @@
 <script>
   // Simple Archive Loader
   const archons = [
-    { name: 'Dr. Mateo Hoffman', born: 'Jan 6, 1852', tenure: 'Mar 8, 1890 – Oct 16, 1942', desc: 'The Founder. Established the foundational texts of the collective.' },
-    { name: 'Dr. Hans Schroeder', born: 'Aug 25, 1890', tenure: 'Oct 20, 1942 – Oct 20, 1972', desc: 'The Architect of Control. Militarized the Guild and founded the MRD.' },
-    { name: 'Dr. Praskovya Sidorov', born: 'May 5, 1940', tenure: 'Nov 5, 1972 – May 6, 1986', desc: 'The Visionary. Formalized the modern classification system.' },
-    { type: 'gap', label: '1986–1989 Instability Period', desc: 'Internal factionalism. Primary Site sealed. No Archon appointed.' },
-    { name: 'Mikolov "Ekat" Gunitsky', born: 'Sept 10, 1942', tenure: 'Nov 23, 1989 – Dec 19, 2005', desc: 'The Rebuilder. Ruled with paranoid protocols to save the Guild from collapse.' },
-    { name: 'Charolette Windsor', born: 'Jan 1, 1952', tenure: 'Jan 9, 2006 – Dec 21, 2012', desc: 'The Refined Leader. Codified ecological anomaly protection.' },
-    { type: 'gap', label: '2012–2015 Government Interim', desc: 'Inquiry period. Collective authority under global oversight.' },
-    { name: 'Javier Quincy', born: 'Nov 8, 1980', tenure: 'April 6, 2015 – Present', desc: 'The Modern Stabilizer. Removed Guild from federal oversight.' }
+    { name: 'Dr. Mateo Hoffman', born: 'Jan 6, 1852', tenure: 'Mar 8, 1890 â€“ Oct 16, 1942', desc: 'The Founder. Established the foundational texts of the collective.' },
+    { name: 'Dr. Hans Schroeder', born: 'Aug 25, 1890', tenure: 'Oct 20, 1942 â€“ Oct 20, 1972', desc: 'The Architect of Control. Militarized the Guild and founded the MRD.' },
+    { name: 'Dr. Praskovya Sidorov', born: 'May 5, 1940', tenure: 'Nov 5, 1972 â€“ May 6, 1986', desc: 'The Visionary. Formalized the modern classification system.' },
+    { type: 'gap', label: '1986â€“1989 Instability Period', desc: 'Internal factionalism. Primary Site sealed. No Archon appointed.' },
+    { name: 'Mikolov "Ekat" Gunitsky', born: 'Sept 10, 1942', tenure: 'Nov 23, 1989 â€“ Dec 19, 2005', desc: 'The Rebuilder. Ruled with paranoid protocols to save the Guild from collapse.' },
+    { name: 'Charolette Windsor', born: 'Jan 1, 1952', tenure: 'Jan 9, 2006 â€“ Dec 21, 2012', desc: 'The Refined Leader. Codified ecological anomaly protection.' },
+    { type: 'gap', label: '2012â€“2015 Government Interim', desc: 'Inquiry period. Collective authority under global oversight.' },
+    { name: 'Javier Quincy', born: 'Nov 8, 1980', tenure: 'April 6, 2015 â€“ Present', desc: 'The Modern Stabilizer. Removed Guild from federal oversight.' }
   ];
 
   const mrd = [
