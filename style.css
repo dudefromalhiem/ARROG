@@ -1474,6 +1474,12 @@ hr {
     linear-gradient(180deg, #000 0%, #050505 100%)
 }
 
+@supports not (height: 100dvh) {
+  .term {
+    height: 100vh;
+  }
+}
+
 .term-body {
   position: absolute;
   inset: 0;
