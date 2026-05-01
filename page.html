@@ -876,6 +876,13 @@ function renderCommentNode(comment, depth = 0) {
     ? '<div class="comment-replies">' + comment.replies.map(child => renderCommentNode(child, depth + 1)).join('') + '</div>'
     : '';
 
+  const likes = Array.isArray(comment.likes) ? comment.likes : [];
+  const dislikes = Array.isArray(comment.dislikes) ? comment.dislikes : [];
+  const hasLiked = currentCommentUser && likes.includes(currentCommentUser.uid);
+  const hasDisliked = currentCommentUser && dislikes.includes(currentCommentUser.uid);
+  const likeStyle = hasLiked ? 'color: #32cd32;' : '';
+  const dislikeStyle = hasDisliked ? 'color: var(--red-g);' : '';
+
   return '<div class="comment-thread" data-depth="' + depth + '">' +
     '<article class="comment-item">' +
       '<div class="comment-head">' +
@@ -893,6 +900,8 @@ function renderCommentNode(comment, depth = 0) {
       '<div class="comment-content">' + renderCommentRichText(comment.content || '') + '</div>' +
       renderCommentMedia(comment.media || []) +
       '<div class="comment-actions">' +
+        '<button class="btn btn-sm btn-s" style="' + likeStyle + '" type="button" onclick="voteComment(\'' + escapeCommentHtml(comment.id || '') + '\', \'like\')">Like (' + likes.length + ')</button>' +
+        '<button class="btn btn-sm btn-s" style="' + dislikeStyle + '" type="button" onclick="voteComment(\'' + escapeCommentHtml(comment.id || '') + '\', \'dislike\')">Dislike (' + dislikes.length + ')</button>' +
         (currentCommentUser
           ? '<button class="btn btn-sm btn-s" type="button" data-reply-id="' + escapeCommentHtml(comment.id || '') + '" data-reply-author="' + replyAuthor + '" onclick="startReplyComment(this.dataset.replyId, this.dataset.replyAuthor)">Reply</button>'
           : '') +
@@ -1153,6 +1162,44 @@ async function deleteComment(id) {
     await loadCommentsForCurrentPage();
   } catch (err) {
     alert('Delete failed: ' + err.message);
+  }
+}
+
+async function voteComment(id, voteType) {
+  const commentId = String(id || '').trim();
+  if (!commentId) return;
+  if (!currentCommentUser) {
+    alert('Sign in to vote on comments.');
+    return;
+  }
+
+  const comment = getCommentById(commentId);
+  if (!comment) return;
+
+  const likes = Array.isArray(comment.likes) ? comment.likes : [];
+  const dislikes = Array.isArray(comment.dislikes) ? comment.dislikes : [];
+  const hasLiked = likes.includes(currentCommentUser.uid);
+  const hasDisliked = dislikes.includes(currentCommentUser.uid);
+  
+  let targetVote = voteType;
+  if (voteType === 'like' && hasLiked) targetVote = 'none';
+  if (voteType === 'dislike' && hasDisliked) targetVote = 'none';
+
+  try {
+    const response = await fetch(commentsApiBase, {
+      method: 'POST',
+      headers: await getCommentsAuthHeaders(),
+      body: JSON.stringify({ action: 'vote', id: commentId, voteType: targetVote })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Vote failed.');
+
+    // Update locally to avoid full reload
+    comment.likes = data.likes || [];
+    comment.dislikes = data.dislikes || [];
+    renderComments();
+  } catch (err) {
+    alert('Vote failed: ' + err.message);
   }
 }
 

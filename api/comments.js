@@ -179,6 +179,45 @@ async function storeCommentReport(db, actor, body) {
   return { statusCode: 200, payload: { ok: true, reportCount: reportsSnap.size } };
 }
 
+async function handleCommentVote(db, actor, body) {
+  const id = normalizeText(body.id || '', 128);
+  const voteType = normalizeText(body.voteType || '', 10);
+
+  if (!id) {
+    return { statusCode: 400, payload: { error: 'Missing comment id.' } };
+  }
+  if (!['like', 'dislike', 'none'].includes(voteType)) {
+    return { statusCode: 400, payload: { error: 'Invalid vote type.' } };
+  }
+
+  const ref = db.collection('comments').doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    return { statusCode: 404, payload: { error: 'Comment not found.' } };
+  }
+
+  const commentData = doc.data() || {};
+  let likes = Array.isArray(commentData.likes) ? commentData.likes : [];
+  let dislikes = Array.isArray(commentData.dislikes) ? commentData.dislikes : [];
+
+  likes = likes.filter(uid => uid !== actor.uid);
+  dislikes = dislikes.filter(uid => uid !== actor.uid);
+
+  if (voteType === 'like') {
+    likes.push(actor.uid);
+  } else if (voteType === 'dislike') {
+    dislikes.push(actor.uid);
+  }
+
+  await ref.set({
+    likes,
+    dislikes,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { statusCode: 200, payload: { ok: true, likes, dislikes } };
+}
+
 async function listComments(db, pageId, slug, actor) {
   let query = db.collection('comments');
   if (pageId) {
@@ -257,6 +296,11 @@ module.exports = async function handler(req, res) {
       if (action === 'report') {
         const reportResult = await storeCommentReport(db, actor, body);
         return sendJson(res, reportResult.statusCode, reportResult.payload);
+      }
+
+      if (action === 'vote') {
+        const voteResult = await handleCommentVote(db, actor, body);
+        return sendJson(res, voteResult.statusCode, voteResult.payload);
       }
 
       const pageId = normalizeText(body.pageId || '', 128);
