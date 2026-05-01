@@ -352,12 +352,34 @@ function closeUserMenus() {
   });
 }
 
+function closeAdminMenus() {
+  document.querySelectorAll('[data-admin-menu].open').forEach(menu => {
+    menu.classList.remove('open');
+    const trigger = menu.querySelector('.admin-menu-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
 function toggleUserMenu(trigger, event) {
   if (event) event.stopPropagation();
   const menu = trigger && trigger.closest('[data-user-menu]');
   if (!menu) return;
   const shouldOpen = !menu.classList.contains('open');
   closeUserMenus();
+  closeAdminMenus();
+  if (shouldOpen) {
+    menu.classList.add('open');
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function toggleAdminMenu(trigger, event) {
+  if (event) event.stopPropagation();
+  const menu = trigger && trigger.closest('[data-admin-menu]');
+  if (!menu) return;
+  const shouldOpen = !menu.classList.contains('open');
+  closeUserMenus();
+  closeAdminMenus();
   if (shouldOpen) {
     menu.classList.add('open');
     trigger.setAttribute('aria-expanded', 'true');
@@ -365,7 +387,10 @@ function toggleUserMenu(trigger, event) {
 }
 
 document.addEventListener('click', event => {
-  if (!event.target.closest('[data-user-menu]')) closeUserMenus();
+  if (!event.target.closest('[data-user-menu]') && !event.target.closest('[data-admin-menu]')) {
+    closeUserMenus();
+    closeAdminMenus();
+  }
 });
 
 function closeMobileNav() {

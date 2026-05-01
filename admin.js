@@ -284,6 +284,7 @@ async function renderAdminBootstrap(user) {
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('editId');
     const editSlug = params.get('editSlug');
+    const tab = params.get('tab');
     if (editId && !isModOnlyRole()) {
       window.location.href = 'submit.html?editId=' + encodeURIComponent(editId);
       return;
@@ -293,6 +294,9 @@ async function renderAdminBootstrap(user) {
     }
 
     loadTab();
+    if (tab) {
+      switchTab(tab);
+    }
   } catch (error) {
     console.error('Error loading user document:', error);
     adminLoading.classList.add('hidden');
