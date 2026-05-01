@@ -122,8 +122,7 @@ function isGuideType(type) {
 }
 
 function canManageGuidePages() {
-  const userDoc = currentUserDoc || {};
-  return userDoc.isOwner || hasPermission(userDoc, 'manageContent');
+  return isOwner(auth.currentUser?.email);
 }
 
 function toDataUrl(file) {
@@ -195,7 +194,7 @@ async function optimizeImageToDataUrl(file, maxDim = 1280, maxBytes = 250 * 1024
   return dataUrl;
 }
 
-function applyTabVisibilityForRole(userDoc, hasAdminAccess = false) {
+function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   const pagesTab = document.getElementById('tab-pages');
   const submissionsTab = document.getElementById('tab-submissions');
   const artworksTab = document.getElementById('tab-artworks');
@@ -205,7 +204,9 @@ function applyTabVisibilityForRole(userDoc, hasAdminAccess = false) {
   const rolesTab = document.getElementById('tab-roles');
   const configTab = document.getElementById('tab-config');
 
-  const isModOnly = (userDoc?.level || 2) < 6 && !userDoc?.isOwner;
+  const isOwnerUser = isOwner(user.email);
+  const isAdminUser = isAdmin(user.email);
+  const isModOnly = !isOwnerUser && !isAdminUser;
 
   if (pagesTab) pagesTab.classList.toggle('hidden', isModOnly);
   if (submissionsTab) submissionsTab.classList.remove('hidden');
@@ -215,7 +216,7 @@ function applyTabVisibilityForRole(userDoc, hasAdminAccess = false) {
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
   if (usersTab) usersTab.classList.toggle('hidden', !hasAdminAccess);
-  if (rolesTab) rolesTab.classList.toggle('hidden', !hasPermission(userDoc, 'manageRoles'));
+  if (rolesTab) rolesTab.classList.toggle('hidden', !isOwnerUser);
 
   if (isModOnly && activeTab !== 'submissions') {
     activeTab = 'submissions';
@@ -250,7 +251,7 @@ async function renderAdminBootstrap(user) {
     currentUserDoc = userDoc.exists ? userDoc.data() : null;
 
     // Check if user has admin permissions
-    const isAdminUser = hasPermission(currentUserDoc, 'manageUsers') || hasPermission(currentUserDoc, 'manageRoles') || hasPermission(currentUserDoc, 'systemAdmin');
+    const isAdminUser = await getUserAdminFlag(user);
     currentUserIsAdminFlag = isAdminUser;
 
     if (!isAdminUser) {
@@ -272,14 +273,15 @@ async function renderAdminBootstrap(user) {
     adminLoading.classList.add('hidden');
 
     const displayLabel = user.displayName || 'Agent';
-    const roleDisplayName = getRoleDisplayName(currentUserDoc);
-    const level = currentUserDoc?.level || 2;
+    const role = resolveRole(user.email);
+    const roleDisplayName = role.charAt(0).toUpperCase() + role.slice(1);
+    const level = role === 'owner' ? 6 : role === 'admin' ? 6 : role === 'mod' ? 5 : 3;
 
     adminInfo.innerHTML =
       `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Role: <span style="color:var(--red-b);text-transform:uppercase">${roleDisplayName}</span> (Level ${level})
        <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
     navAuth.innerHTML = renderUserMenuHTML(displayLabel);
-    applyTabVisibilityForRole(currentUserDoc, isAdminUser);
+    applyTabVisibilityForRole(user, isAdminUser);
 
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('editId');

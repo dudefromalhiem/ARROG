@@ -454,16 +454,10 @@ async function updateAuthUI(user) {
       adminLink.remove();
     }
     // upsert user doc
-    const role = resolveRole(user.email);
-    const level = role === 'owner' ? 6 : role === 'admin' ? 6 : role === 'mod' ? 5 : role === 'user' ? 3 : 2;
-    const isOwner = role === 'owner';
     db.collection('users').doc(user.uid).set({
       uid: user.uid, email: user.email,
       displayName: user.displayName || '',
-      lastLogin: new Date().toISOString(),
-      level: level,
-      isOwner: isOwner,
-      role: role
+      lastLogin: new Date().toISOString()
     }, { merge: true }).catch(() => { });
 
     if (!clearanceWelcomeShownThisLoad) {

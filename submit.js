@@ -4599,6 +4599,9 @@ async function submitPage() {
 }
 
 function resetSubmitForm() {
+  if (!confirm('Are you sure you want to clear all form data? This action cannot be undone.')) {
+    return;
+  }
   suppressDraftAutoSave = true;
   submitEditTarget = null;
   activeDraftId = null;
