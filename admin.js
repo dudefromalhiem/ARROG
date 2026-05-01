@@ -116,6 +116,37 @@ function getCurrentRole() {
   return getRoleDisplayName(currentUserDoc);
 }
 
+function renderHierarchyGraph() {
+  const chain = [
+    { key: 'owner', label: 'Owner / Archivist' },
+    { key: 'chief-admin', label: 'Chief Administrator' },
+    { key: 'deputy-chief-admin', label: 'Deputy Chief Administrator' },
+    { key: 'senior-admin', label: 'Senior Administrator' },
+    { key: 'admin', label: 'Administrator' },
+    { key: 'chief-mod', label: 'Chief of Moderation' },
+    { key: 'deputy-chief-mod', label: 'Deputy Chief of Moderation' },
+    { key: 'senior-mod', label: 'Senior Moderator' },
+    { key: 'mod', label: 'Moderator' },
+    { key: 'junior-mod', label: 'Junior Moderator' },
+    { key: 'user', label: 'User' },
+    { key: 'guest', label: 'Guest' }
+  ];
+
+  const blocks = chain.map((entry, idx) => {
+    const style = idx < chain.length - 1 ? 'margin-bottom:10px;' : '';
+    return '<div style="' + style + '">' +
+      '<div style="border:1px solid var(--blk-m);padding:8px 10px;background:rgba(255,255,255,.02);font-size:.8rem">' + escapeHtml(entry.label) + '</div>' +
+      (idx < chain.length - 1 ? '<div style="text-align:center;color:var(--wht-f);font-size:.75rem;line-height:1.1;padding:3px 0">|</div>' : '') +
+    '</div>';
+  }).join('');
+
+  return '<div style="margin-bottom:20px;border:1px solid var(--blk-m);padding:14px;background:rgba(0,0,0,.25)">' +
+    '<h4 style="margin-bottom:10px;color:var(--red-b)">Guild Authority Hierarchy</h4>' +
+    '<p style="font-size:.78rem;color:var(--wht-d);margin-bottom:10px">Visibility: all admin-clearance users.</p>' +
+    blocks +
+  '</div>';
+}
+
 function isModOnlyRole() {
   return !isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email);
 }
@@ -412,10 +443,11 @@ async function loadReports(container) {
   container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading report queues...</p>';
 
   try {
-    const [commentSnap, dmSnap, pageSnap] = await Promise.all([
+    const [commentSnap, dmSnap, pageSnap, adminAppSnap] = await Promise.all([
       db.collection('commentReports').orderBy('createdAt', 'desc').limit(200).get(),
       db.collection('dmReports').orderBy('createdAt', 'desc').limit(200).get(),
-      db.collection('pageReports').orderBy('createdAt', 'desc').limit(200).get()
+      db.collection('pageReports').orderBy('createdAt', 'desc').limit(200).get(),
+      db.collection('adminApplications').orderBy('updatedAt', 'desc').limit(200).get()
     ]);
 
     const rows = [];
@@ -459,8 +491,10 @@ async function loadReports(container) {
       });
     });
 
+    const adminRows = adminAppSnap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+
     rows.sort((a, b) => b.createdAt - a.createdAt);
-    if (!rows.length) {
+    if (!rows.length && !adminRows.length) {
       container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">No reports found.</p>';
       return;
     }
@@ -484,10 +518,51 @@ async function loadReports(container) {
       }).join(''),
       '</tbody>',
       '</table>',
+      '</div>',
+      '<h3 style="margin:20px 0 12px">Admin Applications</h3>',
+      (adminRows.length ? (
+        '<div style="display:grid;gap:10px">' + adminRows.map(row => {
+          const data = row.data || {};
+          const status = String(data.status || 'pending');
+          return '<div style="border:1px solid var(--blk-m);padding:10px;background:rgba(255,255,255,.02)">' +
+            '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">' +
+              '<strong>' + escapeHtml(data.applicantName || data.applicantEmail || row.id) + '</strong>' +
+              '<span class="status status-' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+            '</div>' +
+            '<div style="font-size:.78rem;color:var(--wht-d);margin-bottom:6px">' + escapeHtml(data.applicantEmail || '') + '</div>' +
+            '<div style="font-size:.8rem;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(data.reason || '') + '</div>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+              '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'approved\')">Approve</button>' +
+              '<button class="btn btn-sm btn-d" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'rejected\')">Reject</button>' +
+              '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'pending\')">Reset Pending</button>' +
+            '</div>' +
+          '</div>';
+        }).join('') + '</div>'
+      ) : '<p style="font-size:.82rem;color:var(--wht-d)">No admin applications found.</p>'),
       '</div>'
     ].join('');
   } catch (err) {
     container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load reports: ' + escapeHtml(err.message) + '</p>';
+  }
+}
+
+async function setAdminApplicationStatus(uid, status) {
+  if (!uid) return;
+  if (!isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email)) {
+    alert('Admin clearance required.');
+    return;
+  }
+  try {
+    await db.collection('adminApplications').doc(uid).set({
+      status: String(status || 'pending'),
+      reviewedBy: String(auth.currentUser?.email || ''),
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    const main = document.getElementById('adm-main');
+    if (main && activeTab === 'reports') await loadReports(main);
+  } catch (err) {
+    alert('Failed to update admin application: ' + err.message);
   }
 }
 
@@ -1687,6 +1762,7 @@ async function loadUsers(container) {
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Registered Users</h3>
     <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">All accounts that have signed into the Guild. Owners may see email addresses; Admins see [Redacted]. Manage admin access in the Roles tab.</p>
+    ${renderHierarchyGraph()}
     <table class="adm-tbl"><thead><tr><th>Display Name</th><th>Email</th><th>Role</th><th>Last Login</th></tr></thead><tbody id="users-tbody"></tbody></table>
   `;
   await refreshUsers();

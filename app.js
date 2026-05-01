@@ -7,6 +7,7 @@
 // ── State ─────────────────────────────────────────────────────
 let currentUser = null;
 let currentRole = "user";
+let socialApiBase = '/api/social';
 let terminalInterval = null;
 let terminalStartedAt = 0;
 let terminalEndTimer = null;
@@ -812,6 +813,67 @@ function openDirectMessage(uid, name) {
   window.location.href = 'messaging.html?to=' + encodeURIComponent(decodedUid);
 }
 
+function configureSocialApiBase() {
+  const host = String(window.location.hostname || '').toLowerCase();
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  const isFile = window.location.protocol === 'file:';
+  socialApiBase = (isLocal || isFile) ? 'https://redoakguild.vercel.app/api/social' : '/api/social';
+}
+
+function setAdminApplyStatus(message, isError) {
+  const el = document.getElementById('admin-apply-status');
+  if (!el) return;
+  el.textContent = String(message || '');
+  el.style.color = isError ? 'var(--red-b)' : 'var(--wht-f)';
+}
+
+async function applyForAdminFromHome() {
+  if (!currentUser) {
+    setAdminApplyStatus('Sign in first to submit your application.', true);
+    return;
+  }
+  const reasonEl = document.getElementById('admin-apply-reason');
+  const expEl = document.getElementById('admin-apply-experience');
+  const btn = document.getElementById('admin-apply-btn');
+  const reason = String(reasonEl && reasonEl.value || '').trim();
+  const experience = String(expEl && expEl.value || '').trim();
+  if (reason.length < 20) {
+    setAdminApplyStatus('Please write at least 20 characters in your reason.', true);
+    return;
+  }
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+    }
+    const token = await currentUser.getIdToken();
+    const response = await fetch(socialApiBase, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token
+      },
+      body: JSON.stringify({ action: 'applyadmin', reason, experience })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'Application failed.');
+    if (payload && payload.alreadyPending) {
+      setAdminApplyStatus('Your admin application is already pending review.', false);
+    } else {
+      setAdminApplyStatus('Application submitted to the Guild administration.', false);
+      if (reasonEl) reasonEl.value = '';
+      if (expEl) expEl.value = '';
+    }
+  } catch (err) {
+    setAdminApplyStatus('Could not submit application: ' + (err && err.message ? err.message : 'Unknown error'), true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Submit Application';
+    }
+  }
+}
+
 // ═════════════════════════════════════════════════════════════
 // DATA LOADING
 // ═════════════════════════════════════════════════════════════
@@ -1025,7 +1087,10 @@ function bootApp() {
   if (skipBtn) skipBtn.addEventListener('click', skipTerminal);
   if (shouldShowTerminal()) runTerminal();
   else skipTerminal();
+  configureSocialApiBase();
   auth.onAuthStateChanged(updateAuthUI);
+  const applyBtn = document.getElementById('admin-apply-btn');
+  if (applyBtn) applyBtn.addEventListener('click', applyForAdminFromHome);
   loadData();
 }
 

@@ -155,6 +155,15 @@
         <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">Requirements: Active account, demonstrated
           contributions, and Owner approval.</p>
         <a href="guide.html" class="btn btn-p">View Admin Requirements</a>
+        <div style="margin-top:12px;border:1px solid var(--blk-m);padding:12px;background:rgba(255,255,255,.02)">
+          <label for="admin-apply-reason" style="display:block;font-size:.78rem;color:var(--wht-d);margin-bottom:6px">Apply for admin access</label>
+          <textarea id="admin-apply-reason" class="fta" rows="4" maxlength="1400" placeholder="Why should the Guild grant you admin access? Include contributions and moderation experience."></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <input id="admin-apply-experience" class="fi" maxlength="700" placeholder="Experience summary (optional)" style="flex:1;min-width:220px" />
+            <button id="admin-apply-btn" type="button" class="btn btn-s">Submit Application</button>
+          </div>
+          <p id="admin-apply-status" style="margin-top:8px;font-size:.75rem;color:var(--wht-f)">Sign in to submit an application.</p>
+        </div>
       </div>
     </div>
 

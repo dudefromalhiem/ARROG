@@ -233,6 +233,26 @@ async function getThreadForParticipants(db, uidA, uidB) {
   return { threadId, exists: doc.exists, data: doc.exists ? (doc.data() || {}) : null };
 }
 
+function normalizeRequestId(uidA, uidB) {
+  return makeThreadId(uidA, uidB);
+}
+
+async function getFriendRequestDoc(db, uidA, uidB) {
+  const requestId = normalizeRequestId(uidA, uidB);
+  const ref = db.collection('friendRequests').doc(requestId);
+  const snap = await ref.get();
+  return {
+    requestId,
+    ref,
+    exists: snap.exists,
+    data: snap.exists ? (snap.data() || {}) : null
+  };
+}
+
+function isAcceptedFriendRequest(data) {
+  return String(data && data.status || '').toLowerCase() === 'accepted';
+}
+
 async function ensureThreadAccess(db, actor, recipient, roles) {
   const thread = await getThreadForParticipants(db, actor.uid, recipient.uid);
   const recipientIsOwner = isOwnerEmail(recipient.email, roles);
@@ -277,6 +297,14 @@ async function sendMessage(db, actor, body) {
 
   if (await checkBlock(db, actor.uid, recipientUid) || await checkBlock(db, recipientUid, actor.uid)) {
     return { statusCode: 403, payload: { error: 'Messaging is blocked between these accounts.' } };
+  }
+
+  const requestState = await getFriendRequestDoc(db, actor.uid, recipientUid);
+  const senderIsAdmin = isAdminEmail(actor.email, roles);
+  const recipientIsAdmin = isAdminEmail(String(recipient.email || ''), roles);
+  const canBypassFriendGate = senderIsAdmin || recipientIsAdmin;
+  if (!canBypassFriendGate && !isAcceptedFriendRequest(requestState.data)) {
+    return { statusCode: 403, payload: { error: 'Friend request must be accepted before messaging.' } };
   }
 
   const threadMeta = await ensureThreadAccess(db, actor, recipient, roles);
@@ -379,13 +407,20 @@ async function addFriendRequest(db, actor, body) {
 
   const senderData = senderSnap.exists ? (senderSnap.data() || {}) : {};
   const targetData = targetSnap.data() || {};
-  const requestId = makeThreadId(actor.uid, targetUid);
+  const requestId = normalizeRequestId(actor.uid, targetUid);
   const requestRef = db.collection('friendRequests').doc(requestId);
   const requestSnap = await requestRef.get();
   if (requestSnap.exists) {
     const existing = requestSnap.data() || {};
-    if (String(existing.status || '').toLowerCase() === 'pending') {
-      return { statusCode: 200, payload: { ok: true, alreadyPending: true } };
+    const existingStatus = String(existing.status || '').toLowerCase();
+    if (existingStatus === 'pending') {
+      if (String(existing.requesterUid || '') === actor.uid) {
+        return { statusCode: 200, payload: { ok: true, alreadyPending: true, direction: 'outgoing' } };
+      }
+      return { statusCode: 200, payload: { ok: true, alreadyPending: true, direction: 'incoming' } };
+    }
+    if (existingStatus === 'accepted') {
+      return { statusCode: 200, payload: { ok: true, alreadyFriends: true } };
     }
   }
 
@@ -401,11 +436,105 @@ async function addFriendRequest(db, actor, body) {
     targetPhotoURL: normalizeText(targetData.photoURL || '', 1200),
     note,
     status: 'pending',
+    acceptedAt: null,
+    acceptedByUid: '',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
 
   return { statusCode: 200, payload: { ok: true, requestId } };
+}
+
+async function listFriendRequests(db, actor) {
+  const [incomingSnap, outgoingSnap] = await Promise.all([
+    db.collection('friendRequests').where('targetUid', '==', actor.uid).limit(200).get(),
+    db.collection('friendRequests').where('requesterUid', '==', actor.uid).limit(200).get()
+  ]);
+
+  const incoming = incomingSnap.docs.map(doc => ({ id: doc.id, ...(toPlainValue(doc.data() || {})) }));
+  const outgoing = outgoingSnap.docs.map(doc => ({ id: doc.id, ...(toPlainValue(doc.data() || {})) }));
+  return { incoming, outgoing };
+}
+
+async function acceptFriendRequest(db, actor, body) {
+  const targetUid = normalizeText(body.targetUid || '', 128);
+  if (!targetUid) return { statusCode: 400, payload: { error: 'Missing target user.' } };
+
+  const requestState = await getFriendRequestDoc(db, actor.uid, targetUid);
+  if (!requestState.exists) return { statusCode: 404, payload: { error: 'Friend request not found.' } };
+  if (String(requestState.data.targetUid || '') !== actor.uid) {
+    return { statusCode: 403, payload: { error: 'Only the recipient can accept this request.' } };
+  }
+
+  await requestState.ref.set({
+    status: 'accepted',
+    acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+    acceptedByUid: actor.uid,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { statusCode: 200, payload: { ok: true, requestId: requestState.requestId } };
+}
+
+async function rejectFriendRequest(db, actor, body) {
+  const targetUid = normalizeText(body.targetUid || '', 128);
+  if (!targetUid) return { statusCode: 400, payload: { error: 'Missing target user.' } };
+
+  const requestState = await getFriendRequestDoc(db, actor.uid, targetUid);
+  if (!requestState.exists) return { statusCode: 404, payload: { error: 'Friend request not found.' } };
+  if (String(requestState.data.targetUid || '') !== actor.uid) {
+    return { statusCode: 403, payload: { error: 'Only the recipient can reject this request.' } };
+  }
+
+  await requestState.ref.set({
+    status: 'rejected',
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { statusCode: 200, payload: { ok: true, requestId: requestState.requestId } };
+}
+
+async function cancelFriendRequest(db, actor, body) {
+  const targetUid = normalizeText(body.targetUid || '', 128);
+  if (!targetUid) return { statusCode: 400, payload: { error: 'Missing target user.' } };
+
+  const requestState = await getFriendRequestDoc(db, actor.uid, targetUid);
+  if (!requestState.exists) return { statusCode: 404, payload: { error: 'Friend request not found.' } };
+  if (String(requestState.data.requesterUid || '') !== actor.uid) {
+    return { statusCode: 403, payload: { error: 'Only the requester can cancel this request.' } };
+  }
+
+  await requestState.ref.set({
+    status: 'cancelled',
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { statusCode: 200, payload: { ok: true, requestId: requestState.requestId } };
+}
+
+async function applyForAdmin(db, actor, body) {
+  const reason = normalizeText(body.reason || '', 1400);
+  const experience = normalizeText(body.experience || '', 700);
+  if (!reason || reason.length < 20) {
+    return { statusCode: 400, payload: { error: 'Please provide at least 20 characters for your admin application.' } };
+  }
+
+  const appRef = db.collection('adminApplications').doc(actor.uid);
+  const existing = await appRef.get();
+  const existingData = existing.exists ? (existing.data() || {}) : {};
+  const existingStatus = String(existingData.status || '').toLowerCase();
+  if (existingStatus === 'pending') {
+    return { statusCode: 200, payload: { ok: true, alreadyPending: true } };
+  }
+
+  await appRef.set({
+    uid: actor.uid,
+    applicantEmail: actor.email,
+    applicantName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
+    reason,
+    experience,
+    status: 'pending',
+    submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { statusCode: 200, payload: { ok: true } };
 }
 
 async function readThreadMessages(db, actor, peerUid) {
@@ -596,6 +725,11 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 200, thread);
     }
 
+    if (method === 'GET' && type === 'friendrequests') {
+      const requests = await listFriendRequests(db, actor);
+      return sendJson(res, 200, requests);
+    }
+
     if (method === 'POST') {
       const body = req.body || {};
       const action = normalizeText(body.action || '', 24).toLowerCase();
@@ -617,6 +751,26 @@ module.exports = async function handler(req, res) {
 
       if (action === 'addfriend') {
         const result = await addFriendRequest(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'acceptfriend') {
+        const result = await acceptFriendRequest(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'rejectfriend') {
+        const result = await rejectFriendRequest(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'cancelfriend') {
+        const result = await cancelFriendRequest(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'applyadmin') {
+        const result = await applyForAdmin(db, actor, body);
         return sendJson(res, result.statusCode, result.payload);
       }
 

@@ -158,7 +158,7 @@
       <!-- Tabs -->
       <div class="msg-tabs">
         <button class="msg-tab-btn active" type="button" data-tab="friends">Conversations</button>
-        <button class="msg-tab-btn" type="button" data-tab="requests">Directory</button>
+        <button class="msg-tab-btn" type="button" data-tab="requests">Requests</button>
         <button class="msg-tab-btn" type="button" data-tab="notifications">Alerts <span class="msg-notifications-badge" id="notif-count" style="display: none;">0</span></button>
       </div>
 
@@ -235,6 +235,8 @@ let currentTab = 'friends';
 let currentPeerUid = '';
 let inboxThreads = [];
 let threadMessages = [];
+let incomingRequests = [];
+let outgoingRequests = [];
 let notifications = [];
 let previousThreadTimestamps = new Map();
 let pollingTimer = null;
@@ -394,30 +396,56 @@ async function renderRequests() {
   const area = document.getElementById('msg-requests-area');
   if (!area) return;
   const query = String(document.getElementById('msg-search')?.value || '').trim();
-  if (query.length < 2) {
-    area.innerHTML = '<div class="msg-empty">Search for a member to start a conversation.</div>';
-    return;
+  const incomingCards = incomingRequests
+    .filter(r => String(r.status || '').toLowerCase() === 'pending')
+    .map(r => '<div class="msg-request-card">' +
+      '<div class="msg-request-header">' +
+        '<span class="msg-request-name">' + escapeHtml(r.requesterName || r.requesterEmail || 'Guild Member') + '</span>' +
+        '<div class="msg-request-actions">' +
+          '<button type="button" class="msg-request-btn" data-accept-uid="' + escapeHtml(r.requesterUid || '') + '">Accept</button>' +
+          '<button type="button" class="msg-request-btn reject" data-reject-uid="' + escapeHtml(r.requesterUid || '') + '">Reject</button>' +
+        '</div>' +
+      '</div>' +
+      '<p style="font-size:0.8rem;color:var(--wht-f);">Wants to connect with you.</p>' +
+    '</div>').join('');
+
+  const outgoingCards = outgoingRequests
+    .filter(r => String(r.status || '').toLowerCase() === 'pending')
+    .map(r => '<div class="msg-request-card">' +
+      '<div class="msg-request-header">' +
+        '<span class="msg-request-name">' + escapeHtml(r.targetName || r.targetEmail || 'Guild Member') + '</span>' +
+        '<div class="msg-request-actions">' +
+          '<button type="button" class="msg-request-btn reject" data-cancel-uid="' + escapeHtml(r.targetUid || '') + '">Cancel</button>' +
+        '</div>' +
+      '</div>' +
+      '<p style="font-size:0.8rem;color:var(--wht-f);">Request pending.</p>' +
+    '</div>').join('');
+
+  let directoryHtml = '';
+  if (query.length >= 2) {
+    try {
+      const result = await apiGet('searchusers', { q: query });
+      const users = (result.users || []).filter(u => u.uid && u.uid !== currentUser.uid).slice(0, 20);
+      directoryHtml = users.length ? users.map(u => {
+        return '<div class="msg-request-card">' +
+          '<div class="msg-request-header">' +
+            '<span class="msg-request-name">' + escapeHtml(u.displayName || 'Guild Member') + '</span>' +
+            '<div class="msg-request-actions"><button type="button" class="msg-request-btn" data-request-uid="' + escapeHtml(u.uid) + '" data-request-name="' + escapeHtml(u.displayName || 'Guild Member') + '">Send Request</button></div>' +
+          '</div>' +
+          '<p style="font-size:0.8rem;color:var(--wht-f);">Send friend request to start messaging.</p>' +
+        '</div>';
+      }).join('') : '<div class="msg-empty">No matching members found.</div>';
+    } catch (_err) {
+      directoryHtml = '<div class="msg-empty">Could not load member search.</div>';
+    }
+  } else {
+    directoryHtml = '<div class="msg-empty">Type at least 2 characters to find members.</div>';
   }
 
-  try {
-    const result = await apiGet('searchusers', { q: query });
-    const users = (result.users || []).filter(u => u.uid && u.uid !== currentUser.uid).slice(0, 20);
-    if (!users.length) {
-      area.innerHTML = '<div class="msg-empty">No matching members found.</div>';
-      return;
-    }
-    area.innerHTML = users.map(u => {
-      return '<div class="msg-request-card">' +
-        '<div class="msg-request-header">' +
-          '<span class="msg-request-name">' + escapeHtml(u.displayName || 'Guild Member') + '</span>' +
-          '<div class="msg-request-actions"><button type="button" class="msg-request-btn" data-request-uid="' + escapeHtml(u.uid) + '" data-request-name="' + escapeHtml(u.displayName || 'Guild Member') + '">Start Chat</button></div>' +
-        '</div>' +
-        '<p style="font-size:0.8rem;color:var(--wht-f);">Open a direct conversation with this member.</p>' +
-      '</div>';
-    }).join('');
-  } catch (_err) {
-    area.innerHTML = '<div class="msg-empty">Could not load the member directory.</div>';
-  }
+  area.innerHTML =
+    '<div style="margin-bottom:10px"><div class="msg-header">Incoming Requests</div>' + (incomingCards || '<div class="msg-empty">No incoming requests.</div>') + '</div>' +
+    '<div style="margin-bottom:10px"><div class="msg-header">Outgoing Requests</div>' + (outgoingCards || '<div class="msg-empty">No outgoing requests.</div>') + '</div>' +
+    '<div><div class="msg-header">Member Directory</div>' + directoryHtml + '</div>';
 }
 
 function renderMessages() {
@@ -493,6 +521,15 @@ async function refreshInbox() {
     inboxThreads = [];
     renderFriends();
   }
+  try {
+    const reqPayload = await apiGet('friendrequests');
+    incomingRequests = Array.isArray(reqPayload.incoming) ? reqPayload.incoming : [];
+    outgoingRequests = Array.isArray(reqPayload.outgoing) ? reqPayload.outgoing : [];
+    if (currentTab === 'requests') renderRequests();
+  } catch (_err) {
+    incomingRequests = [];
+    outgoingRequests = [];
+  }
 }
 
 async function sendMessage() {
@@ -512,8 +549,8 @@ async function sendMessage() {
     if (input) input.value = '';
     await loadMessages();
     await refreshInbox();
-  } catch (_err) {
-    addNotification('Unable to send message right now.');
+  } catch (err) {
+    addNotification((err && err.message) ? err.message : 'Unable to send message right now.');
   } finally {
     sendBtn.disabled = false;
     sendBtn.textContent = 'Send';
@@ -561,7 +598,35 @@ async function reportMessageFromButton(button) {
 }
 
 async function startRequest(uid, name) {
-  await openChat(uid, name);
+  try {
+    const payload = await apiPost({ action: 'addfriend', targetUid: String(uid || '') });
+    if (payload && payload.alreadyPending) addNotification('Friend request already pending.');
+    else if (payload && payload.alreadyFriends) addNotification('Already connected. Opening chat.');
+    else addNotification('Friend request sent to ' + String(name || 'Guild Member') + '.');
+    await refreshInbox();
+    if (payload && payload.alreadyFriends) await openChat(uid, name);
+  } catch (err) {
+    addNotification((err && err.message) || 'Could not send request.');
+  }
+}
+
+async function acceptRequest(uid) {
+  await apiPost({ action: 'acceptfriend', targetUid: String(uid || '') });
+  await refreshInbox();
+  const req = incomingRequests.find(item => String(item.requesterUid || '') === String(uid || ''));
+  await openChat(uid, req && req.requesterName ? req.requesterName : 'Guild Member');
+}
+
+async function rejectRequest(uid) {
+  await apiPost({ action: 'rejectfriend', targetUid: String(uid || '') });
+  await refreshInbox();
+  addNotification('Friend request rejected.');
+}
+
+async function cancelRequest(uid) {
+  await apiPost({ action: 'cancelfriend', targetUid: String(uid || '') });
+  await refreshInbox();
+  addNotification('Friend request cancelled.');
 }
 
 function bindUiEvents() {
@@ -601,6 +666,21 @@ function bindUiEvents() {
   });
 
   document.getElementById('msg-requests-area')?.addEventListener('click', (event) => {
+    const acceptBtn = event.target.closest('[data-accept-uid]');
+    if (acceptBtn) {
+      acceptRequest(acceptBtn.getAttribute('data-accept-uid') || '').catch(() => addNotification('Could not accept request.'));
+      return;
+    }
+    const rejectBtn = event.target.closest('[data-reject-uid]');
+    if (rejectBtn) {
+      rejectRequest(rejectBtn.getAttribute('data-reject-uid') || '').catch(() => addNotification('Could not reject request.'));
+      return;
+    }
+    const cancelBtn = event.target.closest('[data-cancel-uid]');
+    if (cancelBtn) {
+      cancelRequest(cancelBtn.getAttribute('data-cancel-uid') || '').catch(() => addNotification('Could not cancel request.'));
+      return;
+    }
     const target = event.target.closest('[data-request-uid]');
     if (!target) return;
     startRequest(target.getAttribute('data-request-uid') || '', target.getAttribute('data-request-name') || 'Guild Member');
