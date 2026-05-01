@@ -1726,7 +1726,7 @@ async function loadRolesManager(container) {
   }
   const currentLevel = getUserLevel(user?.email);
   const roleOptions = Object.keys(ROLE_LEVELS).filter(role => ROLE_LEVELS[role] < currentLevel && role !== 'owner' && role !== 'user' && role !== 'guest').map(role => 
-    `<option value="${role}">${ROLE_NAMES[role]} (Level ${ROLE_LEVELS[role]})</option>`
+    `<option value="${role}">${ROLE_NAMES[role]}</option>`
   ).join('');
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Roles Management${isOwnerUser ? ' (Owner)' : ' (Admin)'}</h3>

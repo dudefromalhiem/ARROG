@@ -373,8 +373,9 @@ module.exports = async function handler(req, res) {
 
       const data = doc.data() || {};
       const isAuthor = String(data.authorUid || '') === actor.uid;
-      if (!isAuthor) {
-        return sendJson(res, 403, { error: 'Only comment author can edit.' });
+      const adminAccess = await isAdminUser(db, actor.uid, actor.email);
+      if (!isAuthor && !adminAccess) {
+        return sendJson(res, 403, { error: 'Only the author or an owner/admin can edit.' });
       }
 
       const updatePayload = {
