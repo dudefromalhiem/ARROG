@@ -95,6 +95,10 @@ render.mount('admin-terminal');</pre>
   <div class="hidden" id="admin-panel" style="display:none">
     <div class="adm">
       <div class="adm-side" id="adm-tabs">
+        <div style="padding:8px 8px 14px;border-bottom:1px solid var(--blk-m);margin-bottom:10px">
+          <div style="font-size:.72rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--wht-f)">Admin Workspace</div>
+          <div style="font-size:.95rem;color:var(--wht-b);margin-top:4px">Operations Console</div>
+        </div>
         <a class="on" id="tab-pages" onclick="switchTab('pages')">Pages</a>
         <a id="tab-submissions" onclick="switchTab('submissions')">Submissions</a>
         <a id="tab-artworks" onclick="switchTab('artworks')">Artworks</a>
@@ -103,6 +107,10 @@ render.mount('admin-terminal');</pre>
         <a onclick="switchTab('users')" id="tab-users" class="hidden">Users</a>
         <a onclick="switchTab('roles')" id="tab-roles" class="hidden">Roles</a>
         <a onclick="switchTab('config')" id="tab-config">Config</a>
+        <div style="margin-top:14px;padding:10px;border:1px solid var(--blk-m);background:rgba(255,255,255,.02);font-size:.74rem;color:var(--wht-d);line-height:1.6">
+          <strong style="color:var(--wht-b);display:block;margin-bottom:4px">Terminal Notes</strong>
+          Owner and admin actions are logged. Review queue and reports should be checked each session.
+        </div>
       </div>
       <div class="adm-main" id="adm-main">
         <!-- Dynamically filled -->

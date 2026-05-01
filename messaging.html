@@ -155,6 +155,16 @@
   <div class="msg-container">
     <!-- SIDEBAR -->
     <div class="msg-sidebar">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--blk-m)">
+        <div>
+          <div style="font-size:.7rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--wht-f)">Inbox Control</div>
+          <div style="font-size:.9rem;color:var(--wht-b)">Direct Messages</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <span id="msg-incoming-count" style="font-size:.65rem;padding:3px 7px;border:1px solid var(--red-d);color:var(--red-m)">0 Incoming</span>
+          <span id="msg-outgoing-count" style="font-size:.65rem;padding:3px 7px;border:1px solid var(--blk-m);color:var(--wht-f)">0 Outgoing</span>
+        </div>
+      </div>
       <!-- Tabs -->
       <div class="msg-tabs">
         <button class="msg-tab-btn active" type="button" data-tab="friends">Conversations</button>
@@ -192,7 +202,7 @@
       <div id="msg-chat-view" class="msg-chat-container">
         <div class="msg-chat-header">
           <div class="msg-chat-title" id="msg-current-name">Select a friend to start messaging</div>
-          <div class="msg-chat-status" id="msg-current-status"></div>
+          <div class="msg-chat-status" id="msg-current-status">Awaiting thread selection</div>
           <div class="msg-chat-actions" id="msg-chat-actions" style="display:none;">
             <button type="button" class="msg-chat-action-btn" id="msg-block-btn">Block User</button>
           </div>
@@ -448,6 +458,15 @@ async function renderRequests() {
     '<div><div class="msg-header">Member Directory</div>' + directoryHtml + '</div>';
 }
 
+function updateRequestCountBadges() {
+  const incomingEl = document.getElementById('msg-incoming-count');
+  const outgoingEl = document.getElementById('msg-outgoing-count');
+  const incomingCount = incomingRequests.filter(r => String(r.status || '').toLowerCase() === 'pending').length;
+  const outgoingCount = outgoingRequests.filter(r => String(r.status || '').toLowerCase() === 'pending').length;
+  if (incomingEl) incomingEl.textContent = String(incomingCount) + ' Incoming';
+  if (outgoingEl) outgoingEl.textContent = String(outgoingCount) + ' Outgoing';
+}
+
 function renderMessages() {
   const container = document.getElementById('msg-messages');
   if (!container) return;
@@ -525,10 +544,12 @@ async function refreshInbox() {
     const reqPayload = await apiGet('friendrequests');
     incomingRequests = Array.isArray(reqPayload.incoming) ? reqPayload.incoming : [];
     outgoingRequests = Array.isArray(reqPayload.outgoing) ? reqPayload.outgoing : [];
+    updateRequestCountBadges();
     if (currentTab === 'requests') renderRequests();
   } catch (_err) {
     incomingRequests = [];
     outgoingRequests = [];
+    updateRequestCountBadges();
   }
 }
 
