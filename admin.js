@@ -98,6 +98,20 @@ function getRoleDisplayName(userDoc) {
   return hierarchy[level] || 'Unknown';
 }
 
+function getRoleDisplayNameForUserRecord(userRecord) {
+  const user = userRecord || {};
+  const email = String(user.email || '').toLowerCase();
+  const explicitRole = String(user.role || '').toLowerCase().trim();
+  const resolvedRole = email ? resolveRole(email) : '';
+  const roleKey = resolvedRole || explicitRole;
+
+  if (roleKey && ROLE_NAMES[roleKey]) return ROLE_NAMES[roleKey];
+  if (roleKey === 'owner') return 'Owner';
+  if (roleKey === 'admin') return 'Administrator';
+  if (roleKey === 'mod') return 'Moderator';
+  return getRoleDisplayName(user);
+}
+
 function getCurrentRole() {
   return getRoleDisplayName(currentUserDoc);
 }
@@ -447,7 +461,7 @@ async function loadReports(container) {
 
     rows.sort((a, b) => b.createdAt - a.createdAt);
     if (!rows.length) {
-      container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">No reports filed yet.</p>';
+      container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">No reports found.</p>';
       return;
     }
 
@@ -992,7 +1006,11 @@ async function refreshSubmissions(status) {
     const snap = await db.collection('submissions').get();
     const docs = snap.docs
       .map(doc => ({ id: doc.id, data: doc.data() }))
-      .filter(entry => !status || status === 'all' || entry.data.status === status)
+      .filter(entry => {
+        const entryStatus = String(entry?.data?.status || '').toLowerCase();
+        if (entryStatus === 'draft') return false;
+        return !status || status === 'all' || entryStatus === String(status).toLowerCase();
+      })
       .sort((a, b) => {
         const aTime = a.data.submittedAt?.seconds || 0;
         const bTime = b.data.submittedAt?.seconds || 0;
@@ -1682,7 +1700,7 @@ async function refreshUsers() {
     tbody.innerHTML = snap.docs.map(d => {
       const u = d.data();
       const showEmail = hasPermission(currentUserDoc, 'manageUsers') ? (u.email || '[Not Set]') : '[Redacted]';
-      const roleDisplayName = getRoleDisplayName(u);
+      const roleDisplayName = getRoleDisplayNameForUserRecord(u);
       return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${roleDisplayName}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
     }).join('');
   } catch { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
@@ -1700,6 +1718,7 @@ function canEditRole(targetEmail, currentEmail) {
 
 async function loadRolesManager(container) {
   const user = auth.currentUser;
+  const isOwnerUser = isOwner(user?.email);
   const canManageRoles = isOwner(user?.email) || (isAdmin(user?.email) && GUILD_PERMISSIONS['adminCanManageRoles']);
   if (!canManageRoles) {
     container.innerHTML = '<p style="color:var(--red-b)">⚠ Roles management requires Owner clearance or Admin with role management permission.</p>';
