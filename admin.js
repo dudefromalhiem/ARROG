@@ -1693,12 +1693,9 @@ async function refreshUsers() {
 // ═════════════════════════════════════════════════════════════
 
 function canEditRole(targetEmail, currentEmail) {
-  if (isOwner(currentEmail)) return true; // owners can edit anyone
-  if (isAdmin(currentEmail) && GUILD_PERMISSIONS['adminCanManageRoles']) {
-    // admins can edit anyone with less authority (not owner, not admin)
-    return !isOwner(targetEmail) && !isAdmin(targetEmail);
-  }
-  return false;
+  const currentLevel = getUserLevel(currentEmail);
+  const targetLevel = getUserLevel(targetEmail);
+  return currentLevel > targetLevel;
 }
 
 async function loadRolesManager(container) {
@@ -1708,26 +1705,27 @@ async function loadRolesManager(container) {
     container.innerHTML = '<p style="color:var(--red-b)">⚠ Roles management requires Owner clearance or Admin with role management permission.</p>';
     return;
   }
-  const isOwnerUser = isOwner(user?.email);
-  const canAssignAdmin = isOwnerUser; // only owners can assign admin role
+  const currentLevel = getUserLevel(user?.email);
+  const roleOptions = Object.keys(ROLE_LEVELS).filter(role => ROLE_LEVELS[role] < currentLevel && role !== 'owner' && role !== 'user' && role !== 'guest').map(role => 
+    `<option value="${role}">${ROLE_NAMES[role]} (Level ${ROLE_LEVELS[role]})</option>`
+  ).join('');
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Roles Management${isOwnerUser ? ' (Owner)' : ' (Admin)'}</h3>
-    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:24px">${isOwnerUser ? 'Assign Moderator or Admin access.' : 'Assign Moderator access.'} Changes take effect on next login. Roles are stored in Firebase config as email lists for moderators, admins, and owners.</p>
+    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:24px">Assign staff roles. Changes take effect on next login. Roles are stored in Firebase config.</p>
     <div style="margin-bottom:24px;border:1px solid var(--wht-f);padding:16px">
       <h4 style="margin-bottom:12px;color:var(--red-b)">Add Staff Role</h4>
       <div style="display:flex;gap:8px;align-items:center">
         <input class="fi" id="role-email" placeholder="email@example.com" style="flex:1" />
-        <select class="fi" id="role-kind" style="max-width:180px">
-          <option value="mod">Moderator (Level 4)</option>
-          ${canAssignAdmin ? '<option value="admin">Admin (Level 5)</option>' : ''}
+        <select class="fi" id="role-kind" style="max-width:200px">
+          ${roleOptions}
         </select>
         <button class="btn btn-p" onclick="addStaffRole()">+ Add Role</button>
       </div>
     </div>
-    <h4 style="margin-bottom:8px">Current Moderators</h4>
-    <div id="mods-list" style="margin-bottom:24px"></div>
-    <h4 style="margin-bottom:8px">Current Admins</h4>
-    <div id="roles-list" style="margin-bottom:24px"></div>
+    <h4 style="margin-bottom:8px">Administrative Staff</h4>
+    <div id="admin-list" style="margin-bottom:24px"></div>
+    <h4 style="margin-bottom:8px">Moderation Staff</h4>
+    <div id="mod-list" style="margin-bottom:24px"></div>
     <h4 style="margin-bottom:8px;color:var(--wht-d)">Owners (Bootstrap — cannot be changed here)</h4>
     <div id="owners-list"></div>
   `;
@@ -1735,10 +1733,10 @@ async function loadRolesManager(container) {
 }
 
 async function refreshRolesDisplay() {
-  const modsList = document.getElementById('mods-list');
-  const adminsList = document.getElementById('roles-list');
+  const adminList = document.getElementById('admin-list');
+  const modList = document.getElementById('mod-list');
   const ownersList = document.getElementById('owners-list');
-  if (!modsList || !adminsList || !ownersList) return;
+  if (!adminList || !modList || !ownersList) return;
 
   // Refresh from Firestore
   try {
@@ -1748,35 +1746,59 @@ async function refreshRolesDisplay() {
       ROLE_DATA.owners = (d.owners || []).map(e => e.toLowerCase());
       ROLE_DATA.admins = (d.admins || []).map(e => e.toLowerCase());
       ROLE_DATA.mods = (d.mods || []).map(e => e.toLowerCase());
+      ROLE_DATA.userRoles = d.userRoles || {};
       ROLE_DATA.adminAppointments = d.adminAppointments || {};
     }
   } catch(e) { /* keep cached */ }
 
-  if (ROLE_DATA.mods.length === 0) {
-    modsList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No moderators assigned yet.</p>';
+  // Set userRoles for backward compatibility
+  ROLE_DATA.owners.forEach(email => {
+    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'owner';
+  });
+  ROLE_DATA.admins.forEach(email => {
+    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'admin';
+  });
+  ROLE_DATA.mods.forEach(email => {
+    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'mod';
+  });
+
+  const currentEmail = auth.currentUser?.email;
+
+  // Administrative Staff (level >=60 and <100)
+  const adminStaff = Object.entries(ROLE_DATA.userRoles).filter(([email, role]) => {
+    const level = ROLE_LEVELS[role] || 0;
+    return level >= 60 && level < 100;
+  });
+  if (adminStaff.length === 0) {
+    adminList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No administrative staff assigned yet.</p>';
   } else {
-    const currentEmail = auth.currentUser?.email;
-    modsList.innerHTML = ROLE_DATA.mods.map(email => {
+    adminList.innerHTML = adminStaff.map(([email, role]) => {
       const canRevoke = canEditRole(email, currentEmail);
+      const roleName = ROLE_NAMES[role] || role;
       return `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
-          <span>${email}</span>
-          ${canRevoke ? `<button class="btn btn-sm btn-d" onclick="removeStaffRole('mod','${email}')">Revoke</button>` : ''}
+          <span>${email} <span style="color:var(--wht-d)">(${roleName})</span></span>
+          ${canRevoke ? `<button class="btn btn-sm btn-d" onclick="removeStaffRole('${role}','${email}')">Revoke</button>` : ''}
         </div>
       `;
     }).join('');
   }
 
-  if (ROLE_DATA.admins.length === 0) {
-    adminsList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No admins assigned yet.</p>';
+  // Moderation Staff (level >=10 and <60)
+  const modStaff = Object.entries(ROLE_DATA.userRoles).filter(([email, role]) => {
+    const level = ROLE_LEVELS[role] || 0;
+    return level >= 10 && level < 60;
+  });
+  if (modStaff.length === 0) {
+    modList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No moderation staff assigned yet.</p>';
   } else {
-    const currentEmail = auth.currentUser?.email;
-    adminsList.innerHTML = ROLE_DATA.admins.map(email => {
+    modList.innerHTML = modStaff.map(([email, role]) => {
       const canRevoke = canEditRole(email, currentEmail);
+      const roleName = ROLE_NAMES[role] || role;
       return `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
-          <span>${email}</span>
-          ${canRevoke ? `<button class="btn btn-sm btn-d" onclick="removeStaffRole('admin','${email}')">Revoke</button>` : ''}
+          <span>${email} <span style="color:var(--wht-d)">(${roleName})</span></span>
+          ${canRevoke ? `<button class="btn btn-sm btn-d" onclick="removeStaffRole('${role}','${email}')">Revoke</button>` : ''}
         </div>
       `;
     }).join('');
@@ -1784,7 +1806,7 @@ async function refreshRolesDisplay() {
 
   ownersList.innerHTML = ROLE_DATA.owners.map(email => `
     <div style="padding:8px 12px;border:1px solid var(--red-b);margin-bottom:4px;font-family:monospace;font-size:.85rem;color:var(--red-b)">
-      ${email} <span style="color:var(--wht-d)">(owner)</span>
+      ${email} <span style="color:var(--wht-d)">(Owner)</span>
     </div>
   `).join('');
 }
@@ -1795,24 +1817,28 @@ async function addStaffRole() {
   const email = (input.value || '').trim().toLowerCase();
   const kind = (kindInput && kindInput.value) || 'mod';
   if (!email || !email.includes('@')) { alert('Enter a valid email address.'); return; }
-  if (kind === 'admin' && !isOwner(auth.currentUser?.email)) { alert('Only Owners can assign Admin roles.'); return; }
   if (!canEditRole(email, auth.currentUser?.email)) { alert('You do not have permission to modify this user\'s role.'); return; }
   if (ROLE_DATA.owners.includes(email)) { alert('This email is already an Owner.'); return; }
 
-  if (kind === 'admin' && ROLE_DATA.admins.includes(email)) { alert('This email is already an Admin.'); return; }
-  if (kind === 'mod' && ROLE_DATA.mods.includes(email)) { alert('This email is already a Moderator.'); return; }
+  // Check if already has this role
+  if (ROLE_DATA.userRoles[email] === kind) { alert(`This email is already assigned the ${ROLE_NAMES[kind]} role.`); return; }
 
   try {
-    const appointmentStamp = new Date().toISOString();
-    if (kind === 'admin') {
-      ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
-      ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
+    // Remove from old role arrays for backward compatibility
+    ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
+    ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
+    if (ROLE_DATA.adminAppointments && ROLE_DATA.adminAppointments[email]) delete ROLE_DATA.adminAppointments[email];
+
+    // Set new role
+    ROLE_DATA.userRoles[email] = kind;
+
+    // Add to arrays for backward compatibility
+    if (['chief-admin', 'deputy-chief-admin', 'senior-admin', 'admin'].includes(kind)) {
       ROLE_DATA.admins.push(email);
-      ROLE_DATA.adminAppointments = ROLE_DATA.adminAppointments || {};
-      ROLE_DATA.adminAppointments[email] = appointmentStamp;
-    } else {
-      ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
-      ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
+      if (kind === 'admin') {
+        ROLE_DATA.adminAppointments[email] = new Date().toISOString();
+      }
+    } else if (['chief-mod', 'deputy-chief-mod', 'senior-mod', 'mod', 'junior-mod'].includes(kind)) {
       ROLE_DATA.mods.push(email);
     }
 
@@ -1820,11 +1846,12 @@ async function addStaffRole() {
       owners: ROLE_DATA.owners,
       admins: ROLE_DATA.admins,
       mods: ROLE_DATA.mods,
+      userRoles: ROLE_DATA.userRoles,
       adminAppointments: ROLE_DATA.adminAppointments || {}
     });
 
     input.value = '';
-    alert((kind === 'admin' ? 'Admin' : 'Moderator') + ' access granted to ' + email);
+    alert(`${ROLE_NAMES[kind]} role granted to ${email}`);
     await refreshRolesDisplay();
   } catch (err) {
     alert('Failed to add role: ' + err.message);
@@ -1832,20 +1859,25 @@ async function addStaffRole() {
 }
 
 async function removeStaffRole(kind, email) {
-  if (!confirm('Revoke ' + (kind === 'admin' ? 'admin' : 'moderator') + ' access for ' + email + '?')) return;
+  if (!confirm(`Revoke ${ROLE_NAMES[kind]} access for ${email}?`)) return;
   if (!canEditRole(email, auth.currentUser?.email)) { alert('You do not have permission to modify this user\'s role.'); return; }
   try {
-    if (kind === 'admin') ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
-    else ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
-    if (kind === 'admin' && ROLE_DATA.adminAppointments) delete ROLE_DATA.adminAppointments[email];
+    // Remove from userRoles
+    delete ROLE_DATA.userRoles[email];
+
+    // Remove from arrays for backward compatibility
+    ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
+    ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
+    if (ROLE_DATA.adminAppointments && ROLE_DATA.adminAppointments[email]) delete ROLE_DATA.adminAppointments[email];
 
     await db.collection('config').doc('roles').set({
       owners: ROLE_DATA.owners,
       admins: ROLE_DATA.admins,
       mods: ROLE_DATA.mods,
+      userRoles: ROLE_DATA.userRoles,
       adminAppointments: ROLE_DATA.adminAppointments || {}
     });
-    alert((kind === 'admin' ? 'Admin' : 'Moderator') + ' access revoked for ' + email);
+    alert(`${ROLE_NAMES[kind]} access revoked for ${email}`);
     await refreshRolesDisplay();
   } catch (err) {
     alert('Failed to remove role: ' + err.message);

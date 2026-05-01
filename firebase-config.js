@@ -594,7 +594,39 @@ if (document.readyState === 'loading') {
 // Bootstrap — only used if Firestore config/roles doesn't exist yet
 const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
 const BOOTSTRAP_OWNER_SET = new Set(_BOOTSTRAP.map(email => String(email || '').toLowerCase()));
-let ROLE_DATA = { owners: [], admins: [], mods: [], adminAppointments: {} };
+
+// Role definitions
+const ROLE_LEVELS = {
+  'owner': 100,
+  'chief-admin': 90,
+  'deputy-chief-admin': 80,
+  'senior-admin': 70,
+  'admin': 60,
+  'chief-mod': 50,
+  'deputy-chief-mod': 40,
+  'senior-mod': 30,
+  'mod': 20,
+  'junior-mod': 10,
+  'user': 5,
+  'guest': 0
+};
+
+const ROLE_NAMES = {
+  'owner': 'Owner',
+  'chief-admin': 'Chief Administrator',
+  'deputy-chief-admin': 'Deputy Chief Administrator',
+  'senior-admin': 'Senior Administrator',
+  'admin': 'Administrator',
+  'chief-mod': 'Chief of Moderation',
+  'deputy-chief-mod': 'Deputy Chief of Moderation',
+  'senior-mod': 'Senior Moderator',
+  'mod': 'Moderator',
+  'junior-mod': 'Junior Moderator',
+  'user': 'User',
+  'guest': 'Guest'
+};
+
+let ROLE_DATA = { owners: [], admins: [], mods: [], userRoles: {}, adminAppointments: {} };
 let GUILD_PERMISSIONS = {};
 let SITE_STATE = { esdLocked: false, esdActivatedBy: '', esdActivatedAt: null };
 let rolesReadyResolved = false;
@@ -622,6 +654,7 @@ const rolesReady = (async () => {
       ROLE_DATA.owners = (d.owners || []).map(e => e.toLowerCase());
       ROLE_DATA.admins = (d.admins || []).map(e => e.toLowerCase());
       ROLE_DATA.mods = (d.mods || []).map(e => e.toLowerCase());
+      ROLE_DATA.userRoles = d.userRoles || {};
       ROLE_DATA.adminAppointments = d.adminAppointments || {};
     }
     
@@ -636,8 +669,30 @@ const rolesReady = (async () => {
     const low = bo.toLowerCase();
     if (!ROLE_DATA.owners.includes(low)) ROLE_DATA.owners.push(low);
   });
+  // Set userRoles for backward compatibility
+  ROLE_DATA.owners.forEach(email => {
+    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'owner';
+  });
+  ROLE_DATA.admins.forEach(email => {
+    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'admin';
+  });
+  ROLE_DATA.mods.forEach(email => {
+    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'mod';
+  });
   rolesReadyResolved = true;
 })();
+
+function getUserLevel(email) {
+  if (!email) return 0;
+  const e = email.toLowerCase();
+  const role = ROLE_DATA.userRoles[e];
+  if (role) return ROLE_LEVELS[role] || 0;
+  // Fallback for backward compatibility
+  if (BOOTSTRAP_OWNER_SET.has(e) || ROLE_DATA.owners.includes(e)) return 100;
+  if (ROLE_DATA.admins.includes(e)) return 60;
+  if (ROLE_DATA.mods.includes(e)) return 20;
+  return 0;
+}
 
 function resolveRole(email) {
   if (!email) return "user";
@@ -653,15 +708,10 @@ function isModerator(email) {
   return r === "mod" || r === "admin" || r === "owner";
 }
 function isAdmin(email) {
-  const e = String(email || '').toLowerCase();
-  if (BOOTSTRAP_OWNER_SET.has(e)) return true;
-  const r = resolveRole(email);
-  return r === "admin" || r === "owner";
+  return getUserLevel(email) >= 60;
 }
 function isOwner(email) {
-  const e = String(email || '').toLowerCase();
-  if (BOOTSTRAP_OWNER_SET.has(e)) return true;
-  return resolveRole(email) === "owner";
+  return getUserLevel(email) >= 100;
 }
 function adminHasDelegation(email, permissionKey) {
   if (isOwner(email)) return true; // Owner always has every permission
