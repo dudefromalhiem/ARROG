@@ -109,21 +109,6 @@ async function isAdminUser(db, uid, email) {
   if (BOOTSTRAP_OWNERS.has(normalizedEmail)) return true;
 
   const userDoc = await db.collection('users').doc(uid).get();
-  if (userDoc.exists && userDoc.data() && userDoc.data().isAdmin === true) {
-    return true;
-  }
-
-  const rolesDoc = await db.collection('config').doc('roles').get();
-  if (!rolesDoc.exists) return false;
-  const owners = Array.isArray(rolesDoc.data()?.owners) ? rolesDoc.data().owners : [];
-  return owners.map(owner => String(owner || '').toLowerCase()).includes(normalizedEmail);
-}
-
-async function isAdminUser(db, uid, email) {
-  const normalizedEmail = String(email || '').toLowerCase();
-  if (BOOTSTRAP_OWNERS.has(normalizedEmail)) return true;
-
-  const userDoc = await db.collection('users').doc(uid).get();
   if (userDoc.exists) {
     const userData = userDoc.data() || {};
     if (userData.isAdmin === true || userData.role === 'admin' || userData.role === 'owner') return true;
