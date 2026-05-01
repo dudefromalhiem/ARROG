@@ -434,7 +434,6 @@ function loadTab() {
     else if (activeTab === 'artworks') loadArtworks(main);
     else if (activeTab === 'news') loadNewsAdmin(main);
     else if (activeTab === 'reports') loadReports(main);
-    else if (activeTab === 'users') loadUsers(main);
     else if (activeTab === 'roles') loadRolesManager(main);
   }
 }
@@ -495,7 +494,7 @@ async function loadReports(container) {
 
     rows.sort((a, b) => b.createdAt - a.createdAt);
     if (!rows.length && !adminRows.length) {
-      container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">No reports found.</p>';
+      container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">No reports yet.</p>';
       return;
     }
 
@@ -541,8 +540,8 @@ async function loadReports(container) {
       ) : '<p style="font-size:.82rem;color:var(--wht-d)">No admin applications found.</p>'),
       '</div>'
     ].join('');
-  } catch (err) {
-    container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load reports: ' + escapeHtml(err.message) + '</p>';
+  } catch (_err) {
+    container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--red-g)">Error could not load reports.</p>';
   }
 }
 
