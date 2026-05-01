@@ -1,24 +1,28 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Red Oaker Guild — Classified Archive</title>
-  <meta name="description" content="The Red Oaker Guild: a secretive, archival collective documenting anomalous phenomena. Explore contained anomalies, tales, and classified artworks." />
+  <title>The Red Oaker Guild</title>
+  <meta name="description"
+    content="The Red Oaker Guild: a secretive, archival collective documenting anomalous phenomena. Explore contained anomalies, tales, and classified artworks." />
   <!-- SEO -->
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://redoakerguild.com/" />
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Red Oaker Guild" />
-  <meta property="og:title" content="Red Oaker Guild - Classified Archive" />
-  <meta property="og:description" content="The Red Oaker Guild: a secretive, archival collective documenting anomalous phenomena. Explore contained anomalies, tales, and classified artworks." />
+  <meta property="og:title" content="Red Oaker Guild — Classified Archive" />
+  <meta property="og:description"
+    content="The Red Oaker Guild: a secretive, archival collective documenting anomalous phenomena. Explore contained anomalies, tales, and classified artworks." />
   <meta property="og:url" content="https://redoakerguild.com/" />
   <meta property="og:image" content="https://redoakerguild.com/logo.png" />
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Red Oaker Guild - Classified Archive" />
-  <meta name="twitter:description" content="The Red Oaker Guild: a secretive, archival collective documenting anomalous phenomena. Explore contained anomalies, tales, and classified artworks." />
+  <meta name="twitter:title" content="Red Oaker Guild — Classified Archive" />
+  <meta name="twitter:description"
+    content="The Red Oaker Guild: a secretive, archival collective documenting anomalous phenomena. Explore contained anomalies, tales, and classified artworks." />
   <meta name="twitter:image" content="https://redoakerguild.com/logo.png" />
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -26,223 +30,250 @@
   <link rel="apple-touch-icon" href="/logo.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
 
-<!-- ═══ TERMINAL EASTER EGG ═══ -->
-<div class="term" id="terminal">
-  <div class="term-body" id="term-body"></div>
-  <div class="term-skip">
-    <button class="btn btn-sm btn-s" type="button" aria-label="Skip terminal intro" onclick="skipTerminal()">Skip &gt;&gt;</button>
-  </div>
-</div>
-
-<!-- ═══ HEADER ═══ -->
-
-<!-- ═══ HEADER ═══ -->
-<header class="hdr">
-  <div class="hdr-in">
-    <a href="index.html" class="hdr-brand">
-      <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
-      <span class="hdr-title">Red Oaker Guild</span>
-    </a>
-    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
-    <ul class="nav" id="nav">
-      <li><a href="index.html">Home</a></li>
-      <li><a href="guide.html">Guide</a></li>
-      <li><a href="explore.html">Explore</a></li>
-      <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
-      <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
-      <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
-    </ul>
-  </div>
-</header>
-
-<!-- ═══ MAIN CONTENT ═══ -->
-<main class="wrap">
-
-  <!-- Intro -->
-  <section class="intro" id="about">
-    <div class="intro-hero">
-      <img src="logo.png" alt="" class="intro-logo" />
-      <h1 class="intro-t">Red Oaker Guild</h1>
-    </div>
-    <div class="intro-cl">● Clearance Level 2 Required ● Classified Document ●</div>
-    <div class="intro-r"></div>
-    <p class="intro-sub">
-      Necessary for observation, shelter, and understanding.
-    </p>
-  </section>
-
-  <!-- Legacy Block -->
-  <section class="legacy-block" id="legacy">
-    <div class="legacy-kicker">Guild Chronicle</div>
-    <h2 class="legacy-title">Legacy of the Red Oaker Guild</h2>
-    <p class="legacy-copy">
-      Prior to becoming a multinational private organization, the Red Oaker Guild was made up of a singular team of scientific researchers, doctors, and priests. Led by one man's vision, they strived to understand and even befriend the anomalous beings and objects they encountered, harboring and consistently observing many of them. Throughout decades, leadership shifted, and many personnel recorded their findings until the Guild's collapse near the late 20th century.
-    </p>
-    <p class="legacy-copy">
-      During the collapse many anomalies escaped, and those too weak succumbed to the harsh nature of the world. Many records were destroyed or lost. Under the first Archon, Mikolov "Ekat" Gunitsky, the Guild was rebuilt and found records were consolidated into a system known as the Anomalous Registry of the Red Oaker Guild or "ARROG". This served to centralize all information of the guild and the anomalies into a single controlled system. Today, the Guild still uses the ARROG system, with the hopes of one day restoring the archive to its former glory. The Guild has expanded, with 242 Facilities and 12 Complexes placed around the world.
-    </p>
-    <p class="legacy-copy">
-      The current Archon, Archon Quincy, operates the guild as both a psychiatric ward and an anomalous research center, allowing patients to be selected for testing with anomalies. The Guild prioritizes the recovery of lost research and the expansion of the Registry through newly acquired anomalies. In accordance with its doctrine, all anomalies are sheltered, observed, and pursued for understanding.
-    </p>
-    <div class="legacy-actions">
-      <a href="legacy-sheet.html" class="btn btn-p">Open Red Oaker Legacy</a>
-      <a href="guide.html" class="btn btn-s">Read Guild Protocol</a>
-    </div>
-  </section>
-
-  <!-- Warning Banner -->
-  <div class="warn" id="warning">
-    <h2>⚠ Warning: The Guild Will Change the Way You Percieve Reality ⚠</h2>
-    <div class="bgrp">
-      <a href="registry.html" class="btn btn-p">Browse Everything</a>
-      <a href="guide.html" class="btn btn-s">Read the Guide</a>
+  <!-- â• â• â•  TERMINAL EASTER EGG â• â• â•  -->
+  <div class="term" id="terminal">
+    <div class="term-body" id="term-body"></div>
+    <div class="term-skip">
+      <button class="btn btn-sm btn-s" type="button" aria-label="Skip terminal intro" onclick="skipTerminal()">Skip
+        &gt;&gt;</button>
     </div>
   </div>
 
-  <!-- Staff Contact CTA -->
-  <div class="section" id="admin-contact" style="margin-bottom:64px">
-    <div class="section-hd">Guild Staff</div>
-    <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
-      Need help, moderation support, or guidance from the administration team?
-    </p>
-    <a href="staff.html" class="btn btn-p">Contact our admins</a>
-  </div>
+  <!-- â•â•â• HEADER â•â•â• -->
 
-  <!-- Onboarding -->
-  <div class="g2" id="community" style="margin-bottom:64px">
-    <div class="section" style="margin-bottom:0">
-      <div class="section-hd">Get Started</div>
-      <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
-        Welcome, Observer. Before accessing classified materials, familiarize yourself with Guild protocols and containment procedures. Registration grants basic clearance.
+  <!-- â•â•â• HEADER â•â•â• -->
+  <header class="hdr">
+    <div class="hdr-in">
+      <a href="index.html" class="hdr-brand">
+        <img src="logo.png" alt="Red Oaker Guild" class="hdr-logo" />
+        <span class="hdr-title">Red Oaker Guild</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation"
+        onclick="document.getElementById('nav').classList.toggle('open')">â˜°</button>
+      <ul class="nav" id="nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="guide.html">Guide</a></li>
+        <li><a href="explore.html">Explore</a></li>
+        <li id="messaging-link" class="hidden"><a href="messaging.html">Messages</a></li>
+        <li id="submit-link" class="hidden"><a href="submit.html">Workstation</a></li>
+        <li id="nav-auth"><button class="nav-btn" onclick="openAuth()">Sign In</button></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- â•â•â• MAIN CONTENT â•â•â• -->
+  <main class="wrap">
+
+    <!-- Intro -->
+    <section class="intro" id="about">
+      <div class="intro-hero">
+        <img src="logo.png" alt="" class="intro-logo" />
+        <h1 class="intro-t">Red Oaker Guild</h1>
+      </div>
+      <div class="intro-cl">â— Clearance Level 2 Required â— Classified Document â—</div>
+      <div class="intro-r"></div>
+      <p class="intro-sub">
+        Necessary for observation, shelter, and understanding.
       </p>
-      <ol style="padding-left:20px;font-size:.85rem;color:var(--wht-d);margin-bottom:16px;line-height:1.8">
-        <li>Create an account or sign in above.</li>
-        <li>Read the <a href="guide.html">Newcomer's Guide</a>.</li>
-        <li>Browse the <a href="registry.html">Anomaly Registry</a>.</li>
-        <li><a href="submit.html">Submit your first contribution</a>.</li>
-      </ol>
-    </div>
-    <div class="section" style="margin-bottom:0">
-      <div class="section-hd">Be an Admin</div>
-      <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
-        The Guild requires dedicated members to maintain the archive, update content, and enforce containment protocols. Admin clearance provides full create, update, and remove access to all compartments, sections, and uploads.
+    </section>
+
+    <!-- Legacy Block -->
+    <section class="legacy-block" id="legacy">
+      <div class="legacy-kicker">Guild Chronicle</div>
+      <h2 class="legacy-title">Legacy of the Red Oaker Guild</h2>
+      <p class="legacy-copy">
+        Prior to becoming a multinational private organization, the Red Oaker Guild was made up of a singular team of
+        scientific researchers, doctors, and priests. Led by one man's vision, they strived to understand and even
+        befriend the anomalous beings and objects they encountered, harboring and consistently observing many of them.
+        Throughout decades, leadership shifted, and many personnel recorded their findings until the Guild's collapse
+        near the late 20th century.
       </p>
-      <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">Requirements: Active account, demonstrated contributions, and Owner approval.</p>
-      <a href="guide.html" class="btn btn-p">View Admin Requirements</a>
+      <p class="legacy-copy">
+        During the collapse many anomalies escaped, and those too weak succumbed to the harsh nature of the world. Many
+        records were destroyed or lost. Under the first Archon, Mikolov "Ekat" Gunitsky, the Guild was rebuilt and found
+        records were consolidated into a system known as the Anomalous Registry of the Red Oaker Guild or "ARROG". This
+        served to centralize all information of the guild and the anomalies into a single controlled system. Today, the
+        Guild still uses the ARROG system, with the hopes of one day restoring the archive to its former glory. The
+        Guild has expanded, with 242 Facilities and 12 Complexes placed around the world.
+      </p>
+      <p class="legacy-copy">
+        The current Archon, Archon Quincy, operates the guild as both a psychiatric ward and an anomalous research
+        center, allowing patients to be selected for testing with anomalies. The Guild prioritizes the recovery of lost
+        research and the expansion of the Registry through newly acquired anomalies. In accordance with its doctrine,
+        all anomalies are sheltered, observed, and pursued for understanding.
+      </p>
+      <div class="legacy-actions">
+        <a href="legacy-sheet.html" class="btn btn-p">Open Red Oaker Legacy</a>
+        <a href="guide.html" class="btn btn-s">Read Guild Protocol</a>
+      </div>
+    </section>
+
+    <!-- Warning Banner -->
+    <div class="warn" id="warning">
+      <h2>âš  Warning: The Guild Will Change the Way You Percieve Reality âš </h2>
+      <div class="bgrp">
+        <a href="registry.html" class="btn btn-p">Browse Everything</a>
+        <a href="guide.html" class="btn btn-s">Read the Guide</a>
+      </div>
     </div>
-  </div>
 
-  <!-- Create Page CTA -->
-  <div class="create-cta" id="create-cta">
-    <h2>✦ Submit Your Artwork ✦</h2>
-    <a href="submit.html" class="btn btn-p">>> Submit Artwork</a>
-  </div>
-
-  <!-- Featured Pages -->
-  <div class="section" id="featured">
-    <div class="section-hd">Featured Pages</div>
-    <div class="g2" id="featured-grid">
-      <div class="card" style="padding:20px;text-align:center;color:var(--wht-d);grid-column:1/-1">Loading featured pages...</div>
+    <!-- Staff Contact CTA -->
+    <div class="section" id="admin-contact" style="margin-bottom:64px">
+      <div class="section-hd">Guild Staff</div>
+      <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
+        Need help, moderation support, or guidance from the administration team?
+      </p>
+      <a href="staff.html" class="btn btn-p">Contact our admins</a>
     </div>
-  </div>
 
-  <!-- Art Spotlight -->
-  <div class="section">
-    <div class="section-hd">Art Spotlight</div>
-    <div class="carousel" id="art-carousel">
-      <div class="carousel-view">
-        <button class="carousel-btn prev" id="carousel-prev" title="Previous Slide">&lt;</button>
-        <button class="carousel-btn next" id="carousel-next" title="Next Slide">&gt;</button>
-        <div class="carousel-track" id="carousel-track">
-          <div style="padding:40px;text-align:center;color:var(--wht-d);width:100%">Accessing art spotlight...</div>
+    <!-- Onboarding -->
+    <div class="g2" id="community" style="margin-bottom:64px">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-hd">Get Started</div>
+        <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
+          Welcome, Observer. Before accessing classified materials, familiarize yourself with Guild protocols and
+          containment procedures. Registration grants basic clearance.
+        </p>
+        <ol style="padding-left:20px;font-size:.85rem;color:var(--wht-d);margin-bottom:16px;line-height:1.8">
+          <li>Create an account or sign in above.</li>
+          <li>Read the <a href="guide.html">Newcomer's Guide</a>.</li>
+          <li>Browse the <a href="registry.html">Anomaly Registry</a>.</li>
+          <li><a href="submit.html">Submit your first contribution</a>.</li>
+        </ol>
+      </div>
+      <div class="section" style="margin-bottom:0">
+        <div class="section-hd">Be an Admin</div>
+        <p style="font-size:.85rem;color:var(--wht-m);margin-bottom:16px;line-height:1.7">
+          The Guild requires dedicated members to maintain the archive, update content, and enforce containment
+          protocols. Admin clearance provides full create, update, and remove access to all compartments, sections, and
+          uploads.
+        </p>
+        <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">Requirements: Active account, demonstrated
+          contributions, and Owner approval.</p>
+        <a href="guide.html" class="btn btn-p">View Admin Requirements</a>
+      </div>
+    </div>
+
+    <!-- Create Page CTA -->
+    <div class="create-cta" id="create-cta">
+      <h2>âœ¦ Submit Your Artwork âœ¦</h2>
+      <a href="submit.html" class="btn btn-p">>> Submit Artwork</a>
+    </div>
+
+    <!-- Featured Pages -->
+    <div class="section" id="featured">
+      <div class="section-hd">Featured Pages</div>
+      <div class="g2" id="featured-grid">
+        <div class="card" style="padding:20px;text-align:center;color:var(--wht-d);grid-column:1/-1">Loading featured
+          pages...</div>
+      </div>
+    </div>
+
+    <!-- Art Spotlight -->
+    <div class="section">
+      <div class="section-hd">Art Spotlight</div>
+      <div class="carousel" id="art-carousel">
+        <div class="carousel-view">
+          <button class="carousel-btn prev" id="carousel-prev" title="Previous Slide">&lt;</button>
+          <button class="carousel-btn next" id="carousel-next" title="Next Slide">&gt;</button>
+          <div class="carousel-track" id="carousel-track">
+            <div style="padding:40px;text-align:center;color:var(--wht-d);width:100%">Accessing art spotlight...</div>
+          </div>
+        </div>
+        <div class="carousel-label" id="carousel-label"></div>
+        <div class="carousel-dots" id="carousel-dots"></div>
+      </div>
+    </div>
+
+    <!-- Top Rated Anomalies -->
+    <div class="section" id="top-rated">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="section-hd">Top Rated Anomalies</div>
+        <a href="rankings.html"
+          style="font-size:.75rem;color:var(--red-b);text-decoration:none;text-transform:uppercase;letter-spacing:1px">View
+          Full Rankings â†’</a>
+      </div>
+      <div class="g2" id="top-rated-grid">
+        <div class="card" style="padding:20px;text-align:center;color:var(--wht-d)">Loading highest rated anomalies...
         </div>
       </div>
-      <div class="carousel-label" id="carousel-label"></div>
-      <div class="carousel-dots" id="carousel-dots"></div>
     </div>
-  </div>
 
-  <!-- Top Rated Anomalies -->
-  <div class="section" id="top-rated">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div class="section-hd">Top Rated Anomalies</div>
-      <a href="rankings.html" style="font-size:.75rem;color:var(--red-b);text-decoration:none;text-transform:uppercase;letter-spacing:1px">View Full Rankings →</a>
+    <!-- Site News -->
+    <div class="section" id="news">
+      <div class="section-hd">Site News</div>
+      <div id="news-feed">
+        <div style="padding:10px;color:var(--wht-d)">Accessing latest news...</div>
+      </div>
     </div>
-    <div class="g2" id="top-rated-grid">
-      <div class="card" style="padding:20px;text-align:center;color:var(--wht-d)">Loading highest rated anomalies...</div>
+
+    <!-- Read Section -->
+    <div class="section" id="resources">
+      <div class="section-hd">Read</div>
+      <div class="g3">
+        <a href="registry.html" style="text-decoration:none">
+          <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
+            <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">â—ˆ</div>
+            <div class="card-t">Anomalies</div>
+            <div class="card-b" style="font-size:.8rem">Browse the full registry of catalogued anomalous objects,
+              entities, and phenomena.</div>
+          </div>
+        </a>
+        <a href="explore.html" style="text-decoration:none">
+          <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
+            <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">â—‡</div>
+            <div class="card-t">Tales</div>
+            <div class="card-b" style="font-size:.8rem">Narrative accounts, field reports, and canonical stories from
+              Guild members.</div>
+          </div>
+        </a>
+        <a href="explore.html" style="text-decoration:none">
+          <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
+            <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">â–£</div>
+            <div class="card-t">Artworks</div>
+            <div class="card-b" style="font-size:.8rem">Visual documentation and creative interpretations submitted by
+              the community.</div>
+          </div>
+        </a>
+      </div>
     </div>
-  </div>
 
-  <!-- Site News -->
-  <div class="section" id="news">
-    <div class="section-hd">Site News</div>
-    <div id="news-feed">
-      <div style="padding:10px;color:var(--wht-d)">Accessing latest news...</div>
+    <!-- Newest Pages -->
+    <div class="section" id="newest">
+      <div class="section-hd">Newest Pages</div>
+      <div id="newest-feed">
+        <div style="padding:10px;color:var(--wht-d)">Synchronizing newest archives...</div>
+      </div>
     </div>
-  </div>
+  </main>
 
-  <!-- Read Section -->
-  <div class="section" id="resources">
-    <div class="section-hd">Read</div>
-    <div class="g3">
-      <a href="registry.html" style="text-decoration:none">
-        <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
-          <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">◈</div>
-          <div class="card-t">Anomalies</div>
-          <div class="card-b" style="font-size:.8rem">Browse the full registry of catalogued anomalous objects, entities, and phenomena.</div>
-        </div>
-      </a>
-      <a href="explore.html" style="text-decoration:none">
-        <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
-          <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">◇</div>
-          <div class="card-t">Tales</div>
-          <div class="card-b" style="font-size:.8rem">Narrative accounts, field reports, and canonical stories from Guild members.</div>
-        </div>
-      </a>
-      <a href="explore.html" style="text-decoration:none">
-        <div class="card tc" style="min-height:160px;display:flex;flex-direction:column;justify-content:center">
-          <div style="font-size:2rem;color:var(--red-b);margin-bottom:8px">▣</div>
-          <div class="card-t">Artworks</div>
-          <div class="card-b" style="font-size:.8rem">Visual documentation and creative interpretations submitted by the community.</div>
-        </div>
-      </a>
+  <!-- â•â•â• FOOTER â•â•â• -->
+  <footer class="ftr">
+    <div class="ftr-in">
+      <ul class="ftr-links">
+        <li><a href="submit.html">Contribute</a></li>
+        <li><a href="#">List of Hubs</a></li>
+        <li><a href="#">Licensing</a></li>
+        <li><a href="submit.html">Sandbox</a></li>
+      </ul>
+      <p class="ftr-copy">
+        &copy; 2026 Red Oaker Guild â€” All rights reserved.<br>
+        <span style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-2 CLEARANCE REQUIRED</span>
+      </p>
     </div>
-  </div>
+  </footer>
 
-  <!-- Newest Pages -->
-  <div class="section" id="newest">
-    <div class="section-hd">Newest Pages</div>
-    <div id="newest-feed">
-      <div style="padding:10px;color:var(--wht-d)">Synchronizing newest archives...</div>
-    </div>
-  </div>
-</main>
-
-<!-- ═══ FOOTER ═══ -->
-<footer class="ftr">
-  <div class="ftr-in">
-    <ul class="ftr-links">
-      <li><a href="submit.html">Contribute</a></li>
-      <li><a href="#">List of Hubs</a></li>
-      <li><a href="#">Licensing</a></li>
-      <li><a href="submit.html">Sandbox</a></li>
-    </ul>
-    <p class="ftr-copy">
-      &copy; 2026 Red Oaker Guild — All rights reserved.<br>
-      <span style="font-size:.65rem;color:var(--wht-f)">CLASSIFIED // LEVEL-2 CLEARANCE REQUIRED</span>
-    </p>
-  </div>
-</footer>
-
-<!-- Firebase SDK (CDN) -->
-<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="seed-data.js"></script>
-<script src="app.js"></script>
+  <!-- Firebase SDK (CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="seed-data.js"></script>
+  <script src="app.js"></script>
 </body>
+
 </html>
