@@ -15,10 +15,71 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function getBearerToken(req) {
+  const header = String(req.headers.authorization || req.headers.Authorization || '');
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : '';
+}
+
+async function verifyUser(req) {
+  const app = initAdmin();
+  const token = getBearerToken(req);
+  if (!token) {
+    const err = new Error('Missing bearer token.');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const decoded = await admin.auth(app).verifyIdToken(token);
+  const uid = String(decoded.uid || '');
+  if (!uid) {
+    const err = new Error('Invalid authentication token.');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  return {
+    uid,
+    email: String(decoded.email || '').toLowerCase()
+  };
+}
+
+const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem@gmail.com']);
+
+async function isAdminUser(db, uid, email) {
+  if (BOOTSTRAP_OWNERS.has(String(email || '').toLowerCase())) return true;
+
+  const [userDoc, rolesDoc] = await Promise.all([
+    db.collection('users').doc(uid).get(),
+    db.collection('config').doc('roles').get()
+  ]);
+
+  if (userDoc.exists) {
+    const userData = userDoc.data() || {};
+    if (userData.isAdmin === true || userData.role === 'admin' || userData.role === 'owner') {
+      return true;
+    }
+  }
+
+  if (!rolesDoc.exists) return false;
+  const roleData = rolesDoc.data() || {};
+  const owners = Array.isArray(roleData.owners) ? roleData.owners : [];
+  const admins = Array.isArray(roleData.admins) ? roleData.admins : [];
+  return [...owners, ...admins].map(value => String(value || '').toLowerCase()).includes(String(email || '').toLowerCase());
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
 
   try {
+    const app = initAdmin();
+    const db = admin.firestore(app);
+    const actor = await verifyUser(req);
+    const allowed = await isAdminUser(db, actor.uid, actor.email);
+    if (!allowed) {
+      return sendJson(res, 403, { error: 'Admin access required.' });
+    }
+
     const { slug, title, type, tags, htmlContent, cssContent } = req.body || {};
     
     if (!slug || !type) {
@@ -29,9 +90,6 @@ module.exports = async function handler(req, res) {
     if (normalizedType.toLowerCase() !== 'anomaly') {
       return sendJson(res, 400, { error: 'Sync is only available for anomalies' });
     }
-
-    const app = initAdmin();
-    const db = admin.firestore(app);
 
     // Extract Anomaly ID from slug or title
     const slugUpper = String(slug).toUpperCase().trim();

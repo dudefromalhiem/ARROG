@@ -107,7 +107,7 @@ function extractPlainTextExcerpt(html, maxLength = 220) {
     .replace(/&[a-z0-9#]+;/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return text.length > maxLength ? text.slice(0, maxLength).trim() + '…' : text;
+  return text.length > maxLength ? text.slice(0, maxLength).trim() + '...' : text;
 }
 
 function normalizeMediaAssets(assets) {

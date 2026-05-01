@@ -57,6 +57,11 @@ service cloud.firestore {
       return isOwnerUser() || level == 6; // Admin
     }
 
+    function isAdminUser() {
+      let level = getUserLevel();
+      return isOwnerUser() || level == 6;
+    }
+
     function canReadPublicContent() {
       return true; // Everyone can read public content
     }
