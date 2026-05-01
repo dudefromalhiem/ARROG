@@ -424,8 +424,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('pv-title').textContent = page.title;
     document.getElementById('pv-type').innerHTML = '<span class="tag">' + escapeCommentHtml(page.type || 'Page') + '</span>';
 
-    const authorDisplay = page.authorName || 'Unknown Agent';
-    document.getElementById('pv-author').textContent = 'by ' + authorDisplay;
+    let authorDisplay = escapeCommentHtml(page.authorName || 'Unknown Agent');
+    const pvAuthor = document.getElementById('pv-author');
+    if (page.authorUid) {
+      const authorLink = '<a href="profile.html?uid=' + encodeURIComponent(page.authorUid) + '" style="color:var(--red-b);text-decoration:none;">' + authorDisplay + '</a>';
+      pvAuthor.innerHTML = 'by ' + authorLink;
+      
+      // Async fetch the latest displayName
+      db.collection('users').doc(page.authorUid).get().then(userDoc => {
+        if (userDoc.exists && userDoc.data() && userDoc.data().displayName) {
+          const liveName = escapeCommentHtml(userDoc.data().displayName);
+          const liveLink = '<a href="profile.html?uid=' + encodeURIComponent(page.authorUid) + '" style="color:var(--red-b);text-decoration:none;">' + liveName + '</a>';
+          pvAuthor.innerHTML = 'by ' + liveLink;
+        }
+      }).catch(err => console.warn('Could not fetch live author name:', err));
+    } else {
+      pvAuthor.textContent = 'by ' + authorDisplay;
+    }
 
     if (page.approvedBy) {
       document.getElementById('pv-approved').innerHTML = ` <span style="color:var(--wht-d)">|</span> Approved by: <span style="color:var(--red-b)">${escapeCommentHtml(page.approvedBy)}</span> <span style="color:var(--wht-d)">|</span> `;
