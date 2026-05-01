@@ -363,7 +363,7 @@ function showClearanceWelcome(role) {
     lineHeight: '1.6'
   });
 
-  const welcomeMessage = role === 'guest' ? 'Welcome, Observer' : 'Welcome, Authorized Personnel';
+  const welcomeMessage = role === 'guest' ? 'Welcome, Observer' : role === 'owner' ? 'Welcome, Archivist' : 'Welcome, Authorized Personnel';
   box.innerHTML =
     `<div style="font-size:clamp(10px,1.2vw,14px);color:rgba(255,255,255,0.4);letter-spacing:4px;margin-bottom:16px;">RED OAKER GUILD // SECURE TERMINAL</div>` +
     `<div style="font-size:clamp(22px,3vw,48px);font-weight:bold;letter-spacing:6px;margin-bottom:8px;">LEVEL ${level}</div>` +
@@ -373,11 +373,12 @@ function showClearanceWelcome(role) {
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
-  // After the blink animation (3s), fade out (1s) then remove
+  // After the blink animation (3s for non-owners, 5s for owners), fade out (1s) then remove
+  const blinkDuration = role === 'owner' ? 5000 : 3000;
   setTimeout(() => {
     overlay.style.animation = 'clearanceFadeOut 1s ease-out forwards';
     setTimeout(() => overlay.remove(), 1000);
-  }, 3000);
+  }, blinkDuration);
 }
 
 function showClearanceWelcomeWhenReady(role) {
