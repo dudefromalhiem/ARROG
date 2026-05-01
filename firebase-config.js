@@ -860,3 +860,29 @@ auth.onAuthStateChanged(async user => {
     completeAuthBootstrap();
   }
 });
+
+function initializeUiReveal() {
+  document.body.classList.add('ui-ready');
+  const candidates = document.querySelectorAll('.section, .card, .intro, .legacy-block, .warn, .msg-main, .msg-sidebar, .profile-card');
+  if (!candidates.length || typeof IntersectionObserver !== 'function') return;
+
+  const observer = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add('is-visible');
+      obs.unobserve(entry.target);
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  candidates.forEach((node, idx) => {
+    node.classList.add('ui-reveal');
+    node.style.transitionDelay = Math.min(idx * 18, 220) + 'ms';
+    observer.observe(node);
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeUiReveal, { once: true });
+} else {
+  initializeUiReveal();
+}
