@@ -561,6 +561,7 @@ async function setAdminApplicationStatus(uid, status) {
     }, { merge: true });
     const main = document.getElementById('adm-main');
     if (main && activeTab === 'reports') await loadReports(main);
+    if (main && activeTab === 'roles') await refreshRolesDisplay();
   } catch (err) {
     alert('Failed to update admin application: ' + err.message);
   }
@@ -1787,6 +1788,8 @@ async function refreshUsers() {
 // ═════════════════════════════════════════════════════════════
 
 function canEditRole(targetEmail, currentEmail) {
+  const target = String(targetEmail || '').toLowerCase();
+  if (!target || isOwner(target)) return false;
   const currentLevel = getUserLevel(currentEmail);
   const targetLevel = getUserLevel(targetEmail);
   return currentLevel > targetLevel;
@@ -1823,6 +1826,15 @@ async function loadRolesManager(container) {
     <div id="mod-list" style="margin-bottom:24px"></div>
     <h4 style="margin-bottom:8px;color:var(--wht-d)">Owners (Bootstrap — cannot be changed here)</h4>
     <div id="owners-list"></div>
+    <div style="margin:10px 0 24px;padding:12px;border:1px solid var(--blk-m);background:rgba(255,255,255,.02)">
+      <div style="font-size:.78rem;color:var(--wht-f);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Hierarchy Guide</div>
+      <div style="font-size:.8rem;color:var(--wht-d);line-height:1.7">
+        Owner / Archivist &gt; Chief Administrator &gt; Deputy Chief Administrator &gt; Senior Administrator &gt; Administrator &gt; Chief of Moderation &gt; Deputy Chief of Moderation &gt; Senior Moderator &gt; Moderator &gt; Junior Moderator
+      </div>
+    </div>
+    <h4 style="margin-bottom:8px">Admin Applications</h4>
+    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:10px">Review users applying for admin access.</p>
+    <div id="role-admin-applications"></div>
   `;
   await refreshRolesDisplay();
 }
@@ -1831,7 +1843,8 @@ async function refreshRolesDisplay() {
   const adminList = document.getElementById('admin-list');
   const modList = document.getElementById('mod-list');
   const ownersList = document.getElementById('owners-list');
-  if (!adminList || !modList || !ownersList) return;
+  const roleAdminApplications = document.getElementById('role-admin-applications');
+  if (!adminList || !modList || !ownersList || !roleAdminApplications) return;
 
   // Refresh from Firestore
   try {
@@ -1858,6 +1871,21 @@ async function refreshRolesDisplay() {
   });
 
   const currentEmail = auth.currentUser?.email;
+  const currentLevel = getUserLevel(currentEmail);
+  const roleOptions = Object.keys(ROLE_LEVELS)
+    .filter(role => role !== 'owner' && role !== 'user' && role !== 'guest' && (ROLE_LEVELS[role] || 0) < currentLevel)
+    .map(role => `<option value="${role}">${ROLE_NAMES[role] || role}</option>`)
+    .join('');
+
+  const renderRoleEditor = (email, role) => {
+    const canModify = canEditRole(email, currentEmail);
+    if (!canModify) return '';
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+      `<select class="fi" id="role-edit-${email.replace(/[^a-z0-9]/gi, '-')}" style="min-width:190px;max-width:260px">${roleOptions}</select>` +
+      `<button class="btn btn-sm btn-p" onclick="updateStaffRole('${email}')">Update Role</button>` +
+      `<button class="btn btn-sm btn-d" onclick="removeStaffRole('${role}','${email}')">Revoke</button>` +
+    '</div>';
+  };
 
   // Administrative Staff (level >=60 and <100)
   const adminStaff = Object.entries(ROLE_DATA.userRoles).filter(([email, role]) => {
@@ -1871,9 +1899,9 @@ async function refreshRolesDisplay() {
       const canRevoke = canEditRole(email, currentEmail);
       const roleName = ROLE_NAMES[role] || role;
       return `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
           <span>${email} <span style="color:var(--wht-d)">(${roleName})</span></span>
-          ${canRevoke ? `<button class="btn btn-sm btn-d" onclick="removeStaffRole('${role}','${email}')">Revoke</button>` : ''}
+          ${canRevoke ? renderRoleEditor(email, role) : ''}
         </div>
       `;
     }).join('');
@@ -1891,9 +1919,9 @@ async function refreshRolesDisplay() {
       const canRevoke = canEditRole(email, currentEmail);
       const roleName = ROLE_NAMES[role] || role;
       return `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
           <span>${email} <span style="color:var(--wht-d)">(${roleName})</span></span>
-          ${canRevoke ? `<button class="btn btn-sm btn-d" onclick="removeStaffRole('${role}','${email}')">Revoke</button>` : ''}
+          ${canRevoke ? renderRoleEditor(email, role) : ''}
         </div>
       `;
     }).join('');
@@ -1904,6 +1932,61 @@ async function refreshRolesDisplay() {
       ${email} <span style="color:var(--wht-d)">(Owner)</span>
     </div>
   `).join('');
+
+  Object.entries(ROLE_DATA.userRoles).forEach(([email, role]) => {
+    const selectorId = 'role-edit-' + String(email).replace(/[^a-z0-9]/gi, '-');
+    const picker = document.getElementById(selectorId);
+    if (picker) picker.value = role;
+  });
+
+  try {
+    const adminAppSnap = await db.collection('adminApplications').orderBy('updatedAt', 'desc').limit(100).get();
+    const apps = adminAppSnap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+    roleAdminApplications.innerHTML = apps.length ? (
+      '<div style="display:grid;gap:10px">' + apps.map(row => {
+        const data = row.data || {};
+        const status = String(data.status || 'pending');
+        return '<div style="border:1px solid var(--blk-m);padding:10px;background:rgba(255,255,255,.02)">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+            '<strong>' + escapeHtml(data.applicantName || data.applicantEmail || row.id) + '</strong>' +
+            '<span class="status status-' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+          '</div>' +
+          '<div style="font-size:.78rem;color:var(--wht-d);margin-bottom:6px">' + escapeHtml(data.applicantEmail || '') + '</div>' +
+          '<div style="font-size:.8rem;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(data.reason || '') + '</div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'approved\')">Approve</button>' +
+            '<button class="btn btn-sm btn-d" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'rejected\')">Reject</button>' +
+            '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'pending\')">Reset Pending</button>' +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>'
+    ) : '<p style="font-size:.82rem;color:var(--wht-d)">No admin applications found.</p>';
+  } catch (err) {
+    roleAdminApplications.innerHTML = '<p style="font-size:.82rem;color:var(--red-g)">Could not load admin applications: ' + escapeHtml(err.message) + '</p>';
+  }
+}
+
+async function updateStaffRole(email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const selectorId = 'role-edit-' + normalizedEmail.replace(/[^a-z0-9]/gi, '-');
+  const roleSelect = document.getElementById(selectorId);
+  const nextRole = String(roleSelect && roleSelect.value || '').trim();
+  if (!normalizedEmail || !nextRole) return;
+  if (!canEditRole(normalizedEmail, auth.currentUser?.email)) {
+    alert('You do not have permission to modify this user\'s role.');
+    return;
+  }
+  if (ROLE_DATA.userRoles[normalizedEmail] === nextRole) {
+    alert('No changes detected for this user.');
+    return;
+  }
+  const roleInput = document.getElementById('role-email');
+  const kindInput = document.getElementById('role-kind');
+  if (roleInput && kindInput) {
+    roleInput.value = normalizedEmail;
+    kindInput.value = nextRole;
+  }
+  await addStaffRole();
 }
 
 async function addStaffRole() {
