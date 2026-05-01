@@ -103,8 +103,7 @@ function getCurrentRole() {
 }
 
 function isModOnlyRole() {
-  const userDoc = currentUserDoc || {};
-  return (userDoc.level || 2) < 6 && !userDoc.isOwner;
+  return !isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email);
 }
 
 function canModerateSubmissions() {
