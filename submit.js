@@ -69,7 +69,7 @@ let seedDataLoadPromise = null;
 
 const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
 const DOC_MEDIA_DRAG_SETTING_KEY = 'rog-doc-media-drag-enabled';
-const DRAFT_AUTOSAVE_MIN_WORDS = 150;
+const DRAFT_AUTOSAVE_MIN_WORDS = 1;
 
 function ensureSubmitSeedDataLoaded() {
   if (typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)) {
@@ -1089,15 +1089,9 @@ async function saveDraft(options = {}) {
     return null;
   }
 
-  if (trigger === 'autosave') {
-    if (wordCount < DRAFT_AUTOSAVE_MIN_WORDS) {
-      setDraftStatus('Autosave skipped: at least ' + DRAFT_AUTOSAVE_MIN_WORDS + ' words are required.');
-      return null;
-    }
-    if (!hasImage) {
-      setDraftStatus('Autosave skipped: add at least one image, audio, or video before autosaving.');
-      return null;
-    }
+  if (trigger === 'autosave' && wordCount < DRAFT_AUTOSAVE_MIN_WORDS && !hasImage) {
+    setDraftStatus('Autosave skipped: add content before autosaving.');
+    return null;
   }
 
   /* Removed confirm to improve draft persistence reliability */
@@ -1135,7 +1129,6 @@ async function saveDraft(options = {}) {
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
     status: 'draft',
-    currentMode: currentMode,
     draftTrigger: trigger,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1483,9 +1476,23 @@ async function initializeSubmitEditModeFromUrl() {
     renderMediaList();
     refreshImageSelectors();
 
+    docBlocks = Array.isArray(page.docBlocks) ? JSON.parse(JSON.stringify(page.docBlocks)) : [];
+    currentTemplate = String(page.currentTemplate || '').trim() || currentTemplate;
+    if (page.subsectionCounters && typeof page.subsectionCounters === 'object') {
+      subsectionCounters = {
+        anomaly: Number(page.subsectionCounters.anomaly || 0),
+        tale: Number(page.subsectionCounters.tale || 0),
+        guide: Number(page.subsectionCounters.guide || 0)
+      };
+    }
+
     const content = String(page.htmlContent || '');
     const isGuide = String(page.type || '') === 'Guide' || String(page.type || '') === 'Lore';
-    if (isGuide) {
+    const savedMode = String(page.currentMode || '').trim();
+    if (savedMode === 'doc' && docBlocks.length) {
+      switchMode('doc');
+      renderDocBlocks();
+    } else if (isGuide) {
       switchMode('template');
       selectTemplate('guide');
       setGuideSectionsFixedStructure();
@@ -4546,7 +4553,7 @@ async function submitPage(event) {
   const mergedCSS = mergeWithDefaultSchemaCSS(cssContent);
   const isAdminUser = await getUserAdminFlag(currentUserForSubmit);
 
-  const submission = {
+    const submission = {
     title: title,
     anomalyId: anomalyId,
     anomalySubtype: anomalySubtype || '',
@@ -4565,6 +4572,10 @@ async function submitPage(event) {
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
     authorName: currentUserForSubmit.displayName || currentUserForSubmit.email.split('@')[0],
+      currentMode: currentMode,
+      docBlocks: Array.isArray(docBlocks) ? docBlocks : [],
+      currentTemplate: currentTemplate,
+      subsectionCounters: subsectionCounters,
     status: 'pending',
     submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };

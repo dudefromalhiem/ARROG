@@ -335,8 +335,16 @@ function buildSubmissionPayload(body, actor) {
     authorName: sanitizePlainText(payload.authorName || actor.name || actor.email.split('@')[0] || 'Agent', MAX_AUTHOR_NAME_LENGTH),
     status: String(payload.status || 'pending').trim(),
     currentMode: String(payload.currentMode || '').trim(),
+    currentTemplate: String(payload.currentTemplate || '').trim(),
     draftTrigger: String(payload.draftTrigger || '').trim(),
     docBlocks: Array.isArray(payload.docBlocks) ? payload.docBlocks : [],
+    subsectionCounters: payload && typeof payload.subsectionCounters === 'object' && payload.subsectionCounters
+      ? {
+          anomaly: Number(payload.subsectionCounters.anomaly || 0),
+          tale: Number(payload.subsectionCounters.tale || 0),
+          guide: Number(payload.subsectionCounters.guide || 0)
+        }
+      : { anomaly: 0, tale: 0, guide: 0 },
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     submittedAt: admin.firestore.FieldValue.serverTimestamp()
   };
@@ -663,6 +671,10 @@ module.exports = async function handler(req, res) {
           imageAssets: payload.imageAssets,
           mediaUrls: payload.mediaUrls,
           mediaAssets: payload.mediaAssets,
+          currentMode: payload.currentMode,
+          currentTemplate: payload.currentTemplate,
+          docBlocks: payload.docBlocks,
+          subsectionCounters: payload.subsectionCounters,
           clearanceLevel: payload.clearanceLevel,
           authorUid: actor.uid,
           authorEmail: actor.email,
