@@ -4,19 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Red Oaker Guild</title>
-  <meta name="description" content="Apply for Editor access to submit pages and media to the Red Oaker Guild archive." />
-  <meta name="keywords" content="Red Oaker Guild, editor application, submission access, workshop access, archive contribution" />
+  <meta name="description" content="Apply to contribute to the Red Oaker Guild and request Contributor, Moderator, Admin, or Chief Admin role review." />
+  <meta name="keywords" content="Red Oaker Guild, contributor application, role application, moderator application, admin application" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://redoakerguild.com/application" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Red Oaker Guild" />
   <meta property="og:title" content="Red Oaker Guild" />
-  <meta property="og:description" content="Apply for Editor access to contribute pages, artwork, and media." />
+  <meta property="og:description" content="Apply to contribute to the Red Oaker Guild role ladder." />
   <meta property="og:url" content="https://redoakerguild.com/application" />
   <meta property="og:image" content="https://redoakerguild.com/logo.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Red Oaker Guild" />
-  <meta name="twitter:description" content="Apply for Editor access to contribute pages, artwork, and media." />
+  <meta name="twitter:description" content="Apply to contribute to the Red Oaker Guild role ladder." />
   <meta name="twitter:image" content="https://redoakerguild.com/logo.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -141,12 +141,13 @@
   <div class="app-hero section" style="margin-bottom:16px">
     <div class="app-panel">
       <div class="app-kicker">Workshop Access</div>
-      <div class="app-title">Apply to become an Editor</div>
-      <p class="app-copy">Editors can publish pages, upload art, and contribute media to the archive after staff review. Signed-in users can apply here. Moderators, admins, and owners already have the access they need.</p>
+      <div class="app-title">Apply to Contribute to the Red Oaker Guild</div>
+      <p class="app-copy">Use this form to apply for a role in the Guild ladder: Contributor, Moderator, Admin, or Chief Admin. Applications are reviewed manually by staff.</p>
       <div class="app-list">
-        <div class="app-point"><strong>What to include:</strong> a brief explanation of why you want access and any relevant work or moderation experience.</div>
-        <div class="app-point"><strong>What happens next:</strong> staff review the application, then either approve editor access or leave feedback.</div>
-        <div class="app-point"><strong>Already approved?</strong> use the workshop link after signing in to create submissions.</div>
+        <div class="app-point"><strong>Contributor:</strong> create and edit your own submissions, upload media, and contribute archive entries.</div>
+        <div class="app-point"><strong>Moderator:</strong> includes Contributor powers, plus submission review and report handling in moderation scope.</div>
+        <div class="app-point"><strong>Admin:</strong> includes Moderator powers, plus application decisions, user management, and full report handling.</div>
+        <div class="app-point"><strong>Chief Admin:</strong> includes Admin powers with override authority for non-owner decisions.</div>
       </div>
       <div class="app-actions">
         <a class="btn btn-p" href="submit.html" id="go-workshop-btn">Go to Workshop</a>
@@ -157,10 +158,10 @@
     <div class="app-panel">
       <div class="app-kicker">Access Summary</div>
       <div class="app-list">
-        <div class="app-point"><strong>Guest:</strong> can browse public pages only.</div>
-        <div class="app-point"><strong>User:</strong> can comment and use messaging, but not submit pages.</div>
-        <div class="app-point"><strong>Editor:</strong> can create submissions and upload media.</div>
-        <div class="app-point"><strong>Moderator / Admin / Owner:</strong> can submit immediately and review applications.</div>
+        <div class="app-point"><strong>User:</strong> browse, comment, and message.</div>
+        <div class="app-point"><strong>Contributor:</strong> submit and edit own content.</div>
+        <div class="app-point"><strong>Moderator:</strong> review submissions and triage reports.</div>
+        <div class="app-point"><strong>Admin / Chief Admin:</strong> role governance, user management, and full report actions.</div>
       </div>
       <div class="app-status" id="application-access-state">Checking your account...</div>
     </div>
@@ -168,17 +169,26 @@
 
   <div class="app-form-grid">
     <div class="app-card section" style="margin-bottom:0">
-      <div class="section-hd">Editor Application</div>
+      <div class="section-hd">Contribution Application</div>
       <div id="application-not-allowed" class="app-banner hidden">
-        <strong>Editor access already granted.</strong> Your current role can already use the workshop.
+        <strong>Role already sufficient.</strong> Your current role already meets or exceeds the selected role.
       </div>
       <div id="application-pending" class="app-banner hidden">
         <strong>Application pending.</strong> The staff team is already reviewing your request.
       </div>
       <div id="application-form-wrap">
         <div class="fg">
-          <label class="fl" for="application-reason">Why should you be granted Editor access?</label>
-          <textarea class="fta" id="application-reason" rows="6" maxlength="1400" placeholder="Tell the staff what you want to contribute and why you should have publishing access."></textarea>
+          <label class="fl" for="application-role">Role you are applying for</label>
+          <select class="fi" id="application-role">
+            <option value="contributor">Contributor</option>
+            <option value="moderator">Moderator</option>
+            <option value="admin">Admin</option>
+            <option value="chief_admin">Chief Admin</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl" for="application-reason">Why should you be granted this role?</label>
+          <textarea class="fta" id="application-reason" rows="6" maxlength="1400" placeholder="Tell the staff what you will contribute and why this role is appropriate."></textarea>
         </div>
         <div class="fg">
           <label class="fl" for="application-experience">Relevant experience</label>
@@ -188,15 +198,15 @@
           <button class="btn btn-p" type="button" id="application-submit-btn">Submit Application</button>
           <a class="btn btn-s" href="index.html">Return Home</a>
         </div>
-        <p class="app-status" id="application-status">Sign in to submit an Editor application.</p>
+        <p class="app-status" id="application-status">Sign in to submit your contribution application.</p>
       </div>
     </div>
 
     <div class="app-card section" style="margin-bottom:0">
       <div class="section-hd">Review Notes</div>
-      <p class="app-copy" style="margin-bottom:12px">The staff team reviews requests manually. Applications are rate limited server-side to reduce spam and duplicate requests. If you are already a moderator or admin, the system will block the application because you already have access.</p>
+      <p class="app-copy" style="margin-bottom:12px">The staff team reviews requests manually. <strong>You can apply only once per month</strong>. This limit is enforced by the backend.</p>
       <div class="app-point">Keep your reason focused on what you will contribute to the archive.</div>
-      <div class="app-point">If your request is approved, the workshop link will take you directly to page creation.</div>
+      <div class="app-point">Choose the specific role you are requesting before submitting.</div>
       <div class="app-point">You can still browse the site and use messaging while waiting for a review.</div>
     </div>
   </div>
@@ -216,6 +226,20 @@
 let socialApiBase = '/api/social';
 let currentUser = null;
 let currentApplicationStatus = 'none';
+const APPLICATION_ROLE_ORDER = ['user', 'contributor', 'moderator', 'admin', 'chief_admin', 'owner'];
+
+function normalizeApplicationRole(value) {
+  const role = String(value || '').trim().toLowerCase();
+  if (role === 'editor') return 'contributor';
+  if (role === 'mod') return 'moderator';
+  if (role === 'chief-admin') return 'chief_admin';
+  return role || 'user';
+}
+
+function roleRank(role) {
+  const idx = APPLICATION_ROLE_ORDER.indexOf(normalizeApplicationRole(role));
+  return idx === -1 ? 0 : idx;
+}
 
 function configureSocialApiBase() {
   const host = String(window.location.hostname || '').toLowerCase();
@@ -236,9 +260,11 @@ async function loadApplicationRecord(user) {
   try {
     const userDoc = await db.collection('users').doc(user.uid).get();
     const userData = userDoc.exists ? (userDoc.data() || {}) : {};
-    const appDoc = await db.collection('editorApplications').doc(user.uid).get();
+    const appDoc = await db.collection('applications').doc(user.uid).get();
     const appData = appDoc.exists ? (appDoc.data() || {}) : {};
-    const approved = userData.submissionAccess === true || userData.role === 'editor' || userData.roleName === 'Editor';
+    const selectedRole = normalizeApplicationRole(document.getElementById('application-role')?.value || 'contributor');
+    const currentRole = normalizeApplicationRole(userData.role || (userData.submissionAccess ? 'contributor' : 'user'));
+    const approved = roleRank(currentRole) >= roleRank(selectedRole);
     const pending = String(appData.status || '').toLowerCase() === 'pending';
 
     currentApplicationStatus = approved ? 'approved' : (pending ? 'pending' : 'none');
@@ -256,22 +282,22 @@ async function loadApplicationRecord(user) {
     const accessState = document.getElementById('application-access-state');
     if (accessState) {
       if (approved) {
-        accessState.textContent = 'Your account already has Editor access.';
+        accessState.textContent = 'Your account already meets this role level.';
       } else if (pending) {
         accessState.textContent = 'Your last application is pending review.';
       } else if (currentUser && (isModerator(currentUser.email) || isAdmin(currentUser.email) || isOwner(currentUser.email))) {
         accessState.textContent = 'Your role already permits submissions.';
       } else {
-        accessState.textContent = 'You can apply for Editor access using the form below.';
+        accessState.textContent = 'You can apply for a higher contribution role using the form below.';
       }
     }
 
     if (approved) {
-      setApplicationStatus('Your account already has Editor access.', false);
+      setApplicationStatus('Your account already meets this role level.', false);
     } else if (pending) {
       setApplicationStatus('Your application is pending review.', false);
     } else {
-      setApplicationStatus('Sign in to submit an Editor application.', false);
+      setApplicationStatus('Sign in to submit your contribution application.', false);
     }
   } catch (err) {
     setApplicationStatus('Could not load application status: ' + err.message, true);
@@ -286,6 +312,7 @@ async function submitApplication() {
 
   const reason = String(document.getElementById('application-reason')?.value || '').trim();
   const experience = String(document.getElementById('application-experience')?.value || '').trim();
+  const roleApplied = String(document.getElementById('application-role')?.value || 'contributor').trim();
   const button = document.getElementById('application-submit-btn');
   if (reason.length < 20) {
     setApplicationStatus('Please write at least 20 characters in your application.', true);
@@ -304,16 +331,16 @@ async function submitApplication() {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + token
       },
-      body: JSON.stringify({ action: 'applyeditor', reason, experience })
+      body: JSON.stringify({ action: 'applyeditor', roleApplied, reason, experience })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'Application failed.');
     if (payload.alreadyPending) {
       setApplicationStatus('Your application is already pending review.', false);
     } else if (payload.alreadyApproved) {
-      setApplicationStatus('Your account already has Editor access.', false);
+      setApplicationStatus('Your account already meets this role level.', false);
     } else {
-      setApplicationStatus('Application submitted to the Guild staff team.', false);
+      setApplicationStatus('Application submitted for ' + roleApplied.replace('_', ' ') + ' review.', false);
       document.getElementById('application-reason').value = '';
       document.getElementById('application-experience').value = '';
       await loadApplicationRecord(currentUser);
@@ -336,7 +363,7 @@ auth.onAuthStateChanged(async user => {
     await syncSharedNav(user);
   }
   if (!user) {
-    document.getElementById('application-status').textContent = 'Sign in to submit an Editor application.';
+    document.getElementById('application-status').textContent = 'Sign in to submit your contribution application.';
     document.getElementById('application-not-allowed')?.classList.add('hidden');
     document.getElementById('application-pending')?.classList.add('hidden');
     document.getElementById('application-form-wrap')?.classList.remove('hidden');
@@ -346,6 +373,9 @@ auth.onAuthStateChanged(async user => {
 });
 
 document.getElementById('application-submit-btn')?.addEventListener('click', submitApplication);
+document.getElementById('application-role')?.addEventListener('change', () => {
+  if (currentUser) loadApplicationRecord(currentUser);
+});
 </script>
 </body>
 </html>

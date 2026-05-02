@@ -1,40 +1,79 @@
 /**
- * Role-Based Permission System for Red Oak Guild
- * Stack-based permissions with explicit Moderator exception
+ * Unified role ladder and permissions for Red Oaker Guild.
+ * Public ladder ends at chief_admin. owner is internal-only and absolute.
  */
 
-const ROLE_HIERARCHY = {
-  2: { name: 'Guest', roles: ['Guest'] },
-  3: { name: 'User', roles: ['Registered User'] },
-  4: { name: 'Contributor', roles: ['Contributor'] },
-  5: { name: 'Moderator', roles: ['Junior Moderator', 'Moderator', 'Senior Moderator', 'Deputy Chief of Moderation', 'Chief of Moderation'] },
-  6: { name: 'Admin', roles: ['Administrator', 'Senior Administrator', 'Deputy Chief Administrator', 'Chief Administrator'] }
+const ROLES = {
+  USER: 'user',
+  CONTRIBUTOR: 'contributor',
+  MODERATOR: 'moderator',
+  ADMIN: 'admin',
+  CHIEF_ADMIN: 'chief_admin',
+  OWNER: 'owner'
+};
+
+const PUBLIC_ROLE_LADDER = [
+  ROLES.USER,
+  ROLES.CONTRIBUTOR,
+  ROLES.MODERATOR,
+  ROLES.ADMIN,
+  ROLES.CHIEF_ADMIN
+];
+
+const ALL_ROLES = [...PUBLIC_ROLE_LADDER, ROLES.OWNER];
+
+const ROLE_LABELS = {
+  [ROLES.USER]: 'User',
+  [ROLES.CONTRIBUTOR]: 'Contributor',
+  [ROLES.MODERATOR]: 'Moderator',
+  [ROLES.ADMIN]: 'Admin',
+  [ROLES.CHIEF_ADMIN]: 'Chief Admin',
+  [ROLES.OWNER]: 'Owner'
 };
 
 const PERMISSIONS = {
-  // Level 2 (Guest)
-  viewContent: { level: 2, description: 'View public content' },
+  viewContent: { role: ROLES.USER, description: 'View public content' },
+  comment: { role: ROLES.USER, description: 'Post comments and interact with content' },
+  interact: { role: ROLES.USER, description: 'Like, share, and engage with content' },
 
-  // Level 3 (User) - inherits Level 2
-  comment: { level: 3, description: 'Post comments and interact with content' },
-  interact: { level: 3, description: 'Like, share, and engage with content' },
+  createPages: { role: ROLES.CONTRIBUTOR, description: 'Create and submit content' },
+  editOwnPages: { role: ROLES.CONTRIBUTOR, description: 'Edit own content' },
 
-  // Level 4 (Contributor) - inherits Level 3, but Moderators don't inherit this
-  createPages: { level: 4, description: 'Create new pages and content' },
-  editOwnPages: { level: 4, description: 'Edit pages they created' },
+  reviewSubmissions: { role: ROLES.MODERATOR, description: 'Review submissions in moderation queue' },
+  moderateContent: { role: ROLES.MODERATOR, description: 'Moderate content and enforce rules' },
+  handleReports: { role: ROLES.MODERATOR, description: 'Handle reports in limited scope' },
+  revokeContributor: { role: ROLES.MODERATOR, description: 'Revoke contributor role' },
 
-  // Level 5 (Moderator) - inherits Level 3, NOT Level 4
-  monitorActivity: { level: 5, description: 'Monitor user activity and reports' },
-  handleViolations: { level: 5, description: 'Review and handle reported violations' },
-  moderateUsers: { level: 5, description: 'Moderate user accounts and content' },
-  moderateContent: { level: 5, description: 'Delete, hide, or modify inappropriate content' },
+  manageApplications: { role: ROLES.ADMIN, description: 'Approve or reject role applications' },
+  manageUsers: { role: ROLES.ADMIN, description: 'Manage users within policy limits' },
+  manageReports: { role: ROLES.ADMIN, description: 'Manage reports and escalations' },
 
-  // Level 6 (Admin) - inherits ALL (including Level 4)
-  manageUsers: { level: 6, description: 'Create, modify, and delete user accounts' },
-  manageRoles: { level: 6, description: 'Assign and modify user roles and permissions' },
-  manageContent: { level: 6, description: 'Full content management and system administration' },
-  systemAdmin: { level: 6, description: 'System configuration and maintenance' }
+  overrideAdminDecisions: { role: ROLES.CHIEF_ADMIN, description: 'Override admin decisions' },
+  manageHighLevelRoles: { role: ROLES.CHIEF_ADMIN, description: 'Manage all non-owner roles' },
+  systemAdmin: { role: ROLES.CHIEF_ADMIN, description: 'System administration and moderation control' }
 };
+
+function normalizeRole(value) {
+  const role = String(value || '').trim().toLowerCase();
+  if (!role) return ROLES.USER;
+  if (role === 'editor') return ROLES.CONTRIBUTOR;
+  if (role === 'mod') return ROLES.MODERATOR;
+  if (role === 'chief-admin' || role === 'chiefadmin') return ROLES.CHIEF_ADMIN;
+  return ALL_ROLES.includes(role) ? role : ROLES.USER;
+}
+
+function roleRank(role) {
+  const normalized = normalizeRole(role);
+  if (normalized === ROLES.OWNER) return 999;
+  const idx = PUBLIC_ROLE_LADDER.indexOf(normalized);
+  return idx === -1 ? 0 : idx;
+}
+
+function isAtLeast(userRole, requiredRole) {
+  const a = roleRank(userRole);
+  const b = roleRank(requiredRole);
+  return a >= b;
+}
 
 /**
  * Get the effective permissions for a user based on their role level
@@ -42,35 +81,13 @@ const PERMISSIONS = {
  * @returns {Object} - Object with permission keys set to true/false
  */
 function getPermissions(userDoc) {
-  if (!userDoc) {
-    // Unauthenticated user - only guest permissions
-    return getPermissionsForLevel(2);
-  }
-
-  const level = userDoc.level || 2;
-  const isOwner = userDoc.isOwner === true;
-  const contributorGranted = userDoc.contributorGranted === true;
-
-  // Owner has all permissions
-  if (isOwner) {
-    return getAllPermissions();
-  }
-
-  let permissions = {};
-
-  // Stack permissions based on level
-  if (level >= 2) permissions = { ...permissions, ...getPermissionsForLevel(2) };
-  if (level >= 3) permissions = { ...permissions, ...getPermissionsForLevel(3) };
-
-  // Special handling for Level 4 (Contributor)
-  // Moderators (Level 5) do NOT inherit Level 4 permissions unless explicitly granted
-  if (level === 4 || level === 6 || (level === 5 && contributorGranted)) {
-    permissions = { ...permissions, ...getPermissionsForLevel(4) };
-  }
-
-  if (level >= 5) permissions = { ...permissions, ...getPermissionsForLevel(5) };
-  if (level >= 6) permissions = { ...permissions, ...getPermissionsForLevel(6) };
-
+  const role = userDoc && userDoc.isOwner ? ROLES.OWNER : normalizeRole(userDoc && userDoc.role);
+  const permissions = {};
+  Object.keys(PERMISSIONS).forEach(permKey => {
+    if (isAtLeast(role, PERMISSIONS[permKey].role)) {
+      permissions[permKey] = true;
+    }
+  });
   return permissions;
 }
 
@@ -82,8 +99,16 @@ function getPermissions(userDoc) {
 function getPermissionsForLevel(level) {
   const permissions = {};
 
+  const legacyMap = {
+    2: ROLES.USER,
+    3: ROLES.USER,
+    4: ROLES.CONTRIBUTOR,
+    5: ROLES.MODERATOR,
+    6: ROLES.ADMIN
+  };
+  const role = legacyMap[Number(level)] || ROLES.USER;
   Object.keys(PERMISSIONS).forEach(permKey => {
-    if (PERMISSIONS[permKey].level <= level) {
+    if (isAtLeast(role, PERMISSIONS[permKey].role)) {
       permissions[permKey] = true;
     }
   });
@@ -120,19 +145,9 @@ function hasPermission(userDoc, permission) {
  * @returns {string} - Human-readable role name
  */
 function getRoleDisplayName(userDoc) {
-  if (!userDoc) return 'Guest';
-
-  if (userDoc.isOwner) return 'Owner';
-
-  const level = userDoc.level || 2;
-  const roleName = userDoc.roleName || '';
-
-  // If they have a specific role name, use it
-  if (roleName) return roleName;
-
-  // Otherwise use the level name
-  const hierarchy = ROLE_HIERARCHY[level];
-  return hierarchy ? hierarchy.name : 'Unknown';
+  if (!userDoc) return ROLE_LABELS[ROLES.USER];
+  const role = userDoc.isOwner ? ROLES.OWNER : normalizeRole(userDoc.role);
+  return userDoc.roleName || ROLE_LABELS[role] || 'User';
 }
 
 /**
@@ -140,14 +155,7 @@ function getRoleDisplayName(userDoc) {
  * @returns {string} - Formatted hierarchy string
  */
 function getRoleHierarchyText() {
-  return `Role Hierarchy (low → high):
-
-Level 2: Guest - View content only
-Level 3: User - View + comment + interact with content
-Level 4: Contributor - Level 3 + create/edit pages (no user authority)
-Level 5: Moderator - Level 3 + monitor activity + handle violations + moderate users/content (NO Level 4)
-Level 6: Admin - ALL permissions + manage users, roles, content, system structure
-Owner: Absolute control above Level 6`;
+  return 'Role Hierarchy (low to high): User -> Contributor -> Moderator -> Admin -> Chief Admin. Owner is internal-only and unrestricted.';
 }
 
 /**
@@ -165,15 +173,29 @@ function isValidRoleLevel(level) {
  * @returns {Array<string>} - Array of valid role names
  */
 function getValidRoleNames(level) {
-  const hierarchy = ROLE_HIERARCHY[level];
-  return hierarchy ? hierarchy.roles : [];
+  if (level === 6) return [ROLE_LABELS[ROLES.ADMIN], ROLE_LABELS[ROLES.CHIEF_ADMIN]];
+  if (level === 5) return [ROLE_LABELS[ROLES.MODERATOR]];
+  if (level === 4) return [ROLE_LABELS[ROLES.CONTRIBUTOR]];
+  if (level <= 3) return [ROLE_LABELS[ROLES.USER]];
+  return [];
+}
+
+function canApplyForRole(role) {
+  const normalized = normalizeRole(role);
+  return PUBLIC_ROLE_LADDER.includes(normalized) && normalized !== ROLES.USER;
 }
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    ROLE_HIERARCHY,
+    ROLES,
+    PUBLIC_ROLE_LADDER,
+    ALL_ROLES,
+    ROLE_LABELS,
     PERMISSIONS,
+    normalizeRole,
+    roleRank,
+    isAtLeast,
     getPermissions,
     getPermissionsForLevel,
     getAllPermissions,
@@ -181,6 +203,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getRoleDisplayName,
     getRoleHierarchyText,
     isValidRoleLevel,
-    getValidRoleNames
+    getValidRoleNames,
+    canApplyForRole
   };
 }

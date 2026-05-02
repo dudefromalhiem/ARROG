@@ -327,7 +327,8 @@ async function getUserSubmissionAccessFlag(user) {
     if (isOwner(user.email) || isAdmin(user.email) || isModerator(user.email)) return true;
     const doc = await db.collection('users').doc(user.uid).get();
     const data = doc.exists ? (doc.data() || {}) : {};
-    return data.submissionAccess === true || data.role === 'editor' || data.roleName === 'Editor' || data.editorApproved === true;
+    const role = normalizeResolvedRole(data.role || 'user');
+    return data.submissionAccess === true || role === 'contributor' || role === 'moderator' || role === 'admin' || role === 'chief_admin' || data.editorApproved === true;
   } catch (_err) {
     return false;
   }
@@ -610,33 +611,46 @@ const BOOTSTRAP_OWNER_SET = new Set(_BOOTSTRAP.map(email => String(email || '').
 // Role definitions
 const ROLE_LEVELS = {
   'owner': 100,
-  'chief-admin': 90,
-  'deputy-chief-admin': 80,
-  'senior-admin': 70,
-  'admin': 60,
-  'chief-mod': 50,
-  'deputy-chief-mod': 40,
-  'senior-mod': 30,
-  'mod': 20,
-  'junior-mod': 10,
+  'chief_admin': 90,
+  'admin': 80,
+  'moderator': 70,
+  'contributor': 60,
   'user': 5,
-  'guest': 0
+  'guest': 0,
+  // Legacy aliases
+  'chief-admin': 90,
+  'mod': 70,
+  'editor': 60,
+  'chief-mod': 70,
+  'deputy-chief-admin': 80,
+  'senior-admin': 80,
+  'deputy-chief-mod': 70,
+  'senior-mod': 70,
+  'junior-mod': 70
 };
 
 const ROLE_NAMES = {
   'owner': 'Owner',
-  'chief-admin': 'Chief Administrator',
-  'deputy-chief-admin': 'Deputy Chief Administrator',
-  'senior-admin': 'Senior Administrator',
-  'admin': 'Administrator',
-  'chief-mod': 'Chief of Moderation',
-  'deputy-chief-mod': 'Deputy Chief of Moderation',
-  'senior-mod': 'Senior Moderator',
-  'mod': 'Moderator',
-  'junior-mod': 'Junior Moderator',
+  'chief_admin': 'Chief Admin',
+  'admin': 'Admin',
+  'moderator': 'Moderator',
+  'contributor': 'Contributor',
   'user': 'User',
-  'guest': 'Guest'
+  'guest': 'Guest',
+  // Legacy aliases
+  'chief-admin': 'Chief Admin',
+  'mod': 'Moderator',
+  'editor': 'Contributor'
 };
+
+function normalizeResolvedRole(role) {
+  const value = String(role || '').toLowerCase().trim();
+  if (!value) return 'user';
+  if (value === 'mod') return 'moderator';
+  if (value === 'editor') return 'contributor';
+  if (value === 'chief-admin') return 'chief_admin';
+  return value;
+}
 
 let ROLE_DATA = { owners: [], admins: [], mods: [], userRoles: {}, adminAppointments: {} };
 let GUILD_PERMISSIONS = {};
@@ -697,30 +711,31 @@ const rolesReady = (async () => {
 function getUserLevel(email) {
   if (!email) return 0;
   const e = email.toLowerCase();
-  const role = ROLE_DATA.userRoles[e];
+  const role = normalizeResolvedRole(ROLE_DATA.userRoles[e]);
   if (role) return ROLE_LEVELS[role] || 0;
   // Fallback for backward compatibility
   if (BOOTSTRAP_OWNER_SET.has(e) || ROLE_DATA.owners.includes(e)) return 100;
-  if (ROLE_DATA.admins.includes(e)) return 60;
-  if (ROLE_DATA.mods.includes(e)) return 20;
+  if (ROLE_DATA.admins.includes(e)) return 80;
+  if (ROLE_DATA.mods.includes(e)) return 70;
   return 0;
 }
 
 function resolveRole(email) {
   if (!email) return "user";
   const e = email.toLowerCase();
+  const mapped = normalizeResolvedRole(ROLE_DATA.userRoles[e]);
+  if (mapped && mapped !== 'user') return mapped;
   if (BOOTSTRAP_OWNER_SET.has(e)) return "owner";
   if (ROLE_DATA.owners.includes(e)) return "owner";
   if (ROLE_DATA.admins.includes(e)) return "admin";
-  if (ROLE_DATA.mods.includes(e)) return "mod";
+  if (ROLE_DATA.mods.includes(e)) return "moderator";
   return "user";
 }
 function isModerator(email) {
-  const r = resolveRole(email);
-  return r === "mod" || r === "admin" || r === "owner";
+  return getUserLevel(email) >= 70;
 }
 function isAdmin(email) {
-  return getUserLevel(email) >= 60;
+  return getUserLevel(email) >= 80;
 }
 function isOwner(email) {
   return getUserLevel(email) >= 100;
@@ -733,10 +748,13 @@ function adminHasDelegation(email, permissionKey) {
   return false;
 }
 function clearanceLevelForRole(role) {
-  if (role === "owner") return 6;
-  if (role === "admin") return 5;
-  if (role === "mod") return 4;
-  if (role === "user") return 2;
+  const normalized = normalizeResolvedRole(role);
+  if (normalized === "owner") return 6;
+  if (normalized === "chief_admin") return 6;
+  if (normalized === "admin") return 5;
+  if (normalized === "moderator") return 4;
+  if (normalized === "contributor") return 4;
+  if (normalized === "user") return 2;
   return 2;
 }
 

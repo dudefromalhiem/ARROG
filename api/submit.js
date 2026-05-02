@@ -345,6 +345,57 @@ function buildSubmissionPayload(body, actor) {
   return normalizedPayload;
 }
 
+async function generateUniqueAnomalyId(db, subtype) {
+  const normalizedSubtype = String(subtype || 'ROS').toUpperCase().trim();
+  const counterKey = ['ROS', 'SOA', 'SLOA', 'SCTOR', 'TL'].includes(normalizedSubtype) ? normalizedSubtype : 'ROS';
+  const counterRef = db.collection('counters').doc('anomaly_' + counterKey.toLowerCase());
+
+  const result = await db.runTransaction(async tx => {
+    const snap = await tx.get(counterRef);
+    const data = snap.exists ? (snap.data() || {}) : {};
+    const next = Number(data.last || 0) + 1;
+    tx.set(counterRef, {
+      last: next,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return next;
+  });
+
+  if (counterKey === 'SLOA') {
+    const block = Math.max(0, result - 1);
+    const letterIndex = Math.floor(block / 1000);
+    const letter = String.fromCharCode(65 + (letterIndex % 26));
+    const number = String((block % 1000) + 1).padStart(3, '0');
+    return 'SLOA-' + letter + number;
+  }
+  if (counterKey === 'SCTOR' || counterKey === 'TL') {
+    return counterKey + ': ' + String(result).padStart(2, '0');
+  }
+  return counterKey + '-' + String(result).padStart(4, '0');
+}
+
+async function ensureSubmissionMetadata(db, payload) {
+  if (!payload.title) {
+    const excerpt = extractPlainTextExcerpt(payload.htmlContent || '', 90);
+    if (payload.type === 'Anomaly' && payload.anomalyId) {
+      payload.title = sanitizePlainText(payload.anomalyId + ': ' + (excerpt || 'Untitled Anomaly Entry'), MAX_TITLE_LENGTH);
+    } else {
+      payload.title = sanitizePlainText(excerpt || 'Untitled Submission', MAX_TITLE_LENGTH);
+    }
+  }
+
+  if (payload.type === 'Anomaly' && !payload.anomalyId) {
+    const generatedId = await generateUniqueAnomalyId(db, payload.anomalySubtype || 'ROS');
+    payload.anomalyId = generatedId;
+    if (!payload.anomalySubtype) {
+      payload.anomalySubtype = String(generatedId).split(/[-:]/)[0].toUpperCase();
+    }
+    if (!payload.title || !String(payload.title).toUpperCase().startsWith(String(generatedId).toUpperCase())) {
+      payload.title = sanitizePlainText(generatedId + ': ' + payload.title, MAX_TITLE_LENGTH);
+    }
+  }
+}
+
 function validateSubmissionForPublishOrQueueOrThrow(payload) {
   if (!payload.title || payload.title.length < 3) {
     const err = new Error('Submission title is required.');
@@ -580,6 +631,7 @@ module.exports = async function handler(req, res) {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = action === 'publish' ? 'approved' : 'pending';
       enforceRequestedClearanceOrThrow(payload, actorProfile);
+      await ensureSubmissionMetadata(db, payload);
       validateSubmissionForPublishOrQueueOrThrow(payload);
 
       validateAnomalyPayloadOrThrow(payload, { enforceTitlePrefix: true });

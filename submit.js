@@ -4624,7 +4624,8 @@ async function submitPage(event) {
     } else {
       alert('Submission received! Your page will be reviewed by Guild admins.\nOnce approved, it will be live at: /pages/' + slug);
     }
-    resetSubmitForm();
+    clearEditorUnsavedState();
+    setDraftStatus('Submission saved. Use the Clear button if you want to reset the editor.');
     loadMySubmissions('history');
   } catch (err) {
     alert('Submission failed: ' + err.message);
@@ -4635,9 +4636,6 @@ async function submitPage(event) {
 }
 
 function resetSubmitForm() {
-  if (!confirm('Are you sure you want to clear all form data? This action cannot be undone.')) {
-    return;
-  }
   suppressDraftAutoSave = true;
   submitEditTarget = null;
   activeDraftId = null;

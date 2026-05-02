@@ -178,6 +178,11 @@ function isModOnlyRole() {
   return !currentUserIsAdminFlag && !isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email);
 }
 
+function canModeratorOpenTab(tab) {
+  const allowed = new Set(['submissions', 'reports', 'applications', 'contributors']);
+  return allowed.has(String(tab || ''));
+}
+
 function ensureAdminSeedDataLoaded() {
   if (typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)) {
     return Promise.resolve(true);
@@ -297,6 +302,7 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   const artworksTab = document.getElementById('tab-artworks');
   const newsTab = document.getElementById('tab-news');
   const reportsTab = document.getElementById('tab-reports');
+  const contributorsTab = document.getElementById('tab-contributors');
   const applicationsTab = document.getElementById('tab-applications');
   const usersTab = document.getElementById('tab-users');
   const rolesTab = document.getElementById('tab-roles');
@@ -310,7 +316,8 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   if (submissionsTab) submissionsTab.classList.remove('hidden');
   if (artworksTab) artworksTab.classList.toggle('hidden', isModOnly);
   if (newsTab) newsTab.classList.toggle('hidden', isModOnly);
-  if (reportsTab) reportsTab.classList.toggle('hidden', isModOnly);
+  if (reportsTab) reportsTab.classList.remove('hidden');
+  if (contributorsTab) contributorsTab.classList.remove('hidden');
   if (applicationsTab) applicationsTab.classList.remove('hidden');
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
@@ -319,7 +326,7 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   const canManageRoles = isOwnerUser || (isAdminUser && GUILD_PERMISSIONS['adminCanManageRoles']);
   if (rolesTab) rolesTab.classList.toggle('hidden', !canManageRoles);
 
-  if (isModOnly && activeTab !== 'submissions') {
+  if (isModOnly && !canModeratorOpenTab(activeTab)) {
     activeTab = 'submissions';
     document.querySelectorAll('#adm-tabs a').forEach(a => a.classList.remove('on'));
     if (submissionsTab) submissionsTab.classList.add('on');
@@ -456,7 +463,7 @@ auth.onAuthStateChanged(async user => {
 
 // ── Tab Switching ─────────────────────────────────────────────
 function switchTab(tab) {
-  if (isModOnlyRole() && tab !== 'submissions') {
+  if (isModOnlyRole() && !canModeratorOpenTab(tab)) {
     tab = 'submissions';
   }
   activeTab = tab;
@@ -474,7 +481,7 @@ function switchTab(tab) {
 }
 
 function loadTab() {
-  if (isModOnlyRole() && activeTab !== 'submissions') {
+  if (isModOnlyRole() && !canModeratorOpenTab(activeTab)) {
     activeTab = 'submissions';
   }
 
@@ -495,6 +502,7 @@ function loadTab() {
     else if (activeTab === 'artworks') loadArtworks(main);
     else if (activeTab === 'news') loadNewsAdmin(main);
     else if (activeTab === 'reports') loadReports(main);
+    else if (activeTab === 'contributors') loadContributors(main);
     else if (activeTab === 'applications') loadApplications(main);
     else if (activeTab === 'users') loadUsers(main);
     else if (activeTab === 'roles') loadRolesManager(main);
@@ -505,55 +513,26 @@ async function loadReports(container) {
   container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading report queues...</p>';
 
   try {
-    const [commentSnap, dmSnap, pageSnap] = await Promise.allSettled([
-      db.collection('commentReports').orderBy('createdAt', 'desc').limit(200).get(),
-      db.collection('dmReports').orderBy('createdAt', 'desc').limit(200).get(),
-      db.collection('pageReports').orderBy('createdAt', 'desc').limit(200).get()
-    ]).then(results => results.map((r, idx) => {
-      if (r.status === 'fulfilled') return r.value;
-      rogLogger?.warn?.(`Report collection ${idx} failed:`, r.reason);
-      return { docs: [] };
-    }));
-
-    const rows = [];
-    commentSnap.docs.forEach(doc => {
+    const snap = await db.collection('reports').orderBy('createdAt', 'desc').limit(300).get();
+    const rows = snap.docs.map(doc => {
       const data = doc.data() || {};
-      rows.push({
+      const type = String(data.type || '').toLowerCase();
+      const reportedLabel = type === 'page'
+        ? (data.pageTitle || data.pageSlug || data.targetId || 'Unknown page')
+        : (data.reportedName || data.reportedEmail || data.targetDisplayName || data.targetEmail || data.targetId || 'Unknown target');
+      const contentLabel = type === 'page'
+        ? (data.pageSlug ? '/' + data.pageSlug : (data.pageId ? '(ID: ' + data.pageId + ')' : '(page target)'))
+        : (data.reportedContent || data.messageText || '(content unavailable)');
+      return {
         id: doc.id,
-        type: 'Comment',
+        type: type || 'unknown',
         reporter: data.reporterName || data.reporterEmail || 'Unknown',
-        reported: data.reportedName || data.reportedEmail || 'Unknown',
-        content: data.reportedContent || '(content unavailable)',
+        reported: reportedLabel,
+        content: contentLabel,
         reason: data.reason || '',
-        status: data.status || 'open',
+        status: String(data.status || 'open').toLowerCase(),
         createdAt: data.createdAt && data.createdAt.seconds ? data.createdAt.seconds : 0
-      });
-    });
-    dmSnap.docs.forEach(doc => {
-      const data = doc.data() || {};
-      rows.push({
-        id: doc.id,
-        type: 'DM',
-        reporter: data.reporterName || data.reporterEmail || 'Unknown',
-        reported: data.reportedName || data.reportedEmail || 'Unknown',
-        content: data.reportedContent || '(content unavailable)',
-        reason: data.reason || '',
-        status: data.status || 'open',
-        createdAt: data.createdAt && data.createdAt.seconds ? data.createdAt.seconds : 0
-      });
-    });
-    pageSnap.docs.forEach(doc => {
-      const data = doc.data() || {};
-      rows.push({
-        id: doc.id,
-        type: 'Page',
-        reporter: data.reporterName || data.reporterEmail || 'Unknown',
-        reported: data.pageTitle || data.pageSlug || 'Unknown Page',
-        content: data.pageSlug ? `/${data.pageSlug}` : `(ID: ${data.pageId})`,
-        reason: data.reason || '',
-        status: data.status || 'open',
-        createdAt: data.createdAt && data.createdAt.seconds ? data.createdAt.seconds : 0
-      });
+      };
     });
 
     rows.sort((a, b) => b.createdAt - a.createdAt);
@@ -564,19 +543,26 @@ async function loadReports(container) {
 
     container.innerHTML = [
       '<h3 style="margin-bottom:16px">Moderation Reports</h3>',
-      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Review reported comments, direct messages, and pages. This segment is admin-only.</p>',
+      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Unified queue for page, user, and message reports.</p>',
       '<div style="overflow:auto;border:1px solid var(--blk-m)">',
       '<table style="width:100%;border-collapse:collapse;font-size:.8rem">',
-      '<thead><tr style="background:rgba(139,0,0,.16)"><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Type</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reporter</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reported Item</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Content/Link</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reason</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Status</th></tr></thead>',
+      '<thead><tr style="background:rgba(139,0,0,.16)"><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Type</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reporter</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reported Item</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Content/Link</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Reason</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Status</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Actions</th></tr></thead>',
       '<tbody>',
       rows.map(row => {
         return '<tr>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);white-space:nowrap">' + escapeHtml(row.type) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);white-space:nowrap;text-transform:uppercase">' + escapeHtml(row.type) + '</td>' +
           '<td style="padding:8px;border-bottom:1px solid var(--blk-m)">' + escapeHtml(row.reporter) + '</td>' +
           '<td style="padding:8px;border-bottom:1px solid var(--blk-m)">' + escapeHtml(row.reported) + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);max-width:360px;white-space:normal;word-break:break-word">' + escapeHtml(row.content) + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);max-width:240px;white-space:normal;word-break:break-word">' + escapeHtml(row.reason) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);max-width:280px;white-space:normal;word-break:break-word">' + escapeHtml(row.content) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m);max-width:200px;white-space:normal;word-break:break-word">' + escapeHtml(row.reason) + '</td>' +
           '<td style="padding:8px;border-bottom:1px solid var(--blk-m);text-transform:uppercase">' + escapeHtml(row.status) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--blk-m)">'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+            + '<button class="btn btn-sm btn-s" onclick="setReportStatus(\'' + escapeHtml(row.id) + '\',\'reviewed\')">Review</button>'
+            + '<button class="btn btn-sm btn-p" onclick="setReportStatus(\'' + escapeHtml(row.id) + '\',\'resolved\')">Resolve</button>'
+            + '<button class="btn btn-sm btn-d" onclick="setReportStatus(\'' + escapeHtml(row.id) + '\',\'escalated\')">Escalate</button>'
+            + '</div>'
+          + '</td>' +
         '</tr>';
       }).join(''),
       '</tbody>',
@@ -589,6 +575,21 @@ async function loadReports(container) {
   }
 }
 
+async function setReportStatus(reportId, status) {
+  try {
+    await db.collection('reports').doc(String(reportId || '')).set({
+      status: String(status || 'open').toLowerCase(),
+      reviewedBy: String(auth.currentUser?.email || ''),
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    const main = document.getElementById('adm-main');
+    if (main && activeTab === 'reports') await loadReports(main);
+  } catch (err) {
+    alert('Could not update report: ' + err.message);
+  }
+}
+
 async function setAdminApplicationStatus(uid, status) {
   if (!uid) return;
   if (!isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email) && !isModerator(auth.currentUser?.email)) {
@@ -596,23 +597,30 @@ async function setAdminApplicationStatus(uid, status) {
     return;
   }
   try {
-    await db.collection('editorApplications').doc(uid).set({
+    await db.collection('applications').doc(uid).set({
       status: String(status || 'pending'),
       reviewedBy: String(auth.currentUser?.email || ''),
       reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
     if (String(status || '').toLowerCase() === 'approved') {
-      const appDoc = await db.collection('editorApplications').doc(uid).get();
+      const appDoc = await db.collection('applications').doc(uid).get();
       const appData = appDoc.exists ? (appDoc.data() || {}) : {};
+      const approvedRole = String(appData.roleApplied || 'contributor').toLowerCase();
+      const roleNameMap = {
+        contributor: 'Contributor',
+        moderator: 'Moderator',
+        admin: 'Admin',
+        chief_admin: 'Chief Admin'
+      };
       await db.collection('users').doc(uid).set({
         uid,
         email: String(appData.applicantEmail || ''),
         displayName: String(appData.applicantName || ''),
         submissionAccess: true,
         submissionAccessStatus: 'approved',
-        role: 'editor',
-        roleName: 'Editor',
+        role: approvedRole,
+        roleName: roleNameMap[approvedRole] || 'Contributor',
         submissionGrantedBy: String(auth.currentUser?.email || ''),
         submissionGrantedAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -628,30 +636,31 @@ async function setAdminApplicationStatus(uid, status) {
 }
 
 async function loadApplications(container) {
-  container.innerHTML = '<h3 style="margin-bottom:16px">Editor Applications</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading editor application queue...</p>';
+  container.innerHTML = '<h3 style="margin-bottom:16px">Contribution Applications</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading contribution application queue...</p>';
 
   try {
-    const snap = await db.collection('editorApplications').orderBy('updatedAt', 'desc').limit(200).get();
+    const snap = await db.collection('applications').orderBy('updatedAt', 'desc').limit(200).get();
     const apps = snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
     if (!apps.length) {
-      container.innerHTML = '<h3 style="margin-bottom:16px">Editor Applications</h3><p style="font-size:.82rem;color:var(--wht-d)">No editor applications found.</p>';
+      container.innerHTML = '<h3 style="margin-bottom:16px">Contribution Applications</h3><p style="font-size:.82rem;color:var(--wht-d)">No contribution applications found.</p>';
       return;
     }
 
     container.innerHTML = [
-      '<h3 style="margin-bottom:16px">Editor Applications</h3>',
-      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Approve or reject access for users who want to publish pages and upload media.</p>',
+      '<h3 style="margin-bottom:16px">Contribution Applications</h3>',
+      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Approve or reject role requests from Contributor up to Chief Admin.</p>',
       '<div style="display:grid;gap:10px">',
       apps.map(row => {
         const data = row.data || {};
         const status = String(data.status || 'pending');
+        const roleApplied = String(data.roleAppliedLabel || data.roleApplied || 'contributor');
         return '<div style="border:1px solid var(--blk-m);padding:10px;background:rgba(255,255,255,.02)">' +
           '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">' +
             '<strong>' + escapeHtml(data.applicantName || data.applicantEmail || row.id) + '</strong>' +
             '<span class="status status-' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
           '</div>' +
           '<div style="font-size:.78rem;color:var(--wht-d);margin-bottom:6px">' + escapeHtml(data.applicantEmail || '') + '</div>' +
-          '<div style="font-size:.78rem;color:var(--wht-f);margin-bottom:8px">Role requested: ' + escapeHtml(data.applicantRole || 'user') + '</div>' +
+          '<div style="font-size:.78rem;color:var(--wht-f);margin-bottom:8px">Role requested: ' + escapeHtml(roleApplied) + '</div>' +
           '<div style="font-size:.8rem;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(data.reason || '') + '</div>' +
           '<div style="font-size:.78rem;color:var(--wht-f);margin-bottom:10px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(data.experience || '') + '</div>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
@@ -664,7 +673,73 @@ async function loadApplications(container) {
       '</div>'
     ].join('');
   } catch (err) {
-    container.innerHTML = '<h3 style="margin-bottom:16px">Editor Applications</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load editor applications: ' + escapeHtml(err.message) + '</p>';
+    container.innerHTML = '<h3 style="margin-bottom:16px">Contribution Applications</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load applications: ' + escapeHtml(err.message) + '</p>';
+  }
+}
+
+async function revokeContributor(uid) {
+  if (!uid) return;
+  if (!confirm('Revoke contributor access for this user?')) return;
+  try {
+    await db.collection('users').doc(uid).set({
+      role: 'user',
+      roleName: 'User',
+      submissionAccess: false,
+      submissionAccessStatus: 'revoked',
+      contributorGranted: false,
+      roleRevokedBy: String(auth.currentUser?.email || ''),
+      roleRevokedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    const main = document.getElementById('adm-main');
+    if (main && activeTab === 'contributors') await loadContributors(main);
+  } catch (err) {
+    alert('Failed to revoke contributor role: ' + err.message);
+  }
+}
+
+async function loadContributors(container) {
+  container.innerHTML = '<h3 style="margin-bottom:16px">Editors / Contributors</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading contributor records...</p>';
+  try {
+    const [byRoleSnap, byAccessSnap] = await Promise.all([
+      db.collection('users').where('role', '==', 'contributor').limit(300).get(),
+      db.collection('users').where('submissionAccess', '==', true).limit(300).get()
+    ]);
+
+    const rowsMap = new Map();
+    byRoleSnap.docs.forEach(doc => rowsMap.set(doc.id, { id: doc.id, ...(doc.data() || {}) }));
+    byAccessSnap.docs.forEach(doc => {
+      const data = doc.data() || {};
+      if (String(data.role || '').toLowerCase() === 'contributor') {
+        rowsMap.set(doc.id, { id: doc.id, ...data });
+      }
+    });
+
+    const rows = Array.from(rowsMap.values());
+    if (!rows.length) {
+      container.innerHTML = '<h3 style="margin-bottom:16px">Editors / Contributors</h3><p style="font-size:.82rem;color:var(--wht-d)">No contributors found.</p>';
+      return;
+    }
+
+    container.innerHTML = [
+      '<h3 style="margin-bottom:16px">Editors / Contributors</h3>',
+      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Owner, Admin, and Moderator accounts can revoke contributor access.</p>',
+      '<div style="overflow:auto;border:1px solid var(--blk-m)">',
+      '<table style="width:100%;border-collapse:collapse;font-size:.8rem">',
+      '<thead><tr style="background:rgba(139,0,0,.16)"><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Name</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Email</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Role</th><th style="text-align:left;padding:8px;border-bottom:1px solid var(--blk-m)">Action</th></tr></thead>',
+      '<tbody>',
+      rows.map(row => '<tr>' +
+        '<td style="padding:8px;border-bottom:1px solid var(--blk-m)">' + escapeHtml(row.displayName || 'Unknown Agent') + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid var(--blk-m)">' + escapeHtml(row.email || '') + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid var(--blk-m)">' + escapeHtml(row.roleName || 'Contributor') + '</td>' +
+        '<td style="padding:8px;border-bottom:1px solid var(--blk-m)"><button class="btn btn-sm btn-d" onclick="revokeContributor(\'' + escapeHtml(row.uid || row.id) + '\')">Revoke</button></td>' +
+      '</tr>').join(''),
+      '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  } catch (err) {
+    container.innerHTML = '<h3 style="margin-bottom:16px">Editors / Contributors</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load contributors: ' + escapeHtml(err.message) + '</p>';
   }
 }
 

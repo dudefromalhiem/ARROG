@@ -1,4 +1,11 @@
 const admin = require('firebase-admin');
+const {
+  ROLES,
+  PUBLIC_ROLE_LADDER,
+  normalizeRole,
+  canApplyForRole,
+  isAtLeast
+} = require('../permissions');
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -34,6 +41,21 @@ function getRequestIp(req) {
 
 function normalizeText(text, maxLen = 1200) {
   return String(text || '').replace(/\s+/g, ' ').trim().slice(0, maxLen);
+}
+
+function normalizeApplicationRole(value) {
+  const role = normalizeRole(value);
+  return canApplyForRole(role) ? role : '';
+}
+
+function roleLabel(role) {
+  const normalized = normalizeRole(role);
+  if (normalized === ROLES.CONTRIBUTOR) return 'Contributor';
+  if (normalized === ROLES.MODERATOR) return 'Moderator';
+  if (normalized === ROLES.ADMIN) return 'Admin';
+  if (normalized === ROLES.CHIEF_ADMIN) return 'Chief Admin';
+  if (normalized === ROLES.OWNER) return 'Owner';
+  return 'User';
 }
 
 function toPlainValue(value) {
@@ -700,15 +722,25 @@ async function reportUser(db, actor, body) {
     return { statusCode: 404, payload: { error: 'Target user not found.' } };
   }
 
-  await db.collection('userReports').add({
+  const reportPayload = {
     reporterUid: actor.uid,
     reporterEmail: actor.email,
+    reporterName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
     targetUid,
     targetEmail: String((targetSnap.data() || {}).email || ''),
+    targetDisplayName: normalizeText((targetSnap.data() || {}).displayName || '', 120),
     reason,
+    type: 'user',
+    targetId: targetUid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    status: 'open'
+  };
+
+  await Promise.all([
+    db.collection('userReports').add(reportPayload),
+    db.collection('reports').add(reportPayload)
+  ]);
 
   return { statusCode: 200, payload: { ok: true } };
 }
@@ -731,7 +763,7 @@ async function reportMessage(db, actor, body) {
   }
 
   const targetData = targetSnap.data() || {};
-  await db.collection('dmReports').add({
+  const reportPayload = {
     reporterUid: actor.uid,
     reporterEmail: actor.email,
     reporterName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
@@ -741,10 +773,17 @@ async function reportMessage(db, actor, body) {
     messageId,
     reportedContent: messageText,
     reason,
+    type: 'message',
+    targetId: messageId || targetUid,
     status: 'open',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
+  };
+
+  await Promise.all([
+    db.collection('dmReports').add(reportPayload),
+    db.collection('reports').add(reportPayload)
+  ]);
 
   return { statusCode: 200, payload: { ok: true } };
 }
@@ -770,7 +809,7 @@ async function reportPage(db, actor, body) {
     }
   }
 
-  await db.collection('pageReports').add({
+  const reportPayload = {
     pageId: pageId || '',
     pageSlug: pageSlug || pageData.slug || '',
     pageTitle: pageTitle || pageData.title || '',
@@ -778,10 +817,17 @@ async function reportPage(db, actor, body) {
     reporterUid: actor.uid,
     reporterEmail: actor.email,
     reporterName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
+    type: 'page',
+    targetId: pageId || pageSlug || '',
     status: 'open',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
+  };
+
+  await Promise.all([
+    db.collection('pageReports').add(reportPayload),
+    db.collection('reports').add(reportPayload)
+  ]);
 
   return { statusCode: 200, payload: { ok: true } };
 }
@@ -789,28 +835,24 @@ async function reportPage(db, actor, body) {
 async function enforceEditorApplicationRateLimit(db, uid, ip) {
   const metaRef = db.collection('rateLimits').doc(uid);
   const now = Date.now();
-  const windowMs = 24 * 60 * 60 * 1000;
+  const windowMs = 30 * 24 * 60 * 60 * 1000;
 
   await db.runTransaction(async tx => {
     const snap = await tx.get(metaRef);
     const data = snap.exists ? (snap.data() || {}) : {};
-    const lastReset = data.editorApplicationLastReset && typeof data.editorApplicationLastReset.toMillis === 'function'
-      ? data.editorApplicationLastReset.toMillis()
+    const lastSubmittedAt = data.lastRoleApplicationAt && typeof data.lastRoleApplicationAt.toMillis === 'function'
+      ? data.lastRoleApplicationAt.toMillis()
       : 0;
-    const expired = !lastReset || (now - lastReset) >= windowMs;
-    const count = expired ? 0 : Number(data.editorApplicationCount || 0);
-
-    if (count >= 1) {
-      const err = new Error('You can only submit one editor application per day.');
+    if (lastSubmittedAt && (now - lastSubmittedAt) < windowMs) {
+      const err = new Error('You can submit only one contribution application every 30 days.');
       err.statusCode = 429;
       throw err;
     }
 
     tx.set(metaRef, {
-      editorApplicationCount: count + 1,
-      editorApplicationLastReset: expired ? admin.firestore.Timestamp.fromMillis(now) : data.editorApplicationLastReset,
-      editorApplicationLastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
-      editorApplicationLastIp: String(ip || 'unknown'),
+      roleApplicationCount: Number(data.roleApplicationCount || 0) + 1,
+      lastRoleApplicationAt: admin.firestore.Timestamp.fromMillis(now),
+      lastRoleApplicationIp: String(ip || 'unknown'),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   });
@@ -820,6 +862,11 @@ async function applyForEditor(db, actor, body, req) {
   const reason = normalizeText(body.reason || '', 1400);
   const experience = normalizeText(body.experience || '', 700);
   const roles = await getRolesData(db);
+  const requestedRole = normalizeApplicationRole(body.roleApplied || body.requestedRole || ROLES.CONTRIBUTOR);
+
+  if (!requestedRole) {
+    return { statusCode: 400, payload: { error: 'Choose a valid role from Contributor to Chief Admin.' } };
+  }
 
   if (isOwnerEmail(actor.email, roles) || isAdminEmail(actor.email, roles) || isModeratorEmail(actor.email, roles)) {
     return { statusCode: 403, payload: { error: 'Staff members already have submission access.' } };
@@ -831,13 +878,14 @@ async function applyForEditor(db, actor, body, req) {
 
   const userSnap = await db.collection('users').doc(actor.uid).get();
   const userData = userSnap.exists ? (userSnap.data() || {}) : {};
-  if (userData.submissionAccess === true || userData.role === 'editor' || userData.roleName === 'Editor') {
+  const currentRole = normalizeRole(userData.role || 'user');
+  if (isAtLeast(currentRole, requestedRole) || userData.submissionAccess === true) {
     return { statusCode: 200, payload: { ok: true, alreadyApproved: true } };
   }
 
   await enforceEditorApplicationRateLimit(db, actor.uid, getRequestIp(req));
 
-  const appRef = db.collection('editorApplications').doc(actor.uid);
+  const appRef = db.collection('applications').doc(actor.uid);
   const existing = await appRef.get();
   const existingData = existing.exists ? (existing.data() || {}) : {};
   const existingStatus = String(existingData.status || '').toLowerCase();
@@ -845,22 +893,125 @@ async function applyForEditor(db, actor, body, req) {
     return { statusCode: 200, payload: { ok: true, alreadyPending: true } };
   }
 
-  await appRef.set({
+  const nowField = admin.firestore.FieldValue.serverTimestamp();
+  const appPayload = {
     uid: actor.uid,
     applicantEmail: actor.email,
     applicantName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
-    applicantRole: String(userData.role || 'user'),
+    applicantRole: currentRole,
+    roleApplied: requestedRole,
+    roleAppliedLabel: roleLabel(requestedRole),
+    allowedRoles: PUBLIC_ROLE_LADDER.filter(role => role !== ROLES.USER),
     reason,
     experience,
     status: 'pending',
-    applicationType: 'editor',
-    submittedAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    applicationType: 'role_ladder',
+    submittedAt: nowField,
+    updatedAt: nowField,
     reviewedAt: null,
     reviewedBy: '',
     decisionNote: ''
+  };
+
+  await Promise.all([
+    appRef.set(appPayload, { merge: true }),
+    db.collection('editorApplications').doc(actor.uid).set(appPayload, { merge: true }),
+    db.collection('users').doc(actor.uid).set({
+      lastApplicationAt: nowField,
+      updatedAt: nowField
+    }, { merge: true })
+  ]);
+
+  return { statusCode: 200, payload: { ok: true, roleApplied: requestedRole } };
+}
+
+async function getUnifiedReports(db, actor) {
+  const roles = await getRolesData(db);
+  if (!isModeratorEmail(actor.email, roles)) {
+    return { statusCode: 403, payload: { error: 'Moderator access required.' } };
+  }
+
+  const snap = await db.collection('reports').orderBy('createdAt', 'desc').limit(300).get();
+  const reports = snap.docs.map(doc => ({ id: doc.id, ...(toPlainValue(doc.data()) || {}) }));
+  return { statusCode: 200, payload: { reports } };
+}
+
+async function setReportStatus(db, actor, body) {
+  const roles = await getRolesData(db);
+  if (!isModeratorEmail(actor.email, roles)) {
+    return { statusCode: 403, payload: { error: 'Moderator access required.' } };
+  }
+
+  const id = normalizeText(body.reportId || body.id || '', 128);
+  const status = normalizeText(body.status || '', 30).toLowerCase();
+  const note = normalizeText(body.note || '', 600);
+  const allowed = new Set(['open', 'reviewed', 'resolved', 'escalated']);
+  if (!id) return { statusCode: 400, payload: { error: 'Missing report id.' } };
+  if (!allowed.has(status)) return { statusCode: 400, payload: { error: 'Invalid report status.' } };
+
+  await db.collection('reports').doc(id).set({
+    status,
+    actionNote: note,
+    reviewedBy: actor.email,
+    reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
+
   return { statusCode: 200, payload: { ok: true } };
+}
+
+async function revokeContributor(db, actor, body) {
+  const roles = await getRolesData(db);
+  if (!isModeratorEmail(actor.email, roles)) {
+    return { statusCode: 403, payload: { error: 'Moderator access required.' } };
+  }
+
+  const targetUid = normalizeText(body.targetUid || body.uid || '', 128);
+  if (!targetUid) return { statusCode: 400, payload: { error: 'Missing target user.' } };
+
+  const targetRef = db.collection('users').doc(targetUid);
+  const targetSnap = await targetRef.get();
+  if (!targetSnap.exists) return { statusCode: 404, payload: { error: 'Target user not found.' } };
+
+  const target = targetSnap.data() || {};
+  const targetRole = normalizeRole(target.role || 'user');
+  if (targetRole !== ROLES.CONTRIBUTOR && targetRole !== ROLES.USER) {
+    return { statusCode: 403, payload: { error: 'Only contributor role can be revoked by this action.' } };
+  }
+
+  await targetRef.set({
+    role: ROLES.USER,
+    roleName: roleLabel(ROLES.USER),
+    submissionAccess: false,
+    submissionAccessStatus: 'revoked',
+    contributorGranted: false,
+    roleRevokedBy: actor.email,
+    roleRevokedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { statusCode: 200, payload: { ok: true } };
+}
+
+async function listContributors(db, actor) {
+  const roles = await getRolesData(db);
+  if (!isModeratorEmail(actor.email, roles)) {
+    return { statusCode: 403, payload: { error: 'Moderator access required.' } };
+  }
+
+  const byRole = await db.collection('users').where('role', '==', ROLES.CONTRIBUTOR).limit(300).get();
+  const byAccess = await db.collection('users').where('submissionAccess', '==', true).limit(300).get();
+  const map = new Map();
+  byRole.docs.forEach(doc => map.set(doc.id, { id: doc.id, ...(toPlainValue(doc.data()) || {}) }));
+  byAccess.docs.forEach(doc => {
+    const data = toPlainValue(doc.data()) || {};
+    const role = normalizeRole(data.role || 'user');
+    if (role === ROLES.CONTRIBUTOR) {
+      map.set(doc.id, { id: doc.id, ...data });
+    }
+  });
+
+  return { statusCode: 200, payload: { contributors: Array.from(map.values()) } };
 }
 
 module.exports = async function handler(req, res) {
@@ -904,6 +1055,16 @@ module.exports = async function handler(req, res) {
     if (method === 'GET' && type === 'friendrequests') {
       const requests = await listFriendRequests(db, actor);
       return sendJson(res, 200, requests);
+    }
+
+    if (method === 'GET' && type === 'reports') {
+      const result = await getUnifiedReports(db, actor);
+      return sendJson(res, result.statusCode, result.payload);
+    }
+
+    if (method === 'GET' && type === 'contributors') {
+      const result = await listContributors(db, actor);
+      return sendJson(res, result.statusCode, result.payload);
     }
 
     if (method === 'POST') {
@@ -957,6 +1118,16 @@ module.exports = async function handler(req, res) {
 
       if (action === 'reportpage') {
         const result = await reportPage(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'setreportstatus') {
+        const result = await setReportStatus(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'revokecontributor') {
+        const result = await revokeContributor(db, actor, body);
         return sendJson(res, result.statusCode, result.payload);
       }
 
