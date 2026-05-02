@@ -9,6 +9,20 @@ let adminNewsImageUrl = '';
 let currentUserIsAdminFlag = false;
 let currentUserDoc = null;
 
+// Utility for safe HTML rendering
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
+
 // Permission system functions (client-side)
 const PERMISSIONS = {
   viewContent: { level: 2, description: 'View public content' },
@@ -31,13 +45,25 @@ function getPermissions(userDoc) {
     return getPermissionsForLevel(2);
   }
 
-  const level = userDoc.level || 2;
-  const isOwner = userDoc.isOwner === true;
-  const contributorGranted = userDoc.contributorGranted === true;
-
-  if (isOwner) {
+  // Resolve level from doc or email-based roles
+  let level = userDoc.level;
+  const email = userDoc.email || '';
+  const isOwnerFlag = userDoc.isOwner === true || (email && isOwner(email));
+  
+  if (isOwnerFlag) {
     return getAllPermissions();
   }
+
+  if (!level && email) {
+    const lvl100 = getUserLevel(email);
+    if (lvl100 >= 60) level = 6;      // Admin
+    else if (lvl100 >= 10) level = 5; // Moderator
+    else if (lvl100 >= 5) level = 3;  // User
+    else level = 2;                  // Guest
+  }
+  
+  level = level || 2;
+  const contributorGranted = userDoc.contributorGranted === true;
 
   let permissions = {};
 
@@ -292,12 +318,16 @@ async function renderAdminBootstrap(user) {
 
   try {
     // Load user document from Firestore
-    const userDoc = await db.collection('users').doc(user.uid).get();
-    currentUserDoc = userDoc.exists ? userDoc.data() : null;
+    const userDocSnap = await db.collection('users').doc(user.uid).get();
+    currentUserDoc = userDocSnap.exists ? userDocSnap.data() : { uid: user.uid, email: user.email };
+    if (!currentUserDoc.email) currentUserDoc.email = user.email;
 
     // Check if user has admin permissions
     const isAdminUser = await getUserAdminFlag(user);
     currentUserIsAdminFlag = isAdminUser;
+    
+    // Sync owner status
+    if (isOwner(user.email)) currentUserDoc.isOwner = true;
 
     if (!isAdminUser) {
       adminLoading.classList.add('hidden');
@@ -434,6 +464,7 @@ function loadTab() {
     else if (activeTab === 'artworks') loadArtworks(main);
     else if (activeTab === 'news') loadNewsAdmin(main);
     else if (activeTab === 'reports') loadReports(main);
+    else if (activeTab === 'users') loadUsers(main);
     else if (activeTab === 'roles') loadRolesManager(main);
   }
 }
@@ -442,12 +473,16 @@ async function loadReports(container) {
   container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading report queues...</p>';
 
   try {
-    const [commentSnap, dmSnap, pageSnap, adminAppSnap] = await Promise.all([
+    const [commentSnap, dmSnap, pageSnap, adminAppSnap] = await Promise.allSettled([
       db.collection('commentReports').orderBy('createdAt', 'desc').limit(200).get(),
       db.collection('dmReports').orderBy('createdAt', 'desc').limit(200).get(),
       db.collection('pageReports').orderBy('createdAt', 'desc').limit(200).get(),
       db.collection('adminApplications').orderBy('updatedAt', 'desc').limit(200).get()
-    ]);
+    ]).then(results => results.map((r, idx) => {
+      if (r.status === 'fulfilled') return r.value;
+      rogLogger?.warn?.(`Report collection ${idx} failed:`, r.reason);
+      return { docs: [] };
+    }));
 
     const rows = [];
     commentSnap.docs.forEach(doc => {
@@ -540,8 +575,9 @@ async function loadReports(container) {
       ) : '<p style="font-size:.82rem;color:var(--wht-d)">No admin applications found.</p>'),
       '</div>'
     ].join('');
-  } catch (_err) {
-    container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--red-g)">Error could not load reports.</p>';
+  } catch (err) {
+    rogLogger?.error?.('Failed to load reports:', err);
+    container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--red-g)">Error loading reports: ' + escapeHtml(err.message || 'Unknown error') + '</p>';
   }
 }
 
@@ -1111,7 +1147,7 @@ async function refreshSubmissions(status) {
         const viewUrl = s.slug ? 'pages/' + s.slug : 'page.html?id=' + s.approvedPageId;
         actions += '<a href="' + viewUrl + '" class="btn btn-sm btn-s" target="_blank" style="margin-left:4px">View</a>';
       }
-      const showEmail = isOwner(auth.currentUser?.email) ? (s.authorEmail || '[Not Set]') : '[Redacted]';
+      const showEmail = hasPermission(currentUserDoc, 'manageUsers') ? (s.authorEmail || '[Not Set]') : '[Redacted]';
       return `<tr>
         <td>${s.title}</td>
         <td style="font-size:.75rem;color:var(--wht-d)">${s.authorName || 'Unknown Agent'}<br><span style="font-family:monospace;color:var(--red-b)">${showEmail}</span></td>
@@ -1155,7 +1191,7 @@ async function previewSubmission(id) {
           <p style="font-size:.75rem;color:var(--wht-f);margin-bottom:12px;line-height:1.6">Preview is rendered in a large sandboxed canvas using the same page renderer as the public site, including embedded images.</p>
           <dl>
             <dt>Author</dt><dd>${s.authorName || 'Unknown Agent'}</dd>
-            <dt>Email</dt><dd>${isOwner(auth.currentUser?.email) ? (s.authorEmail || '[Not Set]') : '[Redacted]'}</dd>
+            <dt>Email</dt><dd>${(isOwner(auth.currentUser?.email) || hasPermission(currentUserDoc, 'manageUsers')) ? (s.authorEmail || '[Not Set]') : '[Redacted]'}</dd>
             <dt>Type</dt><dd>${s.type}</dd>
             <dt>Tags</dt><dd>${(s.tags || []).join(', ') || 'None'}</dd>
             <dt>Status</dt><dd><span class="status status-${s.status}">${s.status}</span></dd>
@@ -1234,8 +1270,13 @@ function extractDescriptionFromHTML(html) {
 }
 
 async function approveSubmission(id) {
-  if (!canModerateSubmissions()) {
-    alert('Admin access is required to approve submissions.');
+  const userEmail = auth.currentUser?.email;
+  const isOwnerUser = isOwner(userEmail);
+  const isAdminUser = isAdmin(userEmail);
+  const isModUser = isModerator(userEmail);
+  
+  if (!isOwnerUser && !isAdminUser && !isModUser) {
+    alert('Admin/Moderator access is required to approve submissions.');
     return;
   }
   if (!confirm('Approve this submission and publish it to the site?')) return;
@@ -1304,8 +1345,13 @@ function showRejectForm(id) {
 }
 
 async function rejectSubmission(id, reason) {
-  if (!canModerateSubmissions()) {
-    alert('Admin access is required to reject submissions.');
+  const userEmail = auth.currentUser?.email;
+  const isOwnerUser = isOwner(userEmail);
+  const isAdminUser = isAdmin(userEmail);
+  const isModUser = isModerator(userEmail);
+  
+  if (!isOwnerUser && !isAdminUser && !isModUser) {
+    alert('Admin/Moderator access is required to reject submissions.');
     return;
   }
   try {
@@ -1761,7 +1807,7 @@ async function deleteNews(id) {
 async function loadUsers(container) {
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Registered Users</h3>
-    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">All accounts that have signed into the Guild. Owners may see email addresses; Admins see [Redacted]. Manage admin access in the Roles tab.</p>
+    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">All accounts that have signed into the Guild. Owners and Admins may see email addresses. Manage admin access in the Roles tab.</p>
     ${renderHierarchyGraph()}
     <table class="adm-tbl"><thead><tr><th>Display Name</th><th>Email</th><th>Role</th><th>Last Login</th></tr></thead><tbody id="users-tbody"></tbody></table>
   `;
@@ -1772,14 +1818,51 @@ async function refreshUsers() {
   const tbody = document.getElementById('users-tbody');
   try {
     const snap = await db.collection('users').get();
-    if (snap.empty) { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>'; return; }
-    tbody.innerHTML = snap.docs.map(d => {
+    
+    // Create a map of users from Firestore
+    const userMap = new Map();
+    snap.docs.forEach(d => {
       const u = d.data();
-      const showEmail = hasPermission(currentUserDoc, 'manageUsers') ? (u.email || '[Not Set]') : '[Redacted]';
+      if (u.email) {
+        userMap.set(u.email.toLowerCase(), u);
+      }
+    });
+    
+    // Merge with admin/mod/owner data from ROLE_DATA
+    const allRoles = new Map();
+    ROLE_DATA.owners.forEach(email => {
+      if (!allRoles.has(email.toLowerCase())) allRoles.set(email.toLowerCase(), { email, role: 'owner', displayName: '' });
+    });
+    ROLE_DATA.admins.forEach(email => {
+      if (!allRoles.has(email.toLowerCase())) allRoles.set(email.toLowerCase(), { email, role: 'admin', displayName: '' });
+    });
+    ROLE_DATA.mods.forEach(email => {
+      if (!allRoles.has(email.toLowerCase())) allRoles.set(email.toLowerCase(), { email, role: 'mod', displayName: '' });
+    });
+    
+    // Merge user data into roles
+    userMap.forEach((userData, email) => {
+      if (allRoles.has(email)) {
+        const existing = allRoles.get(email);
+        allRoles.set(email, { ...existing, ...userData });
+      }
+    });
+    
+    const rows = Array.from(allRoles.values());
+    
+    if (rows.length === 0 && snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = rows.map(u => {
+      const showEmail = (isOwner(auth.currentUser?.email) || isAdmin(auth.currentUser?.email)) ? (u.email || '[Not Set]') : '[Redacted]';
       const roleDisplayName = getRoleDisplayNameForUserRecord(u);
-      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${showEmail}</td><td><span class="tag">${roleDisplayName}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
+      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${escapeHtml(showEmail)}</td><td><span class="tag">${roleDisplayName}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
     }).join('');
-  } catch { tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>'; }
+  } catch (err) { 
+    tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>';
+  }
 }
 
 // ═════════════════════════════════════════════════════════════
