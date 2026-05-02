@@ -26,6 +26,10 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isOwner == true;
     }
 
+    function isOwnerActor() {
+      return isBootstrapOwner() || isOwnerFromRolesDoc() || isOwnerUser();
+    }
+
     function getUserLevel() {
       return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.level
@@ -41,7 +45,7 @@ service cloud.firestore {
     function canCreateEditPages() {
       let level = getUserLevel();
       let contributorGranted = isContributorGranted();
-      return isOwnerUser() ||
+      return isOwnerActor() ||
              level == 6 || // Admin
              level == 4 || // Contributor
              (level == 5 && contributorGranted); // Moderator with explicit grant
@@ -49,17 +53,17 @@ service cloud.firestore {
 
     function canModerate() {
       let level = getUserLevel();
-      return isOwnerUser() || level >= 5; // Moderator or Admin
+      return isOwnerActor() || level >= 5; // Moderator or Admin
     }
 
     function canManageUsersRoles() {
       let level = getUserLevel();
-      return isOwnerUser() || level == 6; // Admin
+      return isOwnerActor() || level == 6; // Admin
     }
 
     function isAdminUser() {
       let level = getUserLevel();
-      return isOwnerUser() || level == 6;
+      return isOwnerActor() || level == 6;
     }
 
     function canReadPublicContent() {
@@ -76,7 +80,40 @@ service cloud.firestore {
     }
 
     function maxClearanceForActor() {
-      return isOwnerUser() ? 6 : (getUserLevel() >= 6 ? 5 : (getUserLevel() >= 5 ? 4 : 3));
+      return isOwnerActor() ? 6 : (getUserLevel() >= 6 ? 5 : (getUserLevel() >= 5 ? 4 : 3));
+    }
+
+    function canApproveEditorAccessOnUsersDoc() {
+      return canModerate() && !canManageUsersRoles();
+    }
+
+    function hasEditorApprovalCreateFields() {
+      return request.resource.data.keys().hasOnly([
+        'uid',
+        'email',
+        'displayName',
+        'submissionAccess',
+        'submissionAccessStatus',
+        'role',
+        'roleName',
+        'submissionGrantedBy',
+        'submissionGrantedAt',
+        'updatedAt'
+      ]);
+    }
+
+    function hasEditorApprovalUpdateFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'email',
+        'displayName',
+        'submissionAccess',
+        'submissionAccessStatus',
+        'role',
+        'roleName',
+        'submissionGrantedBy',
+        'submissionGrantedAt',
+        'updatedAt'
+      ]);
     }
 
     function hasValidRequestedClearance() {
@@ -122,12 +159,23 @@ service cloud.firestore {
       allow create: if (canManageUsersRoles() || isSelf(userId)) &&
         !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
         hasSafeDisplayName();
+      allow create: if canApproveEditorAccessOnUsersDoc() &&
+        hasEditorApprovalCreateFields() &&
+        !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
+        hasSafeDisplayName();
       // Allow updates: admins can update everything, users can update safe fields only
       allow update: if canManageUsersRoles() ||
+        (canApproveEditorAccessOnUsersDoc() && hasEditorApprovalUpdateFields() &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted'])) ||
         (isSelf(userId) &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
          hasSafeDisplayName());
       allow delete: if canManageUsersRoles();
+    }
+
+    match /editorApplications/{applicationId} {
+      allow read: if canModerate();
+      allow create, update, delete: if canModerate();
     }
 
     match /pages/{pageId} {
