@@ -63,6 +63,7 @@
   <div class="section">
     <div class="section-hd">Profile</div>
     <div class="profile-warning" id="profile-warning">Any user with inappropriate profile images will be banned.</div>
+    <div class="profile-status" id="profile-role" style="margin-bottom:12px">Role: User</div>
 
     <div class="profile-grid">
       <div class="profile-card">
@@ -244,6 +245,7 @@ async function loadProfile(user) {
     username.value = data.displayName || user.displayName || '';
     bio.value = data.bio || '';
     avatar.src = data.photoURL || user.photoURL || 'logo.png';
+    document.getElementById('profile-role').textContent = 'Role: ' + (data.roleName || data.role || (isOwner(user.email) ? 'Owner' : isAdmin(user.email) ? 'Admin' : isModerator(user.email) ? 'Moderator' : 'User'));
     setProfileStatus('Profile loaded.', false);
   } catch (err) {
     setProfileStatus('Could not load profile: ' + err.message, true);
@@ -259,6 +261,9 @@ async function loadPublicProfile(uid) {
   const response = await fetch(base.toString(), { method: 'GET' });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || 'Could not load profile.');
+  if (payload.profile) {
+    payload.profile.roleName = payload.profile.roleName || payload.profile.role || 'User';
+  }
   return payload.profile || null;
 }
 
@@ -483,9 +488,17 @@ auth.onAuthStateChanged(async user => {
 
   navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
   if (messagingLink) messagingLink.classList.remove('hidden');
-  if (submitLink) submitLink.classList.remove('hidden');
+  if (submitLink) {
+    const canSubmit = await getUserSubmissionAccessFlag(user);
+    const submitAnchor = submitLink.querySelector('a');
+    submitLink.classList.remove('hidden');
+    if (submitAnchor) {
+      submitAnchor.href = canSubmit ? 'submit.html' : 'application.html';
+      submitAnchor.textContent = 'Workshop';
+    }
+  }
   if (nav) {
-    if (isAdmin(user.email)) {
+    if (await getUserAdminFlag(user)) {
       if (!adminLink) {
         adminLink = document.createElement('li');
         adminLink.id = 'admin-link';
@@ -503,6 +516,7 @@ auth.onAuthStateChanged(async user => {
       document.getElementById('profile-username').value = viewedProfileData.displayName || '';
       document.getElementById('profile-bio').value = viewedProfileData.bio || '';
       document.getElementById('profile-avatar').src = viewedProfileData.photoURL || 'logo.png';
+      document.getElementById('profile-role').textContent = 'Role: ' + (viewedProfileData.roleName || viewedProfileData.role || 'User');
       applyProfileMode(false, true);
       setProfileStatus('Viewing profile of ' + (viewedProfileData.displayName || 'Agent') + '.', false);
     } catch (err) {

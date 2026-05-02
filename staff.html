@@ -148,6 +148,7 @@ function renderAdminRoster(items) {
       '<div class="card-m">' + role + '</div>' +
       '<div class="card-b">Appointed ' + date + '</div>' +
       '<div style="margin-top:12px;display:flex;gap:8px">' +
+        '<a class="btn btn-s" href="profile.html?uid=' + uid + '">View Profile</a>' +
         '<button class="btn btn-s" type="button" onclick="openDirectMessage(\'' + uid + '\', \'' + encodedName + '\')">Message Admin</button>' +
       '</div>' +
     '</div>';
@@ -175,7 +176,15 @@ auth.onAuthStateChanged(async function (user) {
   if (user) {
     const displayLabel = user.displayName || 'Agent';
     navAuth.innerHTML = renderUserMenuHTML(displayLabel);
-    if (submitLink) submitLink.classList.remove('hidden');
+    if (submitLink) {
+      const submitAnchor = submitLink.querySelector('a');
+      const canSubmit = await getUserSubmissionAccessFlag(user);
+      submitLink.classList.remove('hidden');
+      if (submitAnchor) {
+        submitAnchor.href = canSubmit ? 'submit.html' : 'application.html';
+        submitAnchor.textContent = 'Workshop';
+      }
+    }
     if (messagingLink) messagingLink.classList.remove('hidden');
     if (nav) {
       const isAdminUser = await getUserAdminFlag(user);

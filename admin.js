@@ -297,6 +297,7 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   const artworksTab = document.getElementById('tab-artworks');
   const newsTab = document.getElementById('tab-news');
   const reportsTab = document.getElementById('tab-reports');
+  const applicationsTab = document.getElementById('tab-applications');
   const usersTab = document.getElementById('tab-users');
   const rolesTab = document.getElementById('tab-roles');
   const configTab = document.getElementById('tab-config');
@@ -310,6 +311,7 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   if (artworksTab) artworksTab.classList.toggle('hidden', isModOnly);
   if (newsTab) newsTab.classList.toggle('hidden', isModOnly);
   if (reportsTab) reportsTab.classList.toggle('hidden', isModOnly);
+  if (applicationsTab) applicationsTab.classList.remove('hidden');
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
   const canViewUsersTab = hasAdminAccess || isOwnerUser || isAdminUser || hasPermission(currentUserDoc, 'manageUsers');
@@ -350,14 +352,15 @@ async function renderAdminBootstrap(user) {
     currentUserDoc = userDocSnap.exists ? userDocSnap.data() : { uid: user.uid, email: user.email };
     if (!currentUserDoc.email) currentUserDoc.email = user.email;
 
-    // Check if user has admin permissions
-    const isAdminUser = await getUserAdminFlag(user);
+    // Check if user can enter the staff shell, but keep true admin state separate.
+    const canOpenAdminPanel = await getUserAdminFlag(user);
+    const isAdminUser = isAdmin(user.email);
     currentUserIsAdminFlag = isAdminUser;
     
     // Sync owner status
     if (isOwner(user.email)) currentUserDoc.isOwner = true;
 
-    if (!isAdminUser) {
+    if (!canOpenAdminPanel) {
       adminLoading.classList.add('hidden');
       adminDenied.classList.remove('hidden');
       adminDenied.style.display = 'block';
@@ -492,6 +495,7 @@ function loadTab() {
     else if (activeTab === 'artworks') loadArtworks(main);
     else if (activeTab === 'news') loadNewsAdmin(main);
     else if (activeTab === 'reports') loadReports(main);
+    else if (activeTab === 'applications') loadApplications(main);
     else if (activeTab === 'users') loadUsers(main);
     else if (activeTab === 'roles') loadRolesManager(main);
   }
@@ -501,11 +505,10 @@ async function loadReports(container) {
   container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading report queues...</p>';
 
   try {
-    const [commentSnap, dmSnap, pageSnap, adminAppSnap] = await Promise.allSettled([
+    const [commentSnap, dmSnap, pageSnap] = await Promise.allSettled([
       db.collection('commentReports').orderBy('createdAt', 'desc').limit(200).get(),
       db.collection('dmReports').orderBy('createdAt', 'desc').limit(200).get(),
-      db.collection('pageReports').orderBy('createdAt', 'desc').limit(200).get(),
-      db.collection('adminApplications').orderBy('updatedAt', 'desc').limit(200).get()
+      db.collection('pageReports').orderBy('createdAt', 'desc').limit(200).get()
     ]).then(results => results.map((r, idx) => {
       if (r.status === 'fulfilled') return r.value;
       rogLogger?.warn?.(`Report collection ${idx} failed:`, r.reason);
@@ -553,10 +556,8 @@ async function loadReports(container) {
       });
     });
 
-    const adminRows = adminAppSnap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
-
     rows.sort((a, b) => b.createdAt - a.createdAt);
-    if (!rows.length && !adminRows.length) {
+    if (!rows.length) {
       container.innerHTML = '<h3 style="margin-bottom:16px">Moderation Reports</h3><p style="font-size:.82rem;color:var(--wht-d)">No reports yet.</p>';
       return;
     }
@@ -580,27 +581,6 @@ async function loadReports(container) {
       }).join(''),
       '</tbody>',
       '</table>',
-      '</div>',
-      '<h3 style="margin:20px 0 12px">Admin Applications</h3>',
-      (adminRows.length ? (
-        '<div style="display:grid;gap:10px">' + adminRows.map(row => {
-          const data = row.data || {};
-          const status = String(data.status || 'pending');
-          return '<div style="border:1px solid var(--blk-m);padding:10px;background:rgba(255,255,255,.02)">' +
-            '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">' +
-              '<strong>' + escapeHtml(data.applicantName || data.applicantEmail || row.id) + '</strong>' +
-              '<span class="status status-' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
-            '</div>' +
-            '<div style="font-size:.78rem;color:var(--wht-d);margin-bottom:6px">' + escapeHtml(data.applicantEmail || '') + '</div>' +
-            '<div style="font-size:.8rem;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(data.reason || '') + '</div>' +
-            '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-              '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'approved\')">Approve</button>' +
-              '<button class="btn btn-sm btn-d" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'rejected\')">Reject</button>' +
-              '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'pending\')">Reset Pending</button>' +
-            '</div>' +
-          '</div>';
-        }).join('') + '</div>'
-      ) : '<p style="font-size:.82rem;color:var(--wht-d)">No admin applications found.</p>'),
       '</div>'
     ].join('');
   } catch (err) {
@@ -611,22 +591,80 @@ async function loadReports(container) {
 
 async function setAdminApplicationStatus(uid, status) {
   if (!uid) return;
-  if (!isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email)) {
-    alert('Admin clearance required.');
+  if (!isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email) && !isModerator(auth.currentUser?.email)) {
+    alert('Moderator or admin clearance required.');
     return;
   }
   try {
-    await db.collection('adminApplications').doc(uid).set({
+    await db.collection('editorApplications').doc(uid).set({
       status: String(status || 'pending'),
       reviewedBy: String(auth.currentUser?.email || ''),
       reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    if (String(status || '').toLowerCase() === 'approved') {
+      const appDoc = await db.collection('editorApplications').doc(uid).get();
+      const appData = appDoc.exists ? (appDoc.data() || {}) : {};
+      await db.collection('users').doc(uid).set({
+        uid,
+        email: String(appData.applicantEmail || ''),
+        displayName: String(appData.applicantName || ''),
+        submissionAccess: true,
+        submissionAccessStatus: 'approved',
+        role: 'editor',
+        roleName: 'Editor',
+        submissionGrantedBy: String(auth.currentUser?.email || ''),
+        submissionGrantedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
     const main = document.getElementById('adm-main');
     if (main && activeTab === 'reports') await loadReports(main);
     if (main && activeTab === 'roles') await refreshRolesDisplay();
+    if (main && activeTab === 'applications') await loadApplications(main);
   } catch (err) {
-    alert('Failed to update admin application: ' + err.message);
+    alert('Failed to update application: ' + err.message);
+  }
+}
+
+async function loadApplications(container) {
+  container.innerHTML = '<h3 style="margin-bottom:16px">Editor Applications</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading editor application queue...</p>';
+
+  try {
+    const snap = await db.collection('editorApplications').orderBy('updatedAt', 'desc').limit(200).get();
+    const apps = snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+    if (!apps.length) {
+      container.innerHTML = '<h3 style="margin-bottom:16px">Editor Applications</h3><p style="font-size:.82rem;color:var(--wht-d)">No editor applications found.</p>';
+      return;
+    }
+
+    container.innerHTML = [
+      '<h3 style="margin-bottom:16px">Editor Applications</h3>',
+      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Approve or reject access for users who want to publish pages and upload media.</p>',
+      '<div style="display:grid;gap:10px">',
+      apps.map(row => {
+        const data = row.data || {};
+        const status = String(data.status || 'pending');
+        return '<div style="border:1px solid var(--blk-m);padding:10px;background:rgba(255,255,255,.02)">' +
+          '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">' +
+            '<strong>' + escapeHtml(data.applicantName || data.applicantEmail || row.id) + '</strong>' +
+            '<span class="status status-' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
+          '</div>' +
+          '<div style="font-size:.78rem;color:var(--wht-d);margin-bottom:6px">' + escapeHtml(data.applicantEmail || '') + '</div>' +
+          '<div style="font-size:.78rem;color:var(--wht-f);margin-bottom:8px">Role requested: ' + escapeHtml(data.applicantRole || 'user') + '</div>' +
+          '<div style="font-size:.8rem;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(data.reason || '') + '</div>' +
+          '<div style="font-size:.78rem;color:var(--wht-f);margin-bottom:10px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(data.experience || '') + '</div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'approved\')">Approve</button>' +
+            '<button class="btn btn-sm btn-d" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'rejected\')">Reject</button>' +
+            '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'pending\')">Reset Pending</button>' +
+          '</div>' +
+        '</div>';
+      }).join(''),
+      '</div>'
+    ].join('');
+  } catch (err) {
+    container.innerHTML = '<h3 style="margin-bottom:16px">Editor Applications</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load editor applications: ' + escapeHtml(err.message) + '</p>';
   }
 }
 
@@ -1943,9 +1981,9 @@ async function loadRolesManager(container) {
         Owner / Archivist &gt; Chief Administrator &gt; Deputy Chief Administrator &gt; Senior Administrator &gt; Administrator &gt; Chief of Moderation &gt; Deputy Chief of Moderation &gt; Senior Moderator &gt; Moderator &gt; Junior Moderator
       </div>
     </div>
-    <h4 style="margin-bottom:8px">Admin Applications</h4>
-    <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:10px">Review users applying for admin access.</p>
-    <div id="role-admin-applications"></div>
+    <div style="margin-top:8px;padding:12px;border:1px solid var(--blk-m);background:rgba(255,255,255,.02);font-size:.78rem;color:var(--wht-d);line-height:1.7">
+      Editor applications are reviewed in the Applications tab.
+    </div>
   `;
   await refreshRolesDisplay();
 }
@@ -1955,7 +1993,7 @@ async function refreshRolesDisplay() {
   const modList = document.getElementById('mod-list');
   const ownersList = document.getElementById('owners-list');
   const roleAdminApplications = document.getElementById('role-admin-applications');
-  if (!adminList || !modList || !ownersList || !roleAdminApplications) return;
+  if (!adminList || !modList || !ownersList) return;
 
   // Refresh from Firestore
   try {
@@ -2056,30 +2094,8 @@ async function refreshRolesDisplay() {
     }
   });
 
-  try {
-    const adminAppSnap = await db.collection('adminApplications').orderBy('updatedAt', 'desc').limit(100).get();
-    const apps = adminAppSnap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
-    roleAdminApplications.innerHTML = apps.length ? (
-      '<div style="display:grid;gap:10px">' + apps.map(row => {
-        const data = row.data || {};
-        const status = String(data.status || 'pending');
-        return '<div style="border:1px solid var(--blk-m);padding:10px;background:rgba(255,255,255,.02)">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
-            '<strong>' + escapeHtml(data.applicantName || data.applicantEmail || row.id) + '</strong>' +
-            '<span class="status status-' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>' +
-          '</div>' +
-          '<div style="font-size:.78rem;color:var(--wht-d);margin-bottom:6px">' + escapeHtml(data.applicantEmail || '') + '</div>' +
-          '<div style="font-size:.8rem;margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(data.reason || '') + '</div>' +
-          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-            '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'approved\')">Approve</button>' +
-            '<button class="btn btn-sm btn-d" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'rejected\')">Reject</button>' +
-            '<button class="btn btn-sm btn-s" onclick="setAdminApplicationStatus(\'' + escapeHtml(row.id) + '\',\'pending\')">Reset Pending</button>' +
-          '</div>' +
-        '</div>';
-      }).join('') + '</div>'
-    ) : '<p style="font-size:.82rem;color:var(--wht-d)">No admin applications found.</p>';
-  } catch (err) {
-    roleAdminApplications.innerHTML = '<p style="font-size:.82rem;color:var(--red-g)">Could not load admin applications: ' + escapeHtml(err.message) + '</p>';
+  if (roleAdminApplications) {
+    roleAdminApplications.innerHTML = '<p style="font-size:.82rem;color:var(--wht-d)">Applications are reviewed in the Applications tab.</p>';
   }
 }
 

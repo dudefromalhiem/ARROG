@@ -315,9 +315,21 @@ async function getUserAdminFlag(user) {
       return true;
     }
     // Owner fallback prevents lockout if the isAdmin flag has not been seeded yet.
-    return isOwner(user.email) || isAdmin(user.email);
+    return isOwner(user.email) || isAdmin(user.email) || isModerator(user.email);
   } catch (_err) {
-    return isOwner(user.email) || isAdmin(user.email);
+    return isOwner(user.email) || isAdmin(user.email) || isModerator(user.email);
+  }
+}
+
+async function getUserSubmissionAccessFlag(user) {
+  if (!user) return false;
+  try {
+    if (isOwner(user.email) || isAdmin(user.email) || isModerator(user.email)) return true;
+    const doc = await db.collection('users').doc(user.uid).get();
+    const data = doc.exists ? (doc.data() || {}) : {};
+    return data.submissionAccess === true || data.role === 'editor' || data.roleName === 'Editor' || data.editorApproved === true;
+  } catch (_err) {
+    return false;
   }
 }
 
@@ -742,8 +754,17 @@ async function syncSharedNav(user) {
   if (user) {
     const displayLabel = user.displayName || 'Agent';
     const isAdminUser = await getUserAdminFlag(user);
+    const hasSubmissionAccess = await getUserSubmissionAccessFlag(user);
     navAuth.innerHTML = renderUserMenuHTML(displayLabel) + exitEsdButton;
     if (submitLink) submitLink.classList.remove('hidden');
+    if (submitLink) {
+      const submitAnchor = submitLink.querySelector('a');
+      if (submitAnchor) {
+        submitAnchor.href = hasSubmissionAccess ? 'submit.html' : 'application.html';
+        submitAnchor.textContent = 'Workshop';
+        submitAnchor.title = hasSubmissionAccess ? 'Open the workshop' : 'Apply for workshop access';
+      }
+    }
     if (nav) {
       let adminLink = nav.querySelector('#admin-link');
       if (isAdminUser) {

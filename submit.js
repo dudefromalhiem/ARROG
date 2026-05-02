@@ -493,9 +493,6 @@ auth.onAuthStateChanged(async user => {
       const deniedText = submitDenied.querySelector('p');
       if (deniedText && message) deniedText.textContent = message;
     }
-    if (navAuth) {
-      navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
-    }
   };
 
   try {
@@ -510,6 +507,14 @@ auth.onAuthStateChanged(async user => {
       setDraftStatus('Draft autosave is idle.');
       configureSubmissionApiBase();
       setLoreWorkshopVisibility(true);
+        const hasSubmissionAccess = await getUserSubmissionAccessFlag(user);
+        if (!hasSubmissionAccess) {
+          currentUserForSubmit = null;
+          submitPanel?.classList.add('hidden');
+          showSubmitDenied('You need Editor access to use the workshop. Apply on the application page first.');
+          if (navAuth) navAuth.innerHTML = renderSubmitUserMenu(user);
+          return;
+        }
       await setClearanceLimits(user);
       initializeSubmitEditModeFromUrl();
       initializeReconstructionPrefillFromUrl();
@@ -536,7 +541,7 @@ auth.onAuthStateChanged(async user => {
     currentUserForSubmit = null;
     currentUserCanAccessLore = false;
     activeDraftId = null;
-    showSubmitDenied('You must be signed in to create pages. Sign in on the main page first.');
+    showSubmitDenied('You must be signed in to use the workshop. If you do not have Editor access yet, apply on the application page first.');
   } catch (err) {
     const logger = window.rogLogger || console;
     if (typeof logger.error === 'function') logger.error('[Submit Auth] Bootstrap failed:', err);

@@ -853,14 +853,14 @@ async function applyForAdminFromHome() {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + token
       },
-      body: JSON.stringify({ action: 'applyadmin', reason, experience })
+      body: JSON.stringify({ action: 'applyeditor', reason, experience })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'Application failed.');
     if (payload && payload.alreadyPending) {
-      setAdminApplyStatus('Your admin application is already pending review.', false);
+      setAdminApplyStatus('Your editor application is already pending review.', false);
     } else {
-      setAdminApplyStatus('Application submitted to the Guild administration.', false);
+      setAdminApplyStatus('Application submitted to the Guild staff team.', false);
       if (reasonEl) reasonEl.value = '';
       if (expEl) expEl.value = '';
     }

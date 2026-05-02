@@ -28,19 +28,20 @@
   <link rel="stylesheet" href="style.css" />
   <style>
     .msg-container { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: 16px; margin-top: 20px; min-height: calc(100vh - 200px); }
-    .msg-sidebar { background: linear-gradient(180deg, rgba(28,20,18,.95), rgba(12,10,10,.97)); border: 1px solid #5a372e; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
-    .msg-main { background: linear-gradient(180deg, rgba(24,16,16,.98), rgba(9,8,8,.98)); border: 1px solid #5a372e; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,.28); }
-    .msg-header { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.1px; color: #f09a75; font-weight: bold; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .msg-sidebar { background: linear-gradient(180deg, rgba(18,22,28,.96), rgba(10,11,14,.98)); border: 1px solid #425165; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; box-shadow: 0 12px 34px rgba(0,0,0,.32); }
+    .msg-main { background: linear-gradient(180deg, rgba(15,18,24,.98), rgba(8,9,12,.98)); border: 1px solid #425165; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; box-shadow: 0 12px 34px rgba(0,0,0,.34); }
+    .msg-header { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.1px; color: #8fd3ff; font-weight: bold; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
     .msg-header::before { content: ''; display: inline-block; width: 4px; height: 4px; background: var(--red-b); border-radius: 50%; }
-    .msg-notifications-badge { background: var(--red-b); color: var(--blk-b); font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; margin-left: auto; }
+    .msg-notifications-badge { background: #8fd3ff; color: #081018; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; margin-left: auto; }
     .msg-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 12px; }
     .msg-tab-btn { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); color: var(--wht-d); cursor: pointer; font-size: 0.76rem; padding: 8px 6px; border-radius: 6px; transition: all 0.2s; }
-    .msg-tab-btn.active { color: #ffb88e; border-color: #b86a48; background: rgba(184,106,72,.18); }
+    .msg-tab-btn.active { color: #8fd3ff; border-color: #6a84a0; background: rgba(111,146,177,.18); }
     .msg-tab-btn:hover { color: var(--wht-m); }
     .msg-list { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
-    .msg-item { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255,255,255,.08); padding: 11px; cursor: pointer; transition: all 0.2s; border-radius: 6px; text-align: left; }
-    .msg-item:hover { background: rgba(255, 255, 255, 0.07); border-color: #d07a52; }
-    .msg-item.active { background: rgba(208,122,82,.17); border-color: #e29670; }
+    .msg-item { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255,255,255,.08); padding: 11px; cursor: pointer; transition: all 0.2s; border-radius: 8px; text-align: left; }
+    .msg-item:hover { background: rgba(255, 255, 255, 0.07); border-color: #6a84a0; }
+    .msg-item.active { background: rgba(111,146,177,.17); border-color: #8fd3ff; }
+    .msg-item.group { border-style: dashed; border-color: rgba(143,211,255,.28); }
     .msg-item-name { font-size: 0.9rem; color: var(--wht-b); font-weight: bold; display: flex; align-items: center; gap: 8px; }
     .msg-item-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1px solid var(--red-d); background: #111; }
     .msg-item-profile-link { margin-left:auto; font-size:.68rem; text-transform: uppercase; letter-spacing: .8px; color: var(--red-b); text-decoration:none; }
@@ -63,29 +64,29 @@
     .msg-chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; padding-right: 8px; }
     .msg-message { display: flex; gap: 12px; max-width: 85%; }
     .msg-message.sent { align-self: flex-end; flex-direction: row-reverse; }
-    .msg-message-avatar { width: 32px; height: 32px; background: var(--red-b); border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--blk-b); font-size: 0.75rem; font-weight: bold; }
-    .msg-message-content { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255,255,255,.12); padding: 10px 12px; border-radius: 8px; }
-    .msg-message.sent .msg-message-content { background: rgba(208,122,82,.2); border-color: #d28765; }
+    .msg-message-avatar { width: 32px; height: 32px; background: #8fd3ff; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #081018; font-size: 0.75rem; font-weight: bold; }
+    .msg-message-content { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255,255,255,.12); padding: 10px 12px; border-radius: 10px; }
+    .msg-message.sent .msg-message-content { background: rgba(111,146,177,.18); border-color: #8fd3ff; }
     .msg-message-text { color: var(--wht-b); font-size: 0.9rem; line-height: 1.5; }
     .msg-message-time { color: var(--wht-f); font-size: 0.65rem; margin-top: 4px; }
-    .msg-message-report { margin-top: 6px; font-size: .65rem; color: var(--red-b); cursor: pointer; border: 0; background: none; padding: 0; text-transform: uppercase; letter-spacing: .7px; }
+    .msg-message-report { margin-top: 6px; font-size: .65rem; color: #8fd3ff; cursor: pointer; border: 0; background: none; padding: 0; text-transform: uppercase; letter-spacing: .7px; }
     .msg-input-area { display: flex; gap: 8px; border-top: 1px solid var(--blk-m); padding-top: 16px; }
-    .msg-input { flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255,255,255,.12); padding: 12px; color: var(--wht-b); border-radius: 8px; font-size: 0.9rem; font-family: var(--font-m); resize: none; max-height: 100px; }
+    .msg-input { flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(143,211,255,.2); padding: 12px; color: var(--wht-b); border-radius: 8px; font-size: 0.9rem; font-family: var(--font-m); resize: none; max-height: 100px; }
     .msg-input::placeholder { color: var(--wht-f); }
-    .msg-input-btn { background: #c96a43; border: none; color: var(--wht-b); padding: 12px 20px; cursor: pointer; font-weight: bold; border-radius: 8px; transition: background 0.2s; }
-    .msg-input-btn:hover { background: #de7d55; }
+    .msg-input-btn { background: #6a84a0; border: none; color: #081018; padding: 12px 20px; cursor: pointer; font-weight: bold; border-radius: 8px; transition: background 0.2s; }
+    .msg-input-btn:hover { background: #8fd3ff; }
     .msg-input-btn:disabled { background: var(--blk-m); cursor: not-allowed; }
-    .msg-request-card { background: rgba(139, 0, 0, 0.1); border: 1px solid var(--red-d); padding: 12px; margin-bottom: 8px; border-radius: 2px; }
+    .msg-request-card { background: rgba(111,146,177, 0.08); border: 1px solid rgba(143,211,255,.18); padding: 12px; margin-bottom: 8px; border-radius: 6px; }
     .msg-request-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .msg-request-name { color: var(--wht-b); font-weight: bold; font-size: 0.9rem; }
     .msg-request-actions { display: flex; gap: 8px; }
-    .msg-request-btn { background: var(--red-b); border: none; color: var(--wht-b); padding: 6px 12px; cursor: pointer; font-size: 0.75rem; border-radius: 2px; transition: background 0.2s; }
-    .msg-request-btn:hover { background: var(--red-m); }
+    .msg-request-btn { background: #8fd3ff; border: none; color: #081018; padding: 6px 12px; cursor: pointer; font-size: 0.75rem; border-radius: 4px; transition: background 0.2s; }
+    .msg-request-btn:hover { background: #b6e5ff; }
     .msg-request-btn.reject { background: var(--blk-d); color: var(--wht-d); }
-    .msg-request-btn.reject:hover { background: var(--red-d); color: var(--wht-b); }
-    .msg-notification { background: rgba(139, 0, 0, 0.15); border: 1px solid var(--red-d); padding: 12px; margin-bottom: 8px; border-radius: 2px; font-size: 0.85rem; color: var(--wht-m); }
+    .msg-request-btn.reject:hover { background: #425165; color: var(--wht-b); }
+    .msg-notification { background: rgba(111,146,177, 0.12); border: 1px solid rgba(143,211,255,.18); padding: 12px; margin-bottom: 8px; border-radius: 6px; font-size: 0.85rem; color: var(--wht-m); }
     .msg-no-selection { display: flex; align-items: center; justify-content: center; color: var(--wht-d); font-style: italic; text-align: center; }
-    .msg-auth-skeleton { display:none; margin-top:20px; border:1px solid var(--red-d); background: linear-gradient(180deg, rgba(14,14,14,.95), rgba(8,8,8,.98)); padding:18px; }
+    .msg-auth-skeleton { display:none; margin-top:20px; border:1px solid #425165; background: linear-gradient(180deg, rgba(14,16,20,.95), rgba(8,9,12,.98)); padding:18px; }
     .auth-pending .msg-auth-skeleton { display:block; }
     .auth-pending .msg-container { display:none; }
     .msg-auth-grid { display:grid; grid-template-columns: 280px 1fr; gap:20px; min-height: calc(100vh - 260px); }
@@ -320,11 +321,20 @@ async function apiPost(body) {
 }
 
 function extractPeer(thread) {
+  if (thread && (thread.id === 'guild-staff' || thread.threadKind === 'guild-staff')) {
+    return {
+      peerUid: 'guild-staff',
+      peerName: 'Guild Staff Channel',
+      peerPhotoURL: 'logo.png',
+      peerRole: 'group'
+    };
+  }
   if (thread && thread.peer && thread.peer.uid) {
     return {
       peerUid: String(thread.peer.uid || ''),
       peerName: String(thread.peer.displayName || 'Guild Member'),
-      peerPhotoURL: String(thread.peer.photoURL || '')
+      peerPhotoURL: String(thread.peer.photoURL || ''),
+      peerRole: String(thread.peer.role || 'user')
     };
   }
   const participants = Array.isArray(thread.participants) ? thread.participants : [];
@@ -332,7 +342,7 @@ function extractPeer(thread) {
   const peerUid = participants.find(uid => uid !== currentUser.uid) || '';
   const peerIndex = participants.indexOf(peerUid);
   const peerName = names[peerIndex] || 'Guild Member';
-  return { peerUid, peerName, peerPhotoURL: '' };
+  return { peerUid, peerName, peerPhotoURL: '', peerRole: 'user' };
 }
 
 function setTab(tab) {
@@ -406,8 +416,10 @@ function renderFriends() {
     const isActive = row.peer.peerUid === currentPeerUid;
     const preview = escapeHtml(String(row.thread.lastMessagePreview || 'No messages yet'));
     const avatar = escapeHtml(row.peer.peerPhotoURL || 'logo.png');
-    return '<button type="button" class="msg-item ' + (isActive ? 'active' : '') + '" data-peer-uid="' + escapeHtml(row.peer.peerUid) + '" data-peer-name="' + escapeHtml(row.peer.peerName) + '">' +
-      '<div class="msg-item-name"><span class="msg-item-status"></span><img class="msg-item-avatar" src="' + avatar + '" alt="' + escapeHtml(row.peer.peerName) + '" loading="lazy" decoding="async" /><a href="profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '" data-open-profile="1" style="color:var(--wht-b);text-decoration:none">' + escapeHtml(row.peer.peerName) + '</a><a class="msg-item-profile-link" href="profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '" data-open-profile="1">Profile</a></div>' +
+    const isGroup = row.peer.peerRole === 'group';
+    const profileLinks = isGroup ? '<span class="msg-item-profile-link" style="cursor:default">Channel</span>' : '<a href="profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '" data-open-profile="1" style="color:var(--wht-b);text-decoration:none">' + escapeHtml(row.peer.peerName) + '</a><a class="msg-item-profile-link" href="profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '" data-open-profile="1">Profile</a>';
+    return '<button type="button" class="msg-item ' + (isGroup ? 'group ' : '') + (isActive ? 'active' : '') + '" data-peer-uid="' + escapeHtml(row.peer.peerUid) + '" data-peer-name="' + escapeHtml(row.peer.peerName) + '">' +
+      '<div class="msg-item-name"><span class="msg-item-status"></span><img class="msg-item-avatar" src="' + avatar + '" alt="' + escapeHtml(row.peer.peerName) + '" loading="lazy" decoding="async" />' + profileLinks + '</div>' +
       '<div class="msg-item-preview">' + preview + '</div>' +
       '<div class="msg-item-time">' + escapeHtml(formatDateTime(row.thread.updatedAt)) + '</div>' +
     '</button>';
@@ -508,11 +520,13 @@ async function openChat(peerUid, peerName) {
   currentPeerUid = String(peerUid || '');
   if (!currentPeerUid) return;
   document.getElementById('msg-current-name').textContent = peerName || 'Guild Member';
-  document.getElementById('msg-current-status').textContent = 'Connected';
+  const isStaffChannel = currentPeerUid === 'guild-staff';
+  document.getElementById('msg-current-status').textContent = isStaffChannel ? 'Guild staff channel' : 'Connected';
   const actions = document.getElementById('msg-chat-actions');
-  if (actions) actions.style.display = 'flex';
+  if (actions) actions.style.display = isStaffChannel ? 'none' : 'flex';
   document.getElementById('msg-input-area').style.display = 'flex';
   document.getElementById('msg-no-selection').style.display = 'none';
+  document.getElementById('msg-block-btn')?.classList.toggle('hidden', isStaffChannel);
   renderFriends();
   await loadMessages();
   setSidebarOpen(false);
@@ -745,6 +759,33 @@ async function bootstrapMessaging() {
     if (!user) {
       window.location.href = 'index.html';
       return;
+    }
+
+    const submitLink = document.getElementById('submit-link');
+    const nav = document.getElementById('nav');
+    let adminLink = nav ? nav.querySelector('#admin-link') : null;
+    const canSubmit = await getUserSubmissionAccessFlag(user);
+    if (submitLink) {
+      const submitAnchor = submitLink.querySelector('a');
+      submitLink.classList.remove('hidden');
+      if (submitAnchor) {
+        submitAnchor.href = canSubmit ? 'submit.html' : 'application.html';
+        submitAnchor.textContent = 'Workshop';
+      }
+    }
+    if (nav) {
+      const canOpenPanel = await getUserAdminFlag(user);
+      if (canOpenPanel) {
+        if (!adminLink) {
+          adminLink = document.createElement('li');
+          adminLink.id = 'admin-link';
+          adminLink.innerHTML = '<a href="admin.html">Admin</a>';
+          const authLi = nav.querySelector('#nav-auth');
+          nav.insertBefore(adminLink, authLi || null);
+        }
+      } else if (adminLink) {
+        adminLink.remove();
+      }
     }
 
     document.getElementById('nav-auth').innerHTML = '<button class="nav-btn" type="button" id="msg-signout-btn">Sign Out</button>';
