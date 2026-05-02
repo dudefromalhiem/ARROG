@@ -3615,8 +3615,8 @@ body::after {
 }
 
 @keyframes logoDrift {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-4px); }
+  0%, 100% { transform: translate(-50%, -50%); }
+  50% { transform: translate(-50%, calc(-50% - 4px)); }
 }
 
 @media (max-width: 980px) {
