@@ -65,10 +65,37 @@ let maxSubmitClearanceLevel = 4;
 let draftAutoSaveQueued = false;
 const nativeSubmitAlert = window.alert.bind(window);
 let submitAlertModal = null;
+let seedDataLoadPromise = null;
 
 const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
 const DOC_MEDIA_DRAG_SETTING_KEY = 'rog-doc-media-drag-enabled';
 const DRAFT_AUTOSAVE_MIN_WORDS = 150;
+
+function ensureSubmitSeedDataLoaded() {
+  if (typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)) {
+    return Promise.resolve(true);
+  }
+  if (seedDataLoadPromise) return seedDataLoadPromise;
+
+  seedDataLoadPromise = new Promise(resolve => {
+    const existing = document.querySelector('script[data-seed-data="true"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)), { once: true });
+      existing.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'seed-data.js';
+    script.defer = true;
+    script.setAttribute('data-seed-data', 'true');
+    script.onload = () => resolve(typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED));
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+
+  return seedDataLoadPromise;
+}
 
 function normalizeClearanceLevel(value, fallback = 2) {
   const parsed = Number.parseInt(String(value || ''), 10);
@@ -1375,10 +1402,11 @@ async function initializeSubmitEditModeFromUrl() {
     }
 
     if (!pageDoc) {
+      const seedReady = await ensureSubmitSeedDataLoaded();
       const seedItem = typeof PAGE_SEED !== 'undefined'
         ? PAGE_SEED.find(p => (editId && p.id === editId) || (editSlug && p.slug === editSlug))
         : null;
-      if (!seedItem) {
+      if (!seedItem || !seedReady) {
         alert('Requested page was not found.');
         return;
       }
@@ -4339,7 +4367,10 @@ async function shouldBypassSubmissionReview() {
 // SUBMIT PAGE
 // ═════════════════════════════════════════════════════════════
 
-async function submitPage() {
+async function submitPage(event) {
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
   if (!currentUserForSubmit) { alert('Please sign in first.'); return; }
 
   const now = Date.now();

@@ -861,9 +861,9 @@ render.mount('submission-terminal');</pre>
         <div id="draft-status" style="font-size:.72rem;color:var(--wht-f);margin-top:6px">Draft autosave is idle.</div>
       </div>
       <div style="display:flex;gap:12px">
-        <button class="btn btn-s" onclick="resetSubmitForm()">Clear All</button>
+        <button class="btn btn-s" type="button" onclick="resetSubmitForm()">Clear All</button>
         <button class="btn btn-s" id="draft-btn" type="button" onclick="manualSaveDraft()">Save Draft</button>
-        <button class="btn btn-p" id="submit-btn" onclick="submitPage()">>> Submit for Review</button>
+        <button class="btn btn-p" id="submit-btn" type="button" onclick="submitPage(event)">>> Submit for Review</button>
       </div>
     </div>
     </div>
@@ -894,7 +894,6 @@ render.mount('submission-terminal');</pre>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="firebase-config.js"></script>
-<script src="seed-data.js"></script>
 <script src="submit.js"></script>
 </body>
 </html>

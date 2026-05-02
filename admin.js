@@ -8,6 +8,7 @@ let adminArtworkUploadUrl = '';
 let adminNewsImageUrl = '';
 let currentUserIsAdminFlag = false;
 let currentUserDoc = null;
+let adminSeedDataLoadPromise = null;
 
 // Utility for safe HTML rendering
 function escapeHtml(text) {
@@ -174,7 +175,33 @@ function renderHierarchyGraph() {
 }
 
 function isModOnlyRole() {
-  return !isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email);
+  return !currentUserIsAdminFlag && !isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email);
+}
+
+function ensureAdminSeedDataLoaded() {
+  if (typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)) {
+    return Promise.resolve(true);
+  }
+  if (adminSeedDataLoadPromise) return adminSeedDataLoadPromise;
+
+  adminSeedDataLoadPromise = new Promise(resolve => {
+    const existing = document.querySelector('script[data-seed-data="true"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)), { once: true });
+      existing.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'seed-data.js';
+    script.defer = true;
+    script.setAttribute('data-seed-data', 'true');
+    script.onload = () => resolve(typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED));
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+
+  return adminSeedDataLoadPromise;
 }
 
 function canModerateSubmissions() {
@@ -285,7 +312,8 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   if (reportsTab) reportsTab.classList.toggle('hidden', isModOnly);
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
-  if (usersTab) usersTab.classList.toggle('hidden', !hasAdminAccess);
+  const canViewUsersTab = hasAdminAccess || isOwnerUser || isAdminUser || hasPermission(currentUserDoc, 'manageUsers');
+  if (usersTab) usersTab.classList.toggle('hidden', !canViewUsersTab);
   const canManageRoles = isOwnerUser || (isAdminUser && GUILD_PERMISSIONS['adminCanManageRoles']);
   if (rolesTab) rolesTab.classList.toggle('hidden', !canManageRoles);
 
@@ -648,7 +676,8 @@ async function migrateSeededPagesToFirestore() {
     alert('You do not have permission to run seeded page migration.');
     return;
   }
-  if (typeof PAGE_SEED === 'undefined' || !Array.isArray(PAGE_SEED) || PAGE_SEED.length === 0) {
+  const seedReady = await ensureAdminSeedDataLoaded();
+  if (!seedReady || typeof PAGE_SEED === 'undefined' || !Array.isArray(PAGE_SEED) || PAGE_SEED.length === 0) {
     if (statusEl) statusEl.textContent = 'Seed migration status: no PAGE_SEED data found.';
     alert('No seeded pages were found to migrate.');
     return;
