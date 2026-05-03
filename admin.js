@@ -2289,35 +2289,15 @@ async function addStaffRole() {
   if (ROLE_DATA.userRoles[email] === kind) { alert(`This email is already assigned the ${ROLE_NAMES[kind]} role.`); return; }
 
   try {
-    // Remove from old role arrays for backward compatibility
-    ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
-    ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
-    if (ROLE_DATA.adminAppointments && ROLE_DATA.adminAppointments[email]) delete ROLE_DATA.adminAppointments[email];
-
-    // Set new role
-    ROLE_DATA.userRoles[email] = kind;
-
-    // Add to arrays for backward compatibility
-    if (['chief-admin', 'deputy-chief-admin', 'senior-admin', 'admin'].includes(kind)) {
-      ROLE_DATA.admins.push(email);
-      if (kind === 'admin') {
-        ROLE_DATA.adminAppointments[email] = new Date().toISOString();
-      }
-    } else if (['chief-mod', 'deputy-chief-mod', 'senior-mod', 'mod', 'junior-mod'].includes(kind)) {
-      ROLE_DATA.mods.push(email);
+    const result = await callSocialApi('POST', { action: 'assignrole', email, role: kind });
+    if (result && result.ok) {
+      // Refresh local cached roles by reading config again
+      await refreshRolesDisplay();
+      input.value = '';
+      alert(`${ROLE_NAMES[kind]} role granted to ${email}`);
+    } else {
+      alert('Failed to add role.');
     }
-
-    await db.collection('config').doc('roles').set({
-      owners: ROLE_DATA.owners,
-      admins: ROLE_DATA.admins,
-      mods: ROLE_DATA.mods,
-      userRoles: ROLE_DATA.userRoles,
-      adminAppointments: ROLE_DATA.adminAppointments || {}
-    });
-
-    input.value = '';
-    alert(`${ROLE_NAMES[kind]} role granted to ${email}`);
-    await refreshRolesDisplay();
   } catch (err) {
     alert('Failed to add role: ' + err.message);
   }
@@ -2327,23 +2307,13 @@ async function removeStaffRole(kind, email) {
   if (!confirm(`Revoke ${ROLE_NAMES[kind]} access for ${email}?`)) return;
   if (!canEditRole(email, auth.currentUser?.email)) { alert('You do not have permission to modify this user\'s role.'); return; }
   try {
-    // Remove from userRoles
-    delete ROLE_DATA.userRoles[email];
-
-    // Remove from arrays for backward compatibility
-    ROLE_DATA.admins = ROLE_DATA.admins.filter(e => e !== email);
-    ROLE_DATA.mods = ROLE_DATA.mods.filter(e => e !== email);
-    if (ROLE_DATA.adminAppointments && ROLE_DATA.adminAppointments[email]) delete ROLE_DATA.adminAppointments[email];
-
-    await db.collection('config').doc('roles').set({
-      owners: ROLE_DATA.owners,
-      admins: ROLE_DATA.admins,
-      mods: ROLE_DATA.mods,
-      userRoles: ROLE_DATA.userRoles,
-      adminAppointments: ROLE_DATA.adminAppointments || {}
-    });
-    alert(`${ROLE_NAMES[kind]} access revoked for ${email}`);
-    await refreshRolesDisplay();
+    const result = await callSocialApi('POST', { action: 'assignrole', email, role: 'user' });
+    if (result && result.ok) {
+      await refreshRolesDisplay();
+      alert(`${ROLE_NAMES[kind]} access revoked for ${email}`);
+    } else {
+      alert('Failed to remove role.');
+    }
   } catch (err) {
     alert('Failed to remove role: ' + err.message);
   }

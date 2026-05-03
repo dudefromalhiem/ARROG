@@ -1152,6 +1152,84 @@ async function listContributors(db, actor) {
   return { statusCode: 200, payload: { contributors: Array.from(map.values()) } };
 }
 
+async function assignRole(db, actor, body) {
+  const rolesRef = db.collection('config').doc('roles');
+  const roles = await getRolesData(db);
+  // Only owners or admins may assign roles
+  if (!isAdminEmail(actor.email, roles) && !isOwnerEmail(actor.email, roles)) {
+    return { statusCode: 403, payload: { error: 'Admin or Owner access required.' } };
+  }
+
+  const email = String((body.email || '').trim()).toLowerCase();
+  const rawRole = String((body.role || '').trim());
+  if (!email || !rawRole) return { statusCode: 400, payload: { error: 'Missing email or role.' } };
+
+  const normalized = normalizeRole(rawRole);
+  if (!normalized) return { statusCode: 400, payload: { error: 'Invalid role.' } };
+
+  // Transactionally update config/roles and the user's users/{uid} doc if present
+  try {
+    await db.runTransaction(async tx => {
+      const rolesSnap = await tx.get(rolesRef);
+      const rd = rolesSnap.exists ? (rolesSnap.data() || {}) : {};
+      const owners = Array.isArray(rd.owners) ? rd.owners.filter(Boolean).map(e => String(e).toLowerCase()) : [];
+      const admins = Array.isArray(rd.admins) ? rd.admins.filter(Boolean).map(e => String(e).toLowerCase()) : [];
+      const mods = Array.isArray(rd.mods) ? rd.mods.filter(Boolean).map(e => String(e).toLowerCase()) : [];
+      const userRoles = Object.assign({}, rd.userRoles || {});
+
+      // Remove email from arrays to avoid duplicates
+      const without = arr => arr.filter(e => String(e).toLowerCase() !== email);
+      const nextOwners = without(owners);
+      const nextAdmins = without(admins);
+      const nextMods = without(mods);
+
+      // Assign into appropriate container
+      if (normalized === 'owner') nextOwners.push(email);
+      else if (['chief_admin','admin','junior_admin','senior_admin','deputy-chief-admin'].includes(normalized)) nextAdmins.push(email);
+      else if (['moderator','junior_moderator','senior_mod','chief_mod','deputy-chief-mod','mod'].includes(normalized)) nextMods.push(email);
+
+      // Update userRoles map (single role per user)
+      userRoles[email] = normalized === 'user' ? undefined : normalized;
+      if (userRoles[email] === undefined) delete userRoles[email];
+
+      tx.set(rolesRef, {
+        owners: nextOwners,
+        admins: nextAdmins,
+        mods: nextMods,
+        userRoles: userRoles,
+        adminAppointments: rd.adminAppointments || {}
+      }, { merge: true });
+
+      // If a users doc exists, update it to reflect the canonical role
+      const userSnap = await tx.get(db.collection('users').where('email', '==', email).limit(1));
+      if (!userSnap.empty) {
+        const doc = userSnap.docs[0];
+        const uid = doc.id;
+        const roleName = roleLabel(normalized);
+        const updates = {
+          role: normalized,
+          roleName: roleName,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+        if (normalized === 'contributor') {
+          updates.contributorGranted = true;
+          updates.submissionAccess = true;
+          updates.submissionAccessStatus = 'granted';
+        } else {
+          updates.contributorGranted = false;
+          updates.submissionAccess = false;
+          updates.submissionAccessStatus = 'revoked';
+        }
+        tx.set(db.collection('users').doc(uid), updates, { merge: true });
+      }
+    });
+  } catch (err) {
+    return { statusCode: 500, payload: { error: 'Failed to assign role: ' + String(err.message || err) } };
+  }
+
+  return { statusCode: 200, payload: { ok: true } };
+}
+
 module.exports = async function handler(req, res) {
   try {
     const app = initAdmin();
@@ -1272,6 +1350,10 @@ module.exports = async function handler(req, res) {
 
       if (action === 'revokecontributor') {
         const result = await revokeContributor(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+      if (action === 'assignrole') {
+        const result = await assignRole(db, actor, body);
         return sendJson(res, result.statusCode, result.payload);
       }
 

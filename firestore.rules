@@ -81,19 +81,18 @@ service cloud.firestore {
     function canModerate() {
       let level = getUserLevel();
       let role = getUserRole();
-      // Fallback: if the roles config doc explicitly lists this actor as an owner/admin/mod,
-      // treat them as having moderation privileges. This helps when role resolution
-      // via users/{uid} is out-of-sync with config/roles.
+
+      // Fallback: consider the actor listed in config/roles (owners/admins/mods)
+      // as having moderation privileges when the users/{uid} document is out-of-sync.
       let email = isSignedIn() ? request.auth.token.email : '';
-      let listedInRolesDoc = false;
-      if (isSignedIn() && exists(/databases/$(database)/documents/config/roles)) {
-        let rd = get(/databases/$(database)/documents/config/roles).data;
-        listedInRolesDoc = (
-          ('owners' in rd && email in rd.owners) ||
-          ('admins' in rd && email in rd.admins) ||
-          ('mods' in rd && email in rd.mods)
-        );
-      }
+      let listedInRolesDoc = isSignedIn() && exists(/databases/$(database)/documents/config/roles) && (
+        (('owners' in get(/databases/$(database)/documents/config/roles).data) &&
+         email in get(/databases/$(database)/documents/config/roles).data.owners) ||
+        (('admins' in get(/databases/$(database)/documents/config/roles).data) &&
+         email in get(/databases/$(database)/documents/config/roles).data.admins) ||
+        (('mods' in get(/databases/$(database)/documents/config/roles).data) &&
+         email in get(/databases/$(database)/documents/config/roles).data.mods)
+      );
 
       return isOwnerActor() || role == 'moderator' || role == 'admin' || role == 'chief_admin' || level >= 5 || listedInRolesDoc;
     }
@@ -186,6 +185,14 @@ service cloud.firestore {
         );
     }
 
+    function isValidRoleVal(roleVal) {
+      return (roleVal is string) && (
+        roleVal == 'owner' || roleVal == 'chief_admin' || roleVal == 'admin' ||
+        roleVal == 'junior_admin' || roleVal == 'moderator' || roleVal == 'junior_moderator' ||
+        roleVal == 'contributor' || roleVal == 'user' || roleVal == 'guest'
+      );
+    }
+
     // Contributor revocations must go through server APIs with abuse-rate checks.
     function isClientContributorRevocation() {
       let currentRole = ('role' in resource.data && resource.data.role is string)
@@ -236,16 +243,18 @@ service cloud.firestore {
       // Allow create for self (registration) or admins
       allow create: if (canManageUsersRoles() || isSelf(userId)) &&
         !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
-        hasSafeDisplayName();
+        hasSafeDisplayName() &&
+        (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role));
       allow create: if canApproveEditorAccessOnUsersDoc() &&
         hasEditorApprovalCreateFields() &&
         !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
-        hasSafeDisplayName();
+        hasSafeDisplayName() &&
+        (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role));
       // Allow updates: admins can update everything, users can update safe fields only
-      allow update: if (canManageUsersRoles() && !isClientContributorRevocation()) ||
+      allow update: if (canManageUsersRoles() && !isClientContributorRevocation() && (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role))) ||
         (canApproveEditorAccessOnUsersDoc() && hasEditorApprovalUpdateFields() &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
-         !isClientContributorRevocation()) ||
+        !isClientContributorRevocation() && (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role))) ||
         (isSelf(userId) &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
          hasSafeDisplayName());
