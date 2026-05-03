@@ -182,7 +182,9 @@ function getValidRoleNames(level) {
 
 function canApplyForRole(role) {
   const normalized = normalizeRole(role);
-  return PUBLIC_ROLE_LADDER.includes(normalized) && normalized !== ROLES.USER;
+  // Chief Admin is appointment-only, not available via application
+  const APPLICABLE_ROLES = [ROLES.CONTRIBUTOR, ROLES.MODERATOR, ROLES.ADMIN];
+  return APPLICABLE_ROLES.includes(normalized);
 }
 
 // Export for use in other modules

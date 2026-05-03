@@ -175,7 +175,8 @@ function renderHierarchyGraph() {
 }
 
 function isModOnlyRole() {
-  return !currentUserIsAdminFlag && !isOwner(auth.currentUser?.email) && !isAdmin(auth.currentUser?.email);
+  if (!auth.currentUser?.email) return true;
+  return !currentUserIsAdminFlag && !isOwner(auth.currentUser.email) && !isAdmin(auth.currentUser.email);
 }
 
 function canModeratorOpenTab(tab) {
@@ -310,8 +311,10 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
 
   const isOwnerUser = isOwner(user.email);
   const isAdminUser = isAdmin(user.email);
+  const isModUser = isModerator(user.email);
   const isModOnly = !isOwnerUser && !isAdminUser;
 
+  // Owner and admin see all tabs
   if (pagesTab) pagesTab.classList.toggle('hidden', isModOnly);
   if (submissionsTab) submissionsTab.classList.remove('hidden');
   if (artworksTab) artworksTab.classList.toggle('hidden', isModOnly);
@@ -321,8 +324,11 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   if (applicationsTab) applicationsTab.classList.remove('hidden');
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
-  const canViewUsersTab = hasAdminAccess || isOwnerUser || isAdminUser || hasPermission(currentUserDoc, 'manageUsers');
+  // Users tab: visible to owner, admin, and anyone with manageUsers perm
+  const canViewUsersTab = isOwnerUser || isAdminUser || hasAdminAccess || hasPermission(currentUserDoc, 'manageUsers');
   if (usersTab) usersTab.classList.toggle('hidden', !canViewUsersTab);
+
+  // Roles tab: owner always, admin if delegated
   const canManageRoles = isOwnerUser || (isAdminUser && GUILD_PERMISSIONS['adminCanManageRoles']);
   if (rolesTab) rolesTab.classList.toggle('hidden', !canManageRoles);
 
@@ -362,10 +368,11 @@ async function renderAdminBootstrap(user) {
     // Check if user can enter the staff shell, but keep true admin state separate.
     const canOpenAdminPanel = await getUserAdminFlag(user);
     const isAdminUser = isAdmin(user.email);
-    currentUserIsAdminFlag = isAdminUser;
+    const isOwnerUser = isOwner(user.email);
+    currentUserIsAdminFlag = isAdminUser || isOwnerUser;
     
     // Sync owner status
-    if (isOwner(user.email)) currentUserDoc.isOwner = true;
+    if (isOwnerUser) currentUserDoc.isOwner = true;
 
     if (!canOpenAdminPanel) {
       adminLoading.classList.add('hidden');
@@ -648,7 +655,7 @@ async function loadApplications(container) {
 
     container.innerHTML = [
       '<h3 style="margin-bottom:16px">Contribution Applications</h3>',
-      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Approve or reject role requests from Contributor up to Chief Admin.</p>',
+      '<p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">Approve or reject role requests from Contributor up to Admin. Chief Admin and Owner roles are appointment-only.</p>',
       '<div style="display:grid;gap:10px">',
       apps.map(row => {
         const data = row.data || {};

@@ -162,7 +162,26 @@ function loadAdminRoster() {
       renderAdminRoster(Array.isArray(data.admins) ? data.admins : []);
     })
     .catch(function () {
-      renderAdminRoster([]);
+      // Fallback: build roster from ROLE_DATA if the API fails or hasn't loaded owners
+      if (typeof ROLE_DATA !== 'undefined' && typeof rolesReady !== 'undefined') {
+        rolesReady.then(function () {
+          var items = [];
+          (ROLE_DATA.owners || []).forEach(function (email) {
+            items.push({ uid: '', displayName: email.split('@')[0] || 'Owner', role: 'Owner', appointedAt: null });
+          });
+          (ROLE_DATA.admins || []).forEach(function (email) {
+            var roleName = (ROLE_DATA.userRoles && ROLE_DATA.userRoles[email]) || 'admin';
+            items.push({ uid: '', displayName: email.split('@')[0] || 'Admin', role: (ROLE_NAMES && ROLE_NAMES[roleName]) || 'Admin', appointedAt: null });
+          });
+          (ROLE_DATA.mods || []).forEach(function (email) {
+            var roleName = (ROLE_DATA.userRoles && ROLE_DATA.userRoles[email]) || 'mod';
+            items.push({ uid: '', displayName: email.split('@')[0] || 'Moderator', role: (ROLE_NAMES && ROLE_NAMES[roleName]) || 'Moderator', appointedAt: null });
+          });
+          renderAdminRoster(items);
+        }).catch(function () { renderAdminRoster([]); });
+      } else {
+        renderAdminRoster([]);
+      }
     });
 }
 

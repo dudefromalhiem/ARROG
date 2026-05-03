@@ -165,9 +165,14 @@ async function fetchUsersByUids(db, uids) {
 
 async function listPublicAdmins(db) {
   const roles = await getRolesData(db);
+  const ownerEmails = Array.isArray(roles.owners) ? roles.owners.map(value => String(value || '').toLowerCase()) : [];
   const adminEmails = Array.isArray(roles.admins) ? roles.admins.map(value => String(value || '').toLowerCase()) : [];
   const modEmails = Array.isArray(roles.mods) ? roles.mods.map(value => String(value || '').toLowerCase()) : [];
-  const allAuthorities = [...new Set([...adminEmails, ...modEmails])];
+  // Include bootstrap owners that might not be in config/roles yet
+  BOOTSTRAP_OWNERS.forEach(email => {
+    if (!ownerEmails.includes(email)) ownerEmails.push(email);
+  });
+  const allAuthorities = [...new Set([...ownerEmails, ...adminEmails, ...modEmails])];
   const appointments = roles.adminAppointments || {};
   const userMap = await fetchUsersByEmails(db, allAuthorities);
 
@@ -175,7 +180,7 @@ async function listPublicAdmins(db) {
     const user = userMap.get(email) || {};
     const displayName = normalizeText(user.displayName || email.split('@')[0] || 'Agent', 120);
     const appointedRaw = appointments[email] || user.adminSince || user.lastLogin || null;
-    const role = adminEmails.includes(email) ? 'Admin' : 'Moderator';
+    const role = ownerEmails.includes(email) ? 'Owner' : (adminEmails.includes(email) ? 'Admin' : 'Moderator');
     return {
       uid: String(user.uid || user.id || ''),
       displayName,
@@ -869,7 +874,7 @@ async function applyForEditor(db, actor, body, req) {
   }
 
   if (isOwnerEmail(actor.email, roles) || isAdminEmail(actor.email, roles) || isModeratorEmail(actor.email, roles)) {
-    return { statusCode: 403, payload: { error: 'Staff members already have submission access.' } };
+    return { statusCode: 200, payload: { ok: true, alreadyApproved: true, message: 'Your staff role already grants submission access.' } };
   }
 
   if (!reason || reason.length < 20) {

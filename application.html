@@ -142,12 +142,12 @@
     <div class="app-panel">
       <div class="app-kicker">Workshop Access</div>
       <div class="app-title">Apply to Contribute to the Red Oaker Guild</div>
-      <p class="app-copy">Use this form to apply for a role in the Guild ladder: Contributor, Moderator, Admin, or Chief Admin. Applications are reviewed manually by staff.</p>
+      <p class="app-copy">Use this form to apply for a role in the Guild ladder: Contributor, Moderator, or Admin. Chief Admin and higher roles are appointment-only. Applications are reviewed manually by staff.</p>
       <div class="app-list">
         <div class="app-point"><strong>Contributor:</strong> create and edit your own submissions, upload media, and contribute archive entries.</div>
         <div class="app-point"><strong>Moderator:</strong> includes Contributor powers, plus submission review and report handling in moderation scope.</div>
         <div class="app-point"><strong>Admin:</strong> includes Moderator powers, plus application decisions, user management, and full report handling.</div>
-        <div class="app-point"><strong>Chief Admin:</strong> includes Admin powers with override authority for non-owner decisions.</div>
+        <div class="app-point"><strong>Chief Admin:</strong> appointment-only. Includes Admin powers with override authority for non-owner decisions.</div>
       </div>
       <div class="app-actions">
         <a class="btn btn-p" href="submit.html" id="go-workshop-btn">Go to Workshop</a>
@@ -183,7 +183,6 @@
             <option value="contributor">Contributor</option>
             <option value="moderator">Moderator</option>
             <option value="admin">Admin</option>
-            <option value="chief_admin">Chief Admin</option>
           </select>
         </div>
         <div class="fg">
@@ -258,6 +257,29 @@ function setApplicationStatus(message, isError) {
 
 async function loadApplicationRecord(user) {
   try {
+    // First, check email-based staff roles (config/roles) — these override everything
+    const email = user.email || '';
+    const isStaff = (typeof isOwner === 'function' && isOwner(email)) ||
+                    (typeof isAdmin === 'function' && isAdmin(email)) ||
+                    (typeof isModerator === 'function' && isModerator(email));
+
+    if (isStaff) {
+      // Staff already have submission access — show them the workshop link
+      currentApplicationStatus = 'approved';
+      document.getElementById('application-not-allowed')?.classList.add('hidden');
+      document.getElementById('application-pending')?.classList.add('hidden');
+      document.getElementById('application-form-wrap')?.classList.add('hidden');
+      const workshopBtn = document.getElementById('go-workshop-btn');
+      if (workshopBtn) {
+        workshopBtn.href = 'submit.html';
+        workshopBtn.textContent = 'Go to Workshop';
+      }
+      const accessState = document.getElementById('application-access-state');
+      if (accessState) accessState.textContent = 'Your staff role grants full submission access.';
+      setApplicationStatus('Your staff role grants full submission access.', false);
+      return;
+    }
+
     const userDoc = await db.collection('users').doc(user.uid).get();
     const userData = userDoc.exists ? (userDoc.data() || {}) : {};
     const appDoc = await db.collection('applications').doc(user.uid).get();
@@ -285,8 +307,6 @@ async function loadApplicationRecord(user) {
         accessState.textContent = 'Your account already meets this role level.';
       } else if (pending) {
         accessState.textContent = 'Your last application is pending review.';
-      } else if (currentUser && (isModerator(currentUser.email) || isAdmin(currentUser.email) || isOwner(currentUser.email))) {
-        accessState.textContent = 'Your role already permits submissions.';
       } else {
         accessState.textContent = 'You can apply for a higher contribution role using the form below.';
       }
@@ -359,6 +379,10 @@ configureSocialApiBase();
 
 auth.onAuthStateChanged(async user => {
   currentUser = user || null;
+  // Wait for roles to load before checking email-based staff status
+  if (typeof rolesReady !== 'undefined') {
+    await rolesReady.catch(() => {});
+  }
   if (typeof syncSharedNav === 'function') {
     await syncSharedNav(user);
   }
@@ -367,6 +391,8 @@ auth.onAuthStateChanged(async user => {
     document.getElementById('application-not-allowed')?.classList.add('hidden');
     document.getElementById('application-pending')?.classList.add('hidden');
     document.getElementById('application-form-wrap')?.classList.remove('hidden');
+    const accessState = document.getElementById('application-access-state');
+    if (accessState) accessState.textContent = 'Sign in to check your access level.';
     return;
   }
   await loadApplicationRecord(user);
