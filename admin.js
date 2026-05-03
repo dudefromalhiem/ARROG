@@ -2031,48 +2031,73 @@ async function refreshUsers() {
   const tbody = document.getElementById('users-tbody');
   try {
     const snap = await db.collection('users').get();
-    
-    // Create a map of users from Firestore
-    const userMap = new Map();
-    snap.docs.forEach(d => {
-      const u = d.data();
-      if (u.email) {
-        userMap.set(u.email.toLowerCase(), u);
-      }
+
+    // Build full user list from Firestore
+    const users = snap.docs.map(d => {
+      const u = d.data() || {};
+      return {
+        uid: d.id,
+        email: String(u.email || '').toLowerCase(),
+        displayName: String(u.displayName || u.email || 'Unknown Agent'),
+        role: String(u.role || 'user'),
+        roleName: String(u.roleName || ''),
+        lastLogin: u.lastLogin || u.updatedAt || null,
+        raw: u
+      };
     });
-    
-    // Merge with admin/mod/owner data from ROLE_DATA
-    const allRoles = new Map();
+
+    // Include any configured owners/admins/mods that don't have user docs yet
     ROLE_DATA.owners.forEach(email => {
-      if (!allRoles.has(email.toLowerCase())) allRoles.set(email.toLowerCase(), { email, role: 'owner', displayName: '' });
+      const e = String(email || '').toLowerCase();
+      if (!users.find(u => u.email === e)) users.push({ uid: '', email: e, displayName: e.split('@')[0], role: 'owner', roleName: ROLE_NAMES.owner || 'Owner', lastLogin: null, raw: {} });
     });
     ROLE_DATA.admins.forEach(email => {
-      if (!allRoles.has(email.toLowerCase())) allRoles.set(email.toLowerCase(), { email, role: 'admin', displayName: '' });
+      const e = String(email || '').toLowerCase();
+      if (!users.find(u => u.email === e)) users.push({ uid: '', email: e, displayName: e.split('@')[0], role: 'admin', roleName: ROLE_NAMES.admin || 'Admin', lastLogin: null, raw: {} });
     });
     ROLE_DATA.mods.forEach(email => {
-      if (!allRoles.has(email.toLowerCase())) allRoles.set(email.toLowerCase(), { email, role: 'mod', displayName: '' });
+      const e = String(email || '').toLowerCase();
+      if (!users.find(u => u.email === e)) users.push({ uid: '', email: e, displayName: e.split('@')[0], role: 'mod', roleName: ROLE_NAMES.mod || 'Moderator', lastLogin: null, raw: {} });
     });
-    
-    // Merge user data into roles
-    userMap.forEach((userData, email) => {
-      if (allRoles.has(email)) {
-        const existing = allRoles.get(email);
-        allRoles.set(email, { ...existing, ...userData });
-      }
-    });
-    
-    const rows = Array.from(allRoles.values());
-    
-    if (rows.length === 0 && snap.empty) {
+
+    if (!users.length) {
       tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>';
       return;
     }
-    
-    tbody.innerHTML = rows.map(u => {
-      const showEmail = (isOwner(auth.currentUser?.email) || isAdmin(auth.currentUser?.email)) ? (u.email || '[Not Set]') : '[Redacted]';
-      const roleDisplayName = getRoleDisplayNameForUserRecord(u);
-      return `<tr><td>${u.displayName || 'Unknown Agent'}</td><td style="font-family:monospace;color:var(--wht-d)">${escapeHtml(showEmail)}</td><td><span class="tag">${roleDisplayName}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
-    }).join('');
+
+    // Resolve role for display and group users
+    const groups = { owner: [], admin: [], mod: [], contributor: [], user: [], guest: [] };
+    users.forEach(u => {
+      const email = String(u.email || '').toLowerCase();
+      // Prefer explicit config role mapping
+      const mapped = ROLE_DATA.userRoles && ROLE_DATA.userRoles[email] ? ROLE_DATA.userRoles[email] : u.role || 'user';
+      const normalized = mapped || 'user';
+      const key = (normalized === 'owner' || normalized === 'the archivist') ? 'owner' : (normalized.startsWith('admin') ? 'admin' : (normalized.startsWith('mod') || normalized === 'moderator' ? 'mod' : (normalized === 'contributor' ? 'contributor' : (normalized === 'guest' ? 'guest' : 'user'))));
+      groups[key].push(u);
+    });
+
+    // Helper to render a group as table rows with a section header
+    const renderGroup = (label, arr) => {
+      if (!arr || !arr.length) return '';
+      const headerRow = `<tr><td colspan="4" style="padding:6px 12px;background:rgba(0,0,0,.06);font-weight:600">${escapeHtml(label)} (${arr.length})</td></tr>`;
+      const rows = arr.map(u => {
+        const showEmail = (isOwner(auth.currentUser?.email) || isAdmin(auth.currentUser?.email)) ? (u.email || '[Not Set]') : '[Redacted]';
+        const roleDisplayName = getRoleDisplayNameForUserRecord(u);
+        return `<tr><td>${escapeHtml(u.displayName || 'Unknown Agent')}</td><td style="font-family:monospace;color:var(--wht-d)">${escapeHtml(showEmail)}</td><td><span class="tag">${escapeHtml(roleDisplayName)}</span></td><td style="font-size:.75rem;color:var(--wht-d)">${u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}</td></tr>`;
+      }).join('');
+      return headerRow + rows;
+    };
+
+    // Order: Owners, Admins, Moderators, Contributors, Users, Guests
+    const html = [];
+    html.push(renderGroup('Owners', groups.owner));
+    html.push(renderGroup('Administrators', groups.admin));
+    html.push(renderGroup('Moderation Staff', groups.mod));
+    html.push(renderGroup('Contributors', groups.contributor));
+    html.push(renderGroup('Registered Users', groups.user));
+    html.push(renderGroup('Guests', groups.guest));
+
+    tbody.innerHTML = html.filter(Boolean).join('') || '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>';
   } catch (err) { 
     tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>';
   }
