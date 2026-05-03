@@ -156,13 +156,13 @@ function getPermissionsForLevel(level) {
   const permissions = {};
 
   const legacyMap = {
-    2: ROLES.USER,
-    3: ROLES.USER,
+    2: ROLES.NEWBIE,
+    3: ROLES.SITE_MEMBER,
     4: ROLES.CONTRIBUTOR,
     5: ROLES.MODERATOR,
-    6: ROLES.ADMIN
+    6: ROLES.ADMINISTRATOR
   };
-  const role = legacyMap[Number(level)] || ROLES.USER;
+  const role = legacyMap[Number(level)] || ROLES.NEWBIE;
   Object.keys(PERMISSIONS).forEach(permKey => {
     if (isAtLeast(role, PERMISSIONS[permKey].role)) {
       permissions[permKey] = true;
@@ -201,7 +201,7 @@ function hasPermission(userDoc, permission) {
  * @returns {string} - Human-readable role name
  */
 function getRoleDisplayName(userDoc) {
-  if (!userDoc) return ROLE_LABELS[ROLES.USER];
+  if (!userDoc) return ROLE_LABELS[ROLES.NEWBIE];
   const role = userDoc.isOwner ? ROLES.OWNER : normalizeRole(userDoc.role);
   return userDoc.roleName || ROLE_LABELS[role] || 'User';
 }
@@ -211,7 +211,7 @@ function getRoleDisplayName(userDoc) {
  * @returns {string} - Formatted hierarchy string
  */
 function getRoleHierarchyText() {
-  return 'Role Hierarchy (low to high): User -> Contributor -> Moderator -> Admin -> Chief Admin. Owner is internal-only and unrestricted.';
+  return 'Role Hierarchy (low to high): Newbie -> Site Member -> Contributor -> Moderator -> Senior Moderator -> Administrator -> Senior Administrator -> Deputy Chief of Moderation -> Deputy Chief Administrator -> Chief of Moderation -> Chief Administrator. Owner is internal-only and unrestricted.';
 }
 
 /**
@@ -229,11 +229,43 @@ function isValidRoleLevel(level) {
  * @returns {Array<string>} - Array of valid role names
  */
 function getValidRoleNames(level) {
-  if (level === 6) return [ROLE_LABELS[ROLES.ADMIN], ROLE_LABELS[ROLES.CHIEF_ADMIN]];
-  if (level === 5) return [ROLE_LABELS[ROLES.MODERATOR]];
+  if (level === 6) {
+    return [
+      ROLE_LABELS[ROLES.ADMINISTRATOR],
+      ROLE_LABELS[ROLES.SENIOR_ADMINISTRATOR],
+      ROLE_LABELS[ROLES.DEPUTY_CHIEF_ADMINISTRATOR],
+      ROLE_LABELS[ROLES.CHIEF_ADMINISTRATOR]
+    ];
+  }
+  if (level === 5) {
+    return [
+      ROLE_LABELS[ROLES.MODERATOR],
+      ROLE_LABELS[ROLES.SENIOR_MODERATOR],
+      ROLE_LABELS[ROLES.DEPUTY_CHIEF_OF_MODERATION],
+      ROLE_LABELS[ROLES.CHIEF_OF_MODERATION]
+    ];
+  }
   if (level === 4) return [ROLE_LABELS[ROLES.CONTRIBUTOR]];
-  if (level <= 3) return [ROLE_LABELS[ROLES.USER]];
+  if (level <= 3) return [ROLE_LABELS[ROLES.NEWBIE], ROLE_LABELS[ROLES.SITE_MEMBER]];
   return [];
+}
+
+function getAssignableRoleOptions() {
+  return [
+    ROLES.CONTRIBUTOR,
+    ROLES.MODERATOR,
+    ROLES.SENIOR_MODERATOR,
+    ROLES.DEPUTY_CHIEF_OF_MODERATION,
+    ROLES.CHIEF_OF_MODERATION,
+    ROLES.ADMINISTRATOR,
+    ROLES.SENIOR_ADMINISTRATOR,
+    ROLES.DEPUTY_CHIEF_ADMINISTRATOR,
+    ROLES.CHIEF_ADMINISTRATOR
+  ].map(role => ({ value: role, label: ROLE_LABELS[role] || role }));
+}
+
+function getPublicRoleOptions() {
+  return [ROLES.NEWBIE, ROLES.SITE_MEMBER, ROLES.CONTRIBUTOR, ROLES.MODERATOR, ROLES.SENIOR_MODERATOR, ROLES.DEPUTY_CHIEF_OF_MODERATION, ROLES.CHIEF_OF_MODERATION, ROLES.ADMINISTRATOR, ROLES.SENIOR_ADMINISTRATOR, ROLES.DEPUTY_CHIEF_ADMINISTRATOR, ROLES.CHIEF_ADMINISTRATOR].map(role => ({ value: role, label: ROLE_LABELS[role] || role }));
 }
 
 function canApplyForRole(role) {
@@ -267,6 +299,35 @@ if (typeof module !== 'undefined' && module.exports) {
     getRoleHierarchyText,
     isValidRoleLevel,
     getValidRoleNames,
+    getAssignableRoleOptions,
+    getPublicRoleOptions,
     canApplyForRole
   };
+}
+
+if (typeof window !== 'undefined') {
+  const exported = {
+    ROLES,
+    PUBLIC_ROLE_LADDER,
+    ALL_ROLES,
+    ROLE_LABELS,
+    PERMISSIONS,
+    normalizeRole,
+    roleRank,
+    isAtLeast,
+    getPermissions,
+    getPermissionsForLevel,
+    getAllPermissions,
+    hasPermission,
+    getRoleDisplayName,
+    getRoleHierarchyText,
+    isValidRoleLevel,
+    getValidRoleNames,
+    getAssignableRoleOptions,
+    getPublicRoleOptions,
+    canApplyForRole
+  };
+
+  window.REDOAK_ROLES = exported;
+  Object.assign(window, exported);
 }

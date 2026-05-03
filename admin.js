@@ -222,6 +222,10 @@ function canModerateSubmissions() {
 
 function configureSocialApiBase() {
   try {
+    if (window.REDOAK_API && typeof window.REDOAK_API.social === 'function') {
+      socialApiBase = window.REDOAK_API.social();
+      return;
+    }
     const host = String(window.location.hostname || '').toLowerCase();
     const isLocal = host === 'localhost' || host === '127.0.0.1';
     const isFile = window.location.protocol === 'file:';

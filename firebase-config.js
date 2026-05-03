@@ -948,3 +948,35 @@ if (document.readyState === 'loading') {
 } else {
   initializeUiReveal();
 }
+
+function isVercelHostedOrigin() {
+  const host = String(window.location.hostname || '').toLowerCase();
+  return host.endsWith('vercel.app') || host.endsWith('vercel.sh');
+}
+
+function resolveGuildApiUrl(path) {
+  const normalizedPath = String(path || '').startsWith('/') ? String(path || '') : '/' + String(path || '');
+  if (isVercelHostedOrigin()) return normalizedPath;
+  return 'https://redoakguild.vercel.app' + normalizedPath;
+}
+
+function resolveGuildSocialApiUrl(queryString = '') {
+  const query = String(queryString || '');
+  return resolveGuildApiUrl('/api/social') + (query ? (query.startsWith('?') ? query : '?' + query) : '');
+}
+
+function resolveGuildAdminApiUrl(path = '') {
+  const normalized = String(path || '');
+  return resolveGuildApiUrl('/api/admin' + (normalized.startsWith('/') ? normalized : (normalized ? '/' + normalized : '')));
+}
+
+function resolveGuildSyncSeedApiUrl() {
+  return resolveGuildApiUrl('/api/sync-seed');
+}
+
+window.REDOAK_API = {
+  resolve: resolveGuildApiUrl,
+  social: resolveGuildSocialApiUrl,
+  admin: resolveGuildAdminApiUrl,
+  syncSeed: resolveGuildSyncSeedApiUrl
+};

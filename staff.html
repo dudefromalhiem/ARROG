@@ -60,11 +60,12 @@
     <div style="font-size:.9rem; font-weight:600; color:var(--wht-f); margin-bottom:8px">Hierarchy Overview</div>
     <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:.75rem; color:var(--wht-m);">
       <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>The Archivist:</strong> Owner</div>
-      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Chief Admin:</strong> Executives</div>
-      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Admin:</strong> Senior Staff</div>
-      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Junior Admin:</strong> Governance</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Chief Administrator:</strong> Executives</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Senior Administrator:</strong> Senior Staff</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Administrator:</strong> Governance</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Chief of Moderation:</strong> Enforcement Leads</div>
       <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Moderator:</strong> Review & Report</div>
-      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Junior Mod:</strong> Basic Review</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Contributor:</strong> Content Staff</div>
     </div>
   </section>
 
@@ -92,8 +93,11 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-storage-compat.js"></script>
+<script src="permissions.js"></script>
 <script src="firebase-config.js"></script>
 <script>
+const ROLE_META = window.REDOAK_ROLES || {};
+
 function escapeHtmlStaff(value) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
@@ -151,7 +155,8 @@ function renderAdminRoster(items) {
   if (status) status.textContent = items.length + ' authority account' + (items.length === 1 ? '' : 's') + ' listed.';
   grid.innerHTML = items.map(item => {
     const name = escapeHtmlStaff(item.displayName || 'Agent');
-    const role = escapeHtmlStaff(item.role || 'Authority');
+    const normalizedRole = typeof normalizeRole === 'function' ? normalizeRole(item.role) : String(item.role || '').toLowerCase();
+    const role = escapeHtmlStaff((ROLE_META.ROLE_LABELS && ROLE_META.ROLE_LABELS[normalizedRole]) || item.role || 'Authority');
     const date = formatDateTime(item.appointedAt);
     const uid = encodeURIComponent(String(item.uid || ''));
     const encodedName = encodeURIComponent(String(item.displayName || 'Agent'));
@@ -168,7 +173,10 @@ function renderAdminRoster(items) {
 }
 
 function loadAdminRoster() {
-  fetch('/api/social?type=admins')
+  const rosterUrl = window.REDOAK_API && typeof window.REDOAK_API.social === 'function'
+    ? window.REDOAK_API.social('type=admins')
+    : '/api/social?type=admins';
+  fetch(rosterUrl)
     .then(function (response) { return response.ok ? response.json() : Promise.reject(new Error('Roster unavailable.')); })
     .then(function (data) {
       renderAdminRoster(Array.isArray(data.admins) ? data.admins : []);
@@ -179,15 +187,15 @@ function loadAdminRoster() {
         rolesReady.then(function () {
           var items = [];
           (ROLE_DATA.owners || []).forEach(function (email) {
-            items.push({ uid: '', displayName: email.split('@')[0] || 'The Archivist', role: 'The Archivist', appointedAt: null });
+            items.push({ uid: '', displayName: email.split('@')[0] || 'The Archivist', role: 'owner', appointedAt: null });
           });
           (ROLE_DATA.admins || []).forEach(function (email) {
             var roleName = (ROLE_DATA.userRoles && ROLE_DATA.userRoles[email]) || 'admin';
-            items.push({ uid: '', displayName: email.split('@')[0] || 'Admin', role: (ROLE_NAMES && ROLE_NAMES[roleName]) || 'Admin', appointedAt: null });
+            items.push({ uid: '', displayName: email.split('@')[0] || 'Admin', role: roleName, appointedAt: null });
           });
           (ROLE_DATA.mods || []).forEach(function (email) {
             var roleName = (ROLE_DATA.userRoles && ROLE_DATA.userRoles[email]) || 'mod';
-            items.push({ uid: '', displayName: email.split('@')[0] || 'Moderator', role: (ROLE_NAMES && ROLE_NAMES[roleName]) || 'Moderator', appointedAt: null });
+            items.push({ uid: '', displayName: email.split('@')[0] || 'Moderator', role: roleName, appointedAt: null });
           });
           renderAdminRoster(items);
         }).catch(function () { renderAdminRoster([]); });

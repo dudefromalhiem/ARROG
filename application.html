@@ -289,8 +289,8 @@
       <div class="app-authority-message hidden" id="authority-message">You have already joined the archive. Do well for the GUILD</div>
       <div class="app-list" id="intro-points">
         <div class="app-point"><strong>Contributor:</strong> Create and edit your own archive entries and media.</div>
-        <div class="app-point"><strong>Junior Moderator:</strong> Review and manage user submissions and basic reports.</div>
-        <div class="app-point"><strong>Junior Admin:</strong> Handle user applications, advanced reports, and community governance.</div>
+        <div class="app-point"><strong>Moderator:</strong> Review and manage user submissions and basic reports.</div>
+        <div class="app-point"><strong>Administrator:</strong> Handle user applications, advanced reports, and community governance.</div>
       </div>
       <div class="app-actions">
         <a class="btn btn-p" href="submit.html" id="go-workshop-btn">Go to Workshop</a>
@@ -617,11 +617,7 @@
       <div id="application-form-wrap">
         <div class="fg">
           <label class="fl" for="application-role">Role you are applying for</label>
-          <select class="fi" id="application-role">
-            <option value="contributor">Contributor</option>
-            <option value="junior_moderator">Junior Moderator</option>
-            <option value="junior_admin">Junior Admin</option>
-          </select>
+          <select class="fi" id="application-role"></select>
         </div>
         <div class="fg">
           <label class="fl" for="application-reason">Why should you be granted this role?</label>
@@ -658,22 +654,48 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="permissions.js"></script>
 <script src="firebase-config.js"></script>
 <script>
 let socialApiBase = '/api/social';
 let currentUser = null;
 let currentApplicationStatus = 'none';
-const APPLICATION_ROLE_ORDER = ['newbie', 'site_member', 'contributor', 'moderator', 'senior_moderator', 'administrator', 'senior_administrator', 'deputy_chief_of_moderation', 'deputy_chief_administrator', 'chief_of_moderation', 'chief_administrator', 'owner'];
+const ROLE_META = window.REDOAK_ROLES || {};
+const APPLICATION_ROLE_ORDER = (ROLE_META.getAssignableRoleOptions ? ROLE_META.getAssignableRoleOptions() : [
+  { value: 'contributor', label: 'Contributor' },
+  { value: 'moderator', label: 'Moderator' },
+  { value: 'senior_moderator', label: 'Senior Moderator' },
+  { value: 'deputy_chief_of_moderation', label: 'Deputy Chief of Moderation' },
+  { value: 'chief_of_moderation', label: 'Chief of Moderation' },
+  { value: 'administrator', label: 'Administrator' },
+  { value: 'senior_administrator', label: 'Senior Administrator' },
+  { value: 'deputy_chief_administrator', label: 'Deputy Chief Administrator' },
+  { value: 'chief_administrator', label: 'Chief Administrator' }
+]).map(option => option.value);
 
 function normalizeApplicationRole(value) {
-  const role = String(value || '').trim().toLowerCase();
-  if (role === 'editor') return 'contributor';
-  if (role === 'mod' || role === 'junior_moderator' || role === 'junior-moderator') return 'moderator';
-  if (role === 'junior_admin' || role === 'junior-admin') return 'administrator';
-  if (role === 'user') return 'newbie';
-  if (role === 'chief-admin' || role === 'chiefadmin' || role === 'chief_admin') return 'chief_administrator';
-  if (role === 'admin') return 'administrator';
-  return role || 'newbie';
+  return typeof normalizeRole === 'function' ? normalizeRole(value) : String(value || '').trim().toLowerCase();
+}
+
+function formatApplicationRole(role) {
+  const normalized = normalizeApplicationRole(role);
+  if (ROLE_META.ROLE_LABELS && ROLE_META.ROLE_LABELS[normalized]) return ROLE_META.ROLE_LABELS[normalized];
+  if (!normalized) return 'Unassigned';
+  return normalized.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+function populateApplicationRoles() {
+  const select = document.getElementById('application-role');
+  if (!select) return;
+  const options = ROLE_META.getAssignableRoleOptions ? ROLE_META.getAssignableRoleOptions() : APPLICATION_ROLE_ORDER.map(value => ({ value, label: formatApplicationRole(value) }));
+  select.innerHTML = '<option value="">Select a role...</option>' + options.map(option => '<option value="' + option.value + '">' + option.label + '</option>').join('');
+  select.value = 'contributor';
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', populateApplicationRoles);
+} else {
+  populateApplicationRoles();
 }
 
 function roleRank(role) {
@@ -682,10 +704,9 @@ function roleRank(role) {
 }
 
 function configureSocialApiBase() {
-  const host = String(window.location.hostname || '').toLowerCase();
-  const isLocal = host === 'localhost' || host === '127.0.0.1';
-  const isFile = window.location.protocol === 'file:';
-  socialApiBase = (isLocal || isFile) ? 'https://redoakguild.vercel.app/api/social' : '/api/social';
+  socialApiBase = window.REDOAK_API && typeof window.REDOAK_API.social === 'function'
+    ? window.REDOAK_API.social()
+    : '/api/social';
 }
 
 function setApplicationStatus(message, isError) {
@@ -794,8 +815,6 @@ async function submitApplication() {
   const experience = String(document.getElementById('application-experience')?.value || '').trim();
   let roleApplied = String(document.getElementById('application-role')?.value || 'contributor').trim();
   // Map UI role names to backend role names
-  if (roleApplied === 'junior_moderator') roleApplied = 'moderator';
-  if (roleApplied === 'junior_admin') roleApplied = 'admin';
   const button = document.getElementById('application-submit-btn');
   if (reason.length < 20) {
     setApplicationStatus('Please write at least 20 characters in your application.', true);
@@ -823,7 +842,7 @@ async function submitApplication() {
     } else if (payload.alreadyApproved) {
       setApplicationStatus('Your account already meets this role level.', false);
     } else {
-      setApplicationStatus('Application submitted for ' + roleApplied.replace('_', ' ') + ' review.', false);
+      setApplicationStatus('Application submitted for ' + formatApplicationRole(roleApplied) + ' review.', false);
       document.getElementById('application-reason').value = '';
       document.getElementById('application-experience').value = '';
       await loadApplicationRecord(currentUser);

@@ -594,11 +594,8 @@ let currentSocialUsers = [];
 
 function configureSocialApiBase() {
   try {
-    const host = String(window.location.hostname || '').toLowerCase();
-    const isLocal = host === 'localhost' || host === '127.0.0.1';
-    const isFile = window.location.protocol === 'file:';
-    socialApiBase = (isLocal || isFile)
-      ? 'https://redoakguild.vercel.app/api/social'
+    socialApiBase = window.REDOAK_API && typeof window.REDOAK_API.social === 'function'
+      ? window.REDOAK_API.social()
       : '/api/social';
   } catch (_err) {
     socialApiBase = '/api/social';
@@ -1652,7 +1649,9 @@ async function triggerSyncIfSeed(pageData) {
 
   if (window.rogLogger) rogLogger.info('[Sync] Initializing seed page in database:', pageData.slug);
   try {
-    const res = await fetch('/api/sync-seed', {
+    const res = await fetch(window.REDOAK_API && typeof window.REDOAK_API.syncSeed === 'function'
+      ? window.REDOAK_API.syncSeed()
+      : '/api/sync-seed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(pageData)

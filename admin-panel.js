@@ -2,6 +2,46 @@
 
 let currentUser = null;
 let userPermissions = null;
+const ROLE_META = typeof window !== 'undefined' ? (window.REDOAK_ROLES || {}) : {};
+
+function getRoleLabel(role) {
+  const normalized = typeof normalizeRole === 'function' ? normalizeRole(role) : String(role || '').trim().toLowerCase();
+  if (ROLE_META.ROLE_LABELS && ROLE_META.ROLE_LABELS[normalized]) return ROLE_META.ROLE_LABELS[normalized];
+  if (typeof getRoleDisplayName === 'function') {
+    const display = getRoleDisplayName({ role: normalized });
+    if (display) return display;
+  }
+  if (!normalized) return 'Unassigned';
+  return String(normalized).split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+function getRoleOptions(type) {
+  if (type === 'assignable' && typeof getAssignableRoleOptions === 'function') {
+    return getAssignableRoleOptions();
+  }
+  if (type === 'public' && typeof getPublicRoleOptions === 'function') {
+    return getPublicRoleOptions();
+  }
+
+  const roles = type === 'assignable'
+    ? ['contributor', 'moderator', 'senior_moderator', 'deputy_chief_of_moderation', 'chief_of_moderation', 'administrator', 'senior_administrator', 'deputy_chief_administrator', 'chief_administrator']
+    : ['newbie', 'site_member', 'contributor', 'moderator', 'senior_moderator', 'deputy_chief_of_moderation', 'chief_of_moderation', 'administrator', 'senior_administrator', 'deputy_chief_administrator', 'chief_administrator'];
+
+  return roles.map(value => ({ value, label: getRoleLabel(value) }));
+}
+
+function populateSelect(selectId, options, placeholder) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const currentValue = select.value;
+  select.innerHTML = `<option value="">${placeholder}</option>` + options.map(option => `<option value="${option.value}">${option.label}</option>`).join('');
+  if (currentValue) select.value = currentValue;
+}
+
+function initializeRoleControls() {
+  populateSelect('filter-role', getRoleOptions('public'), 'All Roles');
+  populateSelect('modal-new-role', getRoleOptions('assignable'), 'Select Role...');
+}
 
 // Initialize
 async function initAdminPanel() {
@@ -25,6 +65,8 @@ async function initAdminPanel() {
         setTimeout(() => window.location.href = 'index.html', 2000);
         return;
       }
+
+      initializeRoleControls();
 
       // Load initial data
       loadUsers();
@@ -60,7 +102,7 @@ function showAlert(type, message) {
 async function loadUsers() {
   try {
     const token = await currentUser.getIdToken();
-    const response = await fetch('/api/social?action=getUsersForAdmin', {
+    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('action=getUsersForAdmin') : '/api/social?action=getUsersForAdmin'), {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
@@ -82,7 +124,7 @@ async function searchUsers() {
     const role = document.getElementById('filter-role').value;
 
     const token = await currentUser.getIdToken();
-    const response = await fetch('/api/social?action=searchUsers', {
+    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('action=searchUsers') : '/api/social?action=searchUsers'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -119,7 +161,7 @@ function renderUsersTable(users) {
   tbody.innerHTML = users.map(user => `
     <tr>
       <td>${escapeHtml(user.email)}</td>
-      <td><span class="role-badge ${getRoleBadgeClass(user.role)}">${formatRole(user.role)}</span></td>
+      <td><span class="role-badge ${getRoleBadgeClass(user.role)}">${getRoleLabel(user.role)}</span></td>
       <td><span class="status ${user.submissionAccess ? 'approved' : 'pending'}">${user.submissionAccess ? 'Active' : 'Inactive'}</span></td>
       <td>${new Date(user.createdAt?.seconds * 1000).toLocaleDateString()}</td>
       <td>
@@ -133,11 +175,13 @@ function renderUsersTable(users) {
 function updateUserStats(users) {
   if (!users) return;
 
+  const normalizedRoles = users.map(user => typeof normalizeRole === 'function' ? normalizeRole(user.role) : String(user.role || '').toLowerCase());
+
   const stats = {
     total: users.length,
-    contributors: users.filter(u => u.role === 'contributor').length,
-    moderators: users.filter(u => u.role && u.role.includes('moderator')).length,
-    admins: users.filter(u => u.role && u.role.includes('administrator')).length
+    contributors: normalizedRoles.filter(role => role === 'contributor').length,
+    moderators: normalizedRoles.filter(role => role === 'moderator' || role === 'senior_moderator' || role === 'deputy_chief_of_moderation' || role === 'chief_of_moderation').length,
+    admins: normalizedRoles.filter(role => role === 'administrator' || role === 'senior_administrator' || role === 'deputy_chief_administrator' || role === 'chief_administrator').length
   };
 
   document.getElementById('stat-total-users').textContent = stats.total;
@@ -154,7 +198,7 @@ async function loadApplications() {
     const role = document.getElementById('filter-app-role').value;
 
     const token = await currentUser.getIdToken();
-    const response = await fetch('/api/social?action=getApplications', {
+    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('action=getApplications') : '/api/social?action=getApplications'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -185,7 +229,7 @@ function renderApplicationsTable(applications) {
   tbody.innerHTML = applications.map(app => `
     <tr>
       <td>${escapeHtml(app.applicantEmail)}</td>
-      <td><span class="role-badge">${formatRole(app.roleApplied)}</span></td>
+      <td><span class="role-badge">${getRoleLabel(app.roleApplied || app.roleAppliedLabel)}</span></td>
       <td><span class="status ${getStatusClass(app.status)}">${app.status}</span></td>
       <td>${new Date(app.submittedAt?.seconds * 1000).toLocaleDateString()}</td>
       <td>
@@ -213,7 +257,7 @@ async function loadAuditLogs() {
     const daysBack = Number(document.getElementById('filter-audit-days').value);
 
     const token = await currentUser.getIdToken();
-    const response = await fetch('/api/admin/audit/logs', {
+    const response = await fetch((window.REDOAK_API && window.REDOAK_API.admin ? window.REDOAK_API.admin('/audit/logs') : '/api/admin/audit/logs'), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -265,7 +309,7 @@ function openRoleModal(uid, email, currentRole, action) {
 
   document.getElementById('modal-title').textContent = action === 'promote' ? '⬆️ Promote User' : '⬇️ Demote User';
   document.getElementById('modal-email').value = email;
-  document.getElementById('modal-current-role').value = formatRole(currentRole);
+  document.getElementById('modal-current-role').value = getRoleLabel(currentRole);
   document.getElementById('modal-new-role').value = '';
   document.getElementById('modal-reason').value = '';
   document.getElementById('modal-action-btn').textContent = action === 'promote' ? 'Promote' : 'Demote';
@@ -327,18 +371,16 @@ async function executeRoleChange() {
 // === UTILITY FUNCTIONS ===
 
 function formatRole(role) {
-  return String(role || '')
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return getRoleLabel(role);
 }
 
 function getRoleBadgeClass(role) {
-  if (!role) return 'badge-newbie';
-  if (role.includes('contributor')) return 'contributor';
-  if (role.includes('moderator')) return 'moderator';
-  if (role.includes('administrator')) return 'administrator';
-  if (role.includes('chief')) return 'chief';
+  const normalized = typeof normalizeRole === 'function' ? normalizeRole(role) : String(role || '').trim().toLowerCase();
+  if (!normalized || normalized === 'newbie' || normalized === 'site_member') return 'badge-newbie';
+  if (normalized === 'contributor') return 'contributor';
+  if (normalized === 'moderator' || normalized === 'senior_moderator' || normalized === 'deputy_chief_of_moderation' || normalized === 'chief_of_moderation') return 'moderator';
+  if (normalized === 'administrator' || normalized === 'senior_administrator' || normalized === 'deputy_chief_administrator' || normalized === 'chief_administrator') return 'administrator';
+  if (normalized === 'owner') return 'chief';
   return 'badge-newbie';
 }
 

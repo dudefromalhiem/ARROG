@@ -814,10 +814,9 @@ function openDirectMessage(uid, name) {
 }
 
 function configureSocialApiBase() {
-  const host = String(window.location.hostname || '').toLowerCase();
-  const isLocal = host === 'localhost' || host === '127.0.0.1';
-  const isFile = window.location.protocol === 'file:';
-  socialApiBase = (isLocal || isFile) ? 'https://redoakguild.vercel.app/api/social' : '/api/social';
+  socialApiBase = window.REDOAK_API && typeof window.REDOAK_API.social === 'function'
+    ? window.REDOAK_API.social()
+    : '/api/social';
 }
 
 function setAdminApplyStatus(message, isError) {
