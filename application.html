@@ -112,6 +112,14 @@
     .app-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
     .app-actions .btn { min-width: 180px; }
     
+    .app-authority-message {
+      font-size: 1.1rem;
+      line-height: 1.8;
+      color: var(--wht);
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    
     /* Authority Sheet Styles */
     .authority-section {
       margin-bottom: 32px;
@@ -229,6 +237,27 @@
       .authority-grid {
         grid-template-columns: 1fr;
       }
+      .app-hero { gap: 12px; }
+      .app-panel { padding: 14px; }
+      .app-kicker { font-size: 0.65rem; }
+      .app-title { font-size: 1.5rem; margin-bottom: 8px; }
+      .app-copy { font-size: 0.85rem; }
+      .app-point { font-size: 0.8rem; padding: 8px 10px; }
+      .authority-branch-title { font-size: 1rem; margin-bottom: 12px; }
+      .authority-header { padding: 16px; }
+      .authority-header .app-title { font-size: 1.4rem; }
+    }
+    
+    @media (max-width: 640px) {
+      .app-shell { padding: 0 8px; }
+      .app-title { font-size: 1.3rem; }
+      .app-kicker { font-size: 0.6rem; }
+      .app-copy { font-size: 0.8rem; }
+      .app-actions { gap: 6px; }
+      .app-actions .btn { min-width: auto; padding: 10px 12px; font-size: 0.9rem; }
+      .authority-card-title { font-size: 0.95rem; }
+      .authority-label { font-size: 0.7rem; }
+      .authority-content { font-size: 0.8rem; }
     }
   </style>
 </head>
@@ -256,8 +285,9 @@
     <div class="app-panel">
       <div class="app-kicker">Workshop Access</div>
       <div class="app-title">Apply to Contribute to the Red Oaker Guild</div>
-      <p class="app-copy">Use this form to apply for a role in the Guild ladder: Contributor, Moderator, or Admin. Chief Admin and higher roles are appointment-only. Applications are reviewed manually by staff.</p>
-      <div class="app-list">
+      <p class="app-copy" id="intro-copy">Use this form to apply for a role in the Guild ladder: Contributor, Moderator, or Admin. Chief Admin and higher roles are appointment-only. Applications are reviewed manually by staff.</p>
+      <div class="app-authority-message hidden" id="authority-message">You have already joined the archive. Do well for the GUILD</div>
+      <div class="app-list" id="intro-points">
         <div class="app-point"><strong>Contributor:</strong> Create and edit your own archive entries and media.</div>
         <div class="app-point"><strong>Junior Moderator:</strong> Review and manage user submissions and basic reports.</div>
         <div class="app-point"><strong>Junior Admin:</strong> Handle user applications, advanced reports, and community governance.</div>
@@ -265,6 +295,7 @@
       <div class="app-actions">
         <a class="btn btn-p" href="submit.html" id="go-workshop-btn">Go to Workshop</a>
         <a class="btn btn-s" href="guide.html">Read the Guide</a>
+        <button class="btn btn-p" id="apply-btn" onclick="document.getElementById('contribution-app-card').scrollIntoView({behavior: 'smooth'})" style="display:none;">APPLY</button>
       </div>
     </div>
 
@@ -575,7 +606,7 @@
   </section>
 
   <div class="app-form-grid">
-    <div class="app-card section" style="margin-bottom:0">
+    <div class="app-card section" style="margin-bottom:0" id="contribution-app-card">
       <div class="section-hd">Contribution Application</div>
       <div id="application-not-allowed" class="app-banner hidden">
         <strong>Role already sufficient.</strong> Your current role already meets or exceeds the selected role.
@@ -678,11 +709,16 @@ async function loadApplicationRecord(user) {
       document.getElementById('application-not-allowed')?.classList.add('hidden');
       document.getElementById('application-pending')?.classList.add('hidden');
       document.getElementById('application-form-wrap')?.classList.add('hidden');
+      document.getElementById('intro-copy')?.classList.add('hidden');
+      document.getElementById('intro-points')?.classList.add('hidden');
+      document.getElementById('authority-message')?.classList.remove('hidden');
       const workshopBtn = document.getElementById('go-workshop-btn');
       if (workshopBtn) {
         workshopBtn.href = 'submit.html';
         workshopBtn.textContent = 'Go to Workshop';
       }
+      const applyBtn = document.getElementById('apply-btn');
+      if (applyBtn) applyBtn.style.display = 'none';
       const accessState = document.getElementById('application-access-state');
       if (accessState) accessState.textContent = 'Your staff role grants full submission access.';
       setApplicationStatus('Your staff role grants full submission access.', false);
@@ -703,6 +739,20 @@ async function loadApplicationRecord(user) {
     document.getElementById('application-not-allowed')?.classList.toggle('hidden', !approved);
     document.getElementById('application-pending')?.classList.toggle('hidden', !pending || approved);
     document.getElementById('application-form-wrap')?.classList.toggle('hidden', approved || pending);
+    
+    if (approved) {
+      document.getElementById('intro-copy')?.classList.add('hidden');
+      document.getElementById('intro-points')?.classList.add('hidden');
+      document.getElementById('authority-message')?.classList.remove('hidden');
+      const applyBtn = document.getElementById('apply-btn');
+      if (applyBtn) applyBtn.style.display = 'none';
+    } else {
+      document.getElementById('intro-copy')?.classList.remove('hidden');
+      document.getElementById('intro-points')?.classList.remove('hidden');
+      document.getElementById('authority-message')?.classList.add('hidden');
+      const applyBtn = document.getElementById('apply-btn');
+      if (applyBtn && currentUser) applyBtn.style.display = 'inline-block';
+    }
 
     const workshopBtn = document.getElementById('go-workshop-btn');
     if (workshopBtn) {
