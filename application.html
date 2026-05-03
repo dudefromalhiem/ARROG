@@ -111,10 +111,124 @@
     .app-banner strong { color: var(--wht); }
     .app-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
     .app-actions .btn { min-width: 180px; }
+    
+    /* Authority Sheet Styles */
+    .authority-section {
+      margin-bottom: 32px;
+    }
+    .authority-header {
+      border: 1px solid var(--blk-m);
+      background: linear-gradient(180deg, rgba(18,18,18,.96), rgba(9,9,9,.98));
+      padding: 24px;
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .authority-header::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      background: radial-gradient(circle at top right, rgba(186,76,35,.16), transparent 36%), radial-gradient(circle at bottom left, rgba(255,172,120,.08), transparent 28%);
+      pointer-events: none;
+    }
+    .authority-header > * { position: relative; z-index: 1; }
+    .authority-header .app-kicker { margin-bottom: 8px; }
+    .authority-header .app-title { margin-bottom: 12px; }
+    .authority-header .app-copy { margin-bottom: 0; }
+    
+    .authority-branch {
+      margin-bottom: 28px;
+    }
+    .authority-branch-title {
+      font-size: 1.2rem;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--wht);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--blk-m);
+    }
+    
+    .authority-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .authority-card {
+      border: 1px solid var(--blk-m);
+      background: rgba(255,255,255,.02);
+      padding: 18px;
+      transition: all 0.3s ease;
+    }
+    .authority-card:hover {
+      background: rgba(255,255,255,.04);
+      border-color: var(--blk-d);
+      box-shadow: 0 4px 12px rgba(186,76,35,.12);
+    }
+    
+    .authority-card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--wht);
+      margin-bottom: 10px;
+    }
+    
+    .authority-label {
+      font-size: 0.75rem;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--wht-f);
+      margin-top: 10px;
+      margin-bottom: 4px;
+    }
+    
+    .authority-content {
+      color: var(--wht-m);
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+    
+    .authority-content ul {
+      margin: 0;
+      padding-left: 18px;
+      list-style-type: disc;
+    }
+    .authority-content li {
+      margin-bottom: 6px;
+    }
+    .authority-content strong {
+      color: var(--wht);
+    }
+    
+    .authority-card.owner-card {
+      border-color: var(--red-d);
+      background: rgba(139,0,0,.08);
+    }
+    .authority-card.owner-card:hover {
+      background: rgba(139,0,0,.12);
+      box-shadow: 0 4px 12px rgba(139,0,0,.2);
+    }
+    .authority-card.owner-card .authority-card-title {
+      color: #d4a584;
+    }
+    
+    .redacted {
+      color: var(--wht-f);
+      font-style: italic;
+      letter-spacing: 1px;
+    }
+    
     @media (max-width: 920px) {
       .app-hero, .app-form-grid { grid-template-columns: 1fr; }
       .app-title { font-size: 1.7rem; }
       .app-actions .btn { width: 100%; min-width: 0; }
+      .authority-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -164,6 +278,301 @@
       <div class="app-status" id="application-access-state">Checking your account...</div>
     </div>
   </div>
+
+  <!-- Authority Sheet -->
+  <section class="authority-section section">
+    <div class="authority-header">
+      <div class="app-kicker">Role Structure</div>
+      <div class="app-title">Authority & Responsibilities</div>
+      <p class="app-copy">The Guild operates on a tiered authority structure with three main branches: Administrative (Site Control & Structure), Moderation (Rules & Enforcement), and Member/Contributor (Community & Content Creation). Below is a complete overview of each role and what they can do.</p>
+    </div>
+
+    <!-- Member/Contributor Branch -->
+    <div class="authority-branch">
+      <div class="authority-branch-title">Member & Contributor Branch</div>
+      <div class="authority-grid">
+        <!-- Newbie -->
+        <div class="authority-card">
+          <div class="authority-card-title">Newbie</div>
+          <div class="authority-label">Level 2</div>
+          <div class="authority-content">
+            Default state upon discovering the site.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <strong>None</strong> — Observational access only.
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Read and explore the archive freely.
+          </div>
+        </div>
+
+        <!-- Site Member -->
+        <div class="authority-card">
+          <div class="authority-card-title">Site Member</div>
+          <div class="authority-label">Level 3</div>
+          <div class="authority-content">
+            Registered user level with basic community access.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Comment on pages</li>
+              <li>Upvote pages and comments</li>
+              <li>Report content</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Participate respectfully in community discussions and follow community standards.
+          </div>
+        </div>
+
+        <!-- Contributor -->
+        <div class="authority-card">
+          <div class="authority-card-title">Contributor</div>
+          <div class="authority-label">Level 4</div>
+          <div class="authority-content">
+            Entry into active participation (must apply). Considered part of the Guild's working body.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Edit registry pages</li>
+              <li>Contribute content</li>
+              <li>Participate in collaborative projects</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Create and maintain high-quality archive entries. No authority over users or rule enforcement — purely a content role (author-level).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Moderation Branch -->
+    <div class="authority-branch">
+      <div class="authority-branch-title">Moderation Branch</div>
+      <div class="authority-grid">
+        <!-- Moderator -->
+        <div class="authority-card">
+          <div class="authority-card-title">Moderator</div>
+          <div class="authority-label">Level 5</div>
+          <div class="authority-content">
+            Frontline enforcement role focused on rule adherence.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Remove inappropriate content</li>
+              <li>Warn users</li>
+              <li>Escalate serious issues</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Monitor community behavior and enforce content standards. Report violations transparently and follow established guidelines.
+          </div>
+        </div>
+
+        <!-- Senior Moderator -->
+        <div class="authority-card">
+          <div class="authority-card-title">Senior Moderator</div>
+          <div class="authority-label">Level 5+</div>
+          <div class="authority-content">
+            Experienced moderation authority with expanded capabilities.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Handle complex disputes</li>
+              <li>Temporarily restrict contributors (up to 2 months)</li>
+              <li>Guide junior moderators</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Mentor moderation staff and handle escalations. Ensure consistency in enforcement standards across the team.
+          </div>
+        </div>
+
+        <!-- Deputy Chief of Moderation -->
+        <div class="authority-card">
+          <div class="authority-card-title">Deputy Chief of Moderation</div>
+          <div class="authority-label">Level 6</div>
+          <div class="authority-content">
+            Second-in-command of the moderation branch.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Oversee moderator performance</li>
+              <li>Handle escalations</li>
+              <li>Assist Chief of Moderation</li>
+              <li>Promote moderation staff (with authority)</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Manage moderation team operations and coordinate enforcement with administration.
+          </div>
+        </div>
+
+        <!-- Chief of Moderation -->
+        <div class="authority-card">
+          <div class="authority-card-title">Chief of Moderation</div>
+          <div class="authority-label">Level 7</div>
+          <div class="authority-content">
+            Head of all moderation operations and rule enforcement.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Define enforcement standards</li>
+              <li>Handle major violations</li>
+              <li>Coordinate with Administrators</li>
+              <li>Promote moderation staff (with authority)</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Establish and maintain moderation policies. Lead the moderation team and ensure fair, consistent enforcement across the Guild.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Administrative Branch -->
+    <div class="authority-branch">
+      <div class="authority-branch-title">Administrative Branch</div>
+      <div class="authority-grid">
+        <!-- Administrator -->
+        <div class="authority-card">
+          <div class="authority-card-title">Administrator</div>
+          <div class="authority-label">Level 5</div>
+          <div class="authority-content">
+            Core operational staff managing site structure and content approval.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Edit and approve pages</li>
+              <li>Enforce rules</li>
+              <li>Manage users (must include report logs when removing contributors)</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Approve content and maintain site structure. Work alongside moderators to ensure stability.
+          </div>
+        </div>
+
+        <!-- Senior Administrator -->
+        <div class="authority-card">
+          <div class="authority-card-title">Senior Administrator</div>
+          <div class="authority-label">Level 5+</div>
+          <div class="authority-content">
+            Oversees major site sections and administrative teams.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Approve major structural changes</li>
+              <li>Supervise admins and moderation leadership</li>
+              <li>Ban users (with evidence)</li>
+              <li>Demote other admins (cannot demote moderators)</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Oversee administrative operations and high-level site decisions. Provide strategic direction for the archive.
+          </div>
+        </div>
+
+        <!-- Deputy Chief Administrator -->
+        <div class="authority-card">
+          <div class="authority-card-title">Deputy Chief Administrator</div>
+          <div class="authority-label">Level 6</div>
+          <div class="authority-content">
+            Second-in-command of the administrative branch.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Handle escalations</li>
+              <li>Act in place of Chief Admin</li>
+              <li>Remove contributors independently</li>
+              <li>Demote moderation ranks below Deputy Chief of Moderation</li>
+              <li>Promote users (with authority)</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Manage administrative operations and assist Chief Administrator in site governance.
+          </div>
+        </div>
+
+        <!-- Chief Administrator -->
+        <div class="authority-card">
+          <div class="authority-card-title">Chief Administrator</div>
+          <div class="authority-label">Level 7</div>
+          <div class="authority-content">
+            Highest authority below Owner. Full control over system operations.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Final decisions on disputes and bans</li>
+              <li>System-wide policy control</li>
+              <li>Permission management</li>
+              <li>Structural oversight</li>
+              <li>Promote users (with authority)</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Oversee all administrative and moderation operations. Set system-wide policies and resolve conflicts at the highest level.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Owner/Archivist -->
+    <div class="authority-branch">
+      <div class="authority-branch-title">Founder</div>
+      <div class="authority-grid">
+        <div class="authority-card owner-card">
+          <div class="authority-card-title">The Archivist</div>
+          <div class="authority-label">Level 8</div>
+          <div class="authority-content">
+            Founder and ultimate authority of the Red Oaker Guild.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <span class="redacted">[Redacted]</span>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            <span class="redacted">[Redacted]</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Notes Section -->
+    <div style="border: 1px solid var(--blk-m); background: rgba(255,255,255,.02); padding: 18px; margin-top: 24px;">
+      <div style="font-size: 1rem; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--wht); margin-bottom: 12px;">Key Principles</div>
+      <ul style="margin: 0; padding-left: 18px; list-style-type: disc; color: var(--wht-m); line-height: 1.8;">
+        <li><strong style="color: var(--wht);">Contributors</strong> are part of the system but hold no authority over other users</li>
+        <li><strong style="color: var(--wht);">Moderation</strong> focuses on people and behavior; <strong>Administration</strong> focuses on content, structure, and permissions</li>
+        <li>Both moderation and administrative branches are <strong>equal in importance but operate in different domains</strong></li>
+        <li><strong>Promotions are strictly controlled</strong> by designated high-ranking roles</li>
+        <li>Role changes require transparent documentation and adherence to established guidelines</li>
+      </ul>
+    </div>
+  </section>
 
   <div class="app-form-grid">
     <div class="app-card section" style="margin-bottom:0">
