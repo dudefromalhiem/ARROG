@@ -2021,8 +2021,8 @@ async function loadUsers(container) {
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Registered Users</h3>
     <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:16px">All accounts that have signed into the Guild. Owners and Admins may see email addresses. Manage admin access in the Roles tab.</p>
-    ${renderHierarchyGraph()}
     <table class="adm-tbl"><thead><tr><th>Display Name</th><th>Email</th><th>Role</th><th>Last Login</th></tr></thead><tbody id="users-tbody"></tbody></table>
+    ${renderHierarchyGraph()}
   `;
   await refreshUsers();
 }
