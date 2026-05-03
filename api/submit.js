@@ -628,7 +628,85 @@ module.exports = async function handler(req, res) {
           if (!adminAccess && current.authorUid !== actor.uid) {
             return sendJson(res, 403, { error: 'Forbidden.' });
           }
+
+          // Handle versioned updates: append to history instead of overwriting
+          const isVersionedUpdate = body.isVersionedUpdate === true || body.isVersionedUpdate === 'true';
+          if (isVersionedUpdate) {
+            const versions = Array.isArray(current.versions) ? current.versions : [];
+            const versionSnapshot = {
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              wordCount: payload.wordCount || 0,
+              trigger: String(body.trigger || 'manual').trim(),
+              savedBy: actor.uid,
+              data: {
+                title: current.title,
+                content: current.content,
+                type: current.type,
+                docBlocks: current.docBlocks || [],
+                currentTemplate: current.currentTemplate,
+                subsectionCounters: current.subsectionCounters || {},
+                imageAssets: current.imageAssets || [],
+                mediaAssets: current.mediaAssets || []
+              }
+            };
+            versions.push(versionSnapshot);
+            payload.versions = versions;
+          } else {
+            // First time draft or non-versioned: create initial version history
+            payload.versions = [{
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              wordCount: payload.wordCount || 0,
+              trigger: String(body.trigger || 'manual').trim(),
+              savedBy: actor.uid,
+              data: {
+                title: payload.title,
+                content: payload.content,
+                type: payload.type,
+                docBlocks: payload.docBlocks || [],
+                currentTemplate: payload.currentTemplate,
+                subsectionCounters: payload.subsectionCounters || {},
+                imageAssets: payload.imageAssets || [],
+                mediaAssets: payload.mediaAssets || []
+              }
+            }];
+          }
+        } else {
+          // New submission: initialize versions array
+          payload.versions = [{
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            wordCount: payload.wordCount || 0,
+            trigger: String(body.trigger || 'manual').trim(),
+            savedBy: actor.uid,
+            data: {
+              title: payload.title,
+              content: payload.content,
+              type: payload.type,
+              docBlocks: payload.docBlocks || [],
+              currentTemplate: payload.currentTemplate,
+              subsectionCounters: payload.subsectionCounters || {},
+              imageAssets: payload.imageAssets || [],
+              mediaAssets: payload.mediaAssets || []
+            }
+          }];
         }
+      } else {
+        // Creating new draft: initialize versions array
+        payload.versions = [{
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          wordCount: payload.wordCount || 0,
+          trigger: String(body.trigger || 'manual').trim(),
+          savedBy: actor.uid,
+          data: {
+            title: payload.title,
+            content: payload.content,
+            type: payload.type,
+            docBlocks: payload.docBlocks || [],
+            currentTemplate: payload.currentTemplate,
+            subsectionCounters: payload.subsectionCounters || {},
+            imageAssets: payload.imageAssets || [],
+            mediaAssets: payload.mediaAssets || []
+          }
+        }];
       }
 
       await submissionRef.set(stripUndefined(payload), { merge: true });
@@ -736,9 +814,78 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 200, { id: submissionRef.id, status: 'pending' });
     }
 
+    if (action === 'restore-version') {
+      if (!submissionId) return sendJson(res, 400, { error: 'Missing submission id.' });
+      
+      const versionIndex = Number(body.versionIndex || -1);
+      if (versionIndex < 0) return sendJson(res, 400, { error: 'Missing or invalid version index.' });
+
+      const existing = await submissionRef.get();
+      if (!existing.exists) return sendJson(res, 404, { error: 'Submission not found.' });
+
+      const current = existing.data() || {};
+      if (!adminAccess && current.authorUid !== actor.uid) {
+        return sendJson(res, 403, { error: 'Forbidden.' });
+      }
+
+      const versions = Array.isArray(current.versions) ? current.versions : [];
+      if (versionIndex >= versions.length) {
+        return sendJson(res, 400, { error: 'Version index out of range.' });
+      }
+
+      const restoredVersion = versions[versionIndex];
+      if (!restoredVersion || !restoredVersion.data) {
+        return sendJson(res, 400, { error: 'Invalid version data.' });
+      }
+
+      // Restore the selected version's data as the current state
+      const restoredData = restoredVersion.data;
+      const newVersion = {
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        wordCount: restoredData.wordCount || 0,
+        trigger: 'restored-from-version-' + versionIndex,
+        savedBy: actor.uid,
+        data: {
+          title: restoredData.title,
+          content: restoredData.content,
+          type: restoredData.type,
+          docBlocks: restoredData.docBlocks || [],
+          currentTemplate: restoredData.currentTemplate,
+          subsectionCounters: restoredData.subsectionCounters || {},
+          imageAssets: restoredData.imageAssets || [],
+          mediaAssets: restoredData.mediaAssets || []
+        }
+      };
+
+      versions.push(newVersion);
+
+      const updatedPayload = stripUndefined({
+        title: restoredData.title,
+        content: restoredData.content,
+        type: restoredData.type,
+        docBlocks: restoredData.docBlocks,
+        currentTemplate: restoredData.currentTemplate,
+        subsectionCounters: restoredData.subsectionCounters,
+        imageAssets: restoredData.imageAssets,
+        mediaAssets: restoredData.mediaAssets,
+        versions: versions,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      await submissionRef.set(updatedPayload, { merge: true });
+      return sendJson(res, 200, { 
+        id: submissionRef.id, 
+        status: 'draft',
+        restoredFromVersion: versionIndex,
+        totalVersions: versions.length
+      });
+    }
+
     return sendJson(res, 400, { error: 'Unknown action.' });
+
   } catch (err) {
     const statusCode = Number(err.statusCode || 500);
     return sendJson(res, statusCode, { error: err.message || 'Server error.' });
   }
 };
+

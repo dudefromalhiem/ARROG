@@ -1144,7 +1144,8 @@ async function saveDraft(options = {}) {
     const result = await callSubmissionApi('POST', {
       action: 'draft',
       submissionId: activeDraftId || (submitEditTarget && submitEditTarget.id) || '',
-      submission: removeClientOnlySubmissionFields(draftPayload)
+      submission: removeClientOnlySubmissionFields(draftPayload),
+      isVersionedUpdate: !!(activeDraftId || (submitEditTarget && submitEditTarget.id))
     });
     activeDraftId = result.id || activeDraftId;
     if (!silent) {
@@ -4749,6 +4750,10 @@ async function loadMySubmissions(viewMode = 'history') {
       const ts = s.updatedAt || s.submittedAt;
       const date = ts && ts.seconds ? new Date(ts.seconds * 1000).toLocaleDateString() : '—';
       const slug = s.slug || '';
+      const versions = Array.isArray(s.versions) ? s.versions : [];
+      const hasVersionHistory = s.status === 'draft' && versions.length > 1;
+      const historyId = 'draft-history-' + d.id;
+      
       let extra = '';
       if (s.status === 'rejected' && s.rejectionReason) {
         extra = '<div style="font-size:.75rem;color:var(--red-b);margin-top:4px">Reason: ' + s.rejectionReason + '</div>' +
@@ -4767,7 +4772,43 @@ async function loadMySubmissions(viewMode = 'history') {
           '<button class="btn btn-sm btn-d" onclick="deleteMySubmission(\'' + d.id + '\')" style="margin-left:8px">Delete Draft</button>';
       }
       const slugInfo = slug ? '<span style="font-size:.65rem;color:var(--wht-f);margin-left:8px">/pages/' + slug + '</span>' : '';
-      return '<div class="my-sub-row"><div class="my-sub-info"><div><div class="my-sub-title">' + s.title + slugInfo + '</div><div class="my-sub-meta">' + s.type + ' · ' + date + '</div>' + extra + '</div></div><div style="display:flex;align-items:center"><span class="' + statusClass + '">' + s.status + '</span>' + deleteBtn + '</div></div>';
+      
+      let versionHistoryHtml = '';
+      if (hasVersionHistory) {
+        versionHistoryHtml = '<div class="draft-version-toggle" style="margin-top:8px">' +
+          '<button class="btn btn-sm btn-s" type="button" onclick="toggleDraftVersionHistory(\'' + d.id + '\')" style="font-size:.65rem">' +
+            '▶ ' + versions.length + ' versions' +
+          '</button>' +
+        '</div>' +
+        '<div id="' + historyId + '" class="draft-version-history" style="display:none;margin-top:12px;padding:12px;background:#0a0a0a;border:1px solid #3a3a3a;border-radius:4px">' +
+          '<div style="font-size:.75rem;color:var(--wht-d);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px">Version History</div>' +
+          versions.slice().reverse().map((v, reverseIdx) => {
+            const vIdx = versions.length - 1 - reverseIdx;
+            const vTime = v.timestamp && v.timestamp.seconds
+              ? new Date(v.timestamp.seconds * 1000)
+              : new Date();
+            const vTimeStr = vTime.toLocaleString();
+            const isCurrent = vIdx === versions.length - 1;
+            const trigger = String(v.trigger || 'manual');
+            const wordCount = Number(v.wordCount || 0);
+            return '<div style="margin-bottom:8px;padding:8px;background:#111;border-left:3px solid ' + (isCurrent ? '#8b0000' : '#333') + '">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center">' +
+                '<div>' +
+                  '<div style="font-size:.7rem;color:var(--wht-f);text-transform:uppercase">' +
+                    (isCurrent ? '★ Current' : 'Version ' + (vIdx + 1)) +
+                  '</div>' +
+                  '<div style="font-size:.65rem;color:var(--wht-d);margin-top:2px">' +
+                    vTimeStr + ' • ' + wordCount + ' words • ' + trigger +
+                  '</div>' +
+                '</div>' +
+                (isCurrent ? '' : '<button class="btn btn-xs" type="button" onclick="restoreDraftVersion(\'' + d.id + '\', ' + vIdx + ')" style="font-size:.6rem;padding:3px 6px">Restore</button>') +
+              '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>';
+      }
+      
+      return '<div class="my-sub-row"><div class="my-sub-info"><div><div class="my-sub-title">' + s.title + slugInfo + '</div><div class="my-sub-meta">' + s.type + ' · ' + date + '</div>' + extra + versionHistoryHtml + '</div></div><div style="display:flex;align-items:center"><span class="' + statusClass + '">' + s.status + '</span>' + deleteBtn + '</div></div>';
     }).join('');
 
   } catch (err) {
@@ -4785,3 +4826,36 @@ async function deleteMySubmission(id) {
     alert('Error: ' + err.message);
   }
 }
+
+function toggleDraftVersionHistory(id) {
+  const historyEl = document.getElementById('draft-history-' + id);
+  if (!historyEl) return;
+  const isHidden = historyEl.style.display === 'none';
+  historyEl.style.display = isHidden ? 'block' : 'none';
+  const toggleBtn = historyEl.previousElementSibling?.querySelector('button');
+  if (toggleBtn) {
+    toggleBtn.textContent = isHidden ? '▼ ' + (historyEl.querySelectorAll('[id^=""]').length || 'X') + ' versions' : '▶ ' + (historyEl.querySelectorAll('[id^=""]').length || 'X') + ' versions';
+  }
+}
+
+async function restoreDraftVersion(id, versionIndex) {
+  if (!confirm('Restore this version? The current version will be saved as a new version in history.')) return;
+  
+  try {
+    const result = await callSubmissionApi('POST', {
+      action: 'restore-version',
+      submissionId: id,
+      versionIndex: versionIndex
+    });
+    
+    alert('Version restored successfully! Total versions: ' + result.totalVersions);
+    loadMySubmissions('drafts');
+    
+    if (activeDraftId === id) {
+      activeDraftId = null;
+    }
+  } catch (err) {
+    alert('Could not restore version: ' + err.message);
+  }
+}
+
