@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Role Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Special+Elite&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --red: #8b0000;
+      --wht: #fff;
+      --blk-m: #1a1a1a;
+      --gray-1: #2a2a2a;
+      --gray-2: #3a3a3a;
+      --gray-3: #4a4a4a;
+      --success: #22c55e;
+      --warning: #eab308;
+      --error: #ef4444;
+      --blue: #3b82f6;
+    }
+
+    body {
+      font-family: 'IBM Plex Mono', monospace;
+      background-color: var(--blk-m);
+      color: var(--wht);
+      line-height: 1.6;
+    }
+
+    .admin-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      border-bottom: 2px solid var(--red);
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      font-family: 'Special Elite', cursive;
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      color: var(--red);
+    }
+
+    .user-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding: 10px;
+      background: var(--gray-1);
+      border-radius: 4px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 1px solid var(--gray-2);
+    }
+
+    .nav-tab {
+      padding: 12px 20px;
+      background: none;
+      border: none;
+      color: var(--gray-3);
+      cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s;
+    }
+
+    .nav-tab.active {
+      color: var(--red);
+      border-bottom-color: var(--red);
+    }
+
+    .nav-tab:hover {
+      color: var(--wht);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Search and Filter Section */
+    .search-section {
+      background: var(--gray-1);
+      padding: 20px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+    }
+
+    .search-field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .search-field label {
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+      color: var(--gray-3);
+    }
+
+    .search-field input,
+    .search-field select {
+      padding: 10px;
+      background: var(--gray-2);
+      border: 1px solid var(--gray-3);
+      color: var(--wht);
+      border-radius: 4px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .search-field input::placeholder {
+      color: var(--gray-3);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: var(--red);
+      color: var(--wht);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace;
+      transition: all 0.3s;
+    }
+
+    button:hover {
+      background: #a30000;
+      transform: translateY(-2px);
+    }
+
+    button.secondary {
+      background: var(--gray-2);
+      color: var(--wht);
+    }
+
+    button.secondary:hover {
+      background: var(--gray-3);
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      background: var(--gray-1);
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    thead {
+      background: var(--gray-2);
+    }
+
+    th {
+      padding: 12px 15px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 1px solid var(--gray-3);
+    }
+
+    td {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--gray-2);
+    }
+
+    tr:hover {
+      background: var(--gray-2);
+    }
+
+    /* Role Badge */
+    .role-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: var(--red);
+      color: var(--wht);
+    }
+
+    .role-badge.contributor { background: var(--blue); }
+    .role-badge.moderator { background: var(--warning); color: var(--blk-m); }
+    .role-badge.administrator { background: var(--error); }
+    .role-badge.chief { background: #a855f7; }
+
+    /* Status Indicator */
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.85rem;
+    }
+
+    .status::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status.pending { color: var(--warning); }
+    .status.approved { color: var(--success); }
+    .status.denied { color: var(--error); }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--gray-1);
+      padding: 30px;
+      border-radius: 4px;
+      border: 2px solid var(--red);
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      color: var(--red);
+      font-family: 'Special Elite', cursive;
+    }
+
+    .modal-field {
+      margin-bottom: 15px;
+    }
+
+    .modal-field label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.9rem;
+      color: var(--gray-3);
+    }
+
+    .modal-field input,
+    .modal-field textarea,
+    .modal-field select {
+      width: 100%;
+      padding: 10px;
+      background: var(--gray-2);
+      border: 1px solid var(--gray-3);
+      color: var(--wht);
+      border-radius: 4px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .modal-field textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    /* Alert Messages */
+    .alert {
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .alert.active {
+      display: block;
+    }
+
+    .alert.success {
+      background: rgba(34, 197, 94, 0.2);
+      border-left: 3px solid var(--success);
+      color: var(--success);
+    }
+
+    .alert.error {
+      background: rgba(239, 68, 68, 0.2);
+      border-left: 3px solid var(--error);
+      color: var(--error);
+    }
+
+    .alert.warning {
+      background: rgba(234, 179, 8, 0.2);
+      border-left: 3px solid var(--warning);
+      color: var(--warning);
+    }
+
+    /* Loading State */
+    .loading {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--gray-3);
+      border-top: 2px solid var(--red);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: var(--gray-1);
+      padding: 20px;
+      border-radius: 4px;
+      border-left: 3px solid var(--red);
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--gray-3);
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--wht);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 1.8rem; }
+      
+      .search-section {
+        grid-template-columns: 1fr;
+      }
+
+      table {
+        font-size: 0.8rem;
+      }
+
+      th, td {
+        padding: 8px 10px;
+      }
+
+      .modal-content {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <header>
+      <h1>⚙️ Admin Panel</h1>
+      <div class="user-info">
+        <span>Logged in: <strong id="current-user">Loading...</strong></span>
+        <button class="secondary" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('users')">👥 Users & Roles</button>
+      <button class="nav-tab" onclick="switchTab('applications')">📋 Applications</button>
+      <button class="nav-tab" onclick="switchTab('audit')">📊 Audit Logs</button>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="alert-success" class="alert success"></div>
+    <div id="alert-error" class="alert error"></div>
+    <div id="alert-warning" class="alert warning"></div>
+
+    <!-- Users & Roles Tab -->
+    <div id="users" class="tab-content active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Users</div>
+          <div class="stat-value" id="stat-total-users">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Contributors</div>
+          <div class="stat-value" id="stat-contributors">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Moderators</div>
+          <div class="stat-value" id="stat-moderators">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Administrators</div>
+          <div class="stat-value" id="stat-admins">-</div>
+        </div>
+      </div>
+
+      <div class="search-section">
+        <div class="search-field">
+          <label>Search by Email</label>
+          <input type="email" id="search-email" placeholder="user@example.com">
+        </div>
+        <div class="search-field">
+          <label>Filter by Role</label>
+          <select id="filter-role">
+            <option value="">All Roles</option>
+            <option value="newbie">Newbie</option>
+            <option value="site_member">Site Member</option>
+            <option value="contributor">Contributor</option>
+            <option value="moderator">Moderator</option>
+            <option value="senior_moderator">Senior Moderator</option>
+            <option value="administrator">Administrator</option>
+            <option value="chief_administrator">Chief Administrator</option>
+          </select>
+        </div>
+        <div class="button-group">
+          <button onclick="searchUsers()">🔍 Search</button>
+          <button class="secondary" onclick="resetUserSearch()">Clear</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Current Role</th>
+              <th>Status</th>
+              <th>Member Since</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-table-body">
+            <tr>
+              <td colspan="5" style="text-align:center; padding: 30px;">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Applications Tab -->
+    <div id="applications" class="tab-content">
+      <div class="search-section">
+        <div class="search-field">
+          <label>Filter Status</label>
+          <select id="filter-app-status">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="denied">Denied</option>
+          </select>
+        </div>
+        <div class="search-field">
+          <label>Filter Role</label>
+          <select id="filter-app-role">
+            <option value="">All Roles</option>
+            <option value="contributor">Contributor</option>
+            <option value="moderator">Moderator</option>
+            <option value="administrator">Administrator</option>
+          </select>
+        </div>
+        <div class="button-group">
+          <button onclick="loadApplications()">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Applicant</th>
+              <th>Requested Role</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="applications-table-body">
+            <tr>
+              <td colspan="5" style="text-align:center; padding: 30px;">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Audit Logs Tab -->
+    <div id="audit" class="tab-content">
+      <div class="search-section">
+        <div class="search-field">
+          <label>Event Type</label>
+          <select id="filter-audit-type">
+            <option value="">All Events</option>
+            <option value="role_change">Role Change</option>
+            <option value="permission_denial">Permission Denial</option>
+            <option value="sensitive_access">Sensitive Access</option>
+          </select>
+        </div>
+        <div class="search-field">
+          <label>Actor Email</label>
+          <input type="email" id="filter-audit-actor" placeholder="admin@example.com">
+        </div>
+        <div class="search-field">
+          <label>Days Back</label>
+          <select id="filter-audit-days">
+            <option value="1">Last 24 Hours</option>
+            <option value="7" selected>Last 7 Days</option>
+            <option value="30">Last 30 Days</option>
+            <option value="90">Last 90 Days</option>
+          </select>
+        </div>
+        <div class="button-group">
+          <button onclick="loadAuditLogs()">🔄 Load Logs</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Event Type</th>
+              <th>Actor</th>
+              <th>Target</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body">
+            <tr>
+              <td colspan="5" style="text-align:center; padding: 30px;">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Promote/Demote Modal -->
+  <div id="role-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header" id="modal-title">Promote User</div>
+      <div class="modal-field">
+        <label>User Email</label>
+        <input type="email" id="modal-email" readonly>
+      </div>
+      <div class="modal-field">
+        <label>Current Role</label>
+        <input type="text" id="modal-current-role" readonly>
+      </div>
+      <div class="modal-field">
+        <label>New Role</label>
+        <select id="modal-new-role">
+          <option value="">Select Role...</option>
+          <option value="contributor">Contributor</option>
+          <option value="moderator">Moderator</option>
+          <option value="senior_moderator">Senior Moderator</option>
+          <option value="administrator">Administrator</option>
+          <option value="senior_administrator">Senior Administrator</option>
+          <option value="chief_of_moderation">Chief of Moderation</option>
+          <option value="chief_administrator">Chief Administrator</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Reason</label>
+        <textarea id="modal-reason" placeholder="Explain why you're making this change..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" onclick="closeRoleModal()">Cancel</button>
+        <button id="modal-action-btn" onclick="executeRoleChange()">Promote</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="admin-panel.js"></script>
+</body>
+</html>

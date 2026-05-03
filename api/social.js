@@ -6,6 +6,7 @@ const {
   canApplyForRole,
   isAtLeast
 } = require('../permissions');
+const { logRoleChange } = require('./audit');
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();

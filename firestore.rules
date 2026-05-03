@@ -47,15 +47,29 @@ service cloud.firestore {
         role == 'admin' ? 80 :
         role == 'moderator' ? 70 :
         role == 'contributor' ? 60 :
-        (
-          isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-            ? (
-                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.level is int
-                  ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.level
-                  : 3
-              )
-            : 2
-        );
+        40; // Default level for invalid roles
+    }
+    // Map new 11-role system to permission levels
+    function getRolePriority(role) {
+      return role == 'owner' ? 100 :
+        role == 'chief_administrator' ? 95 :
+        role == 'chief_of_moderation' ? 90 :
+        role == 'deputy_chief_administrator' ? 85 :
+        role == 'deputy_chief_of_moderation' ? 80 :
+        role == 'senior_administrator' ? 75 :
+        role == 'senior_moderator' ? 70 :
+        role == 'administrator' ? 65 :
+        role == 'moderator' ? 60 :
+        role == 'contributor' ? 50 :
+        role == 'site_member' ? 30 :
+        role == 'newbie' ? 20 :
+        0;
+    }
+
+    // Check if user has at least the required role level
+    function isAtLeastRole(requiredLevel) {
+      let role = getUserRole();
+      return getRolePriority(role) >= requiredLevel;
     }
 
     function isContributorGranted() {
@@ -187,12 +201,26 @@ service cloud.firestore {
 
     function isValidRoleVal(roleVal) {
       return (roleVal is string) && (
-        roleVal == 'owner' || roleVal == 'chief_admin' || roleVal == 'admin' ||
-        roleVal == 'junior_admin' || roleVal == 'moderator' || roleVal == 'junior_moderator' ||
-        roleVal == 'contributor' || roleVal == 'user' || roleVal == 'guest'
+        roleVal == 'owner' || 
+        roleVal == 'chief_administrator' || roleVal == 'deputy_chief_administrator' || roleVal == 'senior_administrator' || roleVal == 'administrator' ||
+        roleVal == 'chief_of_moderation' || roleVal == 'deputy_chief_of_moderation' || roleVal == 'senior_moderator' || roleVal == 'moderator' ||
+        roleVal == 'contributor' || roleVal == 'site_member' || roleVal == 'newbie' ||
+        roleVal == 'admin' || roleVal == 'chief_admin' || roleVal == 'junior_admin' || roleVal == 'junior_moderator' || roleVal == 'user' || roleVal == 'guest'
       );
     }
 
+    // Prevent direct role field modification on client - enforce via API only
+    function isRoleChangeRequest() {
+      return 'role' in request.resource.data && 
+        ('role' in resource.data ? resource.data.role != request.resource.data.role : true);
+    }
+
+    // Check if request includes audit trail fields (only server can set these)
+    function hasAuditFields() {
+      return ('roleChangedBy' in request.resource.data) ||
+        ('roleChangedAt' in request.resource.data) ||
+        ('roleChangeReason' in request.resource.data);
+    }
     // Contributor revocations must go through server APIs with abuse-rate checks.
     function isClientContributorRevocation() {
       let currentRole = ('role' in resource.data && resource.data.role is string)
