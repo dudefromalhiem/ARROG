@@ -9,6 +9,11 @@ let adminNewsImageUrl = '';
 let currentUserIsAdminFlag = false;
 let currentUserDoc = null;
 let adminSeedDataLoadPromise = null;
+let socialApiBase = '/api/social';
+const REMOTE_SOCIAL_API_BASES = [
+  'https://redoakguild.vercel.app/api/social',
+  'https://redoakerguild.vercel.app/api/social'
+];
 
 // Utility for safe HTML rendering
 function escapeHtml(text) {
@@ -215,6 +220,73 @@ function canModerateSubmissions() {
   return hasPermission(userDoc, 'moderateContent');
 }
 
+function configureSocialApiBase() {
+  try {
+    const host = String(window.location.hostname || '').toLowerCase();
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const isFile = window.location.protocol === 'file:';
+    const isGithubPages = host.endsWith('.github.io');
+    if (isLocal || isFile || isGithubPages) {
+      socialApiBase = REMOTE_SOCIAL_API_BASES[0];
+      return;
+    }
+  } catch (_err) {
+    // Keep default relative API path.
+  }
+  socialApiBase = '/api/social';
+}
+
+async function getSocialApiHeaders() {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Please sign in first.');
+  }
+  const token = await user.getIdToken();
+  return {
+    Authorization: 'Bearer ' + token,
+    'Content-Type': 'application/json'
+  };
+}
+
+async function callSocialApi(method, payload = {}, query = '') {
+  const requestHeaders = await getSocialApiHeaders();
+  let response = await fetch(socialApiBase + query, {
+    method: method,
+    headers: requestHeaders,
+    body: method === 'GET' ? undefined : JSON.stringify(payload)
+  });
+
+  if (!response.ok && response.status === 404 && socialApiBase === '/api/social') {
+    socialApiBase = REMOTE_SOCIAL_API_BASES[0];
+    response = await fetch(socialApiBase + query, {
+      method: method,
+      headers: requestHeaders,
+      body: method === 'GET' ? undefined : JSON.stringify(payload)
+    });
+  }
+
+  if (!response.ok && response.status === 404) {
+    const currentRemoteIndex = REMOTE_SOCIAL_API_BASES.indexOf(socialApiBase);
+    if (currentRemoteIndex !== -1 && currentRemoteIndex < REMOTE_SOCIAL_API_BASES.length - 1) {
+      socialApiBase = REMOTE_SOCIAL_API_BASES[currentRemoteIndex + 1];
+      response = await fetch(socialApiBase + query, {
+        method: method,
+        headers: requestHeaders,
+        body: method === 'GET' ? undefined : JSON.stringify(payload)
+      });
+    }
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data && data.error ? data.error : ('Request failed with status ' + response.status);
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+  return data;
+}
+
 function canDeleteManagedContent() {
   const userDoc = currentUserDoc || {};
   return hasPermission(userDoc, 'moderateContent');
@@ -360,6 +432,7 @@ async function renderAdminBootstrap(user) {
   }
 
   try {
+    configureSocialApiBase();
     // Load user document from Firestore
     const userDocSnap = await db.collection('users').doc(user.uid).get();
     currentUserDoc = userDocSnap.exists ? userDocSnap.data() : { uid: user.uid, email: user.email };
@@ -688,16 +761,13 @@ async function revokeContributor(uid) {
   if (!uid) return;
   if (!confirm('Revoke contributor access for this user?')) return;
   try {
-    await db.collection('users').doc(uid).set({
-      role: 'user',
-      roleName: 'User',
-      submissionAccess: false,
-      submissionAccessStatus: 'revoked',
-      contributorGranted: false,
-      roleRevokedBy: String(auth.currentUser?.email || ''),
-      roleRevokedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    const result = await callSocialApi('POST', {
+      action: 'revokecontributor',
+      targetUid: String(uid)
+    });
+    if (result && result.locked) {
+      alert(result.error || 'Contributor removed, and your account has been locked for investigation.');
+    }
     const main = document.getElementById('adm-main');
     if (main && activeTab === 'contributors') await loadContributors(main);
   } catch (err) {
@@ -708,21 +778,8 @@ async function revokeContributor(uid) {
 async function loadContributors(container) {
   container.innerHTML = '<h3 style="margin-bottom:16px">Editors / Contributors</h3><p style="font-size:.82rem;color:var(--wht-d)">Loading contributor records...</p>';
   try {
-    const [byRoleSnap, byAccessSnap] = await Promise.all([
-      db.collection('users').where('role', '==', 'contributor').limit(300).get(),
-      db.collection('users').where('submissionAccess', '==', true).limit(300).get()
-    ]);
-
-    const rowsMap = new Map();
-    byRoleSnap.docs.forEach(doc => rowsMap.set(doc.id, { id: doc.id, ...(doc.data() || {}) }));
-    byAccessSnap.docs.forEach(doc => {
-      const data = doc.data() || {};
-      if (String(data.role || '').toLowerCase() === 'contributor') {
-        rowsMap.set(doc.id, { id: doc.id, ...data });
-      }
-    });
-
-    const rows = Array.from(rowsMap.values());
+    const result = await callSocialApi('GET', {}, '?type=contributors');
+    const rows = Array.isArray(result && result.contributors) ? result.contributors : [];
     if (!rows.length) {
       container.innerHTML = '<h3 style="margin-bottom:16px">Editors / Contributors</h3><p style="font-size:.82rem;color:var(--wht-d)">No contributors found.</p>';
       return;

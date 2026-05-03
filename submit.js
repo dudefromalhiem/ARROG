@@ -39,8 +39,8 @@ const ALLOWED_STORAGE_AUDIO_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/w
 const ALLOWED_STORAGE_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg', 'video/x-matroska']);
 const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-  'audio/mpeg', 'audio/wav', 'audio/mp4',
-  'video/mp4', 'video/webm'
+  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4',
+  'video/mp4', 'video/webm', 'video/quicktime', 'video/ogg', 'video/x-matroska'
 ]);
 const BASE_TAG_OPTIONS = [
   'object', 'animal', 'humanoid', 'plant', 'artifact', 'document', 'digital',

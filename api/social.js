@@ -1010,6 +1010,26 @@ async function revokeContributor(db, actor, body) {
     return { statusCode: 403, payload: { error: 'Moderator access required.' } };
   }
 
+  const actorUserRef = db.collection('users').doc(actor.uid);
+  const actorUserSnap = await actorUserRef.get();
+  const actorUserData = actorUserSnap.exists ? (actorUserSnap.data() || {}) : {};
+  const existingLock = actorUserData.moderationLock && typeof actorUserData.moderationLock === 'object'
+    ? actorUserData.moderationLock
+    : null;
+  const nowMillis = Date.now();
+  const lockUntilMillis = existingLock && existingLock.lockedUntil && typeof existingLock.lockedUntil.toMillis === 'function'
+    ? existingLock.lockedUntil.toMillis()
+    : 0;
+  if (existingLock && existingLock.active === true && (!lockUntilMillis || nowMillis < lockUntilMillis)) {
+    return {
+      statusCode: 423,
+      payload: {
+        error: 'Account temporarily locked for contributor-removal abuse review. Contact the Archivist.',
+        code: 'MODERATION_LOCKED'
+      }
+    };
+  }
+
   const targetUid = normalizeText(body.targetUid || body.uid || '', 128);
   if (!targetUid) return { statusCode: 400, payload: { error: 'Missing target user.' } };
 
@@ -1023,6 +1043,52 @@ async function revokeContributor(db, actor, body) {
     return { statusCode: 403, payload: { error: 'Only contributor role can be revoked by this action.' } };
   }
 
+  const guardRef = db.collection('moderationRateGuards').doc(actor.uid);
+  const guardWindowMs = 30 * 1000;
+  const guardLimit = 5;
+  const lockMinutes = 60;
+
+  const guardResult = await db.runTransaction(async tx => {
+    const guardSnap = await tx.get(guardRef);
+    const guardData = guardSnap.exists ? (guardSnap.data() || {}) : {};
+    const previous = Array.isArray(guardData.contributorRevocationsMs)
+      ? guardData.contributorRevocationsMs.map(n => Number(n)).filter(n => Number.isFinite(n))
+      : [];
+    const recent = previous.filter(ts => (nowMillis - ts) <= guardWindowMs);
+    const nextCount = recent.length + 1;
+    const shouldLock = nextCount >= guardLimit;
+    const lockedUntilTs = shouldLock
+      ? admin.firestore.Timestamp.fromMillis(nowMillis + (lockMinutes * 60 * 1000))
+      : null;
+
+    const nextTimestamps = recent.concat(nowMillis).slice(-guardLimit);
+    tx.set(guardRef, {
+      contributorRevocationsMs: nextTimestamps,
+      contributorRevocationCount: Number(guardData.contributorRevocationCount || 0) + 1,
+      contributorRevocationUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastRevocationAtMs: nowMillis,
+      lastRevocationBy: actor.email
+    }, { merge: true });
+
+    if (shouldLock) {
+      tx.set(actorUserRef, {
+        moderationLock: {
+          active: true,
+          reason: 'contributor-revocation-spike',
+          threshold: guardLimit,
+          windowMs: guardWindowMs,
+          reviewStatus: 'pending-investigation',
+          lockedBySystem: true,
+          lockedUntil: lockedUntilTs,
+          lockedAt: admin.firestore.FieldValue.serverTimestamp()
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+
+    return { shouldLock, nextCount, lockedUntilTs };
+  });
+
   await targetRef.set({
     role: ROLES.USER,
     roleName: roleLabel(ROLES.USER),
@@ -1033,6 +1099,34 @@ async function revokeContributor(db, actor, body) {
     roleRevokedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
+
+  if (guardResult.shouldLock) {
+    await db.collection('moderationInvestigations').add({
+      type: 'contributor-revocation-spike',
+      status: 'open',
+      severity: 'high',
+      actorUid: actor.uid,
+      actorEmail: actor.email,
+      actorName: normalizeText(actor.name || actor.email.split('@')[0] || 'Agent', 120),
+      eventCount: guardResult.nextCount,
+      threshold: guardLimit,
+      windowMs: guardWindowMs,
+      notes: 'Automatic lock triggered due to high-frequency contributor revocations.',
+      triggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+      lockedUntil: guardResult.lockedUntilTs || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return {
+      statusCode: 423,
+      payload: {
+        ok: true,
+        locked: true,
+        error: 'Contributor removed, but your account is now locked for investigation due to rapid revocations.'
+      }
+    };
+  }
 
   return { statusCode: 200, payload: { ok: true } };
 }

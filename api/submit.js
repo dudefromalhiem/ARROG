@@ -296,6 +296,39 @@ function toPlainValue(value) {
   return value;
 }
 
+function buildDraftVersionData(source) {
+  const data = source || {};
+  return {
+    title: String(data.title || ''),
+    htmlContent: String(data.htmlContent || data.content || ''),
+    cssContent: String(data.cssContent || ''),
+    type: String(data.type || ''),
+    slug: String(data.slug || ''),
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    anomalyId: String(data.anomalyId || ''),
+    anomalySubtype: String(data.anomalySubtype || ''),
+    docBlocks: Array.isArray(data.docBlocks) ? data.docBlocks : [],
+    currentMode: String(data.currentMode || ''),
+    currentTemplate: String(data.currentTemplate || ''),
+    subsectionCounters: (data.subsectionCounters && typeof data.subsectionCounters === 'object') ? data.subsectionCounters : {},
+    imageAssets: Array.isArray(data.imageAssets) ? data.imageAssets : [],
+    mediaAssets: Array.isArray(data.mediaAssets) ? data.mediaAssets : [],
+    clearanceLevel: Number.isFinite(Number(data.clearanceLevel)) ? Number(data.clearanceLevel) : 2
+  };
+}
+
+function buildDraftVersionSnapshot(source, actorUid, trigger) {
+  const normalizedTrigger = String(trigger || 'manual').trim() || 'manual';
+  return {
+    // Use concrete timestamp values for array items. FieldValue.serverTimestamp() is invalid inside arrays.
+    timestamp: admin.firestore.Timestamp.now(),
+    trigger: normalizedTrigger,
+    savedBy: String(actorUid || ''),
+    wordCount: extractPlainTextExcerpt(String(source && source.htmlContent || source && source.content || ''), 4000).split(/\s+/).filter(Boolean).length,
+    data: buildDraftVersionData(source)
+  };
+}
+
 function buildSubmissionPayload(body, actor) {
   const payload = body && body.submission ? body.submission : body || {};
   const title = sanitizePlainText(payload.title || '', MAX_TITLE_LENGTH);
@@ -620,6 +653,7 @@ module.exports = async function handler(req, res) {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = 'draft';
       enforceRequestedClearanceOrThrow(payload, actorProfile);
+      const draftTrigger = String(payload.draftTrigger || body.trigger || 'manual').trim() || 'manual';
 
       if (submissionId) {
         const existing = await submissionRef.get();
@@ -633,80 +667,20 @@ module.exports = async function handler(req, res) {
           const isVersionedUpdate = body.isVersionedUpdate === true || body.isVersionedUpdate === 'true';
           if (isVersionedUpdate) {
             const versions = Array.isArray(current.versions) ? current.versions : [];
-            const versionSnapshot = {
-              timestamp: admin.firestore.FieldValue.serverTimestamp(),
-              wordCount: payload.wordCount || 0,
-              trigger: String(body.trigger || 'manual').trim(),
-              savedBy: actor.uid,
-              data: {
-                title: current.title,
-                content: current.content,
-                type: current.type,
-                docBlocks: current.docBlocks || [],
-                currentTemplate: current.currentTemplate,
-                subsectionCounters: current.subsectionCounters || {},
-                imageAssets: current.imageAssets || [],
-                mediaAssets: current.mediaAssets || []
-              }
-            };
+            const versionSnapshot = buildDraftVersionSnapshot(current, actor.uid, draftTrigger);
             versions.push(versionSnapshot);
             payload.versions = versions;
           } else {
             // First time draft or non-versioned: create initial version history
-            payload.versions = [{
-              timestamp: admin.firestore.FieldValue.serverTimestamp(),
-              wordCount: payload.wordCount || 0,
-              trigger: String(body.trigger || 'manual').trim(),
-              savedBy: actor.uid,
-              data: {
-                title: payload.title,
-                content: payload.content,
-                type: payload.type,
-                docBlocks: payload.docBlocks || [],
-                currentTemplate: payload.currentTemplate,
-                subsectionCounters: payload.subsectionCounters || {},
-                imageAssets: payload.imageAssets || [],
-                mediaAssets: payload.mediaAssets || []
-              }
-            }];
+            payload.versions = [buildDraftVersionSnapshot(payload, actor.uid, draftTrigger)];
           }
         } else {
           // New submission: initialize versions array
-          payload.versions = [{
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            wordCount: payload.wordCount || 0,
-            trigger: String(body.trigger || 'manual').trim(),
-            savedBy: actor.uid,
-            data: {
-              title: payload.title,
-              content: payload.content,
-              type: payload.type,
-              docBlocks: payload.docBlocks || [],
-              currentTemplate: payload.currentTemplate,
-              subsectionCounters: payload.subsectionCounters || {},
-              imageAssets: payload.imageAssets || [],
-              mediaAssets: payload.mediaAssets || []
-            }
-          }];
+          payload.versions = [buildDraftVersionSnapshot(payload, actor.uid, draftTrigger)];
         }
       } else {
         // Creating new draft: initialize versions array
-        payload.versions = [{
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-          wordCount: payload.wordCount || 0,
-          trigger: String(body.trigger || 'manual').trim(),
-          savedBy: actor.uid,
-          data: {
-            title: payload.title,
-            content: payload.content,
-            type: payload.type,
-            docBlocks: payload.docBlocks || [],
-            currentTemplate: payload.currentTemplate,
-            subsectionCounters: payload.subsectionCounters || {},
-            imageAssets: payload.imageAssets || [],
-            mediaAssets: payload.mediaAssets || []
-          }
-        }];
+        payload.versions = [buildDraftVersionSnapshot(payload, actor.uid, draftTrigger)];
       }
 
       await submissionRef.set(stripUndefined(payload), { merge: true });
@@ -840,34 +814,35 @@ module.exports = async function handler(req, res) {
 
       // Restore the selected version's data as the current state
       const restoredData = restoredVersion.data;
-      const newVersion = {
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        wordCount: restoredData.wordCount || 0,
-        trigger: 'restored-from-version-' + versionIndex,
-        savedBy: actor.uid,
-        data: {
-          title: restoredData.title,
-          content: restoredData.content,
-          type: restoredData.type,
-          docBlocks: restoredData.docBlocks || [],
-          currentTemplate: restoredData.currentTemplate,
-          subsectionCounters: restoredData.subsectionCounters || {},
-          imageAssets: restoredData.imageAssets || [],
-          mediaAssets: restoredData.mediaAssets || []
-        }
-      };
+      const newVersion = buildDraftVersionSnapshot(
+        {
+          ...restoredData,
+          htmlContent: String(restoredData.htmlContent || restoredData.content || ''),
+          cssContent: String(restoredData.cssContent || '')
+        },
+        actor.uid,
+        'restored-from-version-' + versionIndex
+      );
 
       versions.push(newVersion);
 
       const updatedPayload = stripUndefined({
-        title: restoredData.title,
-        content: restoredData.content,
-        type: restoredData.type,
+        title: String(restoredData.title || ''),
+        htmlContent: String(restoredData.htmlContent || restoredData.content || ''),
+        cssContent: String(restoredData.cssContent || ''),
+        type: String(restoredData.type || ''),
+        slug: String(restoredData.slug || ''),
+        tags: Array.isArray(restoredData.tags) ? restoredData.tags : [],
+        anomalyId: String(restoredData.anomalyId || ''),
+        anomalySubtype: String(restoredData.anomalySubtype || ''),
         docBlocks: restoredData.docBlocks,
+        currentMode: restoredData.currentMode,
         currentTemplate: restoredData.currentTemplate,
         subsectionCounters: restoredData.subsectionCounters,
         imageAssets: restoredData.imageAssets,
         mediaAssets: restoredData.mediaAssets,
+        imageUrls: Array.isArray(restoredData.imageAssets) ? restoredData.imageAssets.map(asset => String(asset && asset.url || '')).filter(Boolean) : [],
+        mediaUrls: Array.isArray(restoredData.mediaAssets) ? restoredData.mediaAssets.map(asset => String(asset && asset.url || '')).filter(Boolean) : [],
         versions: versions,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
