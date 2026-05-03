@@ -3430,6 +3430,1135 @@ body::after {
 }
 
 /* ============================================================
+   COMPREHENSIVE MOBILE RESPONSIVENESS - ALL PAGES
+   ============================================================ */
+
+/* Global tablet (768px and below) */
+@media (max-width: 768px) {
+  .wrap {
+    padding: 12px;
+    max-width: 100%;
+  }
+
+  .section {
+    padding: 16px 14px;
+    margin-bottom: 32px;
+    border-radius: 8px;
+  }
+
+  .section-hd {
+    font-size: 1.05rem;
+    letter-spacing: 1.8px;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    letter-spacing: 2px;
+  }
+
+  h2 {
+    font-size: 1.15rem;
+  }
+
+  h3 {
+    font-size: 1.05rem;
+  }
+
+  .btn {
+    padding: 10px 16px;
+    font-size: 0.8rem;
+  }
+
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 0.7rem;
+  }
+
+  .card {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .card-t {
+    font-size: 0.9rem;
+  }
+
+  .card-b {
+    font-size: 0.8rem;
+  }
+
+  .tag {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+
+  .intro {
+    padding: 0 10px 32px;
+    margin-bottom: 32px;
+    border-radius: 10px;
+  }
+
+  .intro-hero {
+    padding: 32px 12px 20px;
+  }
+
+  .intro-logo {
+    width: 120px;
+    height: 120px;
+  }
+
+  .intro-t {
+    font-size: 1.3rem;
+    letter-spacing: 2px;
+  }
+
+  .intro-cl {
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+  }
+
+  .intro-sub {
+    font-size: 0.85rem;
+  }
+
+  .legacy-block {
+    padding: 18px 12px;
+    margin-bottom: 28px;
+    border-radius: 10px;
+  }
+
+  .legacy-title {
+    font-size: 1.15rem;
+    letter-spacing: 1.8px;
+  }
+
+  .legacy-copy {
+    font-size: 0.8rem;
+    line-height: 1.7;
+  }
+
+  .warn {
+    padding: 24px 16px;
+    margin-bottom: 32px;
+    border-radius: 10px;
+  }
+
+  .warn h2 {
+    font-size: 1.15rem;
+    letter-spacing: 1.8px;
+    margin-bottom: 16px;
+  }
+
+  .carousel-view {
+    height: 300px;
+  }
+
+  .carousel-btn {
+    width: 40px;
+    height: 60px;
+  }
+
+  .carousel-label {
+    font-size: 0.95rem;
+    padding: 12px 8px;
+  }
+
+  .news-item {
+    padding: 10px 0;
+  }
+
+  .news-tt {
+    font-size: 0.85rem;
+  }
+
+  .news-bd {
+    font-size: 0.8rem;
+  }
+
+  .newest-row {
+    padding: 8px 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .page-viewer-header {
+    padding: 12px 14px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .page-viewer-title {
+    font-size: 1.2rem;
+    letter-spacing: 1.5px;
+  }
+
+  .page-viewer-frame {
+    min-height: 60vh;
+    min-height: 60svh;
+  }
+
+  .preview-frame {
+    min-height: 60vh;
+    min-height: 60svh;
+  }
+
+  .preview-header {
+    padding: 8px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 0.7rem;
+  }
+
+  .submit-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .submit-bar .btn {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .editor-wrap {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .editor-pane textarea {
+    min-height: 150px;
+    font-size: 0.75rem;
+  }
+
+  .editor-label {
+    font-size: 0.85rem;
+  }
+
+  .adm {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .adm-side {
+    border-right: none;
+    border-bottom: 1px solid var(--red-d);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .adm-side a {
+    margin-bottom: 0;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+  }
+
+  .adm-main {
+    padding: 12px;
+  }
+
+  .adm-tbl {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 0.75rem;
+  }
+
+  .adm-tbl th,
+  .adm-tbl td {
+    padding: 8px 10px;
+  }
+
+  .review-modal {
+    padding: 8px;
+  }
+
+  .review-modal-body {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .review-modal-preview {
+    min-height: 50vh;
+    height: 50vh;
+  }
+
+  .review-modal-meta {
+    max-height: 35vh;
+    padding: 12px;
+    font-size: 0.75rem;
+  }
+
+  .review-upload-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .review-upload-item img {
+    height: 80px;
+  }
+
+  .review-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .review-actions .btn {
+    width: 100%;
+  }
+
+  .review-modal-header {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+
+  .review-modal-header h3 {
+    font-size: 0.95rem;
+  }
+
+  .ftr {
+    padding: 24px 0;
+    margin-top: 40px;
+  }
+
+  .ftr-links {
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .ftr-links a {
+    font-size: 0.7rem;
+    letter-spacing: 1.2px;
+  }
+
+  .ftr-copy {
+    font-size: 0.65rem;
+  }
+
+  .fg {
+    margin-bottom: 12px;
+  }
+
+  .fl {
+    font-size: 0.75rem;
+  }
+
+  .fi,
+  .fta,
+  .fse {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+  }
+
+  .fta {
+    min-height: 100px;
+  }
+
+  .create-cta {
+    padding: 24px 16px;
+    border-radius: 10px;
+  }
+
+  .create-cta h2 {
+    font-size: 1.15rem;
+    letter-spacing: 1.8px;
+  }
+
+  .create-cta p {
+    font-size: 0.8rem;
+  }
+
+  .upload-zone {
+    padding: 16px;
+    border-radius: 8px;
+  }
+
+  .upload-zone .uz-icon {
+    font-size: 1.5rem;
+  }
+
+  .upload-zone .uz-text {
+    font-size: 0.75rem;
+  }
+
+  .img-item {
+    padding: 6px 10px;
+    gap: 8px;
+    font-size: 0.7rem;
+  }
+
+  .img-item img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .status {
+    padding: 2px 8px;
+    font-size: 0.6rem;
+  }
+
+  .my-sub-row {
+    padding: 10px 0;
+    gap: 8px;
+  }
+
+  .my-sub-title {
+    font-size: 0.8rem;
+  }
+
+  .my-sub-meta {
+    font-size: 0.65rem;
+  }
+
+  .mode-selector {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .mode-btn {
+    padding: 18px 16px;
+    border-radius: 8px;
+  }
+
+  .mode-icon {
+    font-size: 1.5rem;
+  }
+
+  .mode-label {
+    font-size: 0.95rem;
+    letter-spacing: 1.2px;
+  }
+
+  .mode-desc {
+    font-size: 0.7rem;
+  }
+
+  .tpl-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .tpl-card {
+    padding: 14px;
+    border-radius: 8px;
+  }
+
+  .tpl-icon {
+    font-size: 1.3rem;
+  }
+
+  .tpl-name {
+    font-size: 0.75rem;
+  }
+
+  .tpl-desc {
+    font-size: 0.6rem;
+  }
+
+  .create-hero {
+    padding: 24px 16px 20px;
+  }
+
+  .create-hero h1 {
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+  }
+
+  .create-hero p {
+    font-size: 0.8rem;
+  }
+
+  .page-shell {
+    padding: 16px;
+  }
+
+  .page-header {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    letter-spacing: 2px;
+  }
+
+  .page-subtitle {
+    font-size: 0.75rem;
+    letter-spacing: 1.2px;
+  }
+
+  .page-section {
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .g2,
+  .g3 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .doc-wrap {
+    padding: 16px !important;
+    margin: 16px 10px !important;
+  }
+
+  .doc-hdr h1 {
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+  }
+
+  .doc-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .submit-alert-modal {
+    padding: 14px;
+    width: min(100%, 90vw);
+  }
+
+  .submit-alert-body {
+    font-size: 0.8rem;
+  }
+
+  .auth-box {
+    width: calc(100% - 32px);
+    max-width: 360px;
+    padding: 24px;
+  }
+
+  .auth-box h2 {
+    font-size: 1.1rem;
+  }
+
+  .profile-card {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .file-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .file-tile {
+    min-height: 80px;
+    font-size: 0.75rem;
+  }
+
+  .tag-picker-tools {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tag-option {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Global mobile (480px and below) */
+@media (max-width: 480px) {
+  .wrap {
+    padding: 10px;
+  }
+
+  .section {
+    padding: 14px 12px;
+    margin-bottom: 24px;
+  }
+
+  .section-hd {
+    font-size: 0.95rem;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    letter-spacing: 1.2px;
+    margin-bottom: 16px;
+  }
+
+  h2 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+
+  h3 {
+    font-size: 0.95rem;
+  }
+
+  .btn {
+    padding: 10px 14px;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+  }
+
+  .btn-sm {
+    padding: 6px 10px;
+    font-size: 0.65rem;
+  }
+
+  .hdr {
+    padding: 10px 0;
+  }
+
+  .hdr-in {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .hdr-brand {
+    gap: 8px;
+  }
+
+  .hdr-logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .hdr-title {
+    font-size: 0.85rem;
+    letter-spacing: 0.8px;
+  }
+
+  .nav {
+    gap: 10px;
+  }
+
+  .nav a {
+    font-size: 0.75rem;
+    padding: 8px 0;
+  }
+
+  .nav-btn {
+    font-size: 0.65rem;
+    min-height: 40px;
+    padding: 8px 10px;
+  }
+
+  .intro {
+    padding: 0 8px 24px;
+    margin-bottom: 24px;
+  }
+
+  .intro-hero {
+    padding: 24px 10px 16px;
+  }
+
+  .intro-logo {
+    width: 100px;
+    height: 100px;
+  }
+
+  .intro-t {
+    font-size: 1.15rem;
+    letter-spacing: 1px;
+  }
+
+  .intro-cl {
+    font-size: 0.5rem;
+    letter-spacing: 1px;
+  }
+
+  .intro-sub {
+    font-size: 0.8rem;
+  }
+
+  .intro-r {
+    margin: 16px auto;
+  }
+
+  .legacy-block {
+    padding: 16px 10px;
+    margin-bottom: 20px;
+  }
+
+  .legacy-title {
+    font-size: 1.05rem;
+    letter-spacing: 1px;
+  }
+
+  .legacy-copy {
+    font-size: 0.75rem;
+  }
+
+  .legacy-actions {
+    gap: 6px;
+  }
+
+  .warn {
+    padding: 20px 12px;
+    margin-bottom: 24px;
+  }
+
+  .warn h2 {
+    font-size: 1rem;
+    letter-spacing: 1px;
+  }
+
+  .warn .bgrp {
+    gap: 8px;
+  }
+
+  .carousel-view {
+    height: 240px;
+  }
+
+  .carousel-btn {
+    width: 36px;
+    height: 50px;
+    font-size: 1.2rem;
+  }
+
+  .carousel-label {
+    font-size: 0.9rem;
+    padding: 10px 6px;
+    min-height: 50px;
+  }
+
+  .carousel-dots {
+    gap: 6px;
+    padding: 8px 0 16px;
+  }
+
+  .carousel-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .card {
+    padding: 10px;
+    border-radius: 6px;
+  }
+
+  .card-t {
+    font-size: 0.85rem;
+  }
+
+  .card-b {
+    font-size: 0.75rem;
+  }
+
+  .news-item {
+    padding: 8px 0;
+  }
+
+  .news-dt {
+    font-size: 0.65rem;
+  }
+
+  .news-tt {
+    font-size: 0.8rem;
+  }
+
+  .news-bd {
+    font-size: 0.75rem;
+  }
+
+  .newest-row {
+    padding: 6px 0;
+    gap: 3px;
+  }
+
+  .page-viewer-header {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .page-viewer-title {
+    font-size: 1.1rem;
+  }
+
+  .page-viewer-frame {
+    min-height: 55vh;
+    min-height: 55svh;
+  }
+
+  .preview-frame {
+    min-height: 55vh;
+    min-height: 55svh;
+  }
+
+  .preview-header {
+    padding: 8px;
+    gap: 4px;
+  }
+
+  .submit-bar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .submit-bar .btn {
+    min-height: 40px;
+    padding: 8px 10px;
+    font-size: 0.7rem;
+  }
+
+  .editor-wrap {
+    gap: 10px;
+  }
+
+  .editor-pane textarea {
+    min-height: 120px;
+    font-size: 0.7rem;
+    padding: 10px 12px;
+  }
+
+  .editor-label {
+    font-size: 0.8rem;
+    gap: 6px;
+  }
+
+  .adm-side {
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .adm-side a {
+    padding: 8px 10px;
+    font-size: 0.7rem;
+  }
+
+  .adm-main {
+    padding: 10px;
+  }
+
+  .adm-tbl {
+    font-size: 0.7rem;
+  }
+
+  .adm-tbl th,
+  .adm-tbl td {
+    padding: 6px 8px;
+  }
+
+  .review-modal {
+    padding: 6px;
+  }
+
+  .review-modal-header {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+  }
+
+  .review-modal-header h3 {
+    font-size: 0.9rem;
+  }
+
+  .review-modal-preview {
+    min-height: 45vh;
+    height: 45vh;
+  }
+
+  .review-modal-meta {
+    max-height: 32vh;
+    padding: 10px;
+    font-size: 0.7rem;
+  }
+
+  .review-upload-grid {
+    gap: 4px;
+  }
+
+  .review-upload-item img {
+    height: 70px;
+  }
+
+  .review-actions {
+    gap: 6px;
+  }
+
+  .review-actions .btn {
+    padding: 8px 12px;
+    font-size: 0.7rem;
+  }
+
+  .ftr {
+    padding: 18px 0;
+    margin-top: 32px;
+  }
+
+  .ftr-in {
+    padding: 0 10px;
+  }
+
+  .ftr-links {
+    gap: 12px;
+  }
+
+  .ftr-links a {
+    font-size: 0.65rem;
+    letter-spacing: 0.8px;
+  }
+
+  .ftr-copy {
+    font-size: 0.6rem;
+    line-height: 1.6;
+  }
+
+  .fg {
+    margin-bottom: 10px;
+  }
+
+  .fl {
+    font-size: 0.7rem;
+    margin-bottom: 3px;
+  }
+
+  .fi,
+  .fta,
+  .fse {
+    padding: 8px 10px;
+    font-size: 0.75rem;
+    min-height: 40px;
+  }
+
+  .fta {
+    min-height: 90px;
+  }
+
+  .create-cta {
+    padding: 18px 12px;
+    margin-bottom: 32px;
+  }
+
+  .create-cta h2 {
+    font-size: 1.05rem;
+    letter-spacing: 1px;
+  }
+
+  .create-cta p {
+    font-size: 0.75rem;
+  }
+
+  .create-hero {
+    padding: 18px 12px 16px;
+  }
+
+  .create-hero h1 {
+    font-size: 1.2rem;
+    letter-spacing: 1.2px;
+  }
+
+  .create-hero p {
+    font-size: 0.75rem;
+  }
+
+  .mode-selector {
+    gap: 10px;
+  }
+
+  .mode-btn {
+    padding: 16px 12px;
+    border-radius: 6px;
+  }
+
+  .mode-icon {
+    font-size: 1.3rem;
+  }
+
+  .mode-label {
+    font-size: 0.9rem;
+  }
+
+  .mode-desc {
+    font-size: 0.65rem;
+  }
+
+  .tpl-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .tpl-card {
+    padding: 12px;
+    border-radius: 6px;
+  }
+
+  .tpl-icon {
+    font-size: 1.2rem;
+  }
+
+  .tpl-name {
+    font-size: 0.7rem;
+  }
+
+  .tpl-desc {
+    font-size: 0.6rem;
+  }
+
+  .upload-zone {
+    padding: 14px;
+  }
+
+  .upload-zone .uz-icon {
+    font-size: 1.3rem;
+  }
+
+  .upload-zone .uz-text {
+    font-size: 0.7rem;
+  }
+
+  .img-item {
+    padding: 6px 8px;
+    font-size: 0.65rem;
+  }
+
+  .img-item img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .img-item .btn-copy {
+    padding: 2px 8px;
+  }
+
+  .status {
+    padding: 1px 6px;
+    font-size: 0.55rem;
+  }
+
+  .my-sub-row {
+    padding: 8px 0;
+  }
+
+  .my-sub-title {
+    font-size: 0.75rem;
+  }
+
+  .my-sub-meta {
+    font-size: 0.6rem;
+  }
+
+  .page-shell {
+    padding: 12px;
+  }
+
+  .page-header {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .page-title {
+    font-size: 1.3rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.7rem;
+  }
+
+  .page-section {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .doc-wrap {
+    padding: 12px !important;
+    margin: 12px 8px !important;
+  }
+
+  .doc-hdr h1 {
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+  }
+
+  .auth-box {
+    padding: 20px;
+    width: calc(100% - 24px);
+  }
+
+  .auth-box h2 {
+    font-size: 1rem;
+  }
+
+  .submit-alert-modal {
+    padding: 12px;
+  }
+
+  .submit-alert-head {
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+
+  .submit-alert-body {
+    font-size: 0.75rem;
+  }
+
+  .submit-alert-actions {
+    gap: 8px;
+  }
+
+  .submit-alert-actions .btn {
+    padding: 8px 10px;
+    font-size: 0.7rem;
+  }
+
+  .g2,
+  .g3 {
+    gap: 10px;
+  }
+
+  .profile-card {
+    padding: 12px;
+  }
+
+  .file-grid {
+    gap: 6px;
+  }
+
+  .file-tile {
+    min-height: 70px;
+    font-size: 0.7rem;
+  }
+
+  .tag-picker-tools {
+    gap: 6px;
+  }
+
+  .tag-option {
+    padding: 6px 8px;
+    font-size: 0.7rem;
+  }
+}
+
+/* Extra small screens (< 360px) */
+@media (max-width: 360px) {
+  .btn {
+    padding: 8px 10px;
+    font-size: 0.7rem;
+  }
+
+  .section {
+    padding: 12px 10px;
+    margin-bottom: 16px;
+  }
+
+  .carousel-view {
+    height: 200px;
+  }
+
+  .page-viewer-frame,
+  .preview-frame {
+    min-height: 50vh;
+  }
+}
+
+/* ============================================================
    2026 Refinement Pass: Editorial + Operational Polish
    ============================================================ */
 .intro {
