@@ -454,7 +454,7 @@
         <!-- Chief of Moderation -->
         <div class="authority-card">
           <div class="authority-card-title">Chief of Moderation</div>
-          <div class="authority-label">Level 4+</div>
+          <div class="authority-label">Level 5+</div>
           <div class="authority-content">
             Head of all moderation operations and rule enforcement.
           </div>
@@ -548,7 +548,7 @@
         <!-- Chief Administrator -->
         <div class="authority-card">
           <div class="authority-card-title">Chief Administrator</div>
-          <div class="authority-label">Level 6</div>
+          <div class="authority-label">Level 6+</div>
           <div class="authority-content">
             Highest authority below Owner. Full control over system operations.
           </div>
@@ -708,7 +708,7 @@ async function loadApplicationRecord(user) {
       currentApplicationStatus = 'approved';
       document.getElementById('application-not-allowed')?.classList.add('hidden');
       document.getElementById('application-pending')?.classList.add('hidden');
-      document.getElementById('application-form-wrap')?.classList.add('hidden');
+      document.getElementById('application-form-wrap')?.classList.remove('hidden');
       document.getElementById('intro-copy')?.classList.add('hidden');
       document.getElementById('intro-points')?.classList.add('hidden');
       document.getElementById('authority-message')?.classList.remove('hidden');
@@ -718,7 +718,7 @@ async function loadApplicationRecord(user) {
         workshopBtn.textContent = 'Go to Workshop';
       }
       const applyBtn = document.getElementById('apply-btn');
-      if (applyBtn) applyBtn.style.display = 'none';
+      if (applyBtn) applyBtn.style.display = 'inline-block';
       const accessState = document.getElementById('application-access-state');
       if (accessState) accessState.textContent = 'Your staff role grants full submission access.';
       setApplicationStatus('Your staff role grants full submission access.', false);
