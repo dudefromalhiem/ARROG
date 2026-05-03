@@ -172,6 +172,41 @@ service cloud.firestore {
         );
     }
 
+    // Contributor revocations must go through server APIs with abuse-rate checks.
+    function isClientContributorRevocation() {
+      let currentRole = ('role' in resource.data && resource.data.role is string)
+        ? resource.data.role
+        : '';
+      let nextRole = ('role' in request.resource.data && request.resource.data.role is string)
+        ? request.resource.data.role
+        : currentRole;
+
+      let currentAccess = ('submissionAccess' in resource.data)
+        ? resource.data.submissionAccess == true
+        : false;
+      let nextAccess = ('submissionAccess' in request.resource.data)
+        ? request.resource.data.submissionAccess == true
+        : currentAccess;
+
+      let currentGranted = ('contributorGranted' in resource.data)
+        ? resource.data.contributorGranted == true
+        : false;
+      let nextGranted = ('contributorGranted' in request.resource.data)
+        ? request.resource.data.contributorGranted == true
+        : currentGranted;
+
+      let nextStatusRevoked = ('submissionAccessStatus' in request.resource.data) &&
+        request.resource.data.submissionAccessStatus == 'revoked';
+      let hasRevokeStamp = ('roleRevokedBy' in request.resource.data) ||
+        ('roleRevokedAt' in request.resource.data);
+
+      return (currentRole == 'contributor' && nextRole == 'user') ||
+        (currentAccess && !nextAccess) ||
+        (currentGranted && !nextGranted) ||
+        nextStatusRevoked ||
+        hasRevokeStamp;
+    }
+
     // Check if the Archivist has delegated a specific permission to admins.
     // Returns true if the config/permissions doc has the given key set to true.
     function adminHasDelegation(permissionKey) {
@@ -193,9 +228,10 @@ service cloud.firestore {
         !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
         hasSafeDisplayName();
       // Allow updates: admins can update everything, users can update safe fields only
-      allow update: if canManageUsersRoles() ||
+      allow update: if (canManageUsersRoles() && !isClientContributorRevocation()) ||
         (canApproveEditorAccessOnUsersDoc() && hasEditorApprovalUpdateFields() &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted'])) ||
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
+         !isClientContributorRevocation()) ||
         (isSelf(userId) &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
          hasSafeDisplayName());
