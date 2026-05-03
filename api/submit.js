@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { ROLES, normalizeRole, isAtLeast } = require('../permissions');
 const MAX_TITLE_LENGTH = 160;
 const MAX_SLUG_LENGTH = 120;
 const MAX_AUTHOR_NAME_LENGTH = 80;
@@ -254,13 +255,17 @@ const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem
 async function resolveActorAccessProfile(db, uid, email) {
   const normalizedEmail = String(email || '').toLowerCase();
   if (BOOTSTRAP_OWNERS.has(normalizedEmail)) {
-    return { role: 'owner', isOwner: true, isAdmin: true, maxClearance: 6 };
+    return { role: ROLES.OWNER, isOwner: true, isAdmin: true, maxClearance: 6 };
   }
 
   let isAdmin = false;
   const userDoc = await db.collection('users').doc(uid).get();
-  if (userDoc.exists && userDoc.data() && userDoc.data().isAdmin === true) {
-    isAdmin = true;
+  if (userDoc.exists && userDoc.data()) {
+    const userData = userDoc.data();
+    const userRole = normalizeRole(userData.role);
+    if (userData.isAdmin === true || isAtLeast(userRole, ROLES.ADMINISTRATOR)) {
+      isAdmin = true;
+    }
   }
 
   const rolesDoc = await db.collection('config').doc('roles').get();
@@ -268,14 +273,14 @@ async function resolveActorAccessProfile(db, uid, email) {
   const isOwner = owners.map(owner => String(owner || '').toLowerCase()).includes(normalizedEmail);
 
   if (isOwner) {
-    return { role: 'owner', isOwner: true, isAdmin: true, maxClearance: 6 };
+    return { role: ROLES.OWNER, isOwner: true, isAdmin: true, maxClearance: 6 };
   }
 
   if (isAdmin) {
-    return { role: 'admin', isOwner: false, isAdmin: true, maxClearance: 5 };
+    return { role: ROLES.ADMINISTRATOR, isOwner: false, isAdmin: true, maxClearance: 5 };
   }
 
-  return { role: 'user', isOwner: false, isAdmin: false, maxClearance: 4 };
+  return { role: ROLES.NEWBIE, isOwner: false, isAdmin: false, maxClearance: 4 };
 }
 
 function stripUndefined(data) {

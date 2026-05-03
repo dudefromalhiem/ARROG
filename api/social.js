@@ -50,12 +50,22 @@ function normalizeApplicationRole(value) {
 
 function roleLabel(role) {
   const normalized = normalizeRole(role);
-  if (normalized === ROLES.CONTRIBUTOR) return 'Contributor';
-  if (normalized === ROLES.MODERATOR) return 'Moderator';
-  if (normalized === ROLES.ADMIN) return 'Admin';
-  if (normalized === ROLES.CHIEF_ADMIN) return 'Chief Admin';
-  if (normalized === ROLES.OWNER) return 'Owner';
-  return 'User';
+  // Use centralized labels from permissions.js
+  const ROLE_LABELS = {
+    [ROLES.NEWBIE]: 'Newbie',
+    [ROLES.SITE_MEMBER]: 'Site Member',
+    [ROLES.CONTRIBUTOR]: 'Contributor',
+    [ROLES.MODERATOR]: 'Moderator',
+    [ROLES.SENIOR_MODERATOR]: 'Senior Moderator',
+    [ROLES.DEPUTY_CHIEF_OF_MODERATION]: 'Deputy Chief of Moderation',
+    [ROLES.CHIEF_OF_MODERATION]: 'Chief of Moderation',
+    [ROLES.ADMINISTRATOR]: 'Administrator',
+    [ROLES.SENIOR_ADMINISTRATOR]: 'Senior Administrator',
+    [ROLES.DEPUTY_CHIEF_ADMINISTRATOR]: 'Deputy Chief Administrator',
+    [ROLES.CHIEF_ADMINISTRATOR]: 'Chief Administrator',
+    [ROLES.OWNER]: 'The Archivist'
+  };
+  return ROLE_LABELS[normalized] || 'Member';
 }
 
 function toPlainValue(value) {
@@ -180,7 +190,7 @@ async function listPublicAdmins(db) {
     const user = userMap.get(email) || {};
     let displayName = normalizeText(user.displayName || email.split('@')[0] || 'Agent', 120);
     const appointedRaw = appointments[email] || user.adminSince || user.lastLogin || null;
-    let role = ownerEmails.includes(email) ? 'Owner' : (adminEmails.includes(email) ? 'Admin' : 'Moderator');
+    let role = ownerEmails.includes(email) ? 'Owner' : (adminEmails.includes(email) ? 'Chief Administrator' : 'Moderator');
 
     if (ownerEmails.includes(email)) {
       displayName = 'The Archivist';
@@ -262,7 +272,7 @@ async function getPublicProfileByUid(db, uid, actor = null) {
     uid: String(data.uid || doc.id || ''),
     displayName: normalizeText(data.displayName || data.email || 'Agent', 120),
     email: String(data.email || '').toLowerCase(),
-    role: String(data.role || 'user'),
+    role: String(data.role || 'newbie'),
     roleName: normalizeText(data.roleName || '', 120),
     bio: normalizeText(data.bio || '', 500),
     photoURL: normalizeText(data.photoURL || '', 1200)
@@ -491,7 +501,7 @@ async function listInbox(db, actor) {
         uid: String(isStaffThread ? 'guild-staff' : peerUid || ''),
         displayName: normalizeText(isStaffThread ? 'Guild Staff Channel' : (peerData.displayName || peerNameFromThread || peerData.email || 'Guild Member'), 120),
         email: String(isStaffThread ? 'guild-staff@redoakerguild.local' : peerData.email || '').toLowerCase(),
-        role: String(isStaffThread ? 'group' : peerData.role || 'user'),
+        role: String(isStaffThread ? 'group' : peerData.role || 'newbie'),
         photoURL: normalizeText(isStaffThread ? 'logo.png' : peerData.photoURL || '', 1200)
       }
     };
@@ -664,7 +674,7 @@ async function getGuildStaffMembers(db, roles) {
       uid: String(user.uid || user.id || ''),
       email,
       displayName: normalizeText(user.displayName || email.split('@')[0] || 'Agent', 120),
-      role: ownerEmails.includes(email) ? 'owner' : (adminEmails.includes(email) ? 'admin' : 'mod')
+      role: ownerEmails.includes(email) ? 'owner' : (adminEmails.includes(email) ? 'chief_administrator' : 'moderator')
     };
   }).filter(member => member.uid);
 }
@@ -922,7 +932,7 @@ async function applyForEditor(db, actor, body, req) {
 
   const userSnap = await db.collection('users').doc(actor.uid).get();
   const userData = userSnap.exists ? (userSnap.data() || {}) : {};
-  const currentRole = normalizeRole(userData.role || 'user');
+  const currentRole = normalizeRole(userData.role || 'newbie');
   if (isAtLeast(currentRole, requestedRole) || userData.submissionAccess === true) {
     return { statusCode: 200, payload: { ok: true, alreadyApproved: true } };
   }
@@ -945,7 +955,7 @@ async function applyForEditor(db, actor, body, req) {
     applicantRole: currentRole,
     roleApplied: requestedRole,
     roleAppliedLabel: roleLabel(requestedRole),
-    allowedRoles: PUBLIC_ROLE_LADDER.filter(role => role !== ROLES.USER),
+    allowedRoles: PUBLIC_ROLE_LADDER.filter(role => role !== ROLES.NEWBIE),
     reason,
     experience,
     status: 'pending',
@@ -1038,8 +1048,8 @@ async function revokeContributor(db, actor, body) {
   if (!targetSnap.exists) return { statusCode: 404, payload: { error: 'Target user not found.' } };
 
   const target = targetSnap.data() || {};
-  const targetRole = normalizeRole(target.role || 'user');
-  if (targetRole !== ROLES.CONTRIBUTOR && targetRole !== ROLES.USER) {
+  const targetRole = normalizeRole(target.role || 'newbie');
+  if (targetRole !== ROLES.CONTRIBUTOR && targetRole !== ROLES.NEWBIE) {
     return { statusCode: 403, payload: { error: 'Only contributor role can be revoked by this action.' } };
   }
 
@@ -1090,8 +1100,8 @@ async function revokeContributor(db, actor, body) {
   });
 
   await targetRef.set({
-    role: ROLES.USER,
-    roleName: roleLabel(ROLES.USER),
+    role: ROLES.NEWBIE,
+    roleName: roleLabel(ROLES.NEWBIE),
     submissionAccess: false,
     submissionAccessStatus: 'revoked',
     contributorGranted: false,
@@ -1143,7 +1153,7 @@ async function listContributors(db, actor) {
   byRole.docs.forEach(doc => map.set(doc.id, { id: doc.id, ...(toPlainValue(doc.data()) || {}) }));
   byAccess.docs.forEach(doc => {
     const data = toPlainValue(doc.data()) || {};
-    const role = normalizeRole(data.role || 'user');
+    const role = normalizeRole(data.role || 'newbie');
     if (role === ROLES.CONTRIBUTOR) {
       map.set(doc.id, { id: doc.id, ...data });
     }
@@ -1185,11 +1195,11 @@ async function assignRole(db, actor, body) {
 
       // Assign into appropriate container
       if (normalized === 'owner') nextOwners.push(email);
-      else if (['chief_admin','admin','junior_admin','senior_admin','deputy-chief-admin'].includes(normalized)) nextAdmins.push(email);
-      else if (['moderator','junior_moderator','senior_mod','chief_mod','deputy-chief-mod','mod'].includes(normalized)) nextMods.push(email);
+      else if (['administrator','senior_administrator','deputy_chief_administrator','chief_administrator'].includes(normalized)) nextAdmins.push(email);
+      else if (['moderator','senior_moderator','deputy_chief_of_moderation','chief_of_moderation'].includes(normalized)) nextMods.push(email);
 
       // Update userRoles map (single role per user)
-      userRoles[email] = normalized === 'user' ? undefined : normalized;
+      userRoles[email] = normalized === 'newbie' ? undefined : normalized;
       if (userRoles[email] === undefined) delete userRoles[email];
 
       tx.set(rolesRef, {

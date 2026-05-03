@@ -663,16 +663,17 @@
 let socialApiBase = '/api/social';
 let currentUser = null;
 let currentApplicationStatus = 'none';
-const APPLICATION_ROLE_ORDER = ['user', 'contributor', 'junior_moderator', 'moderator', 'junior_admin', 'admin', 'chief_admin', 'owner'];
+const APPLICATION_ROLE_ORDER = ['newbie', 'site_member', 'contributor', 'moderator', 'senior_moderator', 'administrator', 'senior_administrator', 'deputy_chief_of_moderation', 'deputy_chief_administrator', 'chief_of_moderation', 'chief_administrator', 'owner'];
 
 function normalizeApplicationRole(value) {
   const role = String(value || '').trim().toLowerCase();
   if (role === 'editor') return 'contributor';
-  if (role === 'mod') return 'moderator';
-  if (role === 'junior-mod') return 'junior_moderator';
-  if (role === 'junior-admin') return 'junior_admin';
-  if (role === 'chief-admin') return 'chief_admin';
-  return role || 'user';
+  if (role === 'mod' || role === 'junior_moderator' || role === 'junior-moderator') return 'moderator';
+  if (role === 'junior_admin' || role === 'junior-admin') return 'administrator';
+  if (role === 'user') return 'newbie';
+  if (role === 'chief-admin' || role === 'chiefadmin' || role === 'chief_admin') return 'chief_administrator';
+  if (role === 'admin') return 'administrator';
+  return role || 'newbie';
 }
 
 function roleRank(role) {
@@ -730,7 +731,7 @@ async function loadApplicationRecord(user) {
     const appDoc = await db.collection('applications').doc(user.uid).get();
     const appData = appDoc.exists ? (appDoc.data() || {}) : {};
     const selectedRole = normalizeApplicationRole(document.getElementById('application-role')?.value || 'contributor');
-    const currentRole = normalizeApplicationRole(userData.role || (userData.submissionAccess ? 'contributor' : 'user'));
+    const currentRole = normalizeApplicationRole(userData.role || (userData.submissionAccess ? 'contributor' : 'newbie'));
     const approved = roleRank(currentRole) >= roleRank(selectedRole);
     const pending = String(appData.status || '').toLowerCase() === 'pending';
 
@@ -791,7 +792,10 @@ async function submitApplication() {
 
   const reason = String(document.getElementById('application-reason')?.value || '').trim();
   const experience = String(document.getElementById('application-experience')?.value || '').trim();
-  const roleApplied = String(document.getElementById('application-role')?.value || 'contributor').trim();
+  let roleApplied = String(document.getElementById('application-role')?.value || 'contributor').trim();
+  // Map UI role names to backend role names
+  if (roleApplied === 'junior_moderator') roleApplied = 'moderator';
+  if (roleApplied === 'junior_admin') roleApplied = 'admin';
   const button = document.getElementById('application-submit-btn');
   if (reason.length < 20) {
     setApplicationStatus('Please write at least 20 characters in your application.', true);

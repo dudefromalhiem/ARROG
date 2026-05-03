@@ -1,65 +1,121 @@
 /**
  * Unified role ladder and permissions for Red Oaker Guild.
- * Public ladder ends at chief_admin. owner is internal-only and absolute.
+ * Three-branch system: Member/Contributor, Moderation, Administrative
+ * Public ladder ends at chief_administrator. owner is internal-only and absolute.
  */
 
 const ROLES = {
-  USER: 'user',
-  CONTRIBUTOR: 'contributor',
-  MODERATOR: 'moderator',
-  ADMIN: 'admin',
-  CHIEF_ADMIN: 'chief_admin',
-  OWNER: 'owner'
+  // Member/Contributor Branch
+  NEWBIE: 'newbie',                                    // Level 2
+  SITE_MEMBER: 'site_member',                          // Level 3
+  CONTRIBUTOR: 'contributor',                          // Level 4 — Entry into active participation
+
+  // Moderation Branch
+  MODERATOR: 'moderator',                              // Level 4+ — Frontline enforcement
+  SENIOR_MODERATOR: 'senior_moderator',                // Level 5 — Experienced moderation authority
+  DEPUTY_CHIEF_OF_MODERATION: 'deputy_chief_of_moderation', // Level 5 — Second-in-command
+  CHIEF_OF_MODERATION: 'chief_of_moderation',          // Level 4+ — Head of moderation
+
+  // Administrative Branch
+  ADMINISTRATOR: 'administrator',                      // Level 5 — Core operational staff
+  SENIOR_ADMINISTRATOR: 'senior_administrator',        // Level 5+ — Oversees major site sections
+  DEPUTY_CHIEF_ADMINISTRATOR: 'deputy_chief_administrator', // Level 6 — Second-in-command
+  CHIEF_ADMINISTRATOR: 'chief_administrator',          // Level 6 — Highest authority below Owner
+
+  // Owner (internal-only)
+  OWNER: 'owner'                                       // Level [REDACTED] — The Archivist
 };
 
+// Defines the rank order: determines permissions via isAtLeast()
 const PUBLIC_ROLE_LADDER = [
-  ROLES.USER,
+  ROLES.NEWBIE,
+  ROLES.SITE_MEMBER,
   ROLES.CONTRIBUTOR,
   ROLES.MODERATOR,
-  ROLES.ADMIN,
-  ROLES.CHIEF_ADMIN
+  ROLES.SENIOR_MODERATOR,
+  ROLES.ADMINISTRATOR,
+  ROLES.SENIOR_ADMINISTRATOR,
+  ROLES.DEPUTY_CHIEF_OF_MODERATION,
+  ROLES.DEPUTY_CHIEF_ADMINISTRATOR,
+  ROLES.CHIEF_OF_MODERATION,
+  ROLES.CHIEF_ADMINISTRATOR
 ];
 
 const ALL_ROLES = [...PUBLIC_ROLE_LADDER, ROLES.OWNER];
 
 const ROLE_LABELS = {
-  [ROLES.USER]: 'User',
+  [ROLES.NEWBIE]: 'Newbie',
+  [ROLES.SITE_MEMBER]: 'Site Member',
   [ROLES.CONTRIBUTOR]: 'Contributor',
   [ROLES.MODERATOR]: 'Moderator',
-  [ROLES.ADMIN]: 'Admin',
-  [ROLES.CHIEF_ADMIN]: 'Chief Admin',
+  [ROLES.SENIOR_MODERATOR]: 'Senior Moderator',
+  [ROLES.DEPUTY_CHIEF_OF_MODERATION]: 'Deputy Chief of Moderation',
+  [ROLES.CHIEF_OF_MODERATION]: 'Chief of Moderation',
+  [ROLES.ADMINISTRATOR]: 'Administrator',
+  [ROLES.SENIOR_ADMINISTRATOR]: 'Senior Administrator',
+  [ROLES.DEPUTY_CHIEF_ADMINISTRATOR]: 'Deputy Chief Administrator',
+  [ROLES.CHIEF_ADMINISTRATOR]: 'Chief Administrator',
   [ROLES.OWNER]: 'The Archivist'
 };
 
 const PERMISSIONS = {
-  viewContent: { role: ROLES.USER, description: 'View public content' },
-  comment: { role: ROLES.USER, description: 'Post comments and interact with content' },
-  interact: { role: ROLES.USER, description: 'Like, share, and engage with content' },
+  // User/Member permissions
+  viewContent: { role: ROLES.NEWBIE, description: 'View public content' },
+  comment: { role: ROLES.SITE_MEMBER, description: 'Post comments and interact with content' },
+  interact: { role: ROLES.SITE_MEMBER, description: 'Like, share, and engage with content' },
+  reportContent: { role: ROLES.SITE_MEMBER, description: 'Report inappropriate content' },
 
+  // Contributor permissions
   createPages: { role: ROLES.CONTRIBUTOR, description: 'Create and submit content' },
   editOwnPages: { role: ROLES.CONTRIBUTOR, description: 'Edit own content' },
+  editRegistryPages: { role: ROLES.CONTRIBUTOR, description: 'Edit registry pages' },
 
-  reviewSubmissions: { role: ROLES.MODERATOR, description: 'Review submissions in moderation queue' },
-  moderateContent: { role: ROLES.MODERATOR, description: 'Moderate content and enforce rules' },
-  handleReports: { role: ROLES.MODERATOR, description: 'Handle reports in limited scope' },
-  revokeContributor: { role: ROLES.MODERATOR, description: 'Revoke contributor role' },
+  // Moderation permissions (Moderator level and above)
+  moderateContent: { role: ROLES.MODERATOR, description: 'Remove inappropriate content' },
+  warnUsers: { role: ROLES.MODERATOR, description: 'Warn users for violations' },
+  handleReports: { role: ROLES.MODERATOR, description: 'Handle and manage reports' },
+  escalateIssues: { role: ROLES.MODERATOR, description: 'Escalate serious issues' },
+  handleComplexDisputes: { role: ROLES.SENIOR_MODERATOR, description: 'Handle complex disputes' },
+  restrictContributors: { role: ROLES.SENIOR_MODERATOR, description: 'Temporarily restrict contributors (up to 2 months)' },
+  guideJuniorModerators: { role: ROLES.SENIOR_MODERATOR, description: 'Guide junior moderators' },
+  overseeModeratorPerformance: { role: ROLES.DEPUTY_CHIEF_OF_MODERATION, description: 'Oversee moderator performance' },
+  promoteModerationStaff: { role: ROLES.CHIEF_OF_MODERATION, description: 'Promote moderation staff' },
+  defineEnforcementStandards: { role: ROLES.CHIEF_OF_MODERATION, description: 'Define enforcement standards' },
 
-  manageApplications: { role: ROLES.ADMIN, description: 'Approve or reject role applications' },
-  manageUsers: { role: ROLES.ADMIN, description: 'Manage users within policy limits' },
-  manageReports: { role: ROLES.ADMIN, description: 'Manage reports and escalations' },
-
-  overrideAdminDecisions: { role: ROLES.CHIEF_ADMIN, description: 'Override admin decisions' },
-  manageHighLevelRoles: { role: ROLES.CHIEF_ADMIN, description: 'Manage all non-owner roles' },
-  systemAdmin: { role: ROLES.CHIEF_ADMIN, description: 'System administration and moderation control' }
+  // Administrative permissions (Administrator level and above)
+  editAndApprovPages: { role: ROLES.ADMINISTRATOR, description: 'Edit and approve pages' },
+  manageUsers: { role: ROLES.ADMINISTRATOR, description: 'Manage users (with report logs)' },
+  enforcRules: { role: ROLES.ADMINISTRATOR, description: 'Enforce rules alongside moderators' },
+  approveMajorChanges: { role: ROLES.SENIOR_ADMINISTRATOR, description: 'Approve major structural changes' },
+  superviseAdmins: { role: ROLES.SENIOR_ADMINISTRATOR, description: 'Supervise admins and moderation leadership' },
+  banUsers: { role: ROLES.SENIOR_ADMINISTRATOR, description: 'Ban users (with evidence)' },
+  demoteAdmins: { role: ROLES.SENIOR_ADMINISTRATOR, description: 'Demote other admins' },
+  handleAdminEscalations: { role: ROLES.DEPUTY_CHIEF_ADMINISTRATOR, description: 'Handle escalations and act in place of Chief Admin' },
+  removeContributorsIndependently: { role: ROLES.DEPUTY_CHIEF_ADMINISTRATOR, description: 'Remove contributors independently' },
+  demoteModerationRanks: { role: ROLES.DEPUTY_CHIEF_ADMINISTRATOR, description: 'Demote moderation ranks below Deputy Chief' },
+  promoteUsers: { role: ROLES.DEPUTY_CHIEF_ADMINISTRATOR, description: 'Promote users' },
+  finalDisputes: { role: ROLES.CHIEF_ADMINISTRATOR, description: 'Final decisions on disputes and bans' },
+  systemWidePolicy: { role: ROLES.CHIEF_ADMINISTRATOR, description: 'System-wide policy control' },
+  permissionManagement: { role: ROLES.CHIEF_ADMINISTRATOR, description: 'Permission management' },
+  structuralOversight: { role: ROLES.CHIEF_ADMINISTRATOR, description: 'Structural oversight' }
 };
 
 function normalizeRole(value) {
   const role = String(value || '').trim().toLowerCase();
-  if (!role) return ROLES.USER;
+  if (!role) return ROLES.NEWBIE;
+  
+  // Legacy mappings for old role names
+  if (role === 'user') return ROLES.NEWBIE;
   if (role === 'editor') return ROLES.CONTRIBUTOR;
   if (role === 'mod') return ROLES.MODERATOR;
-  if (role === 'chief-admin' || role === 'chiefadmin') return ROLES.CHIEF_ADMIN;
-  return ALL_ROLES.includes(role) ? role : ROLES.USER;
+  if (role === 'junior_moderator') return ROLES.MODERATOR;
+  if (role === 'junior-moderator') return ROLES.MODERATOR;
+  if (role === 'junior_admin' || role === 'junior-admin') return ROLES.ADMINISTRATOR;
+  if (role === 'admin') return ROLES.ADMINISTRATOR;
+  if (role === 'chief-admin' || role === 'chiefadmin' || role === 'chief_admin') return ROLES.CHIEF_ADMINISTRATOR;
+  
+  // All other roles
+  return ALL_ROLES.includes(role) ? role : ROLES.NEWBIE;
 }
 
 function roleRank(role) {
@@ -182,8 +238,13 @@ function getValidRoleNames(level) {
 
 function canApplyForRole(role) {
   const normalized = normalizeRole(role);
-  // Chief Admin is appointment-only, not available via application
-  const APPLICABLE_ROLES = [ROLES.CONTRIBUTOR, ROLES.MODERATOR, ROLES.ADMIN];
+  // Only these roles can be applied for via the application form
+  // Higher ranks (Senior, Deputy Chief, Chief) are promoted by staff, not applied for
+  const APPLICABLE_ROLES = [
+    ROLES.CONTRIBUTOR,
+    ROLES.MODERATOR,
+    ROLES.ADMINISTRATOR
+  ];
   return APPLICABLE_ROLES.includes(normalized);
 }
 

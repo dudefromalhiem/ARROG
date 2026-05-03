@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { ROLES, normalizeRole, isAtLeast } = require('../permissions');
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -56,7 +57,8 @@ async function isAdminUser(db, uid, email) {
 
   if (userDoc.exists) {
     const userData = userDoc.data() || {};
-    if (userData.isAdmin === true || userData.role === 'admin' || userData.role === 'owner') {
+    const userRole = normalizeRole(userData.role);
+    if (userData.isAdmin === true || isAtLeast(userRole, ROLES.ADMINISTRATOR) || userRole === ROLES.OWNER) {
       return true;
     }
   }
