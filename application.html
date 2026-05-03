@@ -144,10 +144,9 @@
       <div class="app-title">Apply to Contribute to the Red Oaker Guild</div>
       <p class="app-copy">Use this form to apply for a role in the Guild ladder: Contributor, Moderator, or Admin. Chief Admin and higher roles are appointment-only. Applications are reviewed manually by staff.</p>
       <div class="app-list">
-        <div class="app-point"><strong>Contributor:</strong> create and edit your own submissions, upload media, and contribute archive entries.</div>
-        <div class="app-point"><strong>Moderator:</strong> includes Contributor powers, plus submission review and report handling in moderation scope.</div>
-        <div class="app-point"><strong>Admin:</strong> includes Moderator powers, plus application decisions, user management, and full report handling.</div>
-        <div class="app-point"><strong>Chief Admin:</strong> appointment-only. Includes Admin powers with override authority for non-owner decisions.</div>
+        <div class="app-point"><strong>Contributor:</strong> Create and edit your own archive entries and media.</div>
+        <div class="app-point"><strong>Junior Moderator:</strong> Review and manage user submissions and basic reports.</div>
+        <div class="app-point"><strong>Junior Admin:</strong> Handle user applications, advanced reports, and community governance.</div>
       </div>
       <div class="app-actions">
         <a class="btn btn-p" href="submit.html" id="go-workshop-btn">Go to Workshop</a>
@@ -158,10 +157,9 @@
     <div class="app-panel">
       <div class="app-kicker">Access Summary</div>
       <div class="app-list">
-        <div class="app-point"><strong>User:</strong> browse, comment, and message.</div>
-        <div class="app-point"><strong>Contributor:</strong> submit and edit own content.</div>
-        <div class="app-point"><strong>Moderator:</strong> review submissions and triage reports.</div>
-        <div class="app-point"><strong>Admin / Chief Admin:</strong> role governance, user management, and full report actions.</div>
+        <div class="app-point"><strong>User:</strong> Browse, comment, and message other users.</div>
+        <div class="app-point"><strong>Contributor:</strong> Submit and edit your own content.</div>
+        <div class="app-point"><strong>Staff Roles:</strong> Help maintain the archive and govern the community. Full staff hierarchy can be viewed on the Staff page.</div>
       </div>
       <div class="app-status" id="application-access-state">Checking your account...</div>
     </div>
@@ -181,8 +179,8 @@
           <label class="fl" for="application-role">Role you are applying for</label>
           <select class="fi" id="application-role">
             <option value="contributor">Contributor</option>
-            <option value="moderator">Moderator</option>
-            <option value="admin">Admin</option>
+            <option value="junior_moderator">Junior Moderator</option>
+            <option value="junior_admin">Junior Admin</option>
           </select>
         </div>
         <div class="fg">
@@ -225,12 +223,14 @@
 let socialApiBase = '/api/social';
 let currentUser = null;
 let currentApplicationStatus = 'none';
-const APPLICATION_ROLE_ORDER = ['user', 'contributor', 'moderator', 'admin', 'chief_admin', 'owner'];
+const APPLICATION_ROLE_ORDER = ['user', 'contributor', 'junior_moderator', 'moderator', 'junior_admin', 'admin', 'chief_admin', 'owner'];
 
 function normalizeApplicationRole(value) {
   const role = String(value || '').trim().toLowerCase();
   if (role === 'editor') return 'contributor';
   if (role === 'mod') return 'moderator';
+  if (role === 'junior-mod') return 'junior_moderator';
+  if (role === 'junior-admin') return 'junior_admin';
   if (role === 'chief-admin') return 'chief_admin';
   return role || 'user';
 }

@@ -178,9 +178,15 @@ async function listPublicAdmins(db) {
 
   return allAuthorities.map(email => {
     const user = userMap.get(email) || {};
-    const displayName = normalizeText(user.displayName || email.split('@')[0] || 'Agent', 120);
+    let displayName = normalizeText(user.displayName || email.split('@')[0] || 'Agent', 120);
     const appointedRaw = appointments[email] || user.adminSince || user.lastLogin || null;
-    const role = ownerEmails.includes(email) ? 'Owner' : (adminEmails.includes(email) ? 'Admin' : 'Moderator');
+    let role = ownerEmails.includes(email) ? 'Owner' : (adminEmails.includes(email) ? 'Admin' : 'Moderator');
+
+    if (ownerEmails.includes(email)) {
+      displayName = 'The Archivist';
+      role = 'The Archivist';
+    }
+
     return {
       uid: String(user.uid || user.id || ''),
       displayName,
@@ -236,7 +242,7 @@ async function searchUsers(db, queryText) {
     .filter(user => user.uid);
 }
 
-async function getPublicProfileByUid(db, uid) {
+async function getPublicProfileByUid(db, uid, actor = null) {
   const targetUid = normalizeText(uid || '', 128);
   if (!targetUid) {
     const err = new Error('Missing target user.');
@@ -252,7 +258,7 @@ async function getPublicProfileByUid(db, uid) {
   }
 
   const data = doc.data() || {};
-  return {
+  let profile = {
     uid: String(data.uid || doc.id || ''),
     displayName: normalizeText(data.displayName || data.email || 'Agent', 120),
     email: String(data.email || '').toLowerCase(),
@@ -261,6 +267,34 @@ async function getPublicProfileByUid(db, uid) {
     bio: normalizeText(data.bio || '', 500),
     photoURL: normalizeText(data.photoURL || '', 1200)
   };
+
+  const roles = await getRolesData(db);
+  const targetIsOwner = isOwnerEmail(profile.email, roles);
+
+  if (targetIsOwner) {
+    profile.displayName = 'The Archivist';
+    profile.roleName = 'The Archivist';
+
+    let isFriend = false;
+    let isStaff = false;
+    let isSelf = false;
+
+    if (actor) {
+      isSelf = actor.uid === profile.uid;
+      isStaff = isAdminEmail(actor.email, roles) || isModeratorEmail(actor.email, roles);
+      const requestState = await getFriendRequestDoc(db, actor.uid, profile.uid);
+      isFriend = isAcceptedFriendRequest(requestState.data);
+    }
+
+    if (!isSelf && !isFriend) {
+      profile.email = '[Redacted]';
+      profile.role = '[Redacted]';
+      profile.bio = '[Redacted]';
+      profile.photoURL = '';
+    }
+  }
+
+  return profile;
 }
 
 async function checkBlock(db, blockerUid, blockedUid) {
@@ -299,14 +333,6 @@ async function ensureThreadAccess(db, actor, recipient, roles) {
   const recipientIsOwner = isOwnerEmail(recipient.email, roles);
   const senderIsOwner = isOwnerEmail(actor.email, roles);
   const senderIsAdmin = isAdminEmail(actor.email, roles);
-
-  if (recipientIsOwner && !senderIsOwner && !senderIsAdmin) {
-    if (!thread.exists || thread.data.ownerConversationOpen !== true) {
-      const err = new Error('Only admins can message the Archivist unless the Archivist opens the conversation first.');
-      err.statusCode = 403;
-      throw err;
-    }
-  }
 
   return { thread, recipientIsOwner, senderIsOwner, senderIsAdmin };
 }
@@ -350,10 +376,23 @@ async function sendMessage(db, actor, body) {
 
   const requestState = await getFriendRequestDoc(db, actor.uid, recipientUid);
   const senderIsAdmin = isAdminEmail(actor.email, roles);
+  const senderIsMod = isModeratorEmail(actor.email, roles);
+
+  const recipientIsOwner = isOwnerEmail(String(recipient.email || ''), roles);
   const recipientIsAdmin = isAdminEmail(String(recipient.email || ''), roles);
-  const canBypassFriendGate = senderIsAdmin || recipientIsAdmin;
+  const recipientIsMod = isModeratorEmail(String(recipient.email || ''), roles);
+
+  let canBypassFriendGate = false;
+  if (recipientIsOwner) {
+    canBypassFriendGate = senderIsAdmin;
+  } else if (recipientIsMod) {
+    canBypassFriendGate = true;
+  } else {
+    canBypassFriendGate = senderIsMod;
+  }
+
   if (!canBypassFriendGate && !isAcceptedFriendRequest(requestState.data)) {
-    return { statusCode: 403, payload: { error: 'Friend request must be accepted before messaging.' } };
+    return { statusCode: 403, payload: { error: recipientIsOwner ? 'You must have an accepted friend request to message The Archivist.' : 'Friend request must be accepted before messaging.' } };
   }
 
   if (isGuildStaffChannel) {
@@ -1032,7 +1071,13 @@ module.exports = async function handler(req, res) {
     }
 
     if (method === 'GET' && type === 'profile') {
-      const profile = await getPublicProfileByUid(db, req.query?.uid || '');
+      let actor = null;
+      try {
+        actor = await verifyUser(req);
+      } catch (e) {
+        // Continue unauthenticated
+      }
+      const profile = await getPublicProfileByUid(db, req.query?.uid || '', actor);
       return sendJson(res, 200, { profile });
     }
 

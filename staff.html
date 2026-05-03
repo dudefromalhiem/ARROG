@@ -56,6 +56,18 @@
     <div class="g2" id="admin-roster-grid"></div>
   </section>
 
+  <section class="section" style="margin-bottom:24px; border-top: 1px solid var(--drk-b); padding-top: 16px;">
+    <div style="font-size:.9rem; font-weight:600; color:var(--wht-f); margin-bottom:8px">Hierarchy Overview</div>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:.75rem; color:var(--wht-m);">
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>The Archivist:</strong> Owner</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Chief Admin:</strong> Executives</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Admin:</strong> Senior Staff</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Junior Admin:</strong> Governance</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Moderator:</strong> Review & Report</div>
+      <div style="background:var(--drk-m); padding:6px 10px; border-radius:4px;"><strong>Junior Mod:</strong> Basic Review</div>
+    </div>
+  </section>
+
   <section class="section">
     <div class="section-hd">Need Support?</div>
     <p style="font-size:.85rem;color:var(--wht-m);line-height:1.7;margin-bottom:16px">
@@ -167,7 +179,7 @@ function loadAdminRoster() {
         rolesReady.then(function () {
           var items = [];
           (ROLE_DATA.owners || []).forEach(function (email) {
-            items.push({ uid: '', displayName: email.split('@')[0] || 'Owner', role: 'Owner', appointedAt: null });
+            items.push({ uid: '', displayName: email.split('@')[0] || 'The Archivist', role: 'The Archivist', appointedAt: null });
           });
           (ROLE_DATA.admins || []).forEach(function (email) {
             var roleName = (ROLE_DATA.userRoles && ROLE_DATA.userRoles[email]) || 'admin';

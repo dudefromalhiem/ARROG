@@ -28,7 +28,7 @@ const ROLE_LABELS = {
   [ROLES.MODERATOR]: 'Moderator',
   [ROLES.ADMIN]: 'Admin',
   [ROLES.CHIEF_ADMIN]: 'Chief Admin',
-  [ROLES.OWNER]: 'Owner'
+  [ROLES.OWNER]: 'The Archivist'
 };
 
 const PERMISSIONS = {

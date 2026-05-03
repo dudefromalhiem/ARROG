@@ -245,7 +245,7 @@ async function loadProfile(user) {
     username.value = data.displayName || user.displayName || '';
     bio.value = data.bio || '';
     avatar.src = data.photoURL || user.photoURL || 'logo.png';
-    document.getElementById('profile-role').textContent = 'Role: ' + (data.roleName || data.role || (isOwner(user.email) ? 'Owner' : isAdmin(user.email) ? 'Admin' : isModerator(user.email) ? 'Moderator' : 'User'));
+    document.getElementById('profile-role').textContent = 'Role: ' + (data.roleName || data.role || (isOwner(user.email) ? 'The Archivist' : isAdmin(user.email) ? 'Admin' : isModerator(user.email) ? 'Moderator' : 'User'));
     setProfileStatus('Profile loaded.', false);
   } catch (err) {
     setProfileStatus('Could not load profile: ' + err.message, true);

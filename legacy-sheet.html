@@ -390,7 +390,7 @@
   <article class="legacy-sheet" id="legacy-sheet-view"></article>
 
   <section class="legacy-editor" id="legacy-editor">
-    <div class="section-hd" style="font-size:1rem">Owner Editing</div>
+    <div class="section-hd" style="font-size:1rem">Archivist Editing</div>
 
     <div class="fg">
       <label class="fl" for="legacy-title">Sheet Title</label>
@@ -413,13 +413,13 @@
         <textarea class="fta" id="legacy-foundation"></textarea>
       </div>
       <div class="fg">
-        <label class="fl" for="legacy-prior">Prior Owners</label>
+        <label class="fl" for="legacy-prior">Prior Archivists</label>
         <textarea class="fta" id="legacy-prior"></textarea>
       </div>
     </div>
 
     <div class="fg">
-      <label class="fl" for="legacy-current">Current Owner Mandate</label>
+      <label class="fl" for="legacy-current">Current Archivist Mandate</label>
       <textarea class="fta" id="legacy-current"></textarea>
     </div>
 
@@ -840,7 +840,7 @@
 
   function bulkUpdateClearance() {
     if (!ownerCanEdit) {
-      alert('Owner authorization required.');
+      alert('Archivist authorization required.');
       return;
     }
     if (selectedEntries.size === 0) {
@@ -863,7 +863,7 @@
 
   function bulkDeleteEntries() {
     if (!ownerCanEdit) {
-      alert('Owner authorization required.');
+      alert('Archivist authorization required.');
       return;
     }
     if (selectedEntries.size === 0) {
@@ -971,7 +971,7 @@
       ? '<section class="chapter" style="margin-top:22px">' +
           '<div class="chapter-head">' +
             '<h2 class="chapter-title">Archived History</h2>' +
-            '<div class="chapter-meta"><span class="chapter-chip">Dynamic Legacy Linkage</span><span class="chapter-chip">Contradicting first owner/admin Legacy records are false</span></div>' +
+            '<div class="chapter-meta"><span class="chapter-chip">Dynamic Legacy Linkage</span><span class="chapter-chip">Contradicting first archivist/admin Legacy records are false</span></div>' +
           '</div>' +
           '<div class="chapter-body"><div class="file-grid">' + loreIndexEntries.map(entry => {
             const openHref = pageOpenHref(entry.slug);
@@ -992,7 +992,7 @@
       : '<section class="chapter" style="margin-top:22px">' +
           '<div class="chapter-head">' +
             '<h2 class="chapter-title">Archived History</h2>' +
-            '<div class="chapter-meta"><span class="chapter-chip">Dynamic Legacy Linkage</span><span class="chapter-chip">Contradicting first owner/admin Legacy records are false</span></div>' +
+            '<div class="chapter-meta"><span class="chapter-chip">Dynamic Legacy Linkage</span><span class="chapter-chip">Contradicting first archivist/admin Legacy records are false</span></div>' +
           '</div>' +
           '<div class="legacy-empty" style="margin:14px">No published Archived History pages yet.</div>' +
         '</section>';

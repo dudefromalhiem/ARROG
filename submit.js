@@ -1386,7 +1386,7 @@ async function initializeSubmitEditModeFromUrl() {
   await rolesReady;
   const isAdminUser = await getUserAdminFlag(currentUserForSubmit);
   if (!isAdminUser) {
-    alert('Only Admin or Owner accounts can edit existing pages.');
+    alert('Only Admin or Archivist accounts can edit existing pages.');
     return;
   }
 
@@ -4584,7 +4584,7 @@ async function submitPage(event) {
   try {
     if (submitEditTarget && submitEditTarget.id) {
       if (!isAdminUser) {
-        alert('Only Admin or Owner accounts can edit existing pages.');
+        alert('Only Admin or Archivist accounts can edit existing pages.');
         return;
       }
 

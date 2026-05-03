@@ -92,7 +92,7 @@ function createGuideDoc() {
 
   <section class="page-section guide-section">
     <h2>Threat Class Framework</h2>
-    <p>The live class model used by the Guild is operational, not cosmetic. Alona marks stable low-risk anomalies. Delphi marks manageable but active risk. Soros marks dangerous entities requiring dedicated response. Vega marks catastrophic regional threat. Apophis marks owner-level override authority. Erebus marks terminal, world-ending risk with no reliable containment path.</p>
+    <p>The live class model used by the Guild is operational, not cosmetic. Alona marks stable low-risk anomalies. Delphi marks manageable but active risk. Soros marks dangerous entities requiring dedicated response. Vega marks catastrophic regional threat. Apophis marks Archivist-level override authority. Erebus marks terminal, world-ending risk with no reliable containment path.</p>
   </section>
 
   <section class="page-section guide-section">
@@ -226,7 +226,7 @@ const clearances = [
   ['Level 2', 'Regular personnel. Restricted access to Alona and Delphi materials.'],
   ['Level 4', 'Moderators and containment specialists. Granted Soros access for review and enforcement.'],
   ['Level 5', 'Administrators. Executive board authority and publication control.'],
-  ['Level 6', 'Owners. Absolute override status across the Guild.']
+  ['Level 6', 'The Archivists. Absolute override status across the Guild.']
 ];
 clearances.forEach( c => {
   PAGE_SEED.push({

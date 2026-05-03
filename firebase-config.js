@@ -617,7 +617,9 @@ const ROLE_LEVELS = {
   'owner': 100,
   'chief_admin': 90,
   'admin': 80,
+  'junior_admin': 75,
   'moderator': 70,
+  'junior_moderator': 65,
   'contributor': 60,
   'user': 5,
   'guest': 0,
@@ -630,14 +632,17 @@ const ROLE_LEVELS = {
   'senior-admin': 80,
   'deputy-chief-mod': 70,
   'senior-mod': 70,
-  'junior-mod': 70
+  'junior-mod': 65,
+  'junior-admin': 75
 };
 
 const ROLE_NAMES = {
-  'owner': 'Owner',
+  'owner': 'The Archivist',
   'chief_admin': 'Chief Admin',
   'admin': 'Admin',
+  'junior_admin': 'Junior Admin',
   'moderator': 'Moderator',
+  'junior_moderator': 'Junior Moderator',
   'contributor': 'Contributor',
   'user': 'User',
   'guest': 'Guest',
@@ -653,6 +658,8 @@ function normalizeResolvedRole(role) {
   if (value === 'mod') return 'moderator';
   if (value === 'editor') return 'contributor';
   if (value === 'chief-admin') return 'chief_admin';
+  if (value === 'junior-mod') return 'junior_moderator';
+  if (value === 'junior-admin') return 'junior_admin';
   return value;
 }
 
@@ -715,22 +722,32 @@ const rolesReady = (async () => {
 function getUserLevel(email) {
   if (!email) return 0;
   const e = email.toLowerCase();
-  const role = normalizeResolvedRole(ROLE_DATA.userRoles[e]);
-  if (role) return ROLE_LEVELS[role] || 0;
-  // Fallback for backward compatibility
+  
   if (BOOTSTRAP_OWNER_SET.has(e) || ROLE_DATA.owners.includes(e)) return 100;
+
+  if (ROLE_DATA.userRoles && ROLE_DATA.userRoles[e]) {
+    const role = normalizeResolvedRole(ROLE_DATA.userRoles[e]);
+    if (role) return ROLE_LEVELS[role] || 0;
+  }
+  
   if (ROLE_DATA.admins.includes(e)) return 80;
   if (ROLE_DATA.mods.includes(e)) return 70;
-  return 0;
+  
+  return ROLE_LEVELS['user'] || 0;
 }
 
 function resolveRole(email) {
   if (!email) return "user";
   const e = email.toLowerCase();
-  const mapped = normalizeResolvedRole(ROLE_DATA.userRoles[e]);
-  if (mapped && mapped !== 'user') return mapped;
+  
   if (BOOTSTRAP_OWNER_SET.has(e)) return "owner";
   if (ROLE_DATA.owners.includes(e)) return "owner";
+
+  if (ROLE_DATA.userRoles && ROLE_DATA.userRoles[e]) {
+    const mapped = normalizeResolvedRole(ROLE_DATA.userRoles[e]);
+    if (mapped && mapped !== 'user') return mapped;
+  }
+  
   if (ROLE_DATA.admins.includes(e)) return "admin";
   if (ROLE_DATA.mods.includes(e)) return "moderator";
   return "user";
@@ -756,7 +773,9 @@ function clearanceLevelForRole(role) {
   if (normalized === "owner") return 6;
   if (normalized === "chief_admin") return 6;
   if (normalized === "admin") return 5;
+  if (normalized === "junior_admin") return 5;
   if (normalized === "moderator") return 4;
+  if (normalized === "junior_moderator") return 4;
   if (normalized === "contributor") return 4;
   if (normalized === "user") return 2;
   return 2;
