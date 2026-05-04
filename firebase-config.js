@@ -46,6 +46,213 @@ if (!storage) {
   console.warn('[Firebase] Storage SDK not loaded on this page. Auth and Firestore remain available.');
 }
 
+let rogDialogQueue = Promise.resolve();
+
+function ensureRogDialogUI() {
+  if (!document.getElementById('rog-dialog-style')) {
+    const style = document.createElement('style');
+    style.id = 'rog-dialog-style';
+    style.textContent = `
+      .rog-dialog-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1000000;
+        background: rgba(0, 0, 0, 0.84);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      .rog-dialog {
+        width: min(560px, 100%);
+        border: 1px solid var(--red-d);
+        background: linear-gradient(180deg, rgba(20,20,20,.98), rgba(8,8,8,.98));
+        box-shadow: 0 0 0 1px rgba(255,255,255,.03), 0 14px 48px rgba(0,0,0,.6);
+      }
+      .rog-dialog-head {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--blk-d);
+        font-family: var(--font-h);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--red-b);
+      }
+      .rog-dialog-body {
+        padding: 14px;
+        color: var(--wht-m);
+        font-size: .84rem;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .rog-dialog-input {
+        width: 100%;
+        border: 1px solid var(--blk-m);
+        background: #0c0c0c;
+        color: var(--wht);
+        padding: 9px 10px;
+        margin-top: 10px;
+        font-family: var(--font-m);
+        font-size: .82rem;
+      }
+      .rog-dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 12px 14px;
+        border-top: 1px solid var(--blk-d);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  let root = document.getElementById('rog-dialog-root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'rog-dialog-root';
+    document.body.appendChild(root);
+  }
+  return root;
+}
+
+function queueRogDialog(executor) {
+  const run = () => new Promise(resolve => executor(resolve));
+  const chained = rogDialogQueue.then(run, run);
+  rogDialogQueue = chained.catch(() => {});
+  return chained;
+}
+
+function buildRogDialog(title, message, actionsHtml, inputHtml) {
+  const overlay = document.createElement('div');
+  overlay.className = 'rog-dialog-overlay';
+  overlay.innerHTML = '' +
+    '<div class="rog-dialog" role="dialog" aria-modal="true" aria-labelledby="rog-dialog-title">' +
+      '<div class="rog-dialog-head" id="rog-dialog-title">' + String(title || 'System Notice') + '</div>' +
+      '<div class="rog-dialog-body">' + String(message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + (inputHtml || '') + '</div>' +
+      '<div class="rog-dialog-actions">' + actionsHtml + '</div>' +
+    '</div>';
+  return overlay;
+}
+
+window.rogAlert = function rogAlert(message) {
+  return queueRogDialog(resolve => {
+    const root = ensureRogDialogUI();
+    const overlay = buildRogDialog('System Notice', message, '<button class="btn btn-p" type="button" data-rog-ok>OK</button>', '');
+    root.appendChild(overlay);
+
+    const close = () => {
+      overlay.remove();
+      resolve();
+    };
+
+    const okBtn = overlay.querySelector('[data-rog-ok]');
+    if (okBtn) okBtn.addEventListener('click', close);
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) close();
+    });
+
+    const onKeyDown = event => {
+      if (event.key === 'Escape' || event.key === 'Enter') {
+        event.preventDefault();
+        close();
+        document.removeEventListener('keydown', onKeyDown, true);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    setTimeout(() => okBtn && okBtn.focus(), 0);
+  });
+};
+
+window.rogConfirm = function rogConfirm(message) {
+  return queueRogDialog(resolve => {
+    const root = ensureRogDialogUI();
+    const overlay = buildRogDialog(
+      'Confirmation Required',
+      message,
+      '<button class="btn btn-s" type="button" data-rog-cancel>Cancel</button><button class="btn btn-p" type="button" data-rog-confirm>Confirm</button>',
+      ''
+    );
+    root.appendChild(overlay);
+
+    const finish = (value) => {
+      overlay.remove();
+      resolve(!!value);
+    };
+
+    const cancelBtn = overlay.querySelector('[data-rog-cancel]');
+    const confirmBtn = overlay.querySelector('[data-rog-confirm]');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => finish(false));
+    if (confirmBtn) confirmBtn.addEventListener('click', () => finish(true));
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) finish(false);
+    });
+
+    const onKeyDown = event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        finish(false);
+        document.removeEventListener('keydown', onKeyDown, true);
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        finish(true);
+        document.removeEventListener('keydown', onKeyDown, true);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    setTimeout(() => confirmBtn && confirmBtn.focus(), 0);
+  });
+};
+
+window.rogPrompt = function rogPrompt(message, defaultValue) {
+  return queueRogDialog(resolve => {
+    const root = ensureRogDialogUI();
+    const inputMarkup = '<input class="rog-dialog-input" data-rog-input type="text" value="' + String(defaultValue || '').replace(/"/g, '&quot;') + '" />';
+    const overlay = buildRogDialog(
+      'Input Required',
+      message,
+      '<button class="btn btn-s" type="button" data-rog-cancel>Cancel</button><button class="btn btn-p" type="button" data-rog-submit>Submit</button>',
+      inputMarkup
+    );
+    root.appendChild(overlay);
+
+    const input = overlay.querySelector('[data-rog-input]');
+    const finish = (value, cancelled) => {
+      overlay.remove();
+      resolve(cancelled ? null : String(value == null ? '' : value));
+    };
+
+    const cancelBtn = overlay.querySelector('[data-rog-cancel]');
+    const submitBtn = overlay.querySelector('[data-rog-submit]');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => finish('', true));
+    if (submitBtn) submitBtn.addEventListener('click', () => finish(input ? input.value : '', false));
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) finish('', true);
+    });
+
+    const onKeyDown = event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        finish('', true);
+        document.removeEventListener('keydown', onKeyDown, true);
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        finish(input ? input.value : '', false);
+        document.removeEventListener('keydown', onKeyDown, true);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    setTimeout(() => {
+      if (!input) return;
+      input.focus();
+      input.select();
+    }, 0);
+  });
+};
+
+window.alert = function rogAlertOverride(message) {
+  window.rogAlert(message);
+};
+
 if (!document.getElementById('auth-pending-style')) {
   const style = document.createElement('style');
   style.id = 'auth-pending-style';
@@ -282,7 +489,7 @@ async function changeUsername() {
   }
 
   const currentName = user.displayName || '';
-  const newName = prompt('Enter new Username/Display Name:', currentName);
+  const newName = await window.rogPrompt('Enter new Username/Display Name:', currentName);
   if (newName === null) return;
 
   const trimmed = sanitizeDisplayNameInput(newName);
@@ -836,7 +1043,7 @@ async function updateESDState(enabled) {
     return;
   }
 
-  const ok = confirm(enabled
+  const ok = await window.rogConfirm(enabled
     ? 'Activate Emergency Shutdown Protocol? Visitors without moderator clearance will be locked out.'
     : 'Deactivate Emergency Shutdown Protocol and restore normal access?');
   if (!ok) return;

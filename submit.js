@@ -67,6 +67,12 @@ let anomalyIdAutoGenerateInFlight = false;
 const nativeSubmitAlert = window.alert.bind(window);
 let submitAlertModal = null;
 let seedDataLoadPromise = null;
+const templateStateCache = {
+  anomaly: null,
+  tale: null,
+  artwork: null,
+  guide: null
+};
 
 const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
 const DOC_MEDIA_DRAG_SETTING_KEY = 'rog-doc-media-drag-enabled';
@@ -166,7 +172,9 @@ function showSubmitAlert(message) {
   });
 }
 
-window.alert = showSubmitAlert;
+window.alert = function submitAlertOverride(message) {
+  return (window.rogAlert || showSubmitAlert)(message);
+};
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape' && submitAlertModal) {
     closeSubmitAlertModal();
@@ -743,7 +751,7 @@ function hasMeaningfulEditorContent() {
 async function confirmEditorLeaveIfUnsaved() {
   if (submitViewMode !== 'editor' || !hasUnsavedEditorChanges) return true;
 
-  const shouldSave = confirm('You have unsaved content. Save it as a draft before leaving this editor?');
+  const shouldSave = await window.rogConfirm('You have unsaved content. Save it as a draft before leaving this editor?');
   if (shouldSave) {
     if (!hasMeaningfulEditorContent()) {
       clearEditorUnsavedState();
@@ -758,7 +766,7 @@ async function confirmEditorLeaveIfUnsaved() {
     return true;
   }
 
-  const discard = confirm('Unsaved content will be lost. Leave without saving?');
+  const discard = await window.rogConfirm('Unsaved content will be lost. Leave without saving?');
   if (discard) {
     clearEditorUnsavedState();
     return true;
@@ -816,6 +824,39 @@ async function openSubmitFileExplorer() {
   if (typeEl) typeEl.disabled = false;
   if (subtypeEl) subtypeEl.disabled = false;
   showSubmitEditor(false);
+}
+
+function getTemplateStateKey(tpl) {
+  const key = String(tpl || '').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(templateStateCache, key) ? key : '';
+}
+
+function seedTemplateCacheFromPage(page, fallbackTemplate) {
+  const key = getTemplateStateKey(page && page.currentTemplate) || getTemplateStateKey(fallbackTemplate);
+  const htmlContent = String(page && (page.htmlContent || page.content) || '').trim();
+  if (!key || !htmlContent) return;
+  templateStateCache[key] = {
+    htmlContent: htmlContent,
+    cssContent: String(page && page.cssContent || '')
+  };
+}
+
+function captureTemplateState(tpl) {
+  const key = getTemplateStateKey(tpl);
+  if (!key) return;
+  const content = buildTemplateHTML();
+  templateStateCache[key] = {
+    htmlContent: String(content && content.html || ''),
+    cssContent: String(content && content.css || '')
+  };
+}
+
+function restoreTemplateState(tpl) {
+  const key = getTemplateStateKey(tpl);
+  const cached = key ? templateStateCache[key] : null;
+  if (!cached || !String(cached.htmlContent || '').trim()) return false;
+  hydrateTemplateFromHtml(key, cached.htmlContent);
+  return true;
 }
 
 function setLoreWorkshopVisibility(canAccess) {
@@ -1203,18 +1244,20 @@ async function continueDraftSubmission(id) {
     // Restore structured state
     docBlocks = Array.isArray(draft.docBlocks) ? JSON.parse(JSON.stringify(draft.docBlocks)) : [];
     currentMode = draft.currentMode || 'code';
-    currentTemplate = draft.currentTemplate || 'anomaly';
+    const draftTemplate = inferTemplateFromPageData(draft);
+    currentTemplate = draft.currentTemplate || draftTemplate || 'anomaly';
+    seedTemplateCacheFromPage(draft, currentTemplate || draftTemplate);
     if (draft.subsectionCounters) {
       subsectionCounters = { ...draft.subsectionCounters };
     }
 
-    if (currentMode === 'doc') {
+    if (docBlocks.length || currentMode === 'doc') {
       switchMode('doc');
       // No need to set sf-html/sf-css here as Document Studio renders from docBlocks
     } else if (currentMode === 'template') {
       switchMode('template');
       if (currentTemplate) selectTemplate(currentTemplate);
-      // Template fields are usually built from DOM, but we should at least restore the mode
+      restoreTemplateState(currentTemplate);
     } else {
       switchMode('code');
       document.getElementById('sf-html').value = draft.htmlContent || DEFAULT_NEW_PAGE_HTML;
@@ -1271,7 +1314,7 @@ async function continueDraftSubmission(id) {
     setSubmitViewMode('editor');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (err) {
-    alert('Could not load draft: ' + err.message);
+    window.rogAlert('Could not load draft: ' + err.message);
   } finally {
     suppressDraftAutoSave = false;
   }
@@ -1500,14 +1543,18 @@ async function initializeSubmitEditModeFromUrl() {
 
     const content = String(page.htmlContent || '');
     const inferredTemplate = inferTemplateFromPageData(page);
+    currentTemplate = String(page.currentTemplate || '').trim() || inferredTemplate || currentTemplate;
+    seedTemplateCacheFromPage(page, currentTemplate || inferredTemplate);
     const savedMode = String(page.currentMode || '').trim();
-    if (savedMode === 'doc' && docBlocks.length) {
+    if (docBlocks.length || savedMode === 'doc') {
       switchMode('doc');
       renderDocBlocks();
-    } else if (savedMode === 'template' || inferredTemplate) {
+    } else if (savedMode === 'template' || inferredTemplate || currentTemplate) {
       switchMode('template');
-      selectTemplate(inferredTemplate || 'anomaly');
-      hydrateTemplateFromHtml(inferredTemplate || 'anomaly', content);
+      selectTemplate(currentTemplate || inferredTemplate || 'anomaly');
+      if (content.trim()) {
+        hydrateTemplateFromHtml(currentTemplate || inferredTemplate || 'anomaly', content);
+      }
     } else {
       switchMode('code');
     }
@@ -1521,7 +1568,7 @@ async function initializeSubmitEditModeFromUrl() {
     const submitBtn = document.getElementById('submit-btn');
     submitBtn.textContent = '>> Save Page Changes';
   } catch (err) {
-    alert('Could not load page for editing: ' + err.message);
+    window.rogAlert('Could not load page for editing: ' + err.message);
   }
 }
 
@@ -1888,6 +1935,11 @@ function switchMode(mode) {
 // ═════════════════════════════════════════════════════════════
 
 function selectTemplate(tpl) {
+  const previousTemplate = currentTemplate;
+  if (previousTemplate && previousTemplate !== tpl) {
+    captureTemplateState(previousTemplate);
+  }
+
   currentTemplate = tpl;
   if (!tpl) return;
   
@@ -1947,7 +1999,9 @@ function selectTemplate(tpl) {
     }
   }
 
-  hydrateTemplateFromEditorContentIfNeeded(tpl);
+  if (!restoreTemplateState(tpl)) {
+    hydrateTemplateFromEditorContentIfNeeded(tpl);
+  }
 
   schedulePreview();
 }
@@ -2552,12 +2606,12 @@ function initDocumentStudio() {
   });
 
   if (linkBtn) {
-    linkBtn.addEventListener('click', () => {
+    linkBtn.addEventListener('click', async () => {
       if (!activeDocEditable) {
         alert('Click inside a text block first.');
         return;
       }
-      const url = prompt('Enter link URL:');
+      const url = await window.rogPrompt('Enter link URL:');
       if (!url) return;
       activeDocEditable.focus();
       document.execCommand('createLink', false, url);
@@ -3961,7 +4015,7 @@ function copyMediaUrl(id, buttonEl) {
       setTimeout(() => { buttonEl.textContent = 'Copy URL'; }, 1500);
     }
   }).catch(() => {
-    prompt('Copy this URL:', url);
+    window.rogPrompt('Copy this URL:', url);
   });
 }
 
@@ -4336,7 +4390,7 @@ function copyImageUrl(id, buttonEl) {
       setTimeout(() => { buttonEl.textContent = 'Copy URL'; }, 1500);
     }
   }).catch(() => {
-    prompt('Copy this URL:', url);
+    window.rogPrompt('Copy this URL:', url);
   });
 }
 
@@ -5104,7 +5158,7 @@ async function loadMySubmissions(viewMode = 'history') {
 }
 
 async function deleteMySubmission(id) {
-  if (!confirm('Withdraw this submission? This cannot be undone.')) return;
+  if (!await window.rogConfirm('Withdraw this submission? This cannot be undone.')) return;
   try {
     await callSubmissionApi('DELETE', { id: id });
     if (activeDraftId === id) activeDraftId = null;
@@ -5126,7 +5180,7 @@ function toggleDraftVersionHistory(id) {
 }
 
 async function restoreDraftVersion(id, versionIndex) {
-  if (!confirm('Restore this version? The current version will be saved as a new version in history.')) return;
+  if (!await window.rogConfirm('Restore this version? The current version will be saved as a new version in history.')) return;
   
   try {
     const result = await callSubmissionApi('POST', {

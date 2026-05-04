@@ -338,7 +338,7 @@ async function addFriendFromProfile() {
 }
 
 async function reportFromProfile() {
-  const reason = prompt('Reason for reporting this user:', '');
+  const reason = await window.rogPrompt('Reason for reporting this user:', '');
   if (reason === null) return;
   const trimmed = String(reason || '').trim();
   if (!trimmed) {
@@ -355,7 +355,7 @@ async function reportFromProfile() {
 }
 
 async function blockFromProfile() {
-  const reason = prompt('Reason for blocking this user (optional):', '');
+  const reason = await window.rogPrompt('Reason for blocking this user (optional):', '');
   if (reason === null) return;
   try {
     setProfileStatus('Blocking user...', false);

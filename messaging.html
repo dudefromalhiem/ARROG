@@ -606,7 +606,7 @@ async function sendMessage() {
 
 async function blockCurrentPeer() {
   if (!currentPeerUid) return;
-  const reason = prompt('Reason for blocking this user (optional):', '');
+  const reason = await window.rogPrompt('Reason for blocking this user (optional):', '');
   if (reason === null) return;
   try {
     await apiPost({ action: 'block', targetUid: currentPeerUid, reason: String(reason || '').trim() });
@@ -622,7 +622,7 @@ async function reportMessageFromButton(button) {
   const messageText = String(button?.getAttribute('data-report-text') || '').trim();
   if (!targetUid || !messageId) return;
 
-  const reason = prompt('Reason for reporting this message:', '');
+  const reason = await window.rogPrompt('Reason for reporting this message:', '');
   if (reason === null) return;
   const trimmed = String(reason || '').trim();
   if (!trimmed) {

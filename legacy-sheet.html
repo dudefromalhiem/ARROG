@@ -838,7 +838,7 @@
     updateBulkActionUI();
   }
 
-  function bulkUpdateClearance() {
+  async function bulkUpdateClearance() {
     if (!ownerCanEdit) {
       alert('Archivist authorization required.');
       return;
@@ -847,7 +847,7 @@
       alert('Select entries first.');
       return;
     }
-    const newLevel = prompt('Enter new clearance level (e.g., LEVEL 3, REQUIRED):');
+    const newLevel = await window.rogPrompt('Enter new clearance level (e.g., LEVEL 3, REQUIRED):');
     if (!newLevel) return;
     
     selectedEntries.forEach(({ chapterId, fileId }) => {
@@ -861,7 +861,7 @@
     document.getElementById('legacy-select-all').checked = false;
   }
 
-  function bulkDeleteEntries() {
+  async function bulkDeleteEntries() {
     if (!ownerCanEdit) {
       alert('Archivist authorization required.');
       return;
@@ -870,7 +870,7 @@
       alert('Select entries first.');
       return;
     }
-    if (!confirm(`Delete ${selectedEntries.size} entry/entries? This cannot be undone.`)) return;
+    if (!await window.rogConfirm(`Delete ${selectedEntries.size} entry/entries? This cannot be undone.`)) return;
     
     selectedEntries.forEach(({ chapterId, fileId }) => {
       const chapter = getChapterById(chapterId);

@@ -1196,7 +1196,7 @@ async function submitCommentReport() {
 async function deleteComment(id) {
   const commentId = String(id || '').trim();
   if (!commentId) return;
-  const ok = confirm('Delete this comment?');
+  const ok = await window.rogConfirm('Delete this comment?');
   if (!ok) return;
 
   try {
@@ -1430,7 +1430,7 @@ async function blockSelectedUser() {
     return;
   }
 
-  const reason = prompt('Reason for blocking this user (optional):', '');
+  const reason = await window.rogPrompt('Reason for blocking this user (optional):', '');
   if (reason === null) return;
 
   try {
@@ -1463,7 +1463,7 @@ async function reportSelectedUser() {
     return;
   }
 
-  const reason = prompt('Reason for reporting this user:', '');
+  const reason = await window.rogPrompt('Reason for reporting this user:', '');
   if (reason === null) return;
   const trimmed = String(reason || '').trim();
   if (!trimmed) {
@@ -1490,8 +1490,8 @@ async function reportSelectedUser() {
   }
 }
 
-function confirmEditDocument(editHref) {
-  const ok = confirm('Open this document in the unified submit editor?');
+async function confirmEditDocument(editHref) {
+  const ok = await window.rogConfirm('Open this document in the unified submit editor?');
   if (!ok) return;
   location.href = editHref;
 }
@@ -1501,7 +1501,7 @@ async function confirmDeleteDocument() {
     alert('This page is seeded/local and cannot be deleted from Firestore.');
     return;
   }
-  const ok = confirm('Delete this document permanently? This action cannot be undone.');
+  const ok = await window.rogConfirm('Delete this document permanently? This action cannot be undone.');
   if (!ok) return;
 
   try {
@@ -2019,7 +2019,7 @@ async function reportCurrentPage() {
     return;
   }
 
-  const reason = prompt('Reason for reporting this page:', '');
+  const reason = await window.rogPrompt('Reason for reporting this page:', '');
   if (reason === null) return;
   const trimmed = String(reason || '').trim();
   if (!trimmed) {

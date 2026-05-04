@@ -763,7 +763,7 @@ async function loadApplications(container) {
 
 async function revokeContributor(uid) {
   if (!uid) return;
-  if (!confirm('Revoke contributor access for this user?')) return;
+  if (!await window.rogConfirm('Revoke contributor access for this user?')) return;
   try {
     const result = await callSocialApi('POST', {
       action: 'revokecontributor',
@@ -864,7 +864,7 @@ async function migrateSeededPagesToFirestore() {
     return;
   }
 
-  const ok = confirm('Move starter pages into the live page collection? Existing page links will be skipped.');
+  const ok = await window.rogConfirm('Move starter pages into the live page collection? Existing page links will be skipped.');
   if (!ok) return;
 
   if (statusEl) statusEl.textContent = 'Seed migration status: scanning existing pages...';
@@ -982,7 +982,7 @@ async function toggleESD(enabled) {
     return;
   }
 
-  const ok = confirm(enabled
+  const ok = await window.rogConfirm(enabled
     ? 'Activate Emergency Shutdown Protocol? Visitors without moderator clearance will be locked out.'
     : 'Deactivate Emergency Shutdown Protocol and restore normal access?');
   if (!ok) return;
@@ -1016,7 +1016,7 @@ async function normalizeAllStoredPageStyles() {
   const statusEl = document.getElementById('normalize-status');
   if (!btn || !statusEl) return;
 
-  const ok = confirm('Normalize and re-save CSS colors for all stored pages? This updates existing Firestore page records.');
+  const ok = await window.rogConfirm('Normalize and re-save CSS colors for all stored pages? This updates existing Firestore page records.');
   if (!ok) return;
 
   btn.disabled = true;
@@ -1082,7 +1082,7 @@ async function normalizeAllStoredPageStyles() {
 
 // ── Username Management ───────────────────────────────────────
 async function changeUsername() {
-  const newName = prompt('Enter new Username/Display Name:');
+  const newName = await window.rogPrompt('Enter new Username/Display Name:');
   if (!newName) return;
   const user = auth.currentUser;
   if (!user) return;
@@ -1165,7 +1165,7 @@ async function deletePage(id) {
     return;
   }
 
-  if (!confirm('Delete this page permanently?')) return;
+  if (!await window.rogConfirm('Delete this page permanently?')) return;
   try {
     if (String(p.type || '').trim() === 'Lore' || String(p.contentFamily || '').trim() === 'lore') {
       await db.collection('loreIndex').doc(id).delete().catch(() => {});
@@ -1489,7 +1489,7 @@ async function approveSubmission(id) {
     alert('Admin/Moderator access is required to approve submissions.');
     return;
   }
-  if (!confirm('Approve this submission and publish it to the site?')) return;
+  if (!await window.rogConfirm('Approve this submission and publish it to the site?')) return;
 
   try {
     const doc = await db.collection('submissions').doc(id).get();
@@ -1555,8 +1555,8 @@ async function approveSubmission(id) {
   }
 }
 
-function showRejectForm(id) {
-  const reason = prompt('Enter rejection reason (optional):');
+async function showRejectForm(id) {
+  const reason = await window.rogPrompt('Enter rejection reason (optional):');
   if (reason === null) return; // cancelled
   rejectSubmission(id, reason);
 }
@@ -1834,7 +1834,7 @@ async function deleteArt(id) {
     alert('Only Admins and Owners can delete artworks.');
     return;
   }
-  if (!confirm('Remove this artwork?')) return;
+  if (!await window.rogConfirm('Remove this artwork?')) return;
   try { await db.collection('artworks').doc(id).delete(); await refreshArt(); }
   catch (err) { alert('Error: ' + err.message); }
 }
@@ -2012,7 +2012,7 @@ async function deleteNews(id) {
     alert('Only Admins and Owners can delete news.');
     return;
   }
-  if (!confirm('Delete this news item?')) return;
+  if (!await window.rogConfirm('Delete this news item?')) return;
   try { await db.collection('news').doc(id).delete(); await refreshNews(); }
   catch (err) { alert('Error: ' + err.message); }
 }
@@ -2333,7 +2333,7 @@ async function addStaffRole() {
 }
 
 async function removeStaffRole(kind, email) {
-  if (!confirm(`Revoke ${ROLE_NAMES[kind]} access for ${email}?`)) return;
+  if (!await window.rogConfirm(`Revoke ${ROLE_NAMES[kind]} access for ${email}?`)) return;
   if (!canEditRole(email, auth.currentUser?.email)) { alert('You do not have permission to modify this user\'s role.'); return; }
   try {
     const result = await callSocialApi('POST', { action: 'assignrole', email, role: 'user' });
