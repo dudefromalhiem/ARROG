@@ -557,6 +557,11 @@ module.exports = async function handler(req, res) {
 
     if (method === 'GET') {
       const query = req.query || {};
+      if (String(query.action || '').trim() === 'next-anomaly-id') {
+        const subtype = sanitizePlainText(query.subtype || 'ROS', 20).toUpperCase();
+        const anomalyId = await generateUniqueAnomalyId(db, subtype || 'ROS');
+        return sendJson(res, 200, { anomalyId, subtype: subtype || 'ROS' });
+      }
       if (query.id) {
         const doc = await db.collection('submissions').doc(String(query.id)).get();
         if (!doc.exists) {
@@ -695,6 +700,9 @@ module.exports = async function handler(req, res) {
     if (action === 'submit' || action === 'publish') {
       const payload = buildSubmissionPayload(body, actor);
       payload.status = action === 'publish' ? 'approved' : 'pending';
+      if (body.pageId) {
+        payload.requestedPageId = String(body.pageId || '').trim();
+      }
       enforceRequestedClearanceOrThrow(payload, actorProfile);
       await ensureSubmissionMetadata(db, payload);
       validateSubmissionForPublishOrQueueOrThrow(payload);
@@ -711,6 +719,10 @@ module.exports = async function handler(req, res) {
       }
 
       if (action === 'publish') {
+        const existingSubmission = submissionId ? await submissionRef.get() : null;
+        const existingRequestedPageId = existingSubmission && existingSubmission.exists
+          ? String((existingSubmission.data() || {}).requestedPageId || '').trim()
+          : '';
         const pagePayload = stripUndefined({
           title: payload.title,
           anomalyId: payload.anomalyId,
@@ -745,7 +757,7 @@ module.exports = async function handler(req, res) {
           status: 'approved'
         });
 
-        const pageId = String(body.pageId || '').trim();
+        const pageId = String(body.pageId || existingRequestedPageId || '').trim();
         let publishedPageId = pageId;
         if (pageId) {
           await db.collection('pages').doc(pageId).set(pagePayload, { merge: true });
