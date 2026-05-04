@@ -1499,37 +1499,15 @@ async function initializeSubmitEditModeFromUrl() {
     }
 
     const content = String(page.htmlContent || '');
-    const isGuide = String(page.type || '') === 'Guide' || String(page.type || '') === 'Lore';
+    const inferredTemplate = inferTemplateFromPageData(page);
     const savedMode = String(page.currentMode || '').trim();
     if (savedMode === 'doc' && docBlocks.length) {
       switchMode('doc');
       renderDocBlocks();
-    } else if (isGuide) {
+    } else if (savedMode === 'template' || inferredTemplate) {
       switchMode('template');
-      selectTemplate('guide');
-      setGuideSectionsFixedStructure();
-      const parsed = new DOMParser().parseFromString(content, 'text/html');
-      const sections = Array.from(parsed.querySelectorAll('.guide-section'));
-      let fixedIndex = 1;
-      sections.forEach(section => {
-        const heading = (section.querySelector('h2')?.textContent || '').trim();
-        const bodyPieces = Array.from(section.children)
-          .filter(node => node.tagName !== 'H2')
-          .map(node => node.outerHTML)
-          .join('');
-        const bodyText = htmlBlockToPlainText(bodyPieces);
-
-        if (/^introduction$/i.test(heading)) {
-          document.getElementById('tf-guide-intro').value = bodyText;
-          return;
-        }
-
-        const titleField = document.getElementById('sub-title-guide-' + fixedIndex);
-        const bodyField = document.getElementById('sub-body-guide-' + fixedIndex);
-        if (titleField) titleField.value = heading || titleField.value;
-        if (bodyField) bodyField.value = bodyText;
-        fixedIndex++;
-      });
+      selectTemplate(inferredTemplate || 'anomaly');
+      hydrateTemplateFromHtml(inferredTemplate || 'anomaly', content);
     } else {
       switchMode('code');
     }
@@ -1969,6 +1947,8 @@ function selectTemplate(tpl) {
     }
   }
 
+  hydrateTemplateFromEditorContentIfNeeded(tpl);
+
   schedulePreview();
 }
 
@@ -2133,6 +2113,243 @@ function htmlBlockToPlainText(html) {
   });
   if (chunks.length) return chunks.join('\n\n');
   return (wrapper.textContent || '').trim();
+}
+
+function getSectionBodyText(sectionNode) {
+  if (!sectionNode) return '';
+  const bodyPieces = Array.from(sectionNode.children)
+    .filter(node => node.tagName !== 'H2')
+    .map(node => node.outerHTML)
+    .join('');
+  return htmlBlockToPlainText(bodyPieces);
+}
+
+function inferTemplateFromPageData(page) {
+  const savedTemplate = String(page && page.currentTemplate || '').trim().toLowerCase();
+  if (savedTemplate === 'anomaly' || savedTemplate === 'tale' || savedTemplate === 'artwork' || savedTemplate === 'guide') {
+    return savedTemplate;
+  }
+
+  const type = String(page && page.type || '').trim();
+  if (isAnomalyFamilyType(type)) return 'anomaly';
+  if (isNarrativeFamilyType(type)) return 'tale';
+  if (type === 'Artwork') return 'artwork';
+  if (isLoreFamilyType(type) || type === 'Guide' || type === 'Hub') return 'guide';
+  return '';
+}
+
+function isTemplateStateEmpty(tpl) {
+  if (tpl === 'anomaly') {
+    const hasPrimary = String(document.getElementById('tf-containment')?.value || '').trim() ||
+      String(document.getElementById('tf-description')?.value || '').trim() ||
+      String(document.getElementById('tf-hero-img')?.value || '').trim() ||
+      String(document.getElementById('tf-anomaly-audio')?.value || '').trim() ||
+      String(document.getElementById('tf-anomaly-video')?.value || '').trim();
+    const hasSubsections = Array.from(document.querySelectorAll('#tf-subsections .subsection-block textarea')).some(el => String(el.value || '').trim());
+    return !hasPrimary && !hasSubsections;
+  }
+
+  if (tpl === 'tale') {
+    const hasPrimary = String(document.getElementById('tf-tale-subtitle')?.value || '').trim() ||
+      String(document.getElementById('tf-tale-intro')?.value || '').trim() ||
+      String(document.getElementById('tf-tale-hero')?.value || '').trim() ||
+      String(document.getElementById('tf-tale-audio')?.value || '').trim() ||
+      String(document.getElementById('tf-tale-video')?.value || '').trim();
+    const hasSubsections = Array.from(document.querySelectorAll('#tf-tale-sections .subsection-block textarea')).some(el => String(el.value || '').trim());
+    return !hasPrimary && !hasSubsections;
+  }
+
+  if (tpl === 'artwork') {
+    const hasPrimary = String(document.getElementById('tf-art-artist')?.value || '').trim() ||
+      String(document.getElementById('tf-art-medium')?.value || '').trim() ||
+      String(document.getElementById('tf-art-desc')?.value || '').trim();
+    const hasImages = Array.from(document.querySelectorAll('#tf-art-images-list .art-img-url, #tf-art-images-list .art-img-select')).some(el => String(el.value || '').trim());
+    return !hasPrimary && !hasImages;
+  }
+
+  if (tpl === 'guide') {
+    const hasPrimary = String(document.getElementById('tf-guide-intro')?.value || '').trim() ||
+      String(document.getElementById('tf-guide-hero')?.value || '').trim() ||
+      String(document.getElementById('tf-guide-audio')?.value || '').trim() ||
+      String(document.getElementById('tf-guide-video')?.value || '').trim();
+    const hasSections = Array.from(document.querySelectorAll('#tf-guide-sections textarea')).some(el => String(el.value || '').trim());
+    return !hasPrimary && !hasSections;
+  }
+
+  return true;
+}
+
+function hydrateTemplateFromHtml(tpl, htmlContent) {
+  const html = String(htmlContent || '').trim();
+  if (!html) return;
+
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+
+  if (tpl === 'anomaly') {
+    const hero = parsed.querySelector('.rog-hero img')?.getAttribute('src') || '';
+    const classRows = Array.from(parsed.querySelectorAll('.rog-class'));
+    const classRow = classRows.find(row => /classification/i.test(String(row.querySelector('.rog-class-label')?.textContent || '')));
+    const classText = classRow
+      ? String(classRow.textContent || '').replace(/classification\s*:/i, '').replace(/test\s*classification\s*:/i, '').trim()
+      : '';
+
+    const sections = Array.from(parsed.querySelectorAll('.rog-section'));
+    let containment = '';
+    let description = '';
+    const subsections = [];
+
+    sections.forEach(section => {
+      const heading = String(section.querySelector('h2')?.textContent || '').trim();
+      if (/shelterization process|containment protocol/i.test(heading)) {
+        containment = getSectionBodyText(section);
+        return;
+      }
+      if (/^description$/i.test(heading)) {
+        description = getSectionBodyText(section);
+        return;
+      }
+      if (/attached media/i.test(heading)) {
+        return;
+      }
+
+      const bodyText = getSectionBodyText(section);
+      if (heading || bodyText) {
+        subsections.push({ title: heading, body: bodyText });
+      }
+    });
+
+    const audioUrl = parsed.querySelector('.rog-section audio')?.getAttribute('src') || '';
+    const videoUrl = parsed.querySelector('.rog-section video')?.getAttribute('src') || '';
+
+    if (document.getElementById('tf-hero-img')) document.getElementById('tf-hero-img').value = hero;
+    if (document.getElementById('tf-object-class') && classText) document.getElementById('tf-object-class').value = classText;
+    if (document.getElementById('tf-containment')) document.getElementById('tf-containment').value = containment;
+    if (document.getElementById('tf-description')) document.getElementById('tf-description').value = description;
+    if (document.getElementById('tf-anomaly-audio')) document.getElementById('tf-anomaly-audio').value = audioUrl;
+    if (document.getElementById('tf-anomaly-video')) document.getElementById('tf-anomaly-video').value = videoUrl;
+
+    subsections.forEach((entry, idx) => {
+      const slot = idx + 1;
+      let titleField = document.getElementById('sub-title-anomaly-' + slot);
+      let bodyField = document.getElementById('sub-body-anomaly-' + slot);
+      if (!titleField || !bodyField) {
+        addSubsection('anomaly');
+        titleField = document.getElementById('sub-title-anomaly-' + slot);
+        bodyField = document.getElementById('sub-body-anomaly-' + slot);
+      }
+      if (titleField) titleField.value = entry.title || titleField.value;
+      if (bodyField) bodyField.value = entry.body || '';
+    });
+    return;
+  }
+
+  if (tpl === 'tale') {
+    if (document.getElementById('tf-tale-subtitle')) {
+      document.getElementById('tf-tale-subtitle').value = String(parsed.querySelector('.tale-subtitle')?.textContent || '').trim();
+    }
+    if (document.getElementById('tf-tale-hero')) {
+      document.getElementById('tf-tale-hero').value = parsed.querySelector('.tale-hero img')?.getAttribute('src') || '';
+    }
+    if (document.getElementById('tf-tale-intro')) {
+      const introNode = parsed.querySelector('.tale-intro');
+      document.getElementById('tf-tale-intro').value = htmlBlockToPlainText(introNode ? introNode.innerHTML : '');
+    }
+    if (document.getElementById('tf-tale-audio')) {
+      document.getElementById('tf-tale-audio').value = parsed.querySelector('audio')?.getAttribute('src') || '';
+    }
+    if (document.getElementById('tf-tale-video')) {
+      document.getElementById('tf-tale-video').value = parsed.querySelector('video')?.getAttribute('src') || '';
+    }
+
+    const taleHolder = document.getElementById('tf-tale-sections');
+    if (taleHolder) {
+      taleHolder.innerHTML = '';
+      subsectionCounters.tale = 0;
+      Array.from(parsed.querySelectorAll('.tale-chapter')).forEach(chapter => {
+        addSubsection('tale');
+        const n = subsectionCounters.tale;
+        const titleField = document.getElementById('sub-title-tale-' + n);
+        const bodyField = document.getElementById('sub-body-tale-' + n);
+        if (titleField) titleField.value = String(chapter.querySelector('h2')?.textContent || '').trim();
+        if (bodyField) bodyField.value = htmlBlockToPlainText(chapter.innerHTML);
+      });
+    }
+    return;
+  }
+
+  if (tpl === 'artwork') {
+    if (document.getElementById('tf-art-artist')) {
+      document.getElementById('tf-art-artist').value = String(parsed.querySelector('.art-artist')?.textContent || '').replace(/^By\s+/i, '').trim();
+    }
+    if (document.getElementById('tf-art-medium')) {
+      document.getElementById('tf-art-medium').value = String(parsed.querySelector('.art-medium')?.textContent || '').trim();
+    }
+    if (document.getElementById('tf-art-desc')) {
+      const descNode = parsed.querySelector('.art-desc');
+      document.getElementById('tf-art-desc').value = htmlBlockToPlainText(descNode ? descNode.innerHTML : '');
+    }
+
+    const list = document.getElementById('tf-art-images-list');
+    if (list) {
+      const images = Array.from(parsed.querySelectorAll('.art-gallery img')).map(img => String(img.getAttribute('src') || '').trim()).filter(Boolean);
+      if (images.length) {
+        list.innerHTML = '';
+        images.forEach(url => {
+          addArtworkImage();
+          const entry = list.lastElementChild;
+          const urlInput = entry ? entry.querySelector('.art-img-url') : null;
+          if (urlInput) urlInput.value = url;
+        });
+      }
+    }
+    return;
+  }
+
+  if (tpl === 'guide') {
+    if (document.getElementById('tf-guide-hero')) {
+      document.getElementById('tf-guide-hero').value = parsed.querySelector('.guide-hero img')?.getAttribute('src') || '';
+    }
+    if (document.getElementById('tf-guide-audio')) {
+      document.getElementById('tf-guide-audio').value = parsed.querySelector('.guide-section audio')?.getAttribute('src') || '';
+    }
+    if (document.getElementById('tf-guide-video')) {
+      document.getElementById('tf-guide-video').value = parsed.querySelector('.guide-section video')?.getAttribute('src') || '';
+    }
+
+    const sections = Array.from(parsed.querySelectorAll('.guide-section'));
+    let fixedIndex = 1;
+    sections.forEach(section => {
+      const heading = String(section.querySelector('h2')?.textContent || '').trim();
+      const bodyText = getSectionBodyText(section);
+
+      if (/^introduction$/i.test(heading)) {
+        if (document.getElementById('tf-guide-intro')) {
+          document.getElementById('tf-guide-intro').value = bodyText;
+        }
+        return;
+      }
+      if (/attached media/i.test(heading)) {
+        return;
+      }
+
+      const titleField = document.getElementById('sub-title-guide-' + fixedIndex);
+      const bodyField = document.getElementById('sub-body-guide-' + fixedIndex);
+      if (titleField) titleField.value = heading || titleField.value;
+      if (bodyField) bodyField.value = bodyText;
+      fixedIndex++;
+    });
+  }
+}
+
+function hydrateTemplateFromEditorContentIfNeeded(tpl) {
+  if (!submitEditTarget) return;
+  if (!isTemplateStateEmpty(tpl)) return;
+
+  const html = String(document.getElementById('sf-html')?.value || '').trim();
+  const defaultHtml = String(DEFAULT_NEW_PAGE_HTML || '').trim();
+  if (!html || html === defaultHtml) return;
+
+  hydrateTemplateFromHtml(tpl, html);
 }
 
 function getUploadedImageOptions(selected) {

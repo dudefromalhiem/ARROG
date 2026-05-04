@@ -661,16 +661,10 @@ let socialApiBase = '/api/social';
 let currentUser = null;
 let currentApplicationStatus = 'none';
 const ROLE_META = window.REDOAK_ROLES || {};
-const APPLICATION_ROLE_ORDER = (ROLE_META.getAssignableRoleOptions ? ROLE_META.getAssignableRoleOptions() : [
+const APPLICATION_ROLE_ORDER = (ROLE_META.getApplicationRoleOptions ? ROLE_META.getApplicationRoleOptions() : [
   { value: 'contributor', label: 'Contributor' },
-  { value: 'moderator', label: 'Moderator' },
-  { value: 'senior_moderator', label: 'Senior Moderator' },
-  { value: 'deputy_chief_of_moderation', label: 'Deputy Chief of Moderation' },
-  { value: 'chief_of_moderation', label: 'Chief of Moderation' },
-  { value: 'administrator', label: 'Administrator' },
-  { value: 'senior_administrator', label: 'Senior Administrator' },
-  { value: 'deputy_chief_administrator', label: 'Deputy Chief Administrator' },
-  { value: 'chief_administrator', label: 'Chief Administrator' }
+  { value: 'moderator', label: 'Junior Moderator' },
+  { value: 'administrator', label: 'Junior Admin' }
 ]).map(option => option.value);
 
 function normalizeApplicationRole(value) {
@@ -687,7 +681,7 @@ function formatApplicationRole(role) {
 function populateApplicationRoles() {
   const select = document.getElementById('application-role');
   if (!select) return;
-  const options = ROLE_META.getAssignableRoleOptions ? ROLE_META.getAssignableRoleOptions() : APPLICATION_ROLE_ORDER.map(value => ({ value, label: formatApplicationRole(value) }));
+  const options = ROLE_META.getApplicationRoleOptions ? ROLE_META.getApplicationRoleOptions() : APPLICATION_ROLE_ORDER.map(value => ({ value, label: formatApplicationRole(value) }));
   select.innerHTML = '<option value="">Select a role...</option>' + options.map(option => '<option value="' + option.value + '">' + option.label + '</option>').join('');
   select.value = 'contributor';
 }

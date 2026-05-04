@@ -268,16 +268,17 @@ function getPublicRoleOptions() {
   return [ROLES.NEWBIE, ROLES.SITE_MEMBER, ROLES.CONTRIBUTOR, ROLES.MODERATOR, ROLES.SENIOR_MODERATOR, ROLES.DEPUTY_CHIEF_OF_MODERATION, ROLES.CHIEF_OF_MODERATION, ROLES.ADMINISTRATOR, ROLES.SENIOR_ADMINISTRATOR, ROLES.DEPUTY_CHIEF_ADMINISTRATOR, ROLES.CHIEF_ADMINISTRATOR].map(role => ({ value: role, label: ROLE_LABELS[role] || role }));
 }
 
+function getApplicationRoleOptions() {
+  return [
+    { value: ROLES.CONTRIBUTOR, label: 'Contributor' },
+    { value: ROLES.MODERATOR, label: 'Junior Moderator' },
+    { value: ROLES.ADMINISTRATOR, label: 'Junior Admin' }
+  ];
+}
+
 function canApplyForRole(role) {
   const normalized = normalizeRole(role);
-  // Only these roles can be applied for via the application form
-  // Higher ranks (Senior, Deputy Chief, Chief) are promoted by staff, not applied for
-  const APPLICABLE_ROLES = [
-    ROLES.CONTRIBUTOR,
-    ROLES.MODERATOR,
-    ROLES.ADMINISTRATOR
-  ];
-  return APPLICABLE_ROLES.includes(normalized);
+  return getApplicationRoleOptions().some(option => option.value === normalized);
 }
 
 // Export for use in other modules
@@ -301,6 +302,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getValidRoleNames,
     getAssignableRoleOptions,
     getPublicRoleOptions,
+    getApplicationRoleOptions,
     canApplyForRole
   };
 }
@@ -325,6 +327,7 @@ if (typeof window !== 'undefined') {
     getValidRoleNames,
     getAssignableRoleOptions,
     getPublicRoleOptions,
+    getApplicationRoleOptions,
     canApplyForRole
   };
 
