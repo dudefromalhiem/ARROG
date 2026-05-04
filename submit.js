@@ -11,6 +11,7 @@ let currentMode = 'doc'; // 'template' | 'doc' | 'code'
 let currentTemplate = 'anomaly'; // 'anomaly' | 'tale' | 'artwork' | 'guide'
 let subsectionCounters = { anomaly: 0, tale: 0, guide: 0 };
 let docBlocks = [];
+let modePreservedContent = { htmlContent: '', cssContent: '' };
 let activeDocEditable = null;
 let docDragIndex = -1;
 let mediaDragReorderEnabled = false;
@@ -748,6 +749,56 @@ function hasMeaningfulEditorContent() {
   return !!(title || slug || (Array.isArray(tags) && tags.length) || String(content.htmlContent || '').trim() || String(content.cssContent || '').trim());
 }
 
+function isMeaningfulHtmlContent(html) {
+  const raw = String(html || '').trim();
+  if (!raw) return false;
+  if (raw === String(DEFAULT_NEW_PAGE_HTML || '').trim()) return false;
+  const text = stripTags(raw);
+  if (text.length > 0) return true;
+  return /<(img|audio|video|section|article|div|h[1-6]|p|ul|ol|li|table|figure|blockquote|pre|code)\b/i.test(raw);
+}
+
+function setModePreservedContent(html, css) {
+  if (!isMeaningfulHtmlContent(html)) return;
+  modePreservedContent = {
+    htmlContent: String(html || ''),
+    cssContent: String(css || '')
+  };
+}
+
+function hasModePreservedContent() {
+  return isMeaningfulHtmlContent(modePreservedContent.htmlContent);
+}
+
+function isDocumentStudioPlaceholderState() {
+  if (!Array.isArray(docBlocks) || docBlocks.length !== 2) return false;
+  const first = docBlocks[0] || {};
+  const second = docBlocks[1] || {};
+  return first.type === 'title' && String(first.text || '').trim() === 'Overview' &&
+    second.type === 'text' && stripTags(second.html || '') === 'Start writing your document here.';
+}
+
+function hydrateDocumentStudioFromHtml(html) {
+  const raw = String(html || '').trim();
+  if (!raw) return;
+
+  const parsed = new DOMParser().parseFromString(raw, 'text/html');
+  const pageShell = parsed.body.querySelector('.page-shell');
+  const docRoot = parsed.body.querySelector('.doc-editor-page');
+  let sourceHtml = '';
+
+  if (docRoot) {
+    sourceHtml = String(docRoot.innerHTML || '').trim();
+  } else if (pageShell) {
+    sourceHtml = String(pageShell.innerHTML || '').trim();
+  } else {
+    sourceHtml = String(parsed.body.innerHTML || '').trim();
+  }
+
+  if (!sourceHtml) return;
+  docBlocks = [{ type: 'text', html: sourceHtml }];
+}
+
 async function confirmEditorLeaveIfUnsaved() {
   if (submitViewMode !== 'editor' || !hasUnsavedEditorChanges) return true;
 
@@ -991,21 +1042,28 @@ function buildCurrentEditorContent(requireContent) {
 
   if (currentMode === 'template') {
     const result = buildTemplateHTML();
-    htmlContent = result.html;
-    cssContent = result.css;
+    const canUsePreserved = isTemplateStateEmpty(currentTemplate) && hasModePreservedContent();
+    htmlContent = canUsePreserved ? modePreservedContent.htmlContent : result.html;
+    cssContent = canUsePreserved
+      ? (String(modePreservedContent.cssContent || '').trim() || result.css)
+      : result.css;
     if (requireContent && !htmlContent.trim()) {
       throw new Error('Please fill in at least some template fields.');
     }
   } else if (currentMode === 'doc') {
     const result = buildDocumentModeHTML();
-    htmlContent = result.html;
-    cssContent = result.css;
+    const canUsePreserved = (isDocumentStudioPlaceholderState() || !hasDocumentContent()) && hasModePreservedContent();
+    htmlContent = canUsePreserved ? modePreservedContent.htmlContent : result.html;
+    cssContent = canUsePreserved
+      ? (String(modePreservedContent.cssContent || '').trim() || result.css)
+      : result.css;
     if (requireContent && !hasDocumentContent()) {
       throw new Error('Please add at least one content block in Document Studio.');
     }
   } else {
     htmlContent = document.getElementById('sf-html').value;
     cssContent = document.getElementById('sf-css').value;
+    setModePreservedContent(htmlContent, cssContent);
     if (requireContent && !htmlContent.trim()) {
       throw new Error('Please enter some HTML content.');
     }
@@ -1247,6 +1305,7 @@ async function continueDraftSubmission(id) {
     const draftTemplate = inferTemplateFromPageData(draft);
     currentTemplate = draft.currentTemplate || draftTemplate || 'anomaly';
     seedTemplateCacheFromPage(draft, currentTemplate || draftTemplate);
+    setModePreservedContent(draft.htmlContent || '', draft.cssContent || '');
     if (draft.subsectionCounters) {
       subsectionCounters = { ...draft.subsectionCounters };
     }
@@ -1492,6 +1551,7 @@ async function initializeSubmitEditModeFromUrl() {
 
     document.getElementById('sf-html').value = page.htmlContent || DEFAULT_NEW_PAGE_HTML;
     document.getElementById('sf-css').value = page.cssContent || '';
+    setModePreservedContent(page.htmlContent || '', page.cssContent || '');
 
     uploadedImages = Array.isArray(page.imageAssets) && page.imageAssets.length
       ? page.imageAssets.map((asset, idx) => ({
@@ -1924,6 +1984,16 @@ function onAnomalyCodeInput() {
 function switchMode(mode) {
   // Relaxed restrictions: Allow Document Studio for all types including Guide/Lore
   const type = document.getElementById('sf-type').value;
+  if (currentMode === 'code') {
+    const htmlEl = document.getElementById('sf-html');
+    const cssEl = document.getElementById('sf-css');
+    if (htmlEl && cssEl) setModePreservedContent(htmlEl.value, cssEl.value);
+  }
+
+  if (mode === 'doc' && hasModePreservedContent() && (docBlocks.length === 0 || isDocumentStudioPlaceholderState())) {
+    hydrateDocumentStudioFromHtml(modePreservedContent.htmlContent);
+  }
+
   currentMode = mode;
   document.getElementById('mode-template').classList.toggle('active', mode === 'template');
   document.getElementById('mode-doc').classList.toggle('active', mode === 'doc');
@@ -3362,6 +3432,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
   document.getElementById('sf-css').value = '';
+  modePreservedContent = { htmlContent: '', cssContent: '' };
   setGuideSectionsFixedStructure();
   onAnomalySubtypeChange();
   updateTagSummary();
@@ -4489,16 +4560,11 @@ function schedulePreview() {
 
 function updatePreview() {
   let html, css;
-
-  if (currentMode === 'template') {
-    const result = buildTemplateHTML();
-    html = result.html;
-    css = result.css;
-  } else if (currentMode === 'doc') {
-    const result = buildDocumentModeHTML();
-    html = result.html;
-    css = result.css;
-  } else {
+  try {
+    const content = buildCurrentEditorContent(false);
+    html = content.htmlContent;
+    css = content.cssContent;
+  } catch (_err) {
     html = document.getElementById('sf-html').value;
     css = document.getElementById('sf-css').value;
   }
