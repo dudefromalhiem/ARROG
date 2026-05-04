@@ -1543,17 +1543,22 @@ async function initializeSubmitEditModeFromUrl() {
 
     const content = String(page.htmlContent || '');
     const inferredTemplate = inferTemplateFromPageData(page);
-    currentTemplate = String(page.currentTemplate || '').trim() || inferredTemplate || currentTemplate;
-    seedTemplateCacheFromPage(page, currentTemplate || inferredTemplate);
-    const savedMode = String(page.currentMode || '').trim();
+    const storedTemplate = getTemplateStateKey(page.currentTemplate);
+    const inferredTemplateKey = getTemplateStateKey(inferredTemplate);
+    const templateForEdit = storedTemplate || inferredTemplateKey || '';
+    currentTemplate = templateForEdit || currentTemplate;
+    if (templateForEdit) {
+      seedTemplateCacheFromPage(page, templateForEdit);
+    }
+    const savedMode = String(page.currentMode || '').trim().toLowerCase();
     if (docBlocks.length || savedMode === 'doc') {
       switchMode('doc');
       renderDocBlocks();
-    } else if (savedMode === 'template' || inferredTemplate || currentTemplate) {
+    } else if (savedMode === 'template' && templateForEdit) {
       switchMode('template');
-      selectTemplate(currentTemplate || inferredTemplate || 'anomaly');
+      selectTemplate(templateForEdit);
       if (content.trim()) {
-        hydrateTemplateFromHtml(currentTemplate || inferredTemplate || 'anomaly', content);
+        hydrateTemplateFromHtml(templateForEdit, content);
       }
     } else {
       switchMode('code');
