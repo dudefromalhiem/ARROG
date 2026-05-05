@@ -55,7 +55,7 @@ let designationLocked = false;
 let submitViewMode = 'explorer'; // 'explorer' | 'editor' | 'history' | 'drafts'
 let submissionApiBase = '/api/submit';
 const REMOTE_SUBMISSION_API_BASES = [
-  'https://redoakerguild.vercel.app/api/submit',
+  'https://redoakguild.vercel.app/api/submit',
   'https://redoakerguild.vercel.app/api/submit'
 ];
 let hasUnsavedEditorChanges = false;
