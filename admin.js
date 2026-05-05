@@ -699,6 +699,16 @@ async function setAdminApplicationStatus(uid, status) {
     return;
   }
   try {
+    // Sync user role flags before writing to ensure permission checks pass
+    try {
+      const token = await auth.currentUser.getIdToken();
+      await fetch(socialApiBase + '?type=sync-user', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      }).catch(() => {});
+    } catch (syncErr) {
+      if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
+    }
     await db.collection('applications').doc(uid).set({
       status: String(status || 'pending'),
       reviewedBy: String(auth.currentUser?.email || ''),
@@ -875,6 +885,18 @@ async function migrateSeededPagesToFirestore() {
     alert('You do not have permission to run seeded page migration.');
     return;
   }
+  
+  // Sync user role flags before writing to ensure permission checks pass
+  try {
+    const token = await auth.currentUser.getIdToken();
+    await fetch(socialApiBase + '?type=sync-user', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+    }).catch(() => {});
+  } catch (syncErr) {
+    if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
+  }
+  
   const seedReady = await ensureAdminSeedDataLoaded();
   if (!seedReady || typeof PAGE_SEED === 'undefined' || !Array.isArray(PAGE_SEED) || PAGE_SEED.length === 0) {
     if (statusEl) statusEl.textContent = 'Seed migration status: no PAGE_SEED data found.';
@@ -956,6 +978,16 @@ async function saveConfig() {
   const tags = document.getElementById('cfg-tags').value.split(',').map(s => s.trim()).filter(Boolean);
   
   try {
+    // Sync user role flags before writing to ensure permission checks pass
+    try {
+      const token = await auth.currentUser.getIdToken();
+      await fetch(socialApiBase + '?type=sync-user', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      }).catch(() => {});
+    } catch (syncErr) {
+      if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
+    }
     await db.collection('config').doc('site').set({ categories, tags }, { merge: true });
     alert('System configuration updated successfully.');
   } catch (err) {
@@ -973,6 +1005,16 @@ async function saveDelegationConfig() {
   btn.textContent = 'Saving...';
   
   try {
+    // Sync user role flags before writing to ensure permission checks pass
+    try {
+      const token = await auth.currentUser.getIdToken();
+      await fetch(socialApiBase + '?type=sync-user', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      }).catch(() => {});
+    } catch (syncErr) {
+      if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
+    }
     const payload = {
       adminCanEditLegacy: document.getElementById('perm-legacy').checked,
       adminCanManageGuides: document.getElementById('perm-guides').checked,
@@ -1006,6 +1048,16 @@ async function toggleESD(enabled) {
   if (!ok) return;
 
   try {
+    // Sync user role flags before writing to ensure permission checks pass
+    try {
+      const token = await auth.currentUser.getIdToken();
+      await fetch(socialApiBase + '?type=sync-user', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      }).catch(() => {});
+    } catch (syncErr) {
+      if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
+    }
     await db.collection('config').doc('site').set({
       esdLocked: !!enabled,
       esdActivatedBy: enabled ? (auth.currentUser.displayName || auth.currentUser.email || 'Owner') : '',

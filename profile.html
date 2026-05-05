@@ -382,6 +382,16 @@ async function saveProfile() {
 
   try {
     setProfileStatus('Saving profile...', false);
+    // Sync user role flags before writing to ensure permission checks pass
+    try {
+      const token = await user.getIdToken();
+      await fetch(typeof socialApiBase !== 'undefined' ? socialApiBase + '?type=sync-user' : '/api/social?type=sync-user', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      }).catch(() => {});
+    } catch (syncErr) {
+      if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
+    }
     await user.updateProfile({ displayName: username });
     await db.collection('users').doc(user.uid).set({
       uid: user.uid,
@@ -434,6 +444,18 @@ async function uploadProfilePicture() {
     }
 
     await user.updateProfile({ photoURL: photoURL });
+    
+    // Sync user role flags before writing to ensure permission checks pass
+    try {
+      const token = await user.getIdToken();
+      await fetch('/api/social?type=sync-user', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      }).catch(() => {});
+    } catch (syncErr) {
+      if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
+    }
+    
     await db.collection('users').doc(user.uid).set({
       photoURL: photoURL,
       updatedAt: new Date().toISOString()
