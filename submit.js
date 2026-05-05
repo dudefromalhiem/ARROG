@@ -1132,6 +1132,7 @@ async function callSubmissionApi(method, payload = {}, query = '') {
     const message = data && data.error ? data.error : ('Request failed with status ' + response.status);
     const err = new Error(message);
     err.status = response.status;
+    err.statusCode = response.status;
     throw err;
   }
   return data;
@@ -1241,6 +1242,11 @@ async function saveDraft(options = {}) {
 
   draftSaveInFlight = true;
   try {
+    const draftPayloadSize = JSON.stringify(draftPayload).length;
+    if (draftPayloadSize > 900000) {
+      setDraftStatus('Warning: Draft is very large (' + Math.round(draftPayloadSize / 1024) + ' KB). Consider splitting into multiple pages.', true);
+    }
+    
     const result = await callSubmissionApi('POST', {
       action: 'draft',
       submissionId: activeDraftId || (submitEditTarget && submitEditTarget.id) || '',
@@ -1256,7 +1262,12 @@ async function saveDraft(options = {}) {
     clearEditorUnsavedState();
     return activeDraftId;
   } catch (err) {
-    setDraftStatus('Draft save failed: ' + err.message, true);
+    const errorMsg = String(err.message || err || '');
+    if (errorMsg.includes('INVALID_ARGUMENT') || errorMsg.includes('exceeds') || errorMsg.includes('1048576')) {
+      setDraftStatus('Error: Draft is too large (>1MB). Remove some content, images, or split into multiple pages.', true);
+    } else {
+      setDraftStatus('Draft save failed: ' + errorMsg, true);
+    }
     return null;
   } finally {
     draftSaveInFlight = false;
@@ -1362,6 +1373,10 @@ async function continueDraftSubmission(id) {
     }));
     renderImageList();
     renderMediaList();
+    
+    // Make editor visible BEFORE rendering to ensure DOM elements are accessible
+    setSubmitViewMode('editor');
+    
     renderDocBlocks();
     refreshImageSelectors();
 
@@ -1370,7 +1385,6 @@ async function continueDraftSubmission(id) {
     updatePreview();
     setDraftStatus('Loaded draft for editing.');
     clearEditorUnsavedState();
-    setSubmitViewMode('editor');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (err) {
     window.rogAlert('Could not load draft: ' + err.message);
@@ -2802,6 +2816,12 @@ function initDocumentStudio() {
     }
 
     if (field === 'align') {
+      docBlocks[index][field] = value;
+      schedulePreview();
+      return;
+    }
+
+    if (field === 'floatStyle') {
       docBlocks[index][field] = value;
       schedulePreview();
       return;
@@ -4662,14 +4682,15 @@ function getExternalImageGalleryHtml(html, imageAssets) {
 
   return `
     <div class="page-section" style="margin-bottom:20px">
-      <h3>Images</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <h3>Unused Images</h3>
+      <p style="font-size:.75rem;color:var(--wht-f);margin-bottom:12px">These images are uploaded but not inserted into your content.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
         ${unusedAssets.map((asset, idx) => `
           <figure style="margin:0">
-            <a href="${asset.url}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">
-              <img src="${asset.url}" alt="${escapeHtml(asset.alt || ('Uploaded asset ' + (idx + 1)))}" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />
+            <a href="${asset.url}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;background:#111;border:1px solid #3a3a3a;padding:2px">
+              <img src="${asset.url}" alt="${escapeHtml(asset.alt || ('Uploaded asset ' + (idx + 1)))}" style="display:block;max-width:100%;width:100%;height:120px;object-fit:cover;border:none" loading="lazy" />
             </a>
-            ${asset.caption ? `<figcaption style="margin-top:6px;font-size:.75rem;color:#bdbdbd;line-height:1.4">${escapeHtml(asset.caption)}</figcaption>` : ''}
+            ${asset.caption ? `<figcaption style="margin-top:4px;font-size:.7rem;color:#8a8a8a;line-height:1.3;padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(asset.caption)}</figcaption>` : ''}
           </figure>
         `).join('')}
       </div>

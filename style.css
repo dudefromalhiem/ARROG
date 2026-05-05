@@ -389,11 +389,12 @@ hr {
 }
 
 .hdr-logo {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   border: 2px solid var(--red);
-  object-fit: cover
+  object-fit: cover;
+  flex-shrink: 0
 }
 
 .hdr-title {
@@ -1060,16 +1061,17 @@ hr {
 }
 
 .intro-logo {
-  width: 280px;
-  height: 280px;
+  width: 220px;
+  height: 220px;
   object-fit: contain;
-  opacity: .25;
+  opacity: .15;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  filter: drop-shadow(0 0 40px rgba(139, 0, 0, .4))
+  filter: drop-shadow(0 0 40px rgba(139, 0, 0, .4));
+  z-index: 0
 }
 
 .intro-t {
@@ -1080,7 +1082,7 @@ hr {
   margin-bottom: 0;
   text-shadow: 0 0 40px rgba(139, 0, 0, .5), 0 2px 8px rgba(0, 0, 0, .9);
   position: relative;
-  z-index: 1
+  z-index: 2
 }
 
 .intro-cl {
@@ -1089,14 +1091,18 @@ hr {
   color: var(--red-b);
   letter-spacing: 6px;
   text-transform: uppercase;
-  margin-bottom: 16px
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 2
 }
 
 .intro-r {
   width: 120px;
   height: 2px;
   background: var(--red);
-  margin: 24px auto
+  margin: 24px auto;
+  position: relative;
+  z-index: 2
 }
 
 .intro-sub {
@@ -1104,7 +1110,9 @@ hr {
   color: var(--wht-d);
   max-width: 600px;
   margin: 0 auto;
-  line-height: 1.8
+  line-height: 1.8;
+  position: relative;
+  z-index: 2
 }
 
 @media(max-width:768px) {
