@@ -8,7 +8,7 @@
  * NEVER expose: apiKey (only for public API key auth, handled server-side)
  */
 
-export default function handler(req, res) {
+function handler(req, res) {
   // Only allow GET requests
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -31,3 +31,5 @@ export default function handler(req, res) {
 
   return res.status(200).json(config);
 }
+
+module.exports = handler;
