@@ -1251,6 +1251,24 @@
         if (window.rogLogger) rogLogger.warn('Could not wait for rolesReady:', _err);
       }
       
+      // Sync user role flags to Firestore to ensure permission checks pass
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const response = await fetch('/api/social?type=sync-user', {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (window.rogLogger) rogLogger.debug('User role sync complete:', data);
+        }
+      } catch (syncErr) {
+        if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
+      }
+      
       ownerCanEdit = _legacyUserCheck(user) || canEditLegacy(user.email, user) || isOwner(user.email) || resolveRole(user.email) === 'owner';
       if (window.rogLogger) rogLogger.debug('Legacy Sheet Auth Check:', { 
         userEmail: user.email, 

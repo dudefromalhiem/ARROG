@@ -790,7 +790,13 @@ function goSlide(i) {
 }
 
 function updateCarousel() {
-  document.getElementById('carousel-track').style.transform = `translateX(-${carouselIdx * 100}%)`;
+  const track = document.getElementById('carousel-track');
+  if (!track) return;
+
+  const slides = track.querySelectorAll('.carousel-slide');
+  track.style.transform = 'none';
+  slides.forEach((slide, i) => slide.classList.toggle('on', i === carouselIdx));
+
   document.getElementById('carousel-label').textContent = carouselItems[carouselIdx]?.title || '';
   document.querySelectorAll('.carousel-dot').forEach((d, i) => d.classList.toggle('on', i === carouselIdx));
 }

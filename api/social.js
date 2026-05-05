@@ -1142,6 +1142,41 @@ async function revokeContributor(db, actor, body) {
   return { statusCode: 200, payload: { ok: true } };
 }
 
+async function syncUserRoleFlags(db, actor) {
+  // Sync the user's role flags from config/roles to their user document
+  // This ensures Firestore rules can trust the isOwner/isAdmin/isModerator flags
+  if (!actor || !actor.uid || !actor.email) {
+    return { statusCode: 400, payload: { error: 'Actor not identified' } };
+  }
+
+  try {
+    const roles = await getRolesData(db);
+    const isOwner = isOwnerEmail(actor.email, roles);
+    const isAdmin = isAdminEmail(actor.email, roles);
+    const isMod = isModeratorEmail(actor.email, roles);
+
+    // Update the user document with these flags
+    const userRef = db.collection('users').doc(actor.uid);
+    const updatePayload = {
+      email: actor.email.toLowerCase(),
+      isOwner: isOwner,
+      isAdmin: isAdmin,
+      isModerator: isMod,
+      lastRoleSyncAt: new Date()
+    };
+
+    await userRef.set(updatePayload, { merge: true });
+    
+    return { 
+      statusCode: 200, 
+      payload: { ok: true, isOwner, isAdmin, isModerator } 
+    };
+  } catch (err) {
+    console.error('Failed to sync user role flags:', err);
+    return { statusCode: 500, payload: { error: 'Failed to sync role flags' } };
+  }
+}
+
 async function listContributors(db, actor) {
   const roles = await getRolesData(db);
   if (!isModeratorEmail(actor.email, roles)) {
@@ -1297,6 +1332,11 @@ module.exports = async function handler(req, res) {
 
     if (method === 'GET' && type === 'contributors') {
       const result = await listContributors(db, actor);
+      return sendJson(res, result.statusCode, result.payload);
+    }
+
+    if (method === 'GET' && type === 'sync-user') {
+      const result = await syncUserRoleFlags(db, actor);
       return sendJson(res, result.statusCode, result.payload);
     }
 

@@ -451,6 +451,24 @@ async function renderAdminBootstrap(user) {
     // Sync owner status
     if (isOwnerUser) currentUserDoc.isOwner = true;
 
+    // Sync user role flags to Firestore to ensure permission checks pass
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(socialApiBase + '?type=sync-user', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (window.rogLogger) rogLogger.debug('Admin user role sync complete:', data);
+      }
+    } catch (syncErr) {
+      if (window.rogLogger) rogLogger.warn('Could not sync admin user role flags:', syncErr);
+    }
+
     if (!canOpenAdminPanel) {
       adminLoading.classList.add('hidden');
       adminDenied.classList.remove('hidden');
