@@ -199,53 +199,6 @@ service cloud.firestore {
         );
     }
 
-    // ═══ ISSUE 4 FIX: Field Injection Prevention ═══
-    // Whitelist allowed fields for pages and similar content
-    function hasSafePageFields() {
-      let allowedKeys = [
-        'id', 'slug', 'title', 'type', 'tags', 'status', 'html', 'css',
-        'htmlContent', 'cssContent', 'clearanceLevel', 'authorUid', 'authorEmail', 
-        'authorName', 'updatedAt', 'createdAt', 'submittedAt', 'approvedAt', 
-        'approvedBy', 'anomalyId', 'anomalySubtype', 'anomalySubtypeLabel', 'anomalyListKey',
-        'imageUrls', 'mediaUrls', 'excerpt'
-      ];
-      return request.resource.data.keys().hasOnly(allowedKeys);
-    }
-
-    function hasSafeSubmissionFields() {
-      let allowedKeys = [
-        'id', 'slug', 'title', 'type', 'tags', 'status', 'html', 'css',
-        'htmlContent', 'cssContent', 'clearanceLevel', 'authorUid', 'authorEmail', 
-        'authorName', 'updatedAt', 'createdAt', 'submittedAt',
-        'anomalyId', 'anomalySubtype', 'anomalySubtypeLabel', 'anomalyListKey',
-        'imageUrls', 'mediaUrls', 'imageAssets', 'mediaAssets',
-        'docBlocks', 'currentMode', 'currentTemplate', 'subsectionCounters'
-      ];
-      return request.resource.data.keys().hasOnly(allowedKeys);
-    }
-
-    // ═══ ISSUE 4 FIX: Audit Trail for Sensitive Changes ═══
-    // Require audit fields for role changes (should only come from server APIs)
-    function hasRoleChangeAuditTrail() {
-      return ('roleChangedBy' in request.resource.data) &&
-        ('roleChangedAt' in request.resource.data) &&
-        request.resource.data.roleChangedBy is string &&
-        request.resource.data.roleChangedAt is timestamp;
-    }
-
-    // ═══ ISSUE 4 FIX: Clearance Level Authorization ═══
-    // Only admins can change clearance level, and only up to their max clearance
-    function isClearanceLevelChange() {
-      return 'clearanceLevel' in request.resource.data &&
-        ('clearanceLevel' in resource.data ? resource.data.clearanceLevel != request.resource.data.clearanceLevel : true);
-    }
-
-    function canModifyClearanceLevel() {
-      return (isClearanceLevelChange() && canManageUsersRoles() && requestedClearanceWithinLimit()) ||
-        !isClearanceLevelChange();
-    }
-    }
-
     function isValidRoleVal(roleVal) {
       return (roleVal is string) && (
         roleVal == 'owner' || 
@@ -313,67 +266,45 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // ISSUE 4 FIX: Reads restricted to admins or self
+      // Allow reads for users who can manage users/roles, or self
       allow read: if canManageUsersRoles() || isSelf(userId);
-      
       // Allow create for self (registration) or admins
       allow create: if (canManageUsersRoles() || isSelf(userId)) &&
-        !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted', 'roleChangedBy', 'roleChangedAt']) &&
+        !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
         hasSafeDisplayName() &&
-        canModifyClearanceLevel() &&
         (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role));
-      
-      // Allow create for moderators with field restrictions
       allow create: if canApproveEditorAccessOnUsersDoc() &&
         hasEditorApprovalCreateFields() &&
         !request.resource.data.keys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
         hasSafeDisplayName() &&
-        canModifyClearanceLevel() &&
         (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role));
-      
       // Allow updates: admins can update everything, users can update safe fields only
-      allow update: if (canManageUsersRoles() && 
-        !isClientContributorRevocation() && 
-        (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role)) &&
-        canModifyClearanceLevel() &&
-        (isRoleChangeRequest() ? hasRoleChangeAuditTrail() : true)) ||
-        
-        (canApproveEditorAccessOnUsersDoc() && 
-         hasEditorApprovalUpdateFields() &&
+      allow update: if (canManageUsersRoles() && !isClientContributorRevocation() && (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role))) ||
+        (canApproveEditorAccessOnUsersDoc() && hasEditorApprovalUpdateFields() &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
-         !isClientContributorRevocation() && 
-         (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role)) &&
-         canModifyClearanceLevel()) ||
-        
+        !isClientContributorRevocation() && (!('role' in request.resource.data) || isValidRoleVal(request.resource.data.role))) ||
         (isSelf(userId) &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted', 'role', 'clearanceLevel', 'roleChangedBy', 'roleChangedAt']) &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'isOwner', 'contributorGranted']) &&
          hasSafeDisplayName());
-      
       allow delete: if canManageUsersRoles();
     }
 
     match /editorApplications/{applicationId} {
-      // ISSUE 4 FIX: Admin only read/write with authentication required
-      allow read: if canModerate() && isSignedIn();
-      allow create, update, delete: if canModerate() && isSignedIn();
+      allow read: if canModerate();
+      allow create, update, delete: if canModerate();
     }
 
     match /applications/{applicationId} {
-      // ISSUE 4 FIX: Read restricted to moderators or document owner, authentication required
-      allow read: if ((canModerate() && isSignedIn()) || (isSignedIn() && request.auth.uid == applicationId));
-      allow create, update: if ((isSignedIn() && request.auth.uid == applicationId) || (canModerate() && isSignedIn()));
-      allow delete: if canModerate() && isSignedIn();
+      allow read: if canModerate() || (isSignedIn() && request.auth.uid == applicationId);
+      allow create, update: if (isSignedIn() && request.auth.uid == applicationId) || canModerate();
+      allow delete: if canModerate();
     }
 
     match /pages/{pageId} {
-      // ISSUE 4 FIX: Read protection for public content
+      // Allow reads for everyone (public content)
       allow read: if canReadPublicContent();
-      
-      // ISSUE 4 FIX: Field validation and clearance level checks
-      allow create, update: if canCreateEditPages() && 
-        requestedClearanceWithinLimit() &&
-        hasSafePageFields();
-      
+      // Allow create/edit for contributors, admins, or explicitly granted moderators
+      allow create, update: if canCreateEditPages() && requestedClearanceWithinLimit();
       allow delete: if canModerate();
 
       // Upvotes subcollection - allow users to upvote/unvote anomalies via the API
@@ -385,84 +316,71 @@ service cloud.firestore {
     }
 
     match /submissions/{subId} {
-      // ISSUE 4 FIX: Author UID must match token, clearance checked, fields validated
       allow create: if canInteractWithContent() &&
         request.resource.data.authorUid == request.auth.uid &&
         (request.resource.data.status == 'pending' || request.resource.data.status == 'draft') &&
-        requestedClearanceWithinLimit() &&
-        hasSafeSubmissionFields();
-      
-      // ISSUE 4 FIX: Read restricted to moderators or document author
+        requestedClearanceWithinLimit();
       allow read: if canModerate() || (isSignedIn() && resource.data.authorUid == request.auth.uid);
-      
-      // ISSUE 4 FIX: Update restricted to moderators or author (drafts only), with field validation
-      allow update: if (canModerate() && 
-        requestedClearanceWithinLimit() &&
-        hasSafeSubmissionFields()) ||
+      // Allow the original author to update their own draft submissions
+      allow update: if (canModerate() && requestedClearanceWithinLimit()) ||
         (canInteractWithContent() &&
          resource.data.authorUid == request.auth.uid &&
          resource.data.status == 'draft' &&
          request.resource.data.status == 'draft' &&
-         requestedClearanceWithinLimit() &&
-         hasSafeSubmissionFields());
-      
+         requestedClearanceWithinLimit());
       allow delete: if canModerate();
     }
 
     match /artworks/{artworkId} {
-      // ISSUE 4 FIX: Public read, field validation on write
       allow read: if canReadPublicContent();
-      allow create, update, delete: if canModerate() && hasSafePageFields();
+      allow create, update, delete: if canModerate();
     }
 
     match /news/{newsId} {
-      // ISSUE 4 FIX: Public read, field validation on write
       allow read: if canReadPublicContent();
-      allow create, update, delete: if canModerate() && hasSafePageFields();
+      allow create, update, delete: if canModerate();
     }
 
     match /config/{docId} {
-      // ISSUE 4 FIX: All signed-in users can read config (needed for role resolution and ESD state)
+      // All signed-in users can read config (needed for role resolution and ESD state)
       allow read: if isSignedIn();
-      // ISSUE 4 FIX: Only admins can write config
-      allow write: if canManageUsersRoles() && isSignedIn();
+      allow write: if canManageUsersRoles();
     }
 
     match /submissions_meta/{uid} {
-      // ISSUE 4 FIX: Admin only, authentication required
-      allow read, write: if canModerate() && isSignedIn();
+      allow read, write: if canModerate();
     }
 
     match /legacySheets/{sheetId} {
-      // ISSUE 4 FIX: Public read, admin write with authentication required
       allow read: if canReadPublicContent();
-      allow create, update, delete: if ((isOwnerUser() && isSignedIn()) || ((canModerate() && isSignedIn()) && adminHasDelegation('adminCanEditLegacy')));
+      // Owner can always write. Moderators and admins can write if owner has delegated this permission.
+      allow create, update, delete: if isOwnerUser() || (canModerate() && adminHasDelegation('adminCanEditLegacy'));
     }
 
-    // Reports collections - ISSUE 4 FIX: Only authenticated users can create, only mods can read/manage
+    // Reports collections - only moderators/admins can read, signed-in users can create
     match /commentReports/{reportId} {
       allow read: if canModerate();
-      allow create: if canInteractWithContent() && isSignedIn();
-      allow update, delete: if false; // Reports are immutable once created
+      allow create: if canInteractWithContent();
+      allow update, delete: if false;
     }
 
     match /dmReports/{reportId} {
       allow read: if canModerate();
-      allow create: if canInteractWithContent() && isSignedIn();
-      allow update, delete: if false; // Reports are immutable once created
+      allow create: if canInteractWithContent();
+      allow update, delete: if false;
     }
 
     match /pageReports/{reportId} {
       allow read: if canModerate();
-      allow create: if canInteractWithContent() && isSignedIn();
-      allow update, delete: if false; // Reports are immutable once created
+      allow create: if canInteractWithContent();
+      allow update, delete: if false;
     }
 
     match /reports/{reportId} {
       allow read: if canModerate();
-      allow create: if canInteractWithContent() && isSignedIn();
+      allow create: if canInteractWithContent();
       allow update: if canModerate();
-      allow delete: if false; // Reports cannot be deleted, only moderated
+      allow delete: if false;
     }
   }
 }

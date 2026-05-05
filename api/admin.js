@@ -1,7 +1,6 @@
 const admin = require('firebase-admin');
 const { ROLES, normalizeRole, isAtLeast, PUBLIC_ROLE_LADDER } = require('../permissions');
 const { logRoleChange, logPermissionDenial } = require('./audit');
-const errorHandler = require('./middleware/errorHandler');
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -390,10 +389,8 @@ async function getAuditLogs(req, res) {
       logs: logs
     });
   } catch (err) {
-    // ISSUE 8 FIX: Sanitize error responses to prevent information leakage
     console.error('Audit log error:', err);
-    const handled = errorHandler.handleCatchError(err);
-    return sendJson(res, handled.statusCode, { error: handled.message });
+    return sendJson(res, 500, { error: String(err.message || 'Server error') });
   }
 }
 
@@ -412,9 +409,7 @@ module.exports = async (req, res) => {
       return sendJson(res, 404, { error: 'Endpoint not found' });
     }
   } catch (err) {
-    // ISSUE 8 FIX: Sanitize error responses to prevent information leakage
     console.error('Admin API error:', err);
-    const handled = errorHandler.handleCatchError(err);
-    return sendJson(res, handled.statusCode, { error: handled.message });
+    return sendJson(res, 500, { error: 'Internal server error' });
   }
 };

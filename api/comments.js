@@ -1,7 +1,5 @@
 const admin = require('firebase-admin');
 const { ROLES, normalizeRole, isAtLeast } = require('../permissions');
-const rateLimitMiddleware = require('./middleware/rateLimit');
-const errorHandler = require('./middleware/errorHandler');
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -278,16 +276,6 @@ module.exports = async function handler(req, res) {
     const actor = await verifyUser(req);
 
     if (method === 'POST') {
-      // ═══ ISSUE 6 FIX: Rate limiting for comment spam ═══
-      // 15 comments/votes/reports per minute per user
-      const isRateLimited = rateLimitMiddleware.enforceRateLimit(
-        req,
-        res,
-        actor.uid,
-        { limit: 15, windowMs: 60000 }  // 15 operations per minute
-      );
-      if (isRateLimited) return; // Response already sent
-
       const body = req.body || {};
       const action = normalizeText(body.action || '', 20).toLowerCase();
 
@@ -407,8 +395,6 @@ module.exports = async function handler(req, res) {
 
     return sendJson(res, 405, { error: 'Method not allowed.' });
   } catch (err) {
-    // ISSUE 8 FIX: Sanitize error responses to prevent information leakage
-    const handled = errorHandler.handleCatchError(err);
-    return sendJson(res, handled.statusCode, { error: handled.message });
+    return sendJson(res, Number(err.statusCode || 500), { error: err.message || 'Server error.' });
   }
 };

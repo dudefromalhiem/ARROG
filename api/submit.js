@@ -1,8 +1,5 @@
 const admin = require('firebase-admin');
 const { ROLES, normalizeRole, isAtLeast } = require('../permissions');
-const authMiddleware = require('./middleware/auth');
-const validateMiddleware = require('./middleware/validate');
-const rateLimitMiddleware = require('./middleware/rateLimit');
 const MAX_TITLE_LENGTH = 160;
 const MAX_SLUG_LENGTH = 120;
 const MAX_AUTHOR_NAME_LENGTH = 80;
@@ -551,56 +548,12 @@ async function listOwnSubmissions(db, uid) {
 
 module.exports = async function handler(req, res) {
   try {
-    // ═══ ISSUE 2 & 3 FIX: Server-side authentication ═══
-    // Verify Firebase ID token from Authorization header
-    const authResult = await authMiddleware.verifyAuth(req);
-    if (authResult.error) {
-      return sendJson(res, authResult.status, { error: authResult.error });
-    }
-
-    const actor = authResult.user;
     const app = initAdmin();
     const db = admin.firestore(app);
+    const actor = await verifyUser(req);
     const actorProfile = await resolveActorAccessProfile(db, actor.uid, actor.email);
     const adminAccess = actorProfile.isAdmin;
     const method = String(req.method || 'GET').toUpperCase();
-
-    // ═══ ISSUE 6 FIX: Rate limiting ═══
-    // POST/PATCH requests are limited to 10 per minute per user
-    // GET/DELETE requests allowed without rate limit (safer operations)
-    if (method === 'POST' || method === 'PATCH') {
-      const isRateLimited = rateLimitMiddleware.enforceRateLimit(
-        req, 
-        res, 
-        actor.uid,  // Rate limit by user ID (authenticated users)
-        { limit: 10, windowMs: 60000 }  // 10 requests per minute
-      );
-      if (isRateLimited) return; // Response already sent
-    }
-
-    // ═══ ISSUE 5 FIX: Input validation ═══
-    // Validate request body structure and sanitize inputs
-    if (method === 'POST' || method === 'PATCH') {
-      if (!req.body || typeof req.body !== 'object') {
-        return sendJson(res, 400, { error: 'Invalid request body.' });
-      }
-      
-      // Check for unexpected fields in submission object
-      const submission = req.body.submission;
-      const allowedFields = new Set([
-        'title', 'slug', 'htmlContent', 'cssContent', 'type', 'tags',
-        'anomalyId', 'anomalySubtype', 'clearanceLevel',
-        'docBlocks', 'currentMode', 'currentTemplate', 'subsectionCounters',
-        'imageAssets', 'mediaAssets', 'imageUrls', 'mediaUrls'
-      ]);
-      
-      if (submission && typeof submission === 'object') {
-        const unexpectedFields = Object.keys(submission).filter(key => !allowedFields.has(key));
-        if (unexpectedFields.length > 0) {
-          return sendJson(res, 400, { error: `Unexpected fields: ${unexpectedFields.join(', ')}` });
-        }
-      }
-    }
 
     if (method === 'GET') {
       const query = req.query || {};
@@ -923,24 +876,8 @@ module.exports = async function handler(req, res) {
     return sendJson(res, 400, { error: 'Unknown action.' });
 
   } catch (err) {
-    // ISSUE 5 FIX: Never expose stack traces or Firebase internal errors
     const statusCode = Number(err.statusCode || 500);
-    
-    // Map Firebase errors to generic messages
-    let errorMessage = err.message || 'Server error.';
-    if (statusCode === 500 || statusCode >= 500) {
-      // Never expose internal error details to client
-      errorMessage = 'Server error.';
-    }
-    
-    // Never expose stack traces or Firebase-specific error codes
-    const sanitizedError = errorMessage
-      .replace(/firebase/gi, 'service')
-      .replace(/firestore/gi, 'database')
-      .replace(/auth\//gi, '')
-      .substring(0, 200); // Limit error message length
-    
-    return sendJson(res, statusCode, { error: sanitizedError });
+    return sendJson(res, statusCode, { error: err.message || 'Server error.' });
   }
 };
 
