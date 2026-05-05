@@ -1243,8 +1243,8 @@ async function saveDraft(options = {}) {
   draftSaveInFlight = true;
   try {
     const draftPayloadSize = JSON.stringify(draftPayload).length;
-    if (draftPayloadSize > 900000) {
-      setDraftStatus('Warning: Draft is very large (' + Math.round(draftPayloadSize / 1024) + ' KB). Consider splitting into multiple pages.', true);
+    if (draftPayloadSize > 4500000) {
+      setDraftStatus('Warning: Draft is very large (' + Math.round(draftPayloadSize / 1024) + ' KB). Consider splitting into multiple pages if you approach 5MB.', true);
     }
     
     const result = await callSubmissionApi('POST', {
@@ -1263,8 +1263,8 @@ async function saveDraft(options = {}) {
     return activeDraftId;
   } catch (err) {
     const errorMsg = String(err.message || err || '');
-    if (errorMsg.includes('INVALID_ARGUMENT') || errorMsg.includes('exceeds') || errorMsg.includes('1048576')) {
-      setDraftStatus('Error: Draft is too large (>1MB). Remove some content, images, or split into multiple pages.', true);
+    if (errorMsg.includes('INVALID_ARGUMENT') || errorMsg.includes('exceeds') || errorMsg.includes('5242880')) {
+      setDraftStatus('Error: Draft is too large (>5MB). Remove some content, images, or split into multiple pages.', true);
     } else {
       setDraftStatus('Draft save failed: ' + errorMsg, true);
     }
