@@ -201,6 +201,7 @@
       line-height: 1.45;
       display: -webkit-box;
       -webkit-line-clamp: 3;
+      line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -264,7 +265,13 @@
       display: none;
       margin-top: 14px;
     }
-    .legacy-editor.open { display: block; }
+    .legacy-editor.open {
+      display: block;
+      visibility: visible;
+      opacity: 1;
+      position: relative;
+      z-index: 1;
+    }
     .legacy-editor .fg { margin-bottom: 12px; }
     .legacy-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     .legacy-owner-actions { display: none; margin-top: 12px; }
@@ -458,9 +465,11 @@
   const LEGACY_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
   const LEGACY_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
-  function canEditLegacy(email) {
+  function canEditLegacy(email, user) {
     if (!email) return false;
-    return isOwner(email) || adminHasDelegation(email, 'adminCanEditLegacy');
+    const resolvedRole = resolveRole(email);
+    const explicitRole = String(user && (user.role || user.roleName || user.customRole || '')).toLowerCase();
+    return isOwner(email) || resolvedRole === 'owner' || explicitRole === 'owner' || adminHasDelegation(email, 'adminCanEditLegacy');
   }
 
   const LEGACY_DEFAULT = {
@@ -1220,7 +1229,7 @@
   // We use this local shim if we need to pass a user object explicitly.
   function _legacyUserCheck(user) {
     if (!user || !user.email) return false;
-    return canEditLegacy(user.email);
+    return canEditLegacy(user.email, user);
   }
 
   async function hydrateLegacyForUser(user) {
@@ -1242,7 +1251,7 @@
         if (window.rogLogger) rogLogger.warn('Could not wait for rolesReady:', _err);
       }
       
-      ownerCanEdit = _legacyUserCheck(user);
+      ownerCanEdit = _legacyUserCheck(user) || canEditLegacy(user.email, user) || isOwner(user.email) || resolveRole(user.email) === 'owner';
       if (window.rogLogger) rogLogger.debug('Legacy Sheet Auth Check:', { 
         userEmail: user.email, 
         ownerCanEdit, 

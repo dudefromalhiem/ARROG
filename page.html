@@ -131,6 +131,7 @@
     <p class="load-copy">Retrieving classified archive entry...</p>
   <!-- Quick Navigation Breadcrumb -->
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--blk-m);border-radius:2px;font-size:.8rem;color:var(--wht-d)">
+    <button onclick="history.back()" style="background:none;border:1px solid var(--red-b);color:var(--red-b);padding:4px 10px;cursor:pointer;font-size:.7rem;border-radius:2px;margin-right:8px;text-transform:uppercase;font-family:inherit">« Back</button>
     <a href="index.html" style="color:var(--red-b);text-decoration:none">Home</a>
     <span>/</span>
     <span id="breadcrumb-type" style="color:var(--red-b)">Page</span>
@@ -186,6 +187,7 @@ render.mount('archive-viewer');</pre>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
         <div id="pv-tags" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+        <button class="btn btn-s" type="button" onclick="history.back()" style="font-size:.7rem;padding:4px 8px;align-self:flex-end">Back</button>
         <button id="pv-report-btn" class="btn btn-s hidden" onclick="reportCurrentPage()" style="font-size:.7rem;padding:4px 8px;">Report Page</button>
       </div>
     </div>
@@ -1731,8 +1733,7 @@ function buildPageDocument(html, css, imageUrls, imageAssets, mediaUrls, mediaAs
   const assets = normalizeImageAssets(imageUrls || [], imageAssets || []);
   const supplementalMedia = normalizeMediaAssets(mediaUrls || [], mediaAssets || []);
   const raw = repairDocumentImagesWithUploads((html || '').trim(), assets.map(asset => asset.url));
-  const withUploads = embedUploadedImagesIfMissing(raw, assets);
-  const withMedia = embedUploadedMediaIfMissing(withUploads, supplementalMedia);
+  const withMedia = embedUploadedMediaIfMissing(raw, supplementalMedia);
   const withCaptions = applyImageCaptions(withMedia, assets);
   const htmlWithUploads = sanitizePageImages(withCaptions).replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
   const wrapped = htmlWithUploads.includes('class="page-shell"')
@@ -1922,7 +1923,11 @@ function embedUploadedImagesIfMissing(html, imageAssets) {
 
   const raw = String(html || '');
   if (raw.includes('class="uploaded-assets"')) return raw;
-  if (urls.some(url => raw.includes(url))) return raw;
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = raw;
+  const existingSrcs = Array.from(wrapper.querySelectorAll('img')).map(img => (img.getAttribute('src') || '').split('?')[0].toLowerCase());
+  if (urls.some(url => existingSrcs.includes(url.split('?')[0].toLowerCase()))) return raw;
 
   const gallery = '<div class="page-section uploaded-assets">' +
     '<h2>Uploaded Assets</h2>' +

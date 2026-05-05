@@ -397,6 +397,10 @@ const DOC_DEFAULT_CSS = `
 .doc-editor-page .align-center { text-align: center; }
 .doc-editor-page .align-right { text-align: right; }
 
+.doc-editor-page .doc-image-float.align-left { float: left; margin-right: 24px; margin-bottom: 16px; width: auto; max-width: 50%; clear: left; }
+.doc-editor-page .doc-image-float.align-right { float: right; margin-left: 24px; margin-bottom: 16px; width: auto; max-width: 50%; clear: right; }
+.doc-editor-page .doc-image-float::after { content: ""; display: table; clear: both; }
+
 .doc-editor-page .doc-image-row {
   display: flex;
   flex-direction: row;
@@ -706,6 +710,12 @@ function setSubmitViewMode(mode) {
   editor.classList.toggle('hidden', !showEditor);
   createWorkspace.classList.toggle('hidden', !showEditor || listMode);
   history.classList.toggle('hidden', !listMode);
+  editor.style.display = showEditor ? 'block' : 'none';
+  editor.style.visibility = showEditor ? 'visible' : 'hidden';
+  editor.style.position = 'relative';
+  editor.style.zIndex = showEditor ? '1' : '';
+  createWorkspace.style.display = showEditor && !listMode ? 'block' : 'none';
+  createWorkspace.style.visibility = showEditor ? 'visible' : 'hidden';
   updateMySubmissionsHeading(mode);
 }
 
@@ -1181,12 +1191,22 @@ async function saveDraft(options = {}) {
     subsectionCounters: subsectionCounters,
   };
 
+  const draftSubmission = removeClientOnlySubmissionFields(draftPayload);
+  const payloadJson = JSON.stringify(draftSubmission);
+  const payloadBytes = typeof Blob !== 'undefined' ? new Blob([payloadJson]).size : payloadJson.length;
+  if (payloadBytes > 950000) {
+    const warning = 'Draft is too large to save (' + payloadBytes + ' bytes, near the Firestore 1 MB limit). Please shorten the content or remove large embedded images/media.';
+    setDraftStatus(warning, true);
+    window.rogAlert(warning);
+    return null;
+  }
+
   draftSaveInFlight = true;
   try {
     const result = await callSubmissionApi('POST', {
       action: 'draft',
       submissionId: activeDraftId || (submitEditTarget && submitEditTarget.id) || '',
-      submission: removeClientOnlySubmissionFields(draftPayload),
+      submission: draftSubmission,
       isVersionedUpdate: !!(activeDraftId || (submitEditTarget && submitEditTarget.id))
     });
     activeDraftId = result.id || activeDraftId;
@@ -1251,13 +1271,13 @@ async function continueDraftSubmission(id) {
       subsectionCounters = { ...draft.subsectionCounters };
     }
 
-    if (docBlocks.length || currentMode === 'doc') {
-      switchMode('doc');
-      // No need to set sf-html/sf-css here as Document Studio renders from docBlocks
-    } else if (currentMode === 'template') {
+    if (currentMode === 'template') {
       switchMode('template');
       if (currentTemplate) selectTemplate(currentTemplate);
       restoreTemplateState(currentTemplate);
+    } else if (currentMode === 'doc') {
+      switchMode('doc');
+      // No need to set sf-html/sf-css here as Document Studio renders from docBlocks
     } else {
       switchMode('code');
       document.getElementById('sf-html').value = draft.htmlContent || DEFAULT_NEW_PAGE_HTML;
@@ -2089,6 +2109,7 @@ function addArtworkImage() {
   div.innerHTML =
     '<div class="doc-image-entry-row">' +
       '<div style="flex:1"><label class="fl">Image ' + n + '</label><select class="fi art-img-select">' + getUploadedImageOptions('') + '</select></div>' +
+      '<div style="flex:1"><label class="fl">Placement</label><select class="fi art-img-placement"><option value="inline">Inline</option><option value="left">Left</option><option value="right">Right</option></select></div>' +
       '<div style="flex:1"><label class="fl">URL</label><input class="fi art-img-url" placeholder="https://..." /></div>' +
       '<button class="btn btn-sm btn-d" onclick="removeArtworkImage(' + n + ')" style="margin-top:20px;height:32px">✕</button>' +
     '</div>';
@@ -2118,7 +2139,7 @@ function buildTemplateHTML() {
 function createDocBlock(type) {
   if (type === 'title') return { type: 'title', text: '' };
   if (type === 'text') return { type: 'text', html: '' };
-  if (type === 'image') return { type: 'image', images: [{ url: '', caption: '' }], layout: 'stack', align: 'center', width: '' };
+  if (type === 'image') return { type: 'image', images: [{ url: '', caption: '' }], layout: 'stack', align: 'center', width: '', wrapText: false };
   if (type === 'audio') return { type: 'audio', url: '', label: '' };
   if (type === 'video') return { type: 'video', url: '', label: '', poster: '' };
   if (type === 'quote') return { type: 'quote', text: '', source: '' };
@@ -2350,14 +2371,22 @@ function hydrateTemplateFromHtml(tpl, htmlContent) {
 
     const list = document.getElementById('tf-art-images-list');
     if (list) {
-      const images = Array.from(parsed.querySelectorAll('.art-gallery img')).map(img => String(img.getAttribute('src') || '').trim()).filter(Boolean);
-      if (images.length) {
+      const frames = Array.from(parsed.querySelectorAll('.art-gallery .art-frame'));
+      const imageEntries = frames.length
+        ? frames.map(frame => ({
+            url: String(frame.querySelector('img')?.getAttribute('src') || '').trim(),
+            placement: frame.classList.contains('art-placement-left') ? 'left' : (frame.classList.contains('art-placement-right') ? 'right' : 'inline')
+          })).filter(item => item.url)
+        : Array.from(parsed.querySelectorAll('.art-gallery img')).map(img => ({ url: String(img.getAttribute('src') || '').trim(), placement: 'inline' })).filter(item => item.url);
+      if (imageEntries.length) {
         list.innerHTML = '';
-        images.forEach(url => {
+        imageEntries.forEach(imageEntry => {
           addArtworkImage();
-          const entry = list.lastElementChild;
-          const urlInput = entry ? entry.querySelector('.art-img-url') : null;
-          if (urlInput) urlInput.value = url;
+          const row = list.lastElementChild;
+          const urlInput = row ? row.querySelector('.art-img-url') : null;
+          const placementInput = row ? row.querySelector('.art-img-placement') : null;
+          if (urlInput) urlInput.value = imageEntry.url;
+          if (placementInput) placementInput.value = imageEntry.placement || 'inline';
         });
       }
     }
@@ -2493,6 +2522,7 @@ function renderDocBlocks() {
             '<option value="right"' + (block.align === 'right' ? ' selected' : '') + '>Right</option>' +
           '</select></div>' +
           '<div><label class="fl">Max Width</label><input class="fi" data-field="width" data-index="' + idx + '" value="' + escapeAttr(block.width || '') + '" placeholder="auto, 100%, 800px" /></div>' +
+          '<div><label class="fl" style="margin-bottom:6px;">Wrap Text</label><div><input type="checkbox" data-field="wrapText" data-index="' + idx + '"' + (block.wrapText ? ' checked' : '') + ' style="vertical-align:middle;"> <span style="font-size:0.8rem;color:var(--wht-f)">Flow text beside</span></div></div>' +
         '</div>' +
         '<div class="doc-image-list">' + imagesHtml + '</div>' +
         '<button class="btn btn-sm btn-s" type="button" data-action="addImage" data-index="' + idx + '" style="margin-top:8px">+ Add Another Image</button>' +
@@ -2775,9 +2805,22 @@ function buildDocumentModeHTML() {
       const layout = block.layout || 'stack';
       const layoutClass = layout === 'row' ? 'doc-image-row' : (layout === 'grid' ? 'doc-image-grid' : 'doc-image-stack');
       const align = (block.align === 'left' || block.align === 'right') ? block.align : 'center';
+      const wrapBeside = !!(block.wrapText && (align === 'left' || align === 'right'));
       
-      let html = '<div class="doc-image-container ' + layoutClass + ' align-' + align + '"';
-      if (block.width) html += ' style="max-width:' + block.width + '"';
+      let html = '<div class="doc-image-container ' + layoutClass + ' align-' + align;
+      if (wrapBeside) html += ' doc-image-float';
+      html += '"';
+      if (block.width || wrapBeside) {
+        const styles = [];
+        if (block.width) styles.push('max-width:' + block.width);
+        if (wrapBeside) {
+          styles.push('float:' + align);
+          styles.push('margin:' + (align === 'left' ? '0 24px 16px 0' : '0 0 16px 24px'));
+          styles.push('width:auto');
+          styles.push('clear:' + align);
+        }
+        html += ' style="' + styles.join(';') + '"';
+      }
       html += '>\n';
       
       images.forEach(img => {
@@ -3126,9 +3169,11 @@ function buildArtworkTemplate() {
     imgEntries.forEach(entry => {
       const sel = entry.querySelector('.art-img-select');
       const url = entry.querySelector('.art-img-url');
+      const placement = entry.querySelector('.art-img-placement');
       const finalUrl = (sel && sel.value) || (url && url.value) || '';
       if (finalUrl) {
-        html += '    <div class="art-frame"><img src="' + escapeAttr(finalUrl) + '" alt="Artwork" /></div>\n';
+        const placementValue = String(placement && placement.value || 'inline').toLowerCase();
+        html += '    <div class="art-frame art-placement-' + placementValue + '"><img src="' + escapeAttr(finalUrl) + '" alt="Artwork" /></div>\n';
       }
     });
     html += '  </div>\n';
@@ -3150,10 +3195,7 @@ function buildArtworkTemplate() {
   letter-spacing: 2px;
 }
 .art-gallery {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  justify-content: center;
+  display: block;
   margin-bottom: 32px;
 }
 .art-frame {
@@ -3162,6 +3204,10 @@ function buildArtworkTemplate() {
   border: 1px solid #3a3a3a;
   display: inline-block;
 }
+.art-frame.art-placement-left { float: left; margin: 0 18px 16px 0; max-width: 45%; }
+.art-frame.art-placement-right { float: right; margin: 0 0 16px 18px; max-width: 45%; }
+.art-frame.art-placement-inline { float: none; margin: 0 16px 16px 0; }
+.art-gallery::after { content: ''; display: table; clear: both; }
 .art-frame img { max-width: 100%; max-height: 500px; display: block; }
 .art-info { max-width: 600px; margin: 0 auto; text-align: left; }
 .art-artist { font-size: 1rem; color: #8b0000; font-weight: 700; margin-bottom: 4px; }
@@ -5023,6 +5069,9 @@ function resetSubmitForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  const artImagesList = document.getElementById('tf-art-images-list');
+  if (artImagesList) artImagesList.innerHTML = '';
+  artworkImageCounter = 0;
 
   // Clear subsections
   ['tf-subsections', 'tf-tale-sections', 'tf-guide-sections'].forEach(id => {
