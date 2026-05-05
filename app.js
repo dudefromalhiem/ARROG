@@ -14,6 +14,40 @@ let terminalEndTimer = null;
 let terminalRafId = null;
 let clearanceWelcomeShownThisLoad = false;
 
+/**
+ * Verify user token server-side and fetch verified role/clearance
+ * SECURITY: Never trust client-side role determination
+ */
+async function getVerifiedUserRole(user) {
+  if (!user) return 'guest';
+  
+  try {
+    const token = await user.getIdToken(true); // Force refresh
+    const response = await fetch('/api/verify-token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      }
+    });
+
+    if (!response.ok) {
+      rogLogger.warn('[Security] Token verification failed:', response.status);
+      return 'guest';
+    }
+
+    const data = await response.json();
+    if (data.verified && data.user) {
+      // Update global state with server-verified role
+      return data.user.role || 'newbie';
+    }
+  } catch (err) {
+    rogLogger.error('[Security] Error verifying token:', err.message);
+  }
+  
+  return 'guest';
+}
+
 // ═════════════════════════════════════════════════════════════
 // TERMINAL EASTER EGG
 // ═════════════════════════════════════════════════════════════
@@ -419,7 +453,8 @@ async function updateAuthUI(user) {
 
   if (user) {
     currentUser = user;
-    currentRole = resolveRole(user.email);
+    // SECURITY FIX: Get verified role from server, never trust client-side determination
+    currentRole = await getVerifiedUserRole(user);
     const displayLabel = user.displayName || 'Agent';
     const isOwnerUser = isOwner(user.email);
     navAuth.innerHTML = renderUserMenuHTML(displayLabel) + exitEsdButton;

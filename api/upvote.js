@@ -1,5 +1,7 @@
 const admin = require('firebase-admin');
 const security = require('./security');
+const authMiddleware = require('./middleware/auth');
+const rateLimitMiddleware = require('./middleware/rateLimit');
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -114,10 +116,15 @@ module.exports = async (req, res) => {
       return security.sendError(res, 401, 'Invalid user session. Please sign in again.');
     }
 
-    // Rate limit per user (100 upvotes per hour)
-    if (security.enforceRateLimit(req, res, `upvote:${voteKey}`, { limit: 100, windowMs: 3600000 })) {
-      return;
-    }
+    // ═══ ISSUE 6 FIX: Rate limiting for upvote spam ═══
+    // 20 upvotes per minute per user to prevent voting spam
+    const isRateLimited = rateLimitMiddleware.enforceRateLimit(
+      req,
+      res,
+      voteKey,
+      { limit: 20, windowMs: 60000 }  // 20 upvotes per minute
+    );
+    if (isRateLimited) return;
 
     // Parse and validate request body
     const pageId = String(req.body?.pageId || '').trim();

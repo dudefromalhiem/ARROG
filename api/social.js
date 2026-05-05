@@ -7,6 +7,7 @@ const {
   isAtLeast
 } = require('../permissions');
 const { logRoleChange } = require('./audit');
+const errorHandler = require('./middleware/errorHandler');
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -1373,6 +1374,8 @@ module.exports = async function handler(req, res) {
 
     return sendJson(res, 405, { error: 'Method not allowed.' });
   } catch (err) {
-    return sendJson(res, Number(err.statusCode || 500), { error: err.message || 'Server error.' });
+    // ISSUE 8 FIX: Sanitize error responses to prevent information leakage
+    const handled = errorHandler.handleCatchError(err);
+    return sendJson(res, handled.statusCode, { error: handled.message });
   }
 };

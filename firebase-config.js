@@ -1,30 +1,71 @@
 /* ═══════════════════════════════════════════════════════════════
- *  FIREBASE CONFIGURATION — Replace placeholders before deploy
- *  For GitHub Pages, these are public config keys (safe to commit)
+ *  FIREBASE CONFIGURATION — Fetched securely from /api/config
+ *  Client never holds sensitive API keys
  * ═══════════════════════════════════════════════════════════════ */
-const firebaseConfig = {
-  apiKey: "AIzaSyDq8UwN7P1EDfa0IvR2-jUUgV3dHt67f3M",
-  authDomain: "redoakerguild.firebaseapp.com",
+
+// Placeholder config until fetched from secure endpoint
+let firebaseConfig = {
   projectId: "redoakerguild",
-  // Canonical Cloud Storage bucket for Firebase uploads.
+  authDomain: "redoakerguild.firebaseapp.com",
   storageBucket: "redoakerguild.firebasestorage.app",
   messagingSenderId: "847903433642",
-  appId: "1:847903433642:web:95a9fdddef4099ff8981d3",
-  measurementId: "G-WLR20NDRQL"
+  appId: "1:847903433642:web:95a9fdddef4099ff8981d3"
 };
 
-// Global Auth State
-if (typeof window.authMode === 'undefined') window.authMode = 'login';
-
-firebase.initializeApp(firebaseConfig);
-
-const auth = firebase.auth();
-const db = firebase.firestore();
-const storage = typeof firebase.storage === 'function' ? firebase.storage() : null;
-
-if (typeof auth.setPersistence === 'function') {
-  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+// Initialize Firebase with safe config (no API key exposed to client)
+if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
 }
+
+// Fetch complete config from secure endpoint for initialization
+async function loadSecureConfig() {
+  try {
+    const response = await fetch('/api/config', { 
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'reload'
+    });
+    if (response.ok) {
+      firebaseConfig = await response.json();
+      // Re-initialize Firebase with fetched config if not already initialized
+      if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      return firebaseConfig;
+    }
+  } catch (err) {
+    // Fall back to default config if endpoint fails
+    console.warn('[Firebase] Config endpoint failed, using fallback config:', err.message);
+  }
+  return firebaseConfig;
+}
+
+// Initialize on page load
+loadSecureConfig().catch(console.error);
+
+// Wait a bit for Firebase to be initialized before accessing auth/db
+const initFirebaseServices = () => {
+  const auth = typeof firebase !== 'undefined' ? firebase.auth() : null;
+  const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
+  const storage = typeof firebase !== 'undefined' && typeof firebase.storage === 'function' ? firebase.storage() : null;
+
+  if (auth && typeof auth.setPersistence === 'function') {
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+  }
+  
+  return { auth, db, storage };
+};
+
+// Initialize Firebase services after config loads
+let { auth, db, storage } = initFirebaseServices();
+
+// Re-initialize if config was loaded
+loadSecureConfig().then(() => {
+  const reInit = initFirebaseServices();
+  auth = reInit.auth;
+  db = reInit.db;
+  storage = reInit.storage;
+}).catch(console.error);
 
 const isProductionHost = !/localhost|127\.0\.0\.1/i.test(String(location.hostname || '')) && location.protocol !== 'file:';
 const rogLogger = {
