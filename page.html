@@ -616,7 +616,7 @@ function configureCommentsApiBase() {
     const isLocal = host === 'localhost' || host === '127.0.0.1';
     const isFile = window.location.protocol === 'file:';
     commentsApiBase = (isLocal || isFile)
-      ? 'https://redoakguild.vercel.app/api/comments'
+      ? 'https://redoakerguild.vercel.app/api/comments'
       : '/api/comments';
   } catch (_err) {
     commentsApiBase = '/api/comments';

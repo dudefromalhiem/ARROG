@@ -1205,7 +1205,7 @@ function isVercelHostedOrigin() {
 function resolveGuildApiUrl(path) {
   const normalizedPath = String(path || '').startsWith('/') ? String(path || '') : '/' + String(path || '');
   if (isVercelHostedOrigin()) return normalizedPath;
-  return 'https://redoakguild.vercel.app' + normalizedPath;
+  return 'https://redoakerguild.vercel.app' + normalizedPath;
 }
 
 function resolveGuildSocialApiUrl(queryString = '') {

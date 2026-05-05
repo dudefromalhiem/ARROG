@@ -11,8 +11,8 @@ let currentUserDoc = null;
 let adminSeedDataLoadPromise = null;
 let socialApiBase = '/api/social';
 const REMOTE_SOCIAL_API_BASES = [
-  'https://redoakguild.vercel.app/api/social',
-  'https://redoakerguild.vercel.app/api/social'
+  'https://redoakerguild.vercel.app/api/social',
+  'https://redoakguild.vercel.app/api/social'
 ];
 
 // Utility for safe HTML rendering
@@ -254,41 +254,47 @@ async function getSocialApiHeaders() {
 
 async function callSocialApi(method, payload = {}, query = '') {
   const requestHeaders = await getSocialApiHeaders();
-  let response = await fetch(socialApiBase + query, {
-    method: method,
-    headers: requestHeaders,
-    body: method === 'GET' ? undefined : JSON.stringify(payload)
-  });
 
-  if (!response.ok && response.status === 404 && socialApiBase === '/api/social') {
-    socialApiBase = REMOTE_SOCIAL_API_BASES[0];
-    response = await fetch(socialApiBase + query, {
-      method: method,
-      headers: requestHeaders,
-      body: method === 'GET' ? undefined : JSON.stringify(payload)
-    });
-  }
+  // Try current base, then fall back to configured remote bases on network errors or 404s.
+  const bases = [socialApiBase].concat(REMOTE_SOCIAL_API_BASES.filter(b => b !== socialApiBase));
+  let lastErr = null;
 
-  if (!response.ok && response.status === 404) {
-    const currentRemoteIndex = REMOTE_SOCIAL_API_BASES.indexOf(socialApiBase);
-    if (currentRemoteIndex !== -1 && currentRemoteIndex < REMOTE_SOCIAL_API_BASES.length - 1) {
-      socialApiBase = REMOTE_SOCIAL_API_BASES[currentRemoteIndex + 1];
-      response = await fetch(socialApiBase + query, {
+  for (let i = 0; i < bases.length; i++) {
+    const base = bases[i];
+    try {
+      const response = await fetch(base + query, {
         method: method,
         headers: requestHeaders,
         body: method === 'GET' ? undefined : JSON.stringify(payload)
       });
+
+      // If 404 on local API, try remote fallback immediately
+      if (!response.ok && response.status === 404 && base === '/api/social') {
+        lastErr = new Error('Not found at local API, trying remote');
+        socialApiBase = REMOTE_SOCIAL_API_BASES[0] || socialApiBase;
+        continue;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = data && data.error ? data.error : ('Request failed with status ' + response.status);
+        const err = new Error(message);
+        err.status = response.status;
+        throw err;
+      }
+
+      // Success — set the active base and return data
+      socialApiBase = base;
+      return data;
+    } catch (err) {
+      // Network error or JSON parsing / status errors — record and try next base
+      lastErr = err;
+      continue;
     }
   }
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = data && data.error ? data.error : ('Request failed with status ' + response.status);
-    const err = new Error(message);
-    err.status = response.status;
-    throw err;
-  }
-  return data;
+  // If we exhausted bases, throw the last error for callers to display
+  throw lastErr || new Error('Social API request failed');
 }
 
 function canDeleteManagedContent() {
