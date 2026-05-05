@@ -1047,7 +1047,6 @@ hr {
   padding: 0 24px 64px;
   border-bottom: 1px solid var(--red-d);
   margin-bottom: 48px;
-  overflow: visible
 }
 
 .intro-hero {
@@ -1056,21 +1055,20 @@ hr {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
   padding: 80px 24px 48px;
   margin-bottom: 24px;
-  overflow: visible
 }
 
 .intro-logo {
-  width: min(100%, 300px);
-  aspect-ratio: 1 / 1;
-  height: auto;
+  width: 280px;
+  height: 280px;
   object-fit: contain;
-  opacity: 1;
-  margin-bottom: 0;
-  position: relative;
-  display: block;
+  opacity: .25;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin-bottom: 24px;
   pointer-events: none;
   filter: drop-shadow(0 0 40px rgba(139, 0, 0, .4))
 }
@@ -1083,7 +1081,6 @@ hr {
   margin-bottom: 0;
   text-shadow: 0 0 40px rgba(139, 0, 0, .5), 0 2px 8px rgba(0, 0, 0, .9);
   position: relative;
-  text-align: center;
   z-index: 1
 }
 
@@ -4061,13 +4058,11 @@ body::after {
 
   .intro-hero {
     padding: 24px 10px 16px;
-    gap: 14px;
   }
 
   .intro-logo {
-    width: min(72vw, 220px);
-    aspect-ratio: 1 / 1;
-    height: auto;
+    width: 100px;
+    height: 100px;
   }
 
   .intro-t {
@@ -4750,8 +4745,8 @@ body::after {
 }
 
 @keyframes logoDrift {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%, 100% { transform: translate(-50%, -50%); }
+  50% { transform: translate(-50%, calc(-50% - 4px)); }
 }
 
 @media (max-width: 980px) {
