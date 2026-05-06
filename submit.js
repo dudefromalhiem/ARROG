@@ -862,7 +862,10 @@ function seedTemplateCacheFromPage(page, fallbackTemplate) {
   if (!key || !htmlContent) return;
   templateStateCache[key] = {
     htmlContent: htmlContent,
-    cssContent: String(page && page.cssContent || '')
+    cssContent: String(page && page.cssContent || ''),
+    htmlCode: String(page && page.htmlContent || page && page.content || ''),
+    cssCode: String(page && page.cssContent || ''),
+    docBlocks: Array.isArray(page && page.docBlocks) ? JSON.parse(JSON.stringify(page.docBlocks)) : undefined
   };
 }
 
@@ -3684,8 +3687,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Bind all template fields to preview
   document.querySelectorAll('#template-mode input, #template-mode textarea, #template-mode select').forEach(el => {
-    el.addEventListener('input', schedulePreview);
-    el.addEventListener('change', schedulePreview);
+    el.addEventListener('input', () => {
+      captureEditorState('template');
+      schedulePreview();
+    });
+    el.addEventListener('change', () => {
+      captureEditorState('template');
+      schedulePreview();
+    });
   });
 
   initDocumentStudio();
