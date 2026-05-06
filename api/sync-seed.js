@@ -45,7 +45,13 @@ async function verifyUser(req) {
   };
 }
 
-const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem@gmail.com']);
+// SECURITY FIX: Load bootstrap owner emails from env to avoid exposing them in repo
+const BOOTSTRAP_OWNERS = new Set(
+  (process.env.BOOTSTRAP_OWNER_EMAILS || '')
+    .split(',')
+    .map(e => String(e || '').trim().toLowerCase())
+    .filter(Boolean)
+);
 
 async function isAdminUser(db, uid, email) {
   if (BOOTSTRAP_OWNERS.has(String(email || '').toLowerCase())) return true;

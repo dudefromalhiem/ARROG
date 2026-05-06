@@ -105,7 +105,14 @@ async function verifyUser(req) {
   };
 }
 
-const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem@gmail.com']);
+// SECURITY FIX: Load bootstrap owner emails from environment variable to avoid
+// exposing owner addresses in the repository.
+const BOOTSTRAP_OWNERS = new Set(
+  (process.env.BOOTSTRAP_OWNER_EMAILS || '')
+    .split(',')
+    .map(e => String(e || '').trim().toLowerCase())
+    .filter(Boolean)
+);
 
 function isOwnerEmail(email, rolesData) {
   const normalizedEmail = String(email || '').toLowerCase();

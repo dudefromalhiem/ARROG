@@ -121,6 +121,13 @@ export async function middleware(request) {
   try {
     const verified = await verifyFirebaseToken(token);
     if (!verified) return redirectToHome(request);
+    // SECURITY FIX: restrict access to /admin pages to only users with
+    // server-set admin or isOwner claims. Other protected paths remain auth-only.
+    if (pathname === '/admin' || pathname === '/admin.html') {
+      const decoded = decodeJwtParts(token);
+      const payload = decoded && decoded.payload ? decoded.payload : {};
+      if (payload.admin !== true && payload.isOwner !== true) return redirectToHome(request);
+    }
     return;
   } catch (_err) {
     return redirectToHome(request);

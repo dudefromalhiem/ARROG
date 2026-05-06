@@ -6,18 +6,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // SECURITY FIX: Rely on trusted token claims for owner/admin checks instead
+    // of matching emails in source. This prevents privilege escalation via
+    // writes to config/roles or public exposure of owner emails.
     function isBootstrapOwner() {
-      return isSignedIn() && (
-        request.auth.token.email == 'jaimejoselaureano@gmail.com' ||
-        request.auth.token.email == 'dudefromalhiem@gmail.com'
-      );
+      return isSignedIn() && request.auth.token.isOwner == true;
     }
 
     function isOwnerFromRolesDoc() {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/config/roles) &&
-        ('owners' in get(/databases/$(database)/documents/config/roles).data) &&
-        request.auth.token.email in get(/databases/$(database)/documents/config/roles).data.owners;
+      // Interpreted as admin claim present on token (trusted server-set claim)
+      return isSignedIn() && request.auth.token.admin == true;
     }
 
     function isOwnerUser() {
@@ -96,19 +94,8 @@ service cloud.firestore {
       let level = getUserLevel();
       let role = getUserRole();
 
-      // Fallback: consider the actor listed in config/roles (owners/admins/mods)
-      // as having moderation privileges when the users/{uid} document is out-of-sync.
-      let email = isSignedIn() ? request.auth.token.email : '';
-      let listedInRolesDoc = isSignedIn() && exists(/databases/$(database)/documents/config/roles) && (
-        (('owners' in get(/databases/$(database)/documents/config/roles).data) &&
-         email in get(/databases/$(database)/documents/config/roles).data.owners) ||
-        (('admins' in get(/databases/$(database)/documents/config/roles).data) &&
-         email in get(/databases/$(database)/documents/config/roles).data.admins) ||
-        (('mods' in get(/databases/$(database)/documents/config/roles).data) &&
-         email in get(/databases/$(database)/documents/config/roles).data.mods)
-      );
-
-      return isOwnerActor() || role == 'moderator' || role == 'admin' || role == 'chief_admin' || level >= 5 || listedInRolesDoc;
+      // Use authoritative sources only: token claims and users/{uid} role priority.
+      return isOwnerActor() || role == 'moderator' || role == 'admin' || role == 'chief_admin' || level >= 5 || getRolePriority(getUserRole()) >= 60;
     }
 
     function canManageUsersRoles() {

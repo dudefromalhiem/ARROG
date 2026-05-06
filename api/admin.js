@@ -30,6 +30,8 @@ function getRequestIp(req) {
   return String(req.socket?.remoteAddress || 'unknown');
 }
 
+// SECURITY FIX: return decoded token/claims so server-side code can rely on
+// custom claims (isOwner/admin) rather than external role documents.
 async function verifyUser(req) {
   const app = initAdmin();
   const token = getBearerToken(req);
@@ -41,44 +43,44 @@ async function verifyUser(req) {
   const decoded = await admin.auth(app).verifyIdToken(token);
   return {
     uid: String(decoded.uid || ''),
-    email: String(decoded.email || '').toLowerCase()
+    email: String(decoded.email || '').toLowerCase(),
+    claims: decoded
   };
 }
 
-const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem@gmail.com']);
+// SECURITY FIX: load bootstrap owner emails from env var to avoid embedding
+// sensitive addresses in source control.
+const BOOTSTRAP_OWNERS = new Set(
+  (process.env.BOOTSTRAP_OWNER_EMAILS || '')
+    .split(',')
+    .map(e => String(e || '').trim().toLowerCase())
+    .filter(Boolean)
+);
 
-async function getActorPermissions(db, uid, email) {
-  const normalizedEmail = String(email || '').toLowerCase();
+// SECURITY FIX: Determine actor permissions using EITHER token claims or the
+// users/{uid} document. Removed fallback to config/roles email arrays which
+// allowed privilege escalation via writes to config/roles.
+async function getActorPermissions(db, actor) {
+  const uid = String(actor.uid || '');
+  const email = String(actor.email || '').toLowerCase();
 
-  // Bootstrap owners have ultimate authority
-  if (BOOTSTRAP_OWNERS.has(normalizedEmail)) {
-    return {
-      role: ROLES.OWNER,
-      rank: 999,
-      canPromote: true,
-      canDemote: true,
-      canAudit: true,
-      canManageAll: true
-    };
+  // Check token-level claims first (trusted source)
+  const claims = actor.claims || {};
+  if (claims.isOwner === true) {
+    return { role: ROLES.OWNER, rank: 999, canPromote: true, canDemote: true, canAudit: true, canManageAll: true };
+  }
+  if (claims.admin === true) {
+    // Treat admin claim as high-level administrator
+    return { role: ROLES.CHIEF_ADMINISTRATOR, rank: PUBLIC_ROLE_LADDER.indexOf(ROLES.CHIEF_ADMINISTRATOR) + 1, canPromote: true, canDemote: true, canAudit: true, canManageAll: false };
   }
 
+  // Fallback to users/{uid} document role (server-controlled, safe)
   const userDoc = await db.collection('users').doc(uid).get();
-  const userData = userDoc.exists ? userDoc.data() : {};
+  const userData = userDoc.exists ? (userDoc.data() || {}) : {};
   const userRole = normalizeRole(userData.role);
 
-  const rolesDoc = await db.collection('config').doc('roles').get();
-  const rolesData = rolesDoc.exists ? rolesDoc.data() : {};
-  const inOwners = Array.isArray(rolesData.owners) && rolesData.owners.map(e => String(e || '').toLowerCase()).includes(normalizedEmail);
-  const inAdmins = Array.isArray(rolesData.admins) && rolesData.admins.map(e => String(e || '').toLowerCase()).includes(normalizedEmail);
-  const inMods = Array.isArray(rolesData.mods) && rolesData.mods.map(e => String(e || '').toLowerCase()).includes(normalizedEmail);
+  const effectiveRole = userRole || ROLES.NEWBIE;
 
-  // Determine effective role
-  let effectiveRole = userRole;
-  if (inOwners) effectiveRole = ROLES.OWNER;
-  else if (inAdmins) effectiveRole = ROLES.CHIEF_ADMINISTRATOR;
-  else if (inMods) effectiveRole = ROLES.CHIEF_OF_MODERATION;
-
-  // Build permissions based on role hierarchy
   const permissions = {
     role: effectiveRole,
     rank: PUBLIC_ROLE_LADDER.indexOf(effectiveRole) + 1,
@@ -88,27 +90,13 @@ async function getActorPermissions(db, uid, email) {
     canManageAll: false
   };
 
-  // OWNER: can do everything
   if (effectiveRole === ROLES.OWNER) {
-    permissions.canPromote = true;
-    permissions.canDemote = true;
-    permissions.canAudit = true;
-    permissions.canManageAll = true;
-  }
-  // CHIEF_ADMINISTRATOR: can manage admins/moderators, full audit
-  else if (isAtLeast(effectiveRole, ROLES.CHIEF_ADMINISTRATOR)) {
-    permissions.canPromote = true;
-    permissions.canDemote = true;
-    permissions.canAudit = true;
-  }
-  // CHIEF_OF_MODERATION: can promote/demote moderators only
-  else if (isAtLeast(effectiveRole, ROLES.CHIEF_OF_MODERATION)) {
-    permissions.canPromote = true;
-    permissions.canDemote = true;
-    permissions.canAudit = true;
-  }
-  // All other roles: audit only
-  else if (isAtLeast(effectiveRole, ROLES.MODERATOR)) {
+    permissions.canPromote = true; permissions.canDemote = true; permissions.canAudit = true; permissions.canManageAll = true;
+  } else if (isAtLeast(effectiveRole, ROLES.CHIEF_ADMINISTRATOR)) {
+    permissions.canPromote = true; permissions.canDemote = true; permissions.canAudit = true;
+  } else if (isAtLeast(effectiveRole, ROLES.CHIEF_OF_MODERATION)) {
+    permissions.canPromote = true; permissions.canDemote = true; permissions.canAudit = true;
+  } else if (isAtLeast(effectiveRole, ROLES.MODERATOR)) {
     permissions.canAudit = true;
   }
 
@@ -173,7 +161,7 @@ async function promoteUser(req, res) {
     const app = initAdmin();
     const db = admin.firestore(app);
     const actor = await verifyUser(req);
-    const actorPerms = await getActorPermissions(db, actor.uid, actor.email);
+    const actorPerms = await getActorPermissions(db, actor);
 
     if (!actorPerms.canPromote) {
       await logPermissionDenial(db, actor, 'promote_user', 'Insufficient permissions', req.body);
@@ -258,7 +246,7 @@ async function demoteUser(req, res) {
     const app = initAdmin();
     const db = admin.firestore(app);
     const actor = await verifyUser(req);
-    const actorPerms = await getActorPermissions(db, actor.uid, actor.email);
+    const actorPerms = await getActorPermissions(db, actor);
 
     if (!actorPerms.canDemote) {
       await logPermissionDenial(db, actor, 'demote_user', 'Insufficient permissions', req.body);
@@ -340,7 +328,7 @@ async function getAuditLogs(req, res) {
     const app = initAdmin();
     const db = admin.firestore(app);
     const actor = await verifyUser(req);
-    const actorPerms = await getActorPermissions(db, actor.uid, actor.email);
+    const actorPerms = await getActorPermissions(db, actor);
 
     if (!actorPerms.canAudit) {
       await logPermissionDenial(db, actor, 'view_audit_logs', 'Insufficient permissions', {});

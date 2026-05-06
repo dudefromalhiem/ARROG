@@ -103,7 +103,14 @@ async function verifyUserIfPresent(req) {
   }
 }
 
-const BOOTSTRAP_OWNERS = new Set(['jaimejoselaureano@gmail.com', 'dudefromalhiem@gmail.com']);
+// SECURITY FIX: Load bootstrap owner emails from environment variable to avoid
+// leaking owner addresses in source control.
+const BOOTSTRAP_OWNERS = new Set(
+  (process.env.BOOTSTRAP_OWNER_EMAILS || '')
+    .split(',')
+    .map(e => String(e || '').trim().toLowerCase())
+    .filter(Boolean)
+);
 
 async function isAdminUser(db, uid, email) {
   const normalizedEmail = String(email || '').toLowerCase();
