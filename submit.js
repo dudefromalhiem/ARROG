@@ -1298,7 +1298,7 @@ async function continueDraftSubmission(id) {
       // No need to set sf-html/sf-css here as Document Studio renders from docBlocks
     } else {
       switchMode('code');
-      document.getElementById('sf-html').value = draft.htmlContent || DEFAULT_NEW_PAGE_HTML;
+      document.getElementById('sf-html').value = draft.htmlContent || draft.content || DEFAULT_NEW_PAGE_HTML;
       document.getElementById('sf-css').value = draft.cssContent || '';
     }
 
@@ -1528,7 +1528,8 @@ async function initializeSubmitEditModeFromUrl() {
       setDesignationLock(false);
     }
 
-    document.getElementById('sf-html').value = page.htmlContent || DEFAULT_NEW_PAGE_HTML;
+    const pageHtmlContent = String(page.htmlContent || page.content || '');
+    document.getElementById('sf-html').value = pageHtmlContent || DEFAULT_NEW_PAGE_HTML;
     document.getElementById('sf-css').value = page.cssContent || '';
 
     uploadedImages = Array.isArray(page.imageAssets) && page.imageAssets.length
@@ -1578,7 +1579,7 @@ async function initializeSubmitEditModeFromUrl() {
       };
     }
 
-    const content = String(page.htmlContent || '');
+    const content = String(pageHtmlContent || '');
     const inferredTemplate = inferTemplateFromPageData(page);
     const storedTemplate = getTemplateStateKey(page.currentTemplate);
     const inferredTemplateKey = getTemplateStateKey(inferredTemplate);
