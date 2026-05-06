@@ -21,5 +21,24 @@
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
       ]
     }
+    ,
+    {
+      "source": "/admin(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    },
+    {
+      "source": "/submit(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    }
   ]
 }
