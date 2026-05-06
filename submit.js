@@ -444,6 +444,21 @@ const DOC_DEFAULT_CSS = `
 }
 .doc-editor-page ul, .doc-editor-page ol { margin: 16px 0 16px 30px; color: #d8d8d8; }
 .doc-editor-page li { margin-bottom: 8px; }
+/* Redaction styling: visually hide the sensitive text and show a red bar. */
+.redaction {
+  display: inline-block;
+  background: #8b0000;
+  color: transparent;
+  border-radius: 2px;
+  padding: 0 0.5ch;
+  line-height: 1em;
+}
+.redaction[aria-hidden="true"]::after {
+  content: '';
+  display: inline-block;
+  width: 0.6em;
+  height: 1em;
+}
 `;
 
 // ═════════════════════════════════════════════════════════════
@@ -1949,29 +1964,53 @@ function captureEditorState(mode) {
     }
     templateStateCache[currentTemplate].htmlContent = String(content && content.html || '');
     templateStateCache[currentTemplate].cssContent = String(content && content.css || '');
+    // Keep a code-mode snapshot so switching back to code preserves exact markup
+    templateStateCache[currentTemplate].htmlCode = String(content && content.html || '');
+    templateStateCache[currentTemplate].cssCode = String(content && content.css || '');
   } else if (mode === 'doc') {
     if (!templateStateCache[currentTemplate]) {
       templateStateCache[currentTemplate] = {};
     }
     templateStateCache[currentTemplate].docBlocks = JSON.parse(JSON.stringify(docBlocks));
+    // Serialize document-mode output into a code snapshot as well
+    try {
+      const docOut = buildDocumentModeHTML();
+      templateStateCache[currentTemplate].htmlCode = String(docOut && docOut.html || '');
+      templateStateCache[currentTemplate].cssCode = String(docOut && docOut.css || '');
+    } catch (_err) {
+      // ignore
+    }
   } else if (mode === 'code') {
     if (!templateStateCache[currentTemplate]) {
       templateStateCache[currentTemplate] = {};
     }
     templateStateCache[currentTemplate].htmlCode = String(document.getElementById('sf-html').value || '');
     templateStateCache[currentTemplate].cssCode = String(document.getElementById('sf-css').value || '');
+    // Also update friendly template/html caches so template/doc modes reflect changes
+    try {
+      const parsed = templateStateCache[currentTemplate].htmlCode || '';
+      templateStateCache[currentTemplate].htmlContent = String(parsed);
+    } catch (_err) {
+      // ignore
+    }
   }
 }
 
 function restoreEditorState(mode) {
   const cached = templateStateCache[currentTemplate] || {};
   if (mode === 'template') {
-    if (cached.htmlContent || cached.cssContent) {
-      hydrateTemplateFromHtml(currentTemplate, cached.htmlContent);
+    const sourceHtml = (cached.htmlContent && String(cached.htmlContent).trim()) ? cached.htmlContent : (cached.htmlCode || '');
+    if (sourceHtml) {
+      hydrateTemplateFromHtml(currentTemplate, sourceHtml);
     }
   } else if (mode === 'doc') {
+    // Prefer explicit docBlocks if present; otherwise try to parse cached HTML/code
     if (cached.docBlocks && Array.isArray(cached.docBlocks)) {
       docBlocks = JSON.parse(JSON.stringify(cached.docBlocks));
+    } else if (cached.htmlContent && String(cached.htmlContent).trim()) {
+      docBlocks = parseHtmlToDocBlocks(String(cached.htmlContent));
+    } else if (cached.htmlCode && String(cached.htmlCode).trim()) {
+      docBlocks = parseHtmlToDocBlocks(String(cached.htmlCode));
     }
   } else if (mode === 'code') {
     const htmlEl = document.getElementById('sf-html');
@@ -2840,6 +2879,82 @@ function initDocumentStudio() {
     schedulePreview();
   }
 
+  // Redaction helper: wrap the current selection or textarea selection with ||...||
+  function redactSelection() {
+    try {
+      const activeEl = document.activeElement;
+      // Code textarea
+      if (currentMode === 'code' && activeEl && activeEl.id === 'sf-html') {
+        const ta = activeEl;
+        const start = ta.selectionStart || 0;
+        const end = ta.selectionEnd || 0;
+        const val = ta.value || '';
+        const sel = val.slice(start, end) || '';
+        const wrapped = '||' + sel + '||';
+        ta.value = val.slice(0, start) + wrapped + val.slice(end);
+        ta.selectionStart = start + 2;
+        ta.selectionEnd = start + 2 + sel.length;
+        ta.focus();
+        // sync
+        if (!templateStateCache[currentTemplate]) templateStateCache[currentTemplate] = {};
+        templateStateCache[currentTemplate].htmlCode = ta.value;
+        schedulePreview();
+        markEditorAsChanged();
+        return;
+      }
+
+      // Input or textarea
+      if (activeEl && (activeEl.tagName === 'TEXTAREA' || (activeEl.tagName === 'INPUT' && activeEl.type === 'text'))) {
+        const ta = activeEl;
+        const start = ta.selectionStart || 0;
+        const end = ta.selectionEnd || 0;
+        const val = ta.value || '';
+        const sel = val.slice(start, end) || '';
+        const wrapped = '||' + sel + '||';
+        ta.value = val.slice(0, start) + wrapped + val.slice(end);
+        ta.selectionStart = start + 2;
+        ta.selectionEnd = start + 2 + sel.length;
+        ta.focus();
+        schedulePreview();
+        markEditorAsChanged();
+        return;
+      }
+
+      // Document Studio contenteditable
+      if (activeDocEditable && activeDocEditable.isContentEditable) {
+        const sel = document.getSelection();
+        if (!sel || sel.isCollapsed) return;
+        const range = sel.getRangeAt(0);
+        const text = range.toString() || '';
+        const wrapNode = document.createTextNode('||' + text + '||');
+        range.deleteContents();
+        range.insertNode(wrapNode);
+        // Move caret after inserted node
+        range.setStartAfter(wrapNode);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        // Persist change to docBlocks
+        const idx = Number(activeDocEditable.getAttribute('data-index'));
+        if (Number.isFinite(idx) && docBlocks[idx]) {
+          docBlocks[idx].html = activeDocEditable.innerHTML;
+        }
+        schedulePreview();
+        markEditorAsChanged();
+        return;
+      }
+    } catch (_err) {
+      // ignore
+    }
+  }
+
+  // Keyboard shortcut: Ctrl+Shift+R to redact
+  document.addEventListener('keydown', e => {
+    if (e.key === 'R' && e.shiftKey && (e.ctrlKey || e.metaKey)) {
+      redactSelection();
+      e.preventDefault();
+    }
+  });
+
   holder.addEventListener('input', e => {
     if (e.target.hasAttribute('data-field')) handleBlockValueChange(e.target);
   });
@@ -3017,6 +3132,88 @@ function buildSandboxDocument(html, css) {
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
     css.replace(/<\/style>/gi, '') +
     '</style></head><body>' + htmlWithLazyImages + '</body></html>';
+}
+
+// Replace ||secret|| markers with a redaction span for preview. Keeps original text in
+// a data-original attribute so parsing back to structured modes can recover it.
+function applyRedactionSpans(html) {
+  return String(html || '').replace(/\|\|([\s\S]*?)\|\|/g, function(_m, inner) {
+    const safe = escapeAttr(String(inner || ''));
+    return '<span class="redaction" data-original="' + safe + '" aria-hidden="true">' + escapeHtml(inner) + '</span>';
+  });
+}
+
+// Parse an HTML string into simple `docBlocks` used by Document Studio. This is
+// a best-effort conversion and aims to preserve titles, paragraphs, images, quotes,
+// lists, code blocks and dividers. Redaction spans with `data-original` are
+// converted back into ||...|| markers in the structured output.
+function parseHtmlToDocBlocks(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(String(html || ''), 'text/html');
+  const body = doc.body || document.createElement('body');
+  const blocks = [];
+
+  const toOriginal = el => {
+    if (!el) return '';
+    // Replace redaction spans into ||...|| markers
+    el.querySelectorAll && el.querySelectorAll('.redaction').forEach(r => {
+      const orig = r.getAttribute('data-original') || r.textContent || '';
+      const marker = '||' + orig + '||';
+      const span = doc.createTextNode(marker);
+      r.parentNode && r.parentNode.replaceChild(span, r);
+    });
+    return el.innerHTML || '';
+  };
+
+  Array.from(body.childNodes || []).forEach(node => {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const tag = node.tagName.toLowerCase();
+      if (tag === 'h2') {
+        blocks.push({ type: 'title', text: node.textContent.trim() });
+        return;
+      }
+      if (tag === 'div' && node.classList.contains('doc-image-container')) {
+        // collect first image in container
+        const img = node.querySelector('img');
+        if (img && img.src) {
+          blocks.push({ type: 'image', url: img.getAttribute('src'), caption: (node.querySelector('figcaption') || {}).textContent || '', align: node.className.includes('align-left') ? 'left' : node.className.includes('align-right') ? 'right' : 'center' });
+        }
+        return;
+      }
+      if (tag === 'figure' && node.querySelector('img')) {
+        const img = node.querySelector('img');
+        blocks.push({ type: 'image', url: img.getAttribute('src'), caption: (node.querySelector('figcaption') || {}).textContent || '' });
+        return;
+      }
+      if (tag === 'blockquote') {
+        blocks.push({ type: 'quote', text: node.textContent.trim(), source: '' });
+        return;
+      }
+      if (tag === 'ul' || tag === 'ol') {
+        const items = Array.from(node.querySelectorAll('li')).map(li => li.textContent.trim()).join('\n');
+        blocks.push({ type: 'list', items });
+        return;
+      }
+      if (tag === 'pre') {
+        blocks.push({ type: 'code', code: node.textContent || '' });
+        return;
+      }
+      if (tag === 'hr') {
+        blocks.push({ type: 'divider' });
+        return;
+      }
+      // Fallback: treat as rich text
+      const rich = toOriginal(node);
+      if (rich && rich.trim()) blocks.push({ type: 'text', html: rich });
+      return;
+    }
+    if (node.nodeType === Node.TEXT_NODE) {
+      const txt = node.textContent.trim();
+      if (txt) blocks.push({ type: 'text', html: '<p>' + escapeHtml(txt) + '</p>' });
+    }
+  });
+
+  return blocks;
 }
 
 function escapeHtml(text) {
@@ -3401,6 +3598,29 @@ document.addEventListener('DOMContentLoaded', () => {
       openFilePicker();
     }
   });
+  // Keep code editor changes in sync with template/doc caches so switching modes
+  // reflects the latest edits. The code editor remains the authoritative source.
+  const htmlArea = document.getElementById('sf-html');
+  const cssArea = document.getElementById('sf-css');
+  if (htmlArea) {
+    htmlArea.addEventListener('input', () => {
+      if (!templateStateCache[currentTemplate]) templateStateCache[currentTemplate] = {};
+      templateStateCache[currentTemplate].htmlCode = String(htmlArea.value || '');
+      // Also keep a content snapshot for template/doc fallback
+      templateStateCache[currentTemplate].htmlContent = String(htmlArea.value || '');
+      markEditorAsChanged();
+      schedulePreview();
+    });
+  }
+  if (cssArea) {
+    cssArea.addEventListener('input', () => {
+      if (!templateStateCache[currentTemplate]) templateStateCache[currentTemplate] = {};
+      templateStateCache[currentTemplate].cssCode = String(cssArea.value || '');
+      templateStateCache[currentTemplate].cssContent = String(cssArea.value || '');
+      markEditorAsChanged();
+      schedulePreview();
+    });
+  }
   if (chooseBtn) chooseBtn.addEventListener('click', openFilePicker);
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
@@ -4614,7 +4834,9 @@ function updatePreview() {
   }
 
   const frame = document.getElementById('preview-frame');
-  const sanitized = sanitizeHTML(html);
+  // Replace redaction markers (||secret||) with visual redaction spans for preview only
+  const withRedactions = applyRedactionSpans(String(html || ''));
+  const sanitized = sanitizeHTML(withRedactions);
   const assets = collectUploadedMediaAssets();
 
   // Update external asset preview section instead of embedding in iframe
