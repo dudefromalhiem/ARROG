@@ -2063,7 +2063,7 @@ function switchMode(mode) {
 function selectTemplate(tpl) {
   const previousTemplate = currentTemplate;
   if (previousTemplate && previousTemplate !== tpl) {
-    captureTemplateState(previousTemplate);
+    captureEditorState(currentMode);
   }
 
   currentTemplate = tpl;
