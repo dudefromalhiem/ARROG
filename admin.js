@@ -253,42 +253,62 @@ async function getSocialApiHeaders() {
 }
 
 async function callSocialApi(method, payload = {}, query = '') {
-  const requestHeaders = await getSocialApiHeaders();
-  let response = await fetch(socialApiBase + query, {
-    method: method,
-    headers: requestHeaders,
-    body: method === 'GET' ? undefined : JSON.stringify(payload)
-  });
+  try {
+    const requestHeaders = await getSocialApiHeaders();
+    let response = null;
+    
+    try {
+      response = await fetch(socialApiBase + query, {
+        method: method,
+        headers: requestHeaders,
+        body: method === 'GET' ? undefined : JSON.stringify(payload)
+      });
+    } catch (networkErr) {
+      if (socialApiBase === '/api/social') {
+        socialApiBase = REMOTE_SOCIAL_API_BASES[0];
+        response = await fetch(socialApiBase + query, {
+          method: method,
+          headers: requestHeaders,
+          body: method === 'GET' ? undefined : JSON.stringify(payload)
+        });
+      } else {
+        throw networkErr;
+      }
+    }
 
-  if (!response.ok && response.status === 404 && socialApiBase === '/api/social') {
-    socialApiBase = REMOTE_SOCIAL_API_BASES[0];
-    response = await fetch(socialApiBase + query, {
-      method: method,
-      headers: requestHeaders,
-      body: method === 'GET' ? undefined : JSON.stringify(payload)
-    });
-  }
-
-  if (!response.ok && response.status === 404) {
-    const currentRemoteIndex = REMOTE_SOCIAL_API_BASES.indexOf(socialApiBase);
-    if (currentRemoteIndex !== -1 && currentRemoteIndex < REMOTE_SOCIAL_API_BASES.length - 1) {
-      socialApiBase = REMOTE_SOCIAL_API_BASES[currentRemoteIndex + 1];
+    if (!response.ok && response.status === 404 && socialApiBase === '/api/social') {
+      socialApiBase = REMOTE_SOCIAL_API_BASES[0];
       response = await fetch(socialApiBase + query, {
         method: method,
         headers: requestHeaders,
         body: method === 'GET' ? undefined : JSON.stringify(payload)
       });
     }
-  }
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = data && data.error ? data.error : ('Request failed with status ' + response.status);
-    const err = new Error(message);
-    err.status = response.status;
+    if (!response.ok && response.status === 404) {
+      const currentRemoteIndex = REMOTE_SOCIAL_API_BASES.indexOf(socialApiBase);
+      if (currentRemoteIndex !== -1 && currentRemoteIndex < REMOTE_SOCIAL_API_BASES.length - 1) {
+        socialApiBase = REMOTE_SOCIAL_API_BASES[currentRemoteIndex + 1];
+        response = await fetch(socialApiBase + query, {
+          method: method,
+          headers: requestHeaders,
+          body: method === 'GET' ? undefined : JSON.stringify(payload)
+        });
+      }
+    }
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data && data.error ? data.error : ('Request failed with status ' + response.status);
+      const err = new Error(message);
+      err.status = response.status;
+      throw err;
+    }
+    return data;
+  } catch (err) {
+    console.error('Social API call failed for ' + query + ':', err.message);
     throw err;
   }
-  return data;
 }
 
 function canDeleteManagedContent() {

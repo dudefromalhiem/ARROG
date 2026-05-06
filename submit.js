@@ -1941,9 +1941,61 @@ function onAnomalyCodeInput() {
 // MODE SWITCHING
 // ═════════════════════════════════════════════════════════════
 
+function captureEditorState(mode) {
+  if (mode === 'template') {
+    const content = buildTemplateHTML();
+    if (!templateStateCache[currentTemplate]) {
+      templateStateCache[currentTemplate] = {};
+    }
+    templateStateCache[currentTemplate].htmlContent = String(content && content.html || '');
+    templateStateCache[currentTemplate].cssContent = String(content && content.css || '');
+  } else if (mode === 'doc') {
+    if (!templateStateCache[currentTemplate]) {
+      templateStateCache[currentTemplate] = {};
+    }
+    templateStateCache[currentTemplate].docBlocks = JSON.parse(JSON.stringify(docBlocks));
+  } else if (mode === 'code') {
+    if (!templateStateCache[currentTemplate]) {
+      templateStateCache[currentTemplate] = {};
+    }
+    templateStateCache[currentTemplate].htmlCode = String(document.getElementById('sf-html').value || '');
+    templateStateCache[currentTemplate].cssCode = String(document.getElementById('sf-css').value || '');
+  }
+}
+
+function restoreEditorState(mode) {
+  const cached = templateStateCache[currentTemplate] || {};
+  if (mode === 'template') {
+    if (cached.htmlContent || cached.cssContent) {
+      hydrateTemplateFromHtml(currentTemplate, cached.htmlContent);
+    }
+  } else if (mode === 'doc') {
+    if (cached.docBlocks && Array.isArray(cached.docBlocks)) {
+      docBlocks = JSON.parse(JSON.stringify(cached.docBlocks));
+    }
+  } else if (mode === 'code') {
+    const htmlEl = document.getElementById('sf-html');
+    const cssEl = document.getElementById('sf-css');
+    if (cached.htmlCode && cached.htmlCode.trim()) {
+      if (htmlEl) htmlEl.value = cached.htmlCode;
+      if (cssEl && cached.cssCode) cssEl.value = cached.cssCode;
+    } else if (!htmlEl?.value || htmlEl.value.trim() === DEFAULT_NEW_PAGE_HTML.trim()) {
+      const generated = buildTemplateHTML();
+      if (htmlEl) htmlEl.value = generated.html || DEFAULT_NEW_PAGE_HTML;
+      if (cssEl) cssEl.value = generated.css || '';
+    }
+  }
+}
+
 function switchMode(mode) {
   // Relaxed restrictions: Allow Document Studio for all types including Guide/Lore
   const type = document.getElementById('sf-type').value;
+  
+  // Capture state of current mode before switching
+  if (currentMode) {
+    captureEditorState(currentMode);
+  }
+  
   currentMode = mode;
   document.getElementById('mode-template').classList.toggle('active', mode === 'template');
   document.getElementById('mode-doc').classList.toggle('active', mode === 'doc');
@@ -1951,7 +2003,17 @@ function switchMode(mode) {
   document.getElementById('template-mode').classList.toggle('hidden', mode !== 'template');
   document.getElementById('doc-mode').classList.toggle('hidden', mode !== 'doc');
   document.getElementById('code-mode').classList.toggle('hidden', mode !== 'code');
-  if (mode === 'doc') renderDocBlocks();
+  
+  // Restore state of new mode
+  if (mode === 'template') {
+    restoreEditorState('template');
+  } else if (mode === 'doc') {
+    restoreEditorState('doc');
+    renderDocBlocks();
+  } else if (mode === 'code') {
+    restoreEditorState('code');
+  }
+  
   schedulePreview();
 }
 
@@ -2109,7 +2171,7 @@ function addArtworkImage() {
   div.innerHTML =
     '<div class="doc-image-entry-row">' +
       '<div style="flex:1"><label class="fl">Image ' + n + '</label><select class="fi art-img-select">' + getUploadedImageOptions('') + '</select></div>' +
-      '<div style="flex:1"><label class="fl">Placement</label><select class="fi art-img-placement"><option value="inline">Inline</option><option value="left">Left</option><option value="right">Right</option></select></div>' +
+      '<div style="flex:1"><label class="fl">Placement</label><select class="fi art-img-placement"><option value="inline">Inline</option><option value="left">Left Float</option><option value="right">Right Float</option><option value="center">Centered</option><option value="full">Full Width</option></select></div>' +
       '<div style="flex:1"><label class="fl">URL</label><input class="fi art-img-url" placeholder="https://..." /></div>' +
       '<button class="btn btn-sm btn-d" onclick="removeArtworkImage(' + n + ')" style="margin-top:20px;height:32px">✕</button>' +
     '</div>';
@@ -3207,6 +3269,8 @@ function buildArtworkTemplate() {
 .art-frame.art-placement-left { float: left; margin: 0 18px 16px 0; max-width: 45%; }
 .art-frame.art-placement-right { float: right; margin: 0 0 16px 18px; max-width: 45%; }
 .art-frame.art-placement-inline { float: none; margin: 0 16px 16px 0; }
+.art-frame.art-placement-center { float: none; margin: 16px auto; text-align: center; display: flex; justify-content: center; }
+.art-frame.art-placement-full { float: none; margin: 16px 0; width: 100%; display: flex; justify-content: center; }
 .art-gallery::after { content: ''; display: table; clear: both; }
 .art-frame img { max-width: 100%; max-height: 500px; display: block; }
 .art-info { max-width: 600px; margin: 0 auto; text-align: left; }
