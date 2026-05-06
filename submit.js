@@ -74,6 +74,12 @@ const templateStateCache = {
   guide: null
 };
 
+const pageEditorState = {
+  htmlContent: '',
+  cssContent: '',
+  docBlocks: []
+};
+
 const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
 const DOC_MEDIA_DRAG_SETTING_KEY = 'rog-doc-media-drag-enabled';
 const DRAFT_AUTOSAVE_MIN_WORDS = 1;
@@ -860,6 +866,9 @@ function seedTemplateCacheFromPage(page, fallbackTemplate) {
   const key = getTemplateStateKey(page && page.currentTemplate) || getTemplateStateKey(fallbackTemplate);
   const htmlContent = String(page && (page.htmlContent || page.content) || '').trim();
   if (!key || !htmlContent) return;
+  pageEditorState.htmlContent = String(page && (page.htmlContent || page.content) || '');
+  pageEditorState.cssContent = String(page && page.cssContent || '');
+  pageEditorState.docBlocks = Array.isArray(page && page.docBlocks) ? JSON.parse(JSON.stringify(page.docBlocks)) : [];
   templateStateCache[key] = {
     htmlContent: htmlContent,
     cssContent: String(page && page.cssContent || ''),
@@ -873,9 +882,13 @@ function captureTemplateState(tpl) {
   const key = getTemplateStateKey(tpl);
   if (!key) return;
   const content = buildTemplateHTML();
+  pageEditorState.htmlContent = String(content && content.html || '');
+  pageEditorState.cssContent = String(content && content.css || '');
   templateStateCache[key] = {
     htmlContent: String(content && content.html || ''),
-    cssContent: String(content && content.css || '')
+    cssContent: String(content && content.css || ''),
+    htmlCode: String(content && content.html || ''),
+    cssCode: String(content && content.css || '')
   };
 }
 
@@ -1284,6 +1297,9 @@ async function continueDraftSubmission(id) {
     currentMode = draft.currentMode || 'code';
     const draftTemplate = inferTemplateFromPageData(draft);
     currentTemplate = draft.currentTemplate || draftTemplate || 'anomaly';
+    pageEditorState.htmlContent = String(draft.htmlContent || draft.content || '');
+    pageEditorState.cssContent = String(draft.cssContent || '');
+    pageEditorState.docBlocks = Array.isArray(draft.docBlocks) ? JSON.parse(JSON.stringify(draft.docBlocks)) : [];
     seedTemplateCacheFromPage(draft, currentTemplate || draftTemplate);
     if (draft.subsectionCounters) {
       subsectionCounters = { ...draft.subsectionCounters };
@@ -1298,7 +1314,11 @@ async function continueDraftSubmission(id) {
       // No need to set sf-html/sf-css here as Document Studio renders from docBlocks
     } else {
       switchMode('code');
-      document.getElementById('sf-html').value = draft.htmlContent || draft.content || DEFAULT_NEW_PAGE_HTML;
+      const draftHtml = String(draft.htmlContent || draft.content || '');
+      pageEditorState.htmlContent = draftHtml;
+      pageEditorState.cssContent = String(draft.cssContent || '');
+      pageEditorState.docBlocks = Array.isArray(draft.docBlocks) ? JSON.parse(JSON.stringify(draft.docBlocks)) : [];
+      document.getElementById('sf-html').value = draftHtml || DEFAULT_NEW_PAGE_HTML;
       document.getElementById('sf-css').value = draft.cssContent || '';
     }
 
@@ -1529,6 +1549,9 @@ async function initializeSubmitEditModeFromUrl() {
     }
 
     const pageHtmlContent = String(page.htmlContent || page.content || '');
+    pageEditorState.htmlContent = pageHtmlContent;
+    pageEditorState.cssContent = String(page.cssContent || '');
+    pageEditorState.docBlocks = Array.isArray(page.docBlocks) ? JSON.parse(JSON.stringify(page.docBlocks)) : [];
     document.getElementById('sf-html').value = pageHtmlContent || DEFAULT_NEW_PAGE_HTML;
     document.getElementById('sf-css').value = page.cssContent || '';
 
@@ -1962,6 +1985,8 @@ function onAnomalyCodeInput() {
 function captureEditorState(mode) {
   if (mode === 'template') {
     const content = buildTemplateHTML();
+    pageEditorState.htmlContent = String(content && content.html || '');
+    pageEditorState.cssContent = String(content && content.css || '');
     if (!templateStateCache[currentTemplate]) {
       templateStateCache[currentTemplate] = {};
     }
@@ -1971,6 +1996,7 @@ function captureEditorState(mode) {
     templateStateCache[currentTemplate].htmlCode = String(content && content.html || '');
     templateStateCache[currentTemplate].cssCode = String(content && content.css || '');
   } else if (mode === 'doc') {
+    pageEditorState.docBlocks = JSON.parse(JSON.stringify(docBlocks));
     if (!templateStateCache[currentTemplate]) {
       templateStateCache[currentTemplate] = {};
     }
@@ -1984,14 +2010,16 @@ function captureEditorState(mode) {
       // ignore
     }
   } else if (mode === 'code') {
+    pageEditorState.htmlContent = String(document.getElementById('sf-html').value || '');
+    pageEditorState.cssContent = String(document.getElementById('sf-css').value || '');
     if (!templateStateCache[currentTemplate]) {
       templateStateCache[currentTemplate] = {};
     }
-    templateStateCache[currentTemplate].htmlCode = String(document.getElementById('sf-html').value || '');
-    templateStateCache[currentTemplate].cssCode = String(document.getElementById('sf-css').value || '');
+    templateStateCache[currentTemplate].htmlCode = pageEditorState.htmlContent;
+    templateStateCache[currentTemplate].cssCode = pageEditorState.cssContent;
     // Also update friendly template/html caches so template/doc modes reflect changes
     try {
-      const parsed = templateStateCache[currentTemplate].htmlCode || '';
+      const parsed = pageEditorState.htmlContent || '';
       templateStateCache[currentTemplate].htmlContent = String(parsed);
     } catch (_err) {
       // ignore
@@ -2002,25 +2030,33 @@ function captureEditorState(mode) {
 function restoreEditorState(mode) {
   const cached = templateStateCache[currentTemplate] || {};
   if (mode === 'template') {
-    const sourceHtml = (cached.htmlContent && String(cached.htmlContent).trim()) ? cached.htmlContent : (cached.htmlCode || '');
+    const sourceHtml = (cached.htmlContent && String(cached.htmlContent).trim()) ? cached.htmlContent : (pageEditorState.htmlContent || cached.htmlCode || '');
     if (sourceHtml) {
       hydrateTemplateFromHtml(currentTemplate, sourceHtml);
     }
   } else if (mode === 'doc') {
     // Prefer explicit docBlocks if present; otherwise try to parse cached HTML/code
-    if (cached.docBlocks && Array.isArray(cached.docBlocks)) {
+    if (pageEditorState.docBlocks && Array.isArray(pageEditorState.docBlocks) && pageEditorState.docBlocks.length) {
+      docBlocks = JSON.parse(JSON.stringify(pageEditorState.docBlocks));
+    } else if (cached.docBlocks && Array.isArray(cached.docBlocks)) {
       docBlocks = JSON.parse(JSON.stringify(cached.docBlocks));
+    } else if (pageEditorState.htmlContent && String(pageEditorState.htmlContent).trim()) {
+      docBlocks = parseHtmlToDocBlocks(String(pageEditorState.htmlContent));
     } else if (cached.htmlContent && String(cached.htmlContent).trim()) {
       docBlocks = parseHtmlToDocBlocks(String(cached.htmlContent));
+    } else if (pageEditorState.htmlContent && String(pageEditorState.htmlContent).trim()) {
+      docBlocks = parseHtmlToDocBlocks(String(pageEditorState.htmlContent));
     } else if (cached.htmlCode && String(cached.htmlCode).trim()) {
       docBlocks = parseHtmlToDocBlocks(String(cached.htmlCode));
     }
   } else if (mode === 'code') {
     const htmlEl = document.getElementById('sf-html');
     const cssEl = document.getElementById('sf-css');
-    if (cached.htmlCode && cached.htmlCode.trim()) {
-      if (htmlEl) htmlEl.value = cached.htmlCode;
-      if (cssEl && cached.cssCode) cssEl.value = cached.cssCode;
+    const sourceHtml = pageEditorState.htmlContent || cached.htmlCode || cached.htmlContent || '';
+    const sourceCss = pageEditorState.cssContent || cached.cssCode || cached.cssContent || '';
+    if (String(sourceHtml).trim()) {
+      if (htmlEl) htmlEl.value = sourceHtml;
+      if (cssEl) cssEl.value = sourceCss;
     } else if (!htmlEl?.value || htmlEl.value.trim() === DEFAULT_NEW_PAGE_HTML.trim()) {
       const generated = buildTemplateHTML();
       if (htmlEl) htmlEl.value = generated.html || DEFAULT_NEW_PAGE_HTML;
@@ -2534,9 +2570,7 @@ function hydrateTemplateFromHtml(tpl, htmlContent) {
 }
 
 function hydrateTemplateFromEditorContentIfNeeded(tpl) {
-  if (!isTemplateStateEmpty(tpl)) return;
-
-  const html = String(document.getElementById('sf-html')?.value || '').trim();
+  const html = String(pageEditorState.htmlContent || document.getElementById('sf-html')?.value || '').trim();
   const defaultHtml = String(DEFAULT_NEW_PAGE_HTML || '').trim();
   if (!html || html === defaultHtml) return;
 
@@ -3606,19 +3640,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const cssArea = document.getElementById('sf-css');
   if (htmlArea) {
     htmlArea.addEventListener('input', () => {
+      pageEditorState.htmlContent = String(htmlArea.value || '');
       if (!templateStateCache[currentTemplate]) templateStateCache[currentTemplate] = {};
-      templateStateCache[currentTemplate].htmlCode = String(htmlArea.value || '');
+      templateStateCache[currentTemplate].htmlCode = pageEditorState.htmlContent;
       // Also keep a content snapshot for template/doc fallback
-      templateStateCache[currentTemplate].htmlContent = String(htmlArea.value || '');
+      templateStateCache[currentTemplate].htmlContent = pageEditorState.htmlContent;
       markEditorAsChanged();
       schedulePreview();
     });
   }
   if (cssArea) {
     cssArea.addEventListener('input', () => {
+      pageEditorState.cssContent = String(cssArea.value || '');
       if (!templateStateCache[currentTemplate]) templateStateCache[currentTemplate] = {};
-      templateStateCache[currentTemplate].cssCode = String(cssArea.value || '');
-      templateStateCache[currentTemplate].cssContent = String(cssArea.value || '');
+      templateStateCache[currentTemplate].cssCode = pageEditorState.cssContent;
+      templateStateCache[currentTemplate].cssContent = pageEditorState.cssContent;
       markEditorAsChanged();
       schedulePreview();
     });
@@ -5348,6 +5384,9 @@ function resetSubmitForm() {
   document.getElementById('sf-slug').value = '';
   document.getElementById('sf-html').value = DEFAULT_NEW_PAGE_HTML;
   document.getElementById('sf-css').value = '';
+  pageEditorState.htmlContent = '';
+  pageEditorState.cssContent = '';
+  pageEditorState.docBlocks = [];
 
   // Reset template fields
   ['tf-containment', 'tf-description', 'tf-tale-subtitle', 'tf-tale-intro',
