@@ -1570,7 +1570,6 @@ async function initializeSubmitEditModeFromUrl() {
     refreshImageSelectors();
 
     docBlocks = Array.isArray(page.docBlocks) ? JSON.parse(JSON.stringify(page.docBlocks)) : [];
-    currentTemplate = String(page.currentTemplate || '').trim() || currentTemplate;
     if (page.subsectionCounters && typeof page.subsectionCounters === 'object') {
       subsectionCounters = {
         anomaly: Number(page.subsectionCounters.anomaly || 0),
@@ -1584,7 +1583,7 @@ async function initializeSubmitEditModeFromUrl() {
     const storedTemplate = getTemplateStateKey(page.currentTemplate);
     const inferredTemplateKey = getTemplateStateKey(inferredTemplate);
     const templateForEdit = storedTemplate || inferredTemplateKey || '';
-    currentTemplate = templateForEdit || currentTemplate;
+    currentTemplate = templateForEdit || inferredTemplateKey || 'anomaly';
     if (templateForEdit) {
       seedTemplateCacheFromPage(page, templateForEdit);
     }
@@ -2534,7 +2533,6 @@ function hydrateTemplateFromHtml(tpl, htmlContent) {
 }
 
 function hydrateTemplateFromEditorContentIfNeeded(tpl) {
-  if (!submitEditTarget) return;
   if (!isTemplateStateEmpty(tpl)) return;
 
   const html = String(document.getElementById('sf-html')?.value || '').trim();
