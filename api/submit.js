@@ -5,8 +5,10 @@ const MAX_SLUG_LENGTH = 120;
 const MAX_AUTHOR_NAME_LENGTH = 80;
 const MAX_TAG_LENGTH = 32;
 const MAX_TAGS = 24;
-const MAX_HTML_BYTES = 220000;
-const MAX_CSS_BYTES = 80000;
+const MAX_HTML_BYTES = 512 * 1024 * 1024; // 512MB
+const MAX_CSS_BYTES = 50 * 1024 * 1024; // 50MB
+const FIRESTORE_DOC_SIZE_LIMIT = 1024 * 1024; // 1MB - Firestore hard limit
+const CONTENT_STORAGE_THRESHOLD = 500 * 1024; // 500KB - threshold for Cloud Storage
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -40,13 +42,61 @@ function getRequestIp(req) {
   return String(req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : 'unknown');
 }
 
-function sanitizeHtmlContent(html) {
-  let clean = String(html || '');
-  if (Buffer.byteLength(clean, 'utf8') > MAX_HTML_BYTES) {
-    const err = new Error('HTML payload is too large.');
-    err.statusCode = 413;
+/**
+ * Upload content to Cloud Storage if it exceeds the threshold
+ * Returns the GCS URL if uploaded, or null if content is kept in Firestore
+ * 
+ * @param {object} app - Firebase app instance
+ * @param {string} submissionId - Submission ID
+ * @param {string} contentType - 'html' or 'css'
+ * @param {string} content - The content to upload
+ * @returns {Promise<string|null>} GCS URL or null
+ */
+async function uploadLargeContentToStorage(app, submissionId, contentType, content) {
+  const contentSize = Buffer.byteLength(content, 'utf8');
+  if (contentSize <= CONTENT_STORAGE_THRESHOLD) {
+    return null; // Keep in Firestore
+  }
+
+  const bucket = admin.storage(app).bucket();
+  const timestamp = Date.now();
+  const filePath = `submissions/${submissionId}/${contentType}-${timestamp}.txt`;
+  const file = bucket.file(filePath);
+
+  try {
+    await file.save(content, {
+      metadata: {
+        contentType: 'text/plain; charset=utf-8'
+      },
+      resumable: false
+    });
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+    return publicUrl;
+  } catch (err) {
+    console.error(`Failed to upload ${contentType} to Cloud Storage:`, err);
     throw err;
   }
+}
+
+/**
+ * Fetch content from Cloud Storage URL
+ * 
+ * @param {string} gcsUrl - GCS public URL
+ * @returns {Promise<string>} Content from storage
+ */
+async function fetchContentFromStorage(gcsUrl) {
+  try {
+    const response = await fetch(gcsUrl, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.text();
+  } catch (err) {
+    console.error('Failed to fetch content from Cloud Storage:', err);
+    throw err;
+  }
+}
+
+function sanitizeHtmlContent(html) {
+  let clean = String(html || '');
   clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   clean = clean.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '');
   clean = clean.replace(/javascript\s*:/gi, 'blocked:');
@@ -54,10 +104,20 @@ function sanitizeHtmlContent(html) {
   return clean;
 }
 
+function validateHtmlSizeOrThrow(html) {
+  const size = Buffer.byteLength(html, 'utf8');
+  if (size > MAX_HTML_BYTES) {
+    const err = new Error(`HTML content is too large. Maximum is ${MAX_HTML_BYTES / (1024 * 1024)}MB.`);
+    err.statusCode = 413;
+    throw err;
+  }
+}
+
 function sanitizeCssOrThrow(css) {
   const source = String(css || '');
-  if (Buffer.byteLength(source, 'utf8') > MAX_CSS_BYTES) {
-    const err = new Error('CSS payload is too large.');
+  const size = Buffer.byteLength(source, 'utf8');
+  if (size > MAX_CSS_BYTES) {
+    const err = new Error(`CSS payload is too large. Maximum is ${MAX_CSS_BYTES / (1024 * 1024)}MB.`);
     err.statusCode = 413;
     throw err;
   }
@@ -398,6 +458,43 @@ function buildSubmissionPayload(body, actor) {
   return normalizedPayload;
 }
 
+/**
+ * Process large content by uploading to Cloud Storage if needed
+ * Modifies the payload in place to reference storage URLs instead of inline content
+ * 
+ * @param {object} app - Firebase app instance
+ * @param {string} submissionId - Submission ID
+ * @param {object} payload - Submission payload with content
+ * @returns {Promise<void>}
+ */
+async function processLargeContentForStorage(app, submissionId, payload) {
+  // Validate sizes first
+  if (payload.htmlContent) {
+    validateHtmlSizeOrThrow(payload.htmlContent);
+  }
+  if (payload.cssContent) {
+    validateHtmlSizeOrThrow(payload.cssContent); // CSS uses same MAX_CSS_BYTES check
+  }
+
+  // Upload HTML content to Cloud Storage if it exceeds threshold
+  if (payload.htmlContent) {
+    const htmlUrl = await uploadLargeContentToStorage(app, submissionId, 'html', payload.htmlContent);
+    if (htmlUrl) {
+      payload.htmlContentStorageUrl = htmlUrl;
+      delete payload.htmlContent; // Remove from Firestore
+    }
+  }
+
+  // Upload CSS content to Cloud Storage if it exceeds threshold
+  if (payload.cssContent) {
+    const cssUrl = await uploadLargeContentToStorage(app, submissionId, 'css', payload.cssContent);
+    if (cssUrl) {
+      payload.cssContentStorageUrl = cssUrl;
+      delete payload.cssContent; // Remove from Firestore
+    }
+  }
+}
+
 async function generateUniqueAnomalyId(db, subtype) {
   const normalizedSubtype = String(subtype || 'ROS').toUpperCase().trim();
   const counterKey = ['ROS', 'SOA', 'SLOA', 'SCTOR', 'TL'].includes(normalizedSubtype) ? normalizedSubtype : 'ROS';
@@ -700,6 +797,7 @@ module.exports = async function handler(req, res) {
         payload.versions = [buildDraftVersionSnapshot(payload, actor.uid, draftTrigger)];
       }
 
+      await processLargeContentForStorage(app, submissionRef.id, payload);
       await submissionRef.set(stripUndefined(payload), { merge: true });
       return sendJson(res, 200, { id: submissionRef.id, status: 'draft' });
     }
@@ -766,6 +864,12 @@ module.exports = async function handler(req, res) {
 
         const pageId = String(body.pageId || existingRequestedPageId || '').trim();
         let publishedPageId = pageId;
+        
+        // Process large content for the page before saving
+        // Use the pageId if available, otherwise use the submissionId as the storage path
+        const pageStorageId = pageId || submissionRef.id || 'page';
+        await processLargeContentForStorage(app, pageStorageId, pagePayload);
+        
         if (pageId) {
           await db.collection('pages').doc(pageId).set(pagePayload, { merge: true });
         } else {
@@ -808,6 +912,7 @@ module.exports = async function handler(req, res) {
         return sendJson(res, 200, { id: submissionRef.id, pageId: body.pageId || pageId || null, status: 'approved' });
       }
 
+      await processLargeContentForStorage(app, submissionRef.id, payload);
       await submissionRef.set(stripUndefined(payload), { merge: true });
       return sendJson(res, 200, { id: submissionRef.id, status: 'pending' });
     }

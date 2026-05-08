@@ -1297,8 +1297,39 @@ async function continueDraftSubmission(id) {
     currentMode = draft.currentMode || 'code';
     const draftTemplate = inferTemplateFromPageData(draft);
     currentTemplate = draft.currentTemplate || draftTemplate || 'anomaly';
-    pageEditorState.htmlContent = String(draft.htmlContent || draft.content || '');
-    pageEditorState.cssContent = String(draft.cssContent || '');
+    
+    // Fetch large content from Cloud Storage if it's stored there
+    let draftHtmlContent = String(draft.htmlContent || draft.content || '');
+    let draftCssContent = String(draft.cssContent || '');
+    
+    if (draft.htmlContentStorageUrl && !draftHtmlContent) {
+      try {
+        const response = await fetch(draft.htmlContentStorageUrl, { cache: 'no-store' });
+        if (response.ok) {
+          draftHtmlContent = await response.text();
+        } else {
+          console.warn('Failed to fetch HTML content from storage:', response.status);
+        }
+      } catch (err) {
+        console.warn('Error fetching HTML from storage:', err);
+      }
+    }
+    
+    if (draft.cssContentStorageUrl && !draftCssContent) {
+      try {
+        const response = await fetch(draft.cssContentStorageUrl, { cache: 'no-store' });
+        if (response.ok) {
+          draftCssContent = await response.text();
+        } else {
+          console.warn('Failed to fetch CSS content from storage:', response.status);
+        }
+      } catch (err) {
+        console.warn('Error fetching CSS from storage:', err);
+      }
+    }
+    
+    pageEditorState.htmlContent = draftHtmlContent;
+    pageEditorState.cssContent = draftCssContent;
     pageEditorState.docBlocks = Array.isArray(draft.docBlocks) ? JSON.parse(JSON.stringify(draft.docBlocks)) : [];
     seedTemplateCacheFromPage(draft, currentTemplate || draftTemplate);
     if (draft.subsectionCounters) {
@@ -1314,12 +1345,11 @@ async function continueDraftSubmission(id) {
       // No need to set sf-html/sf-css here as Document Studio renders from docBlocks
     } else {
       switchMode('code');
-      const draftHtml = String(draft.htmlContent || draft.content || '');
-      pageEditorState.htmlContent = draftHtml;
-      pageEditorState.cssContent = String(draft.cssContent || '');
+      pageEditorState.htmlContent = draftHtmlContent;
+      pageEditorState.cssContent = draftCssContent;
       pageEditorState.docBlocks = Array.isArray(draft.docBlocks) ? JSON.parse(JSON.stringify(draft.docBlocks)) : [];
-      document.getElementById('sf-html').value = draftHtml || DEFAULT_NEW_PAGE_HTML;
-      document.getElementById('sf-css').value = draft.cssContent || '';
+      document.getElementById('sf-html').value = draftHtmlContent || DEFAULT_NEW_PAGE_HTML;
+      document.getElementById('sf-css').value = draftCssContent || '';
     }
 
     const draftAssets = Array.isArray(draft.imageAssets) && draft.imageAssets.length

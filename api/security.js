@@ -124,10 +124,10 @@ function handleCORSPreflight(req, res) {
  * Validate content length
  *
  * @param {object} req - Express request
- * @param {number} maxBytes - Maximum content length (default 1MB)
+ * @param {number} maxBytes - Maximum content length (default 512MB)
  * @returns {boolean} true if valid, false if too large
  */
-function validateContentLength(req, maxBytes = 1048576) {
+function validateContentLength(req, maxBytes = 512 * 1024 * 1024) {
   const contentLength = parseInt(req.headers['content-length'] || 0, 10);
   return contentLength > 0 && contentLength <= maxBytes;
 }

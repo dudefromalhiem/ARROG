@@ -409,6 +409,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (!page) { showError(); return; }
     
+    // Fetch large content from Cloud Storage if it's stored there
+    if (page.htmlContentStorageUrl && !page.htmlContent) {
+      try {
+        const response = await fetch(page.htmlContentStorageUrl, { cache: 'no-store' });
+        if (response.ok) {
+          page.htmlContent = await response.text();
+        } else {
+          console.warn('Failed to fetch HTML content from storage:', response.status);
+        }
+      } catch (err) {
+        console.warn('Error fetching HTML from storage:', err);
+      }
+    }
+    
+    if (page.cssContentStorageUrl && !page.cssContent) {
+      try {
+        const response = await fetch(page.cssContentStorageUrl, { cache: 'no-store' });
+        if (response.ok) {
+          page.cssContent = await response.text();
+        } else {
+          console.warn('Failed to fetch CSS content from storage:', response.status);
+        }
+      } catch (err) {
+        console.warn('Error fetching CSS from storage:', err);
+      }
+    }
+    
     window.__pageDocId = docId;
     window.__pageId = docId; // Alias for consistency
     window.__pageSlug = page.slug || slug || '';
