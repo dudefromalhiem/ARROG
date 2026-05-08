@@ -5,8 +5,8 @@ const MAX_SLUG_LENGTH = 120;
 const MAX_AUTHOR_NAME_LENGTH = 80;
 const MAX_TAG_LENGTH = 32;
 const MAX_TAGS = 24;
-const MAX_HTML_BYTES = 220000;
-const MAX_CSS_BYTES = 80000;
+const MAX_HTML_BYTES = 700000;
+const MAX_CSS_BYTES = 200000;
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -887,4 +887,3 @@ module.exports = async function handler(req, res) {
     return sendJson(res, statusCode, { error: err.message || 'Server error.' });
   }
 };
-
