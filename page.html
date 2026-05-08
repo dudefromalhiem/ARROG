@@ -1756,11 +1756,28 @@ function showError() {
   document.getElementById('page-error').classList.remove('hidden');
 }
 
+function escapeHtml(text) {
+  const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
+  return String(text || '').replace(/[&<>"']/g, m => map[m]);
+}
+
+function escapeAttr(text) {
+  return String(text || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function applyRedactionSpans(html) {
+  return String(html || '').replace(/\|\|([\s\S]*?)\|\|/g, function(_m, inner) {
+    const safe = escapeAttr(String(inner || ''));
+    return '<span class="redaction" data-original="' + safe + '" aria-hidden="true">' + escapeHtml(inner) + '</span>';
+  });
+}
+
 function buildPageDocument(html, css, imageUrls, imageAssets, mediaUrls, mediaAssets) {
   const assets = normalizeImageAssets(imageUrls || [], imageAssets || []);
   const supplementalMedia = normalizeMediaAssets(mediaUrls || [], mediaAssets || []);
   const raw = repairDocumentImagesWithUploads((html || '').trim(), assets.map(asset => asset.url));
-  const withMedia = embedUploadedMediaIfMissing(raw, supplementalMedia);
+  const withRedactions = applyRedactionSpans(raw);
+  const withMedia = embedUploadedMediaIfMissing(withRedactions, supplementalMedia);
   const withCaptions = applyImageCaptions(withMedia, assets);
   const htmlWithUploads = sanitizePageImages(withCaptions).replace(/<img(?![^>]*\bloading=)([^>]*?)>/gi, '<img loading="lazy" decoding="async"$1>');
   const wrapped = htmlWithUploads.includes('class="page-shell"')
@@ -1796,6 +1813,7 @@ function buildPageDocument(html, css, imageUrls, imageAssets, mediaUrls, mediaAs
     ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
     '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}figure{margin:0 0 14px}figcaption{margin-top:8px;font-size:.82rem;color:#c3c3c3;line-height:1.5}' +
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
+    '.redaction{display:inline-block;background:#8b0000;color:transparent;border-radius:2px;padding:0 0.5ch;line-height:1em}.redaction[aria-hidden="true"]::after{content:"";display:inline-block;width:0.6em;height:1em}' +
     safeCss.replace(/<\/style>/gi, '') +
     '</style></head><body>' + normalizedWrapped + '</body></html>';
 }
@@ -1945,8 +1963,7 @@ function applyImageCaptions(html, imageAssets) {
 
 function embedUploadedImagesIfMissing(html, imageAssets) {
   const assets = Array.isArray(imageAssets) ? imageAssets : [];
-  const urls = assets.map(asset => asset.url).filter(Boolean);
-  if (!urls.length) return String(html || '');
+  if (!assets.length) return String(html || '');
 
   const raw = String(html || '');
   if (raw.includes('class="uploaded-assets"')) return raw;
@@ -1954,12 +1971,15 @@ function embedUploadedImagesIfMissing(html, imageAssets) {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = raw;
   const existingSrcs = Array.from(wrapper.querySelectorAll('img')).map(img => (img.getAttribute('src') || '').split('?')[0].toLowerCase());
-  if (urls.some(url => existingSrcs.includes(url.split('?')[0].toLowerCase()))) return raw;
+  
+  // Filter to only unused assets (not already in HTML)
+  const unusedAssets = assets.filter(asset => !existingSrcs.includes(asset.url.split('?')[0].toLowerCase()));
+  if (!unusedAssets.length) return raw;
 
   const gallery = '<div class="page-section uploaded-assets">' +
     '<h2>Uploaded Assets</h2>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
-      assets.map((asset, idx) =>
+      unusedAssets.map((asset, idx) =>
         '<figure style="margin:0">' +
           '<a href="' + asset.url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
             '<img src="' + asset.url + '" alt="' + escapeHtml(asset.alt || ('Uploaded asset ' + (idx + 1))) + '" loading="lazy" decoding="async" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />' +
@@ -1979,12 +1999,15 @@ function embedUploadedMediaIfMissing(html, mediaAssets) {
 
   const raw = String(html || '');
   if (raw.includes('class="uploaded-media"')) return raw;
-  if (assets.some(asset => raw.includes(asset.url))) return raw;
+  
+  // Filter to only unused media (not already in HTML)
+  const unusedAssets = assets.filter(asset => !raw.includes(asset.url));
+  if (!unusedAssets.length) return raw;
 
   const gallery = '<div class="page-section uploaded-media">' +
     '<h2>Uploaded Media</h2>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">' +
-      assets.map((asset, idx) => {
+      unusedAssets.map((asset, idx) => {
         const kind = String(asset.kind || 'audio').toLowerCase();
         const label = escapeHtml(asset.label || asset.caption || (kind + ' ' + (idx + 1)));
         const player = kind === 'video'

@@ -28,6 +28,17 @@ function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, m => map[m]);
 }
 
+function escapeAttr(text) {
+  return String(text || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function applyRedactionSpans(html) {
+  return String(html || '').replace(/\|\|([\s\S]*?)\|\|/g, function(_m, inner) {
+    const safe = escapeAttr(String(inner || ''));
+    return '<span class="redaction" data-original="' + safe + '" aria-hidden="true">' + escapeHtml(inner) + '</span>';
+  });
+}
+
 
 // Permission system functions (client-side)
 const PERMISSIONS = {
@@ -805,7 +816,16 @@ async function loadApplications(container) {
       '</div>'
     ].join('');
   } catch (err) {
-    container.innerHTML = '<h3 style="margin-bottom:16px">Contribution Applications</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load applications: ' + escapeHtml(err.message) + '</p>';
+    let errorMsg = String(err && err.message || 'Unknown error');
+    
+    // Provide helpful diagnostic info for permission errors
+    if (err && err.code === 'permission-denied') {
+      errorMsg = 'Permission denied. You may not have moderator access. Please ensure your admin role is properly configured in the users collection and your session token is up to date. Try refreshing the page or signing out and back in.';
+    }
+    
+    container.innerHTML = '<h3 style="margin-bottom:16px">Contribution Applications</h3>' +
+      '<p style="font-size:.82rem;color:var(--red-g)">Could not load applications: ' + escapeHtml(errorMsg) + '</p>' +
+      '<p style="font-size:.75rem;color:var(--wht-f);margin-top:8px">Error details: ' + escapeHtml(err.code || 'N/A') + '</p>';
   }
 }
 
@@ -1323,12 +1343,15 @@ function embedUploadedImagesIfMissing(html, imageUrls) {
 
   const raw = String(html || '');
   if (raw.includes('class="uploaded-assets"')) return raw;
-  if (urls.some(url => raw.includes(url))) return raw;
+  
+  // Filter to only unused images (not already in HTML)
+  const unusedUrls = urls.filter(url => !raw.includes(url));
+  if (!unusedUrls.length) return raw;
 
   const gallery = '<div class="page-section uploaded-assets">' +
     '<h2>Uploaded Assets</h2>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
-      urls.map((url, idx) =>
+      unusedUrls.map((url, idx) =>
         '<a href="' + url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
           '<img src="' + url + '" alt="Uploaded asset ' + (idx + 1) + '" loading="lazy" decoding="async" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />' +
         '</a>'
@@ -1364,7 +1387,8 @@ function repairDocumentImagesWithUploads(html, imageUrls) {
 
 function buildPageDocument(html, css, imageUrls) {
   const raw = repairDocumentImagesWithUploads((html || '').trim(), imageUrls || []);
-  const htmlWithUploads = embedUploadedImagesIfMissing(raw, imageUrls || []);
+  const withRedactions = applyRedactionSpans(raw);
+  const htmlWithUploads = embedUploadedImagesIfMissing(withRedactions, imageUrls || []);
   const wrapped = htmlWithUploads.includes('class="page-shell"')
     ? htmlWithUploads
     : '<div class="page-shell"><section class="page-section">' + htmlWithUploads + '</section></div>';
@@ -1374,6 +1398,7 @@ function buildPageDocument(html, css, imageUrls) {
     ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
     '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
+    '.redaction{display:inline-block;background:#8b0000;color:transparent;border-radius:2px;padding:0 0.5ch;line-height:1em}.redaction[aria-hidden="true"]::after{content:"";display:inline-block;width:0.6em;height:1em}' +
     safeCss.replace(/<\/style>/gi, '') +
     '</style></head><body>' + wrapped + '</body></html>';
 }

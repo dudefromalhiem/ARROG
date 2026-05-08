@@ -1348,8 +1348,12 @@ async function continueDraftSubmission(id) {
       pageEditorState.htmlContent = draftHtmlContent;
       pageEditorState.cssContent = draftCssContent;
       pageEditorState.docBlocks = Array.isArray(draft.docBlocks) ? JSON.parse(JSON.stringify(draft.docBlocks)) : [];
-      document.getElementById('sf-html').value = draftHtmlContent || DEFAULT_NEW_PAGE_HTML;
-      document.getElementById('sf-css').value = draftCssContent || '';
+      const sfHtml = document.getElementById('sf-html');
+      const sfCss = document.getElementById('sf-css');
+      if (sfHtml) sfHtml.value = draftHtmlContent || DEFAULT_NEW_PAGE_HTML;
+      if (sfCss) sfCss.value = draftCssContent || '';
+      // Ensure editor UI is visible after loading
+      setTimeout(() => { updatePreview(); }, 100);
     }
 
     const draftAssets = Array.isArray(draft.imageAssets) && draft.imageAssets.length
@@ -2068,14 +2072,12 @@ function restoreEditorState(mode) {
     // Prefer explicit docBlocks if present; otherwise try to parse cached HTML/code
     if (pageEditorState.docBlocks && Array.isArray(pageEditorState.docBlocks) && pageEditorState.docBlocks.length) {
       docBlocks = JSON.parse(JSON.stringify(pageEditorState.docBlocks));
-    } else if (cached.docBlocks && Array.isArray(cached.docBlocks)) {
+    } else if (cached.docBlocks && Array.isArray(cached.docBlocks) && cached.docBlocks.length) {
       docBlocks = JSON.parse(JSON.stringify(cached.docBlocks));
     } else if (pageEditorState.htmlContent && String(pageEditorState.htmlContent).trim()) {
       docBlocks = parseHtmlToDocBlocks(String(pageEditorState.htmlContent));
     } else if (cached.htmlContent && String(cached.htmlContent).trim()) {
       docBlocks = parseHtmlToDocBlocks(String(cached.htmlContent));
-    } else if (pageEditorState.htmlContent && String(pageEditorState.htmlContent).trim()) {
-      docBlocks = parseHtmlToDocBlocks(String(pageEditorState.htmlContent));
     } else if (cached.htmlCode && String(cached.htmlCode).trim()) {
       docBlocks = parseHtmlToDocBlocks(String(cached.htmlCode));
     }
@@ -2087,7 +2089,7 @@ function restoreEditorState(mode) {
     if (String(sourceHtml).trim()) {
       if (htmlEl) htmlEl.value = sourceHtml;
       if (cssEl) cssEl.value = sourceCss;
-    } else if (!htmlEl?.value || htmlEl.value.trim() === DEFAULT_NEW_PAGE_HTML.trim()) {
+    } else if (!htmlEl?.value || !htmlEl.value || htmlEl.value.trim() === DEFAULT_NEW_PAGE_HTML.trim()) {
       const generated = buildTemplateHTML();
       if (htmlEl) htmlEl.value = generated.html || DEFAULT_NEW_PAGE_HTML;
       if (cssEl) cssEl.value = generated.css || '';
@@ -2108,21 +2110,39 @@ function switchMode(mode) {
   document.getElementById('mode-template').classList.toggle('active', mode === 'template');
   document.getElementById('mode-doc').classList.toggle('active', mode === 'doc');
   document.getElementById('mode-code').classList.toggle('active', mode === 'code');
-  document.getElementById('template-mode').classList.toggle('hidden', mode !== 'template');
-  document.getElementById('doc-mode').classList.toggle('hidden', mode !== 'doc');
-  document.getElementById('code-mode').classList.toggle('hidden', mode !== 'code');
+  
+  // Ensure all mode containers are hidden first, then show the active one
+  const templateMode = document.getElementById('template-mode');
+  const docMode = document.getElementById('doc-mode');
+  const codeMode = document.getElementById('code-mode');
+  
+  if (templateMode) templateMode.classList.add('hidden');
+  if (docMode) docMode.classList.add('hidden');
+  if (codeMode) codeMode.classList.add('hidden');
   
   // Restore state of new mode
   if (mode === 'template') {
     restoreEditorState('template');
+    if (templateMode) {
+      templateMode.classList.remove('hidden');
+    }
   } else if (mode === 'doc') {
     restoreEditorState('doc');
     renderDocBlocks();
+    if (docMode) {
+      docMode.classList.remove('hidden');
+    }
   } else if (mode === 'code') {
     restoreEditorState('code');
+    if (codeMode) {
+      codeMode.classList.remove('hidden');
+    }
   }
   
-  schedulePreview();
+  // Ensure UI is visible after state restoration
+  setTimeout(() => {
+    schedulePreview();
+  }, 50);
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -4827,19 +4847,19 @@ function embedUploadedImagesIfMissing(html, imageAssets) {
   const assets = Array.isArray(imageAssets)
     ? imageAssets.map(item => typeof item === 'string' ? { url: item, caption: '', alt: '' } : item).filter(item => item && item.url)
     : [];
-  const urls = assets.map(item => item.url);
-  if (!urls.length) return html || '';
+  if (!assets.length) return html || '';
 
   const raw = String(html || '');
   if (raw.includes('class="uploaded-assets"')) return raw;
 
-  // If at least one uploaded URL is already used in content, respect author layout.
-  if (urls.some(url => raw.includes(url))) return raw;
+  // Filter to only unused images (not already in HTML)
+  const unusedAssets = assets.filter(asset => !raw.includes(asset.url));
+  if (!unusedAssets.length) return raw;
 
   const gallery = '\n<div class="page-section uploaded-assets">' +
     '<h2>Uploaded Assets</h2>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
-      assets.map((asset, idx) =>
+      unusedAssets.map((asset, idx) =>
         '<figure style="margin:0">' +
           '<a href="' + asset.url + '" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none">' +
             '<img src="' + asset.url + '" alt="' + escapeHtml(asset.alt || ('Uploaded asset ' + (idx + 1))) + '" style="display:block;max-width:100%;width:auto;height:auto;border:1px solid #3a3a3a;background:#111" />' +
@@ -4859,12 +4879,15 @@ function embedUploadedMediaIfMissing(html, mediaAssets) {
 
   const raw = String(html || '');
   if (raw.includes('class="uploaded-media"')) return raw;
-  if (assets.some(asset => raw.includes(asset.url))) return raw;
+  
+  // Filter to only unused media (not already in HTML)
+  const unusedAssets = assets.filter(asset => !raw.includes(asset.url));
+  if (!unusedAssets.length) return raw;
 
   const gallery = '\n<div class="page-section uploaded-media">' +
     '<h2>Uploaded Media</h2>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">' +
-      assets.map((asset, idx) => {
+      unusedAssets.map((asset, idx) => {
         const kind = String(asset.kind || '').toLowerCase();
         const label = escapeHtml(asset.label || asset.caption || (kind ? kind + ' ' + (idx + 1) : 'Media ' + (idx + 1)));
         const player = kind === 'video'
