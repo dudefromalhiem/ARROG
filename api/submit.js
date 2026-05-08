@@ -8,6 +8,9 @@ const MAX_TAGS = 24;
 const MAX_HTML_BYTES = 700000;
 const MAX_CSS_BYTES = 200000;
 const MAX_SUBMISSION_PAYLOAD_BYTES = 950000;
+const JSON_OBJECT_BRACES_BYTES = 2;
+const JSON_ENTRY_SEPARATOR_BYTES = 1;
+const JSON_KEY_VALUE_SEPARATOR_BYTES = 1;
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -126,12 +129,12 @@ function normalizeMediaAssets(assets) {
 
 function enforceSubmissionPayloadSizeOrThrow(payload) {
   const entries = Object.entries(payload || {});
-  let payloadBytes = 2; // {}
+  let payloadBytes = JSON_OBJECT_BRACES_BYTES;
   for (let index = 0; index < entries.length; index += 1) {
     const [key, value] = entries[index];
-    if (index > 0) payloadBytes += 1; // comma
+    if (index > 0) payloadBytes += JSON_ENTRY_SEPARATOR_BYTES;
     payloadBytes += Buffer.byteLength(JSON.stringify(String(key)), 'utf8');
-    payloadBytes += 1; // colon
+    payloadBytes += JSON_KEY_VALUE_SEPARATOR_BYTES;
     payloadBytes += Buffer.byteLength(JSON.stringify(value === undefined ? null : value), 'utf8');
   }
   if (payloadBytes > MAX_SUBMISSION_PAYLOAD_BYTES) {
