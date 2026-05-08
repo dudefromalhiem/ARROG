@@ -130,10 +130,10 @@ function normalizeMediaAssets(assets) {
 function enforceSubmissionPayloadSizeOrThrow(payload) {
   const entries = Object.entries(payload || {});
   let payloadBytes = JSON_OBJECT_BRACES_BYTES;
-  for (let index = 0; index < entries.length; index += 1) {
-    const [key, value] = entries[index];
-    if (index > 0) payloadBytes += JSON_ENTRY_SEPARATOR_BYTES;
-    payloadBytes += Buffer.byteLength(JSON.stringify(String(key)), 'utf8');
+  for (let i = 0; i < entries.length; i += 1) {
+    const [key, value] = entries[i];
+    if (i > 0) payloadBytes += JSON_ENTRY_SEPARATOR_BYTES;
+    payloadBytes += Buffer.byteLength(JSON.stringify(key), 'utf8');
     payloadBytes += JSON_KEY_VALUE_SEPARATOR_BYTES;
     payloadBytes += Buffer.byteLength(JSON.stringify(value === undefined ? null : value), 'utf8');
   }
