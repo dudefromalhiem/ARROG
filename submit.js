@@ -727,16 +727,21 @@ function setSubmitViewMode(mode) {
   const showEditor = mode !== 'explorer';
   const listMode = mode === 'history' || mode === 'drafts';
 
+  // Use only .hidden class for visibility control (no conflicting inline styles)
   explorer.classList.toggle('hidden', !showExplorer);
   editor.classList.toggle('hidden', !showEditor);
   createWorkspace.classList.toggle('hidden', !showEditor || listMode);
   history.classList.toggle('hidden', !listMode);
-  editor.style.display = showEditor ? 'block' : 'none';
-  editor.style.visibility = showEditor ? 'visible' : 'hidden';
-  editor.style.position = 'relative';
-  editor.style.zIndex = showEditor ? '1' : '';
-  createWorkspace.style.display = showEditor && !listMode ? 'block' : 'none';
-  createWorkspace.style.visibility = showEditor ? 'visible' : 'hidden';
+  
+  // Only add inline positioning for editor (not display/visibility which conflict with .hidden)
+  if (showEditor) {
+    editor.style.position = 'relative';
+    editor.style.zIndex = '1';
+  } else {
+    editor.style.position = '';
+    editor.style.zIndex = '';
+  }
+  
   updateMySubmissionsHeading(mode);
 }
 
