@@ -7,6 +7,7 @@ const MAX_TAG_LENGTH = 32;
 const MAX_TAGS = 24;
 const MAX_HTML_BYTES = 700000;
 const MAX_CSS_BYTES = 200000;
+const MAX_SUBMISSION_PAYLOAD_BYTES = 950000;
 
 function initAdmin() {
   if (admin.apps.length) return admin.app();
@@ -121,6 +122,15 @@ function normalizeMediaAssets(assets) {
         label: String(asset && asset.label || asset.title || asset.name || '').trim()
       })).filter(asset => asset.url)
     : [];
+}
+
+function enforceSubmissionPayloadSizeOrThrow(payload) {
+  const payloadBytes = Buffer.byteLength(JSON.stringify(payload || {}), 'utf8');
+  if (payloadBytes > MAX_SUBMISSION_PAYLOAD_BYTES) {
+    const err = new Error('Submission payload is too large. Please shorten the content or remove large embedded media.');
+    err.statusCode = 413;
+    throw err;
+  }
 }
 
 function validateSubmissionMediaOrThrow(payload) {
@@ -395,6 +405,7 @@ function buildSubmissionPayload(body, actor) {
   };
 
   validateSubmissionMediaOrThrow(normalizedPayload);
+  enforceSubmissionPayloadSizeOrThrow(normalizedPayload);
   return normalizedPayload;
 }
 
