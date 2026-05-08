@@ -11,8 +11,8 @@ let currentUserDoc = null;
 let adminSeedDataLoadPromise = null;
 let socialApiBase = '/api/social';
 const REMOTE_SOCIAL_API_BASES = [
-  'https://redoakguild.vercel.app/api/social',
-  'https://redoakerguild.vercel.app/api/social'
+  'https://www.redoakerguild.com/api/social',
+  'https://arrog-l1n833511-dudefromalhiem-1186s-projects.vercel.app/api/social'
 ];
 
 // Utility for safe HTML rendering
