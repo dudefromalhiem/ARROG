@@ -892,7 +892,19 @@ async function loadContributors(container) {
       '</div>'
     ].join('');
   } catch (err) {
-    container.innerHTML = '<h3 style="margin-bottom:16px">Editors / Contributors</h3><p style="font-size:.82rem;color:var(--red-g)">Could not load contributors: ' + escapeHtml(err.message) + '</p>';
+    const raw = String(err && err.message || 'Unknown error');
+    // Extract any attempted host URLs for clearer guidance
+    const urls = (raw.match(/https?:\/\/[\w.\-:\/]+/g) || []).filter(Boolean);
+    const tried = urls.length ? urls.join(', ') : socialApiBase || '/api/social';
+
+    container.innerHTML = [
+      '<h3 style="margin-bottom:16px">Editors / Contributors</h3>',
+      '<p style="font-size:.82rem;color:var(--red-g)">Could not load contributors: Social API appears unavailable.</p>',
+      '<p style="font-size:.75rem;color:var(--wht-f);margin-top:8px">Attempted endpoints: ' + escapeHtml(tried) + '</p>',
+      '<p style="font-size:.75rem;color:var(--wht-f);margin-top:8px">Possible causes: the API deployment is missing or down, or required server environment variables are not set.</p>',
+      '<p style="font-size:.75rem;color:var(--wht-f);margin-top:8px">Quick fixes: deploy the API to Vercel or run locally with the Vercel dev server. Ensure the function `api/social` is deployed and the env var <strong>FIREBASE_SERVICE_ACCOUNT_KEY</strong> is configured.</p>',
+      '<p style="font-size:.75rem;color:var(--wht-f);margin-top:8px">Local test command:<br><code>npm i -g vercel</code><br><code>vercel dev</code></p>'
+    ].join('');
   }
 }
 
