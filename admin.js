@@ -275,15 +275,29 @@ async function callSocialApi(method, payload = {}, query = '') {
         body: method === 'GET' ? undefined : JSON.stringify(payload)
       });
     } catch (networkErr) {
-      if (socialApiBase === '/api/social') {
-        socialApiBase = REMOTE_SOCIAL_API_BASES[0];
-        response = await fetch(socialApiBase + query, {
-          method: method,
-          headers: requestHeaders,
-          body: method === 'GET' ? undefined : JSON.stringify(payload)
-        });
-      } else {
-        throw networkErr;
+      // If initial local API failed, try all configured remote fallbacks
+      const tried = [];
+      let lastErr = networkErr;
+      for (let i = 0; i < REMOTE_SOCIAL_API_BASES.length; i++) {
+        const base = REMOTE_SOCIAL_API_BASES[i];
+        tried.push(base);
+        try {
+          socialApiBase = base;
+          response = await fetch(socialApiBase + query, {
+            method: method,
+            headers: requestHeaders,
+            body: method === 'GET' ? undefined : JSON.stringify(payload)
+          });
+          break; // success (or a non-network response)
+        } catch (e) {
+          lastErr = e;
+          // continue to next remote
+        }
+      }
+      if (!response) {
+        const err = new Error('Network failure when contacting social API. Tried: ' + tried.join(', ') + '. Last error: ' + (lastErr && lastErr.message ? lastErr.message : String(lastErr)));
+        err.cause = lastErr;
+        throw err;
       }
     }
 
@@ -317,8 +331,11 @@ async function callSocialApi(method, payload = {}, query = '') {
     }
     return data;
   } catch (err) {
-    console.error('Social API call failed for ' + query + ':', err.message);
-    throw err;
+    // Provide actionable logs including target base and status
+    console.error('Social API call failed for ' + query + ' (base=' + socialApiBase + '):', err && err.message ? err.message : err);
+    const wrapped = new Error('Social API request failed: ' + (err && err.message ? err.message : 'Unknown error') + ' (base=' + socialApiBase + ')');
+    wrapped.status = err && err.status ? err.status : undefined;
+    throw wrapped;
   }
 }
 
