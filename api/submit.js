@@ -125,7 +125,15 @@ function normalizeMediaAssets(assets) {
 }
 
 function enforceSubmissionPayloadSizeOrThrow(payload) {
-  const payloadBytes = Buffer.byteLength(JSON.stringify(payload || {}), 'utf8');
+  const entries = Object.entries(payload || {});
+  let payloadBytes = 2; // {}
+  for (let index = 0; index < entries.length; index += 1) {
+    const [key, value] = entries[index];
+    if (index > 0) payloadBytes += 1; // comma
+    payloadBytes += Buffer.byteLength(JSON.stringify(String(key)), 'utf8');
+    payloadBytes += 1; // colon
+    payloadBytes += Buffer.byteLength(JSON.stringify(value === undefined ? null : value), 'utf8');
+  }
   if (payloadBytes > MAX_SUBMISSION_PAYLOAD_BYTES) {
     const err = new Error('Submission payload is too large. Please shorten the content or remove large embedded media.');
     err.statusCode = 413;
