@@ -1651,6 +1651,18 @@ async function initializeSubmitEditModeFromUrl() {
       document.getElementById('sf-anomaly-code').value = code;
       onAnomalySubtypeChange();
       setDesignationLock(false);
+    } else if (page.type === 'Organization') {
+      // Load organization metadata
+      if (document.getElementById('tf-org-type')) {
+        document.getElementById('tf-org-type').value = String(page.orgCompartment || 'hostile').toLowerCase();
+      }
+      if (document.getElementById('tf-org-letter')) {
+        document.getElementById('tf-org-letter').value = String(page.orgLetter || '').toUpperCase();
+      }
+      if (document.getElementById('tf-org-slot')) {
+        document.getElementById('tf-org-slot').value = String(page.orgSlot || '');
+      }
+      setDesignationLock(false);
     } else {
       setDesignationLock(false);
     }
@@ -2703,6 +2715,35 @@ function hydrateTemplateFromHtml(tpl, htmlContent) {
       if (bodyField) bodyField.value = bodyText;
       fixedIndex++;
     });
+    return;
+  }
+
+  if (tpl === 'organization') {
+    if (document.getElementById('tf-org-hero')) {
+      document.getElementById('tf-org-hero').value = parsed.querySelector('.org-hero img')?.getAttribute('src') || '';
+    }
+    if (document.getElementById('tf-org-name')) {
+      const titleNode = parsed.querySelector('.org-header h1');
+      document.getElementById('tf-org-name').value = String(titleNode?.textContent || '').trim();
+    }
+    if (document.getElementById('tf-org-type')) {
+      const typeNode = parsed.querySelector('.org-type strong');
+      if (typeNode) {
+        const typeText = String(typeNode.textContent || '').trim().toLowerCase();
+        document.getElementById('tf-org-type').value = typeText;
+      }
+    }
+    if (document.getElementById('tf-org-description')) {
+      const descNode = parsed.querySelector('.org-section');
+      if (descNode) {
+        // Extract all text except the heading
+        const allText = Array.from(descNode.children)
+          .filter(node => node.tagName !== 'H2')
+          .map(node => htmlBlockToPlainText(node.innerHTML))
+          .join('\n\n');
+        document.getElementById('tf-org-description').value = allText.trim();
+      }
+    }
   }
 }
 
