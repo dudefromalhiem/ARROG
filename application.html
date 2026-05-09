@@ -659,6 +659,11 @@
 <script src="firebase-config.js"></script>
 <script>
 let socialApiBase = '/api/social';
+const REMOTE_SOCIAL_API_BASES = [
+  'https://www.redoakerguild.com/api/social',
+  'https://redoakguild.vercel.app/api/social',
+  'https://redoakerguild.vercel.app/api/social'
+];
 let currentUser = null;
 let currentApplicationStatus = 'none';
 const ROLE_META = window.REDOAK_ROLES || {};
@@ -699,9 +704,56 @@ function roleRank(role) {
 }
 
 function configureSocialApiBase() {
-  socialApiBase = window.REDOAK_API && typeof window.REDOAK_API.social === 'function'
-    ? window.REDOAK_API.social()
-    : '/api/social';
+  try {
+    if (window.REDOAK_API && typeof window.REDOAK_API.social === 'function') {
+      socialApiBase = window.REDOAK_API.social();
+      return;
+    }
+    const host = String(window.location.hostname || '').toLowerCase();
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const isFile = window.location.protocol === 'file:';
+    const isGithubPages = host.endsWith('.github.io');
+    if (isLocal || isFile || isGithubPages) {
+      socialApiBase = REMOTE_SOCIAL_API_BASES[0];
+      return;
+    }
+  } catch (_err) {
+    // Keep default relative API path.
+  }
+  socialApiBase = '/api/social';
+}
+
+async function postToSocialApi(body, token) {
+  const tried = new Set();
+  const candidates = [socialApiBase].concat(REMOTE_SOCIAL_API_BASES).filter(base => {
+    const key = String(base || '').trim();
+    if (!key || tried.has(key)) return false;
+    tried.add(key);
+    return true;
+  });
+
+  let lastError = null;
+  for (const base of candidates) {
+    try {
+      const response = await fetch(base, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || ('Application failed (HTTP ' + response.status + ').'));
+      }
+      socialApiBase = base;
+      return payload;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Failed to fetch');
 }
 
 function setApplicationStatus(message, isError) {
@@ -801,7 +853,7 @@ async function loadApplicationRecord(user) {
     } else if (pending) {
       setApplicationStatus('Your application is pending review.', false);
     } else {
-      setApplicationStatus('Sign in to submit your contribution application.', false);
+      setApplicationStatus('You can submit your contribution application below.', false);
     }
   } catch (err) {
     setApplicationStatus('Could not load application status: ' + err.message, true);
@@ -830,16 +882,7 @@ async function submitApplication() {
       button.textContent = 'Submitting...';
     }
     const token = await currentUser.getIdToken();
-    const response = await fetch(socialApiBase, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + token
-      },
-      body: JSON.stringify({ action: 'applyeditor', roleApplied, reason, experience })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || 'Application failed.');
+    const payload = await postToSocialApi({ action: 'applyeditor', roleApplied, reason, experience }, token);
     if (payload.alreadyPending) {
       setApplicationStatus('Your application is already pending review.', false);
     } else if (payload.alreadyApproved) {
