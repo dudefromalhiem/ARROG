@@ -641,6 +641,7 @@
       <div class="app-point">Keep your reason focused on what you will contribute to the archive.</div>
       <div class="app-point">Choose the specific role you are requesting before submitting.</div>
       <div class="app-point">You can still browse the site and use messaging while waiting for a review.</div>
+      <div class="app-point"><strong>Note:</strong> To move from Contributor to Moderator or Administrator, you must reapply using this form.</div>
     </div>
   </div>
 </main>
@@ -746,7 +747,15 @@ async function loadApplicationRecord(user) {
     const appDoc = await db.collection('applications').doc(user.uid).get();
     const appData = appDoc.exists ? (appDoc.data() || {}) : {};
     const selectedRole = normalizeApplicationRole(document.getElementById('application-role')?.value || 'contributor');
-    const currentRole = normalizeApplicationRole(userData.role || (userData.submissionAccess ? 'contributor' : 'newbie'));
+    let currentRole;
+    if (userData && userData.role) {
+      currentRole = normalizeApplicationRole(userData.role);
+    } else if (userData && userData.submissionAccess === true) {
+      currentRole = normalizeApplicationRole('contributor');
+    } else {
+      // Default authenticated users without explicit role to Site Member (Level 3)
+      currentRole = normalizeApplicationRole('site_member');
+    }
     const approved = roleRank(currentRole) >= roleRank(selectedRole);
     const pending = String(appData.status || '').toLowerCase() === 'pending';
 
