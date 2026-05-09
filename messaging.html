@@ -248,6 +248,11 @@
 
 <script>
 let socialApiBase = '/api/social';
+const REMOTE_SOCIAL_API_BASES = [
+  'https://www.redoakerguild.com/api/social',
+  'https://redoakguild.vercel.app/api/social',
+  'https://redoakerguild.vercel.app/api/social'
+];
 let currentUser = null;
 let currentTab = 'friends';
 let currentPeerUid = '';
@@ -284,9 +289,23 @@ function formatDateTime(value) {
 }
 
 function configureSocialApiBase() {
-  socialApiBase = window.REDOAK_API && typeof window.REDOAK_API.social === 'function'
-    ? window.REDOAK_API.social()
-    : '/api/social';
+  try {
+    if (window.REDOAK_API && typeof window.REDOAK_API.social === 'function') {
+      socialApiBase = window.REDOAK_API.social();
+      return;
+    }
+    const host = String(window.location.hostname || '').toLowerCase();
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const isFile = window.location.protocol === 'file:';
+    const isGithubPages = host.endsWith('.github.io');
+    if (isLocal || isFile || isGithubPages) {
+      socialApiBase = REMOTE_SOCIAL_API_BASES[0];
+      return;
+    }
+  } catch (_err) {
+    // Keep default relative API path.
+  }
+  socialApiBase = '/api/social';
 }
 
 function hasSuperiorModerationAccess(user) {
@@ -308,26 +327,64 @@ async function getAuthHeaders() {
 }
 
 async function apiGet(type, params) {
-  const url = new URL(socialApiBase, window.location.origin);
-  url.searchParams.set('type', type);
-  Object.entries(params || {}).forEach(([k, v]) => {
-    if (v != null && v !== '') url.searchParams.set(k, String(v));
+  const tried = new Set();
+  const candidates = [socialApiBase].concat(REMOTE_SOCIAL_API_BASES).filter(base => {
+    const key = String(base || '').trim();
+    if (!key || tried.has(key)) return false;
+    tried.add(key);
+    return true;
   });
-  const response = await fetch(url.toString(), { headers: await getAuthHeaders() });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || 'Request failed.');
-  return payload;
+
+  let lastError = null;
+  const headers = await getAuthHeaders();
+  for (const base of candidates) {
+    try {
+      const url = new URL(base, window.location.origin);
+      url.searchParams.set('type', type);
+      Object.entries(params || {}).forEach(([k, v]) => {
+        if (v != null && v !== '') url.searchParams.set(k, String(v));
+      });
+      const response = await fetch(url.toString(), { headers });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || 'Request failed.');
+      }
+      socialApiBase = base;
+      return payload;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Request failed.');
 }
 
 async function apiPost(body) {
-  const response = await fetch(socialApiBase, {
-    method: 'POST',
-    headers: await getAuthHeaders(),
-    body: JSON.stringify(body || {})
+  const tried = new Set();
+  const candidates = [socialApiBase].concat(REMOTE_SOCIAL_API_BASES).filter(base => {
+    const key = String(base || '').trim();
+    if (!key || tried.has(key)) return false;
+    tried.add(key);
+    return true;
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || 'Request failed.');
-  return payload;
+
+  let lastError = null;
+  const headers = await getAuthHeaders();
+  for (const base of candidates) {
+    try {
+      const response = await fetch(base, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body || {})
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Request failed.');
+      socialApiBase = base;
+      return payload;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Request failed.');
 }
 
 function extractPeer(thread) {
