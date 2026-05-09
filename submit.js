@@ -2307,6 +2307,9 @@ function selectTemplate(tpl) {
     hydrateTemplateFromEditorContentIfNeeded(tpl);
   }
 
+  // Initialize Quill editors for this template
+  initializeQuillEditorsForTemplate(tpl);
+
   schedulePreview();
 }
 
@@ -2366,6 +2369,12 @@ function addSubsection(type) {
   // Bind preview updates
   div.querySelector('input').addEventListener('input', schedulePreview);
   div.querySelector('textarea').addEventListener('input', schedulePreview);
+
+  // Initialize Quill for the new subsection body
+  const textareaId = 'sub-body-' + type + '-' + n;
+  setTimeout(() => {
+    initializeQuillEditor(textareaId, { placeholder: 'Write the content for this ' + label.toLowerCase() + '...' });
+  }, 100);
 }
 
 function removeSubsection(type, n) {
@@ -3784,7 +3793,15 @@ function buildOrganizationTemplate() {
   const name = document.getElementById('tf-org-name').value.trim();
   const type = document.getElementById('tf-org-type').value.trim();
   const heroUrl = document.getElementById('tf-org-hero').value;
-  const description = document.getElementById('tf-org-description').value.trim();
+  
+  // Use Quill content if available, otherwise use textarea value
+  let description = '';
+  if (quillEditors['tf-org-description']) {
+    description = quillEditors['tf-org-description'].quill.root.innerHTML;
+  } else {
+    const textarea = document.getElementById('tf-org-description');
+    description = textarea ? textarea.value.trim() : '';
+  }
 
   let html = '<div class="org-header">\n';
   html += '  <h1>' + escapeHtml(name || 'Organization') + '</h1>\n';
@@ -3796,7 +3813,7 @@ function buildOrganizationTemplate() {
   }
 
   if (description) {
-    html += '<div class="org-section">\n  <h2>Profile</h2>\n  ' + textToHtmlParagraphs(description) + '\n</div>\n';
+    html += '<div class="org-section">\n  <h2>Profile</h2>\n  <div class="org-content">' + description + '</div>\n</div>\n';
   }
 
   const css = `
@@ -3837,14 +3854,211 @@ function buildOrganizationTemplate() {
   letter-spacing: 2px;
   margin-bottom: 16px;
 }
-.org-section p {
-  margin-bottom: 12px;
+.org-content {
   color: #d8d8d8;
   line-height: 1.7;
+}
+.org-content p {
+  margin-bottom: 12px;
+}
+.org-content strong { color: #f2f2f2; font-weight: bold; }
+.org-content em { font-style: italic; }
+.org-content u { text-decoration: underline; }
+.org-content s { text-decoration: line-through; }
+.org-content ul, .org-content ol {
+  margin-bottom: 12px;
+  margin-left: 1.5em;
+}
+.org-content li {
+  margin-bottom: 6px;
+}
+.org-content blockquote {
+  border-left: 4px solid #8b0000;
+  padding-left: 1em;
+  margin-left: 0;
+  color: #a8a8a8;
+}
+.org-content code {
+  background: rgba(139, 0, 0, 0.2);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: #ff9999;
+}
+.redacted {
+  background-color: #8b0000;
+  color: #8b0000;
+  user-select: none;
 }
 `;
 
   return { html, css };
+}
+
+// ═════════════════════════════════════════════════════════════
+// QUILL RICH TEXT EDITOR
+// ═════════════════════════════════════════════════════════════
+
+const quillEditors = {};
+
+function initializeQuillEditor(fieldId, options = {}) {
+  if (quillEditors[fieldId]) {
+    return quillEditors[fieldId];
+  }
+
+  const container = document.getElementById(fieldId);
+  if (!container) return null;
+
+  const defaultOptions = {
+    theme: 'snow',
+    placeholder: options.placeholder || 'Enter text...',
+    modules: {
+      toolbar: [
+        // Text formatting
+        ['bold', 'italic', 'underline', 'strike'],
+        // Lists
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        // Alignment
+        [{ 'align': [] }],
+        // Font and size
+        [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
+        // Colors
+        [{ 'color': [] }, { 'background': [] }],
+        // Links and code
+        ['link', 'code-block'],
+        // Redaction custom button
+        ['redact'],
+        // Clear formatting
+        ['clean']
+      ],
+      clipboard: {
+        matchVisual: false
+      }
+    },
+    formats: ['bold', 'italic', 'underline', 'strike', 'list', 'align', 'font', 'size', 'color', 'background', 'link', 'code', 'code-block', 'redacted']
+  };
+
+  const config = { ...defaultOptions, ...options };
+
+  // Create wrapper for Quill if needed
+  const wrapper = document.createElement('div');
+  wrapper.className = 'quill-wrapper';
+  wrapper.style.marginBottom = '16px';
+  
+  const editor = document.createElement('div');
+  editor.id = fieldId + '-quill';
+  
+  wrapper.appendChild(editor);
+  container.parentNode.insertBefore(wrapper, container.nextSibling);
+  container.style.display = 'none';
+
+  const quill = new Quill(editor, config);
+
+  // Custom redaction handler
+  const toolbar = wrapper.querySelector('.ql-toolbar');
+  if (toolbar) {
+    const redactButton = toolbar.querySelector('.ql-redact');
+    if (redactButton) {
+      redactButton.addEventListener('click', () => {
+        const range = quill.getSelection();
+        if (range && range.length > 0) {
+          quill.formatText(range.index, range.length, { 'redacted': true });
+        }
+      });
+    }
+  }
+
+  // Load existing content from textarea
+  const textareaContent = container.value || '';
+  if (textareaContent.trim()) {
+    quill.root.innerHTML = textareaContent;
+  }
+
+  // Sync back to textarea on changes
+  quill.on('text-change', () => {
+    container.value = quill.root.innerHTML;
+  });
+
+  quillEditors[fieldId] = { quill, wrapper, container };
+  return quillEditors[fieldId];
+}
+
+function getQuillContent(fieldId) {
+  const editor = quillEditors[fieldId];
+  if (!editor) return '';
+  return editor.quill.root.innerHTML;
+}
+
+function setQuillContent(fieldId, html) {
+  const editor = quillEditors[fieldId];
+  if (!editor) return;
+  editor.quill.root.innerHTML = html;
+  editor.container.value = html;
+}
+
+function initializeQuillEditorsForTemplate(tpl) {
+  // Clear previous editors
+  Object.values(quillEditors).forEach(editor => {
+    if (editor.wrapper) editor.wrapper.remove();
+  });
+  Object.keys(quillEditors).forEach(key => delete quillEditors[key]);
+
+  // Initialize Quill for specific template fields
+  switch(tpl) {
+    case 'organization':
+      if (document.getElementById('tf-org-description')) {
+        initializeQuillEditor('tf-org-description', { placeholder: 'Enter organization profile description...' });
+      }
+      break;
+
+    case 'tale':
+      if (document.getElementById('tf-tale-intro')) {
+        initializeQuillEditor('tf-tale-intro', { placeholder: 'Enter tale introduction...' });
+      }
+      // Initialize Quill for tale chapters
+      const taleSections = document.getElementById('tf-tale-sections');
+      if (taleSections) {
+        const chapterBodies = taleSections.querySelectorAll('textarea[id^="sub-body-tale-"]');
+        chapterBodies.forEach(textarea => {
+          if (textarea.id && !quillEditors[textarea.id]) {
+            initializeQuillEditor(textarea.id, { placeholder: 'Enter chapter content...' });
+          }
+        });
+      }
+      break;
+
+    case 'anomaly':
+      // Initialize Quill for anomaly subsections
+      const anomalySections = document.getElementById('tf-subsections');
+      if (anomalySections) {
+        const subsectionBodies = anomalySections.querySelectorAll('textarea[id^="sub-body-anomaly-"]');
+        subsectionBodies.forEach(textarea => {
+          if (textarea.id && !quillEditors[textarea.id]) {
+            initializeQuillEditor(textarea.id, { placeholder: 'Enter subsection content...' });
+          }
+        });
+      }
+      break;
+
+    case 'guide':
+      // Initialize Quill for guide sections
+      const guideSections = document.getElementById('tf-guide-sections');
+      if (guideSections) {
+        const sectionBodies = guideSections.querySelectorAll('textarea[id^="sub-body-guide-"]');
+        sectionBodies.forEach(textarea => {
+          if (textarea.id && !quillEditors[textarea.id]) {
+            initializeQuillEditor(textarea.id, { placeholder: 'Enter section content...' });
+          }
+        });
+      }
+      break;
+
+    case 'artwork':
+      if (document.getElementById('tf-art-desc')) {
+        initializeQuillEditor('tf-art-desc', { placeholder: 'Enter artwork description...' });
+      }
+      break;
+  }
 }
 
 // ═════════════════════════════════════════════════════════════
