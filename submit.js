@@ -71,7 +71,8 @@ const templateStateCache = {
   anomaly: null,
   tale: null,
   artwork: null,
-  guide: null
+  guide: null,
+  organization: null
 };
 
 const pageEditorState = {
@@ -83,6 +84,63 @@ const pageEditorState = {
 const DRAFT_AUTOSAVE_SETTING_KEY = 'rog-submit-autosave-enabled';
 const DOC_MEDIA_DRAG_SETTING_KEY = 'rog-doc-media-drag-enabled';
 const DRAFT_AUTOSAVE_MIN_WORDS = 1;
+
+// ═══════════════════════════════════════════════════════════════
+// ORGANIZATION FORM AUTO-DETECTION HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+function autoDetectOrgLetter() {
+  const nameEl = document.getElementById('tf-org-name');
+  const letterEl = document.getElementById('tf-org-letter');
+  if (!nameEl || !letterEl) return;
+
+  const name = String(nameEl.value || '').trim();
+  if (name && !letterEl.value) {
+    const firstLetter = name.charAt(0).toUpperCase();
+    if (/^[A-Z]$/.test(firstLetter)) {
+      letterEl.value = firstLetter;
+    }
+  }
+}
+
+async function autoAssignOrgSlot() {
+  const typeEl = document.getElementById('tf-org-type');
+  const letterEl = document.getElementById('tf-org-letter');
+  const slotEl = document.getElementById('tf-org-slot');
+  if (!typeEl || !letterEl || !slotEl) return;
+
+  const type = String(typeEl.value || '').trim();
+  const letter = String(letterEl.value || '').trim().toUpperCase();
+  
+  if (!type || !letter || !/^[A-Z]$/.test(letter)) return;
+  if (slotEl.value) return; // Don't overwrite manual entry
+
+  try {
+    // Query existing organizations for this compartment and letter
+    const query = await db.collection('pages')
+      .where('type', '==', 'Organization')
+      .where('orgCompartment', '==', type)
+      .where('orgLetter', '==', letter)
+      .get();
+
+    const usedSlots = new Set();
+    query.docs.forEach(doc => {
+      const slot = doc.data().orgSlot;
+      if (slot) usedSlots.add(parseInt(slot, 10));
+    });
+
+    // Find first available slot 1-20
+    for (let i = 1; i <= 20; i++) {
+      if (!usedSlots.has(i)) {
+        slotEl.value = i;
+        break;
+      }
+    }
+  } catch (err) {
+    // Silently fail - database might not be ready yet
+    console.debug('Could not auto-assign org slot:', err);
+  }
+}
 
 function ensureSubmitSeedDataLoaded() {
   if (typeof PAGE_SEED !== 'undefined' && Array.isArray(PAGE_SEED)) {
@@ -233,6 +291,7 @@ const ENTRY_PROFILES = {
   tl: { key: 'tl', label: 'Termination Log Format', type: 'Anomaly', subtype: 'TL', template: 'anomaly' },
   tale: { key: 'tale', label: 'Narrative / Field Report', type: 'Tale', template: 'tale' },
   artwork: { key: 'artwork', label: 'Artwork Upload', type: 'Artwork', template: 'artwork' },
+  organizations: { key: 'organizations', label: 'Organizations of Concern', type: 'Organization', template: 'organization' },
   lore: { key: 'lore', label: 'Archived History', type: 'Lore', template: 'guide' }
 };
 
@@ -264,13 +323,17 @@ function isNarrativeFamilyType(rawType) {
   return type === 'Tale' || type === 'Report';
 }
 
+function isOrganizationType(rawType) {
+  return String(rawType || '').trim() === 'Organization';
+}
+
 function isLoreFamilyType(rawType) {
   return String(rawType || '').trim() === 'Lore';
 }
 
 function isMediaEnabledSubmissionType(rawType) {
   const type = String(rawType || '').trim().toLowerCase();
-  return isAnomalyFamilyType(rawType) || isNarrativeFamilyType(rawType) || type === 'guide' || type === 'legacy' || type === 'lore';
+  return isAnomalyFamilyType(rawType) || isNarrativeFamilyType(rawType) || type === 'guide' || type === 'legacy' || type === 'lore' || isOrganizationType(rawType);
 }
 
 function getSelectedSubmissionType() {
@@ -1225,6 +1288,11 @@ async function saveDraft(options = {}) {
     currentMode: currentMode,
     currentTemplate: currentTemplate,
     subsectionCounters: subsectionCounters,
+    ...(type === 'Organization' && {
+      orgCompartment: String(document.getElementById('tf-org-type')?.value || '').toLowerCase() || '',
+      orgLetter: String(document.getElementById('tf-org-letter')?.value || '').toUpperCase() || '',
+      orgSlot: String(document.getElementById('tf-org-slot')?.value || '').padStart(2, '0') || ''
+    }),
   };
 
   const draftSubmission = removeClientOnlySubmissionFields(draftPayload);
@@ -1882,11 +1950,15 @@ function updateTypeSpecificUI() {
   if (anomalyRow) anomalyRow.classList.toggle('hidden', !isAnomalyFamilyType(type));
 
   const isGuide = type === 'Guide' || type === 'Lore';
+  const isOrganization = type === 'Organization';
 
   if (isGuide) {
     switchMode('template');
     selectTemplate('guide');
     setGuideSectionsFixedStructure();
+  } else if (isOrganization) {
+    switchMode('template');
+    selectTemplate('organization');
   }
 
   updateUploadZoneCopy();
@@ -1913,7 +1985,7 @@ function updateUploadZoneCopy() {
 
   if (hint) {
     hint.textContent = mediaEnabled
-      ? 'Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, and Lore submissions.'
+      ? 'Images are available for all page types. Audio and video are enabled for Tale, Anomaly, Guide, Lore, and Organization submissions.'
       : 'Images are available for all page types. Audio and video are disabled for this submission type.';
   }
 }
@@ -2163,7 +2235,7 @@ function selectTemplate(tpl) {
   currentTemplate = tpl;
   if (!tpl) return;
   
-  ['anomaly', 'tale', 'artwork', 'guide'].forEach(t => {
+  ['anomaly', 'tale', 'artwork', 'guide', 'organization'].forEach(t => {
     const card = document.getElementById('tpl-' + t);
     const fields = document.getElementById('tpl-fields-' + t);
     if (card) {
@@ -2183,7 +2255,7 @@ function selectTemplate(tpl) {
   });
 
   // Auto-set the type dropdown
-  const typeMap = { anomaly: 'Anomaly', tale: 'Tale', artwork: 'Artwork' };
+  const typeMap = { anomaly: 'Anomaly', tale: 'Tale', artwork: 'Artwork', organization: 'Organization' };
   const typeEl = document.getElementById('sf-type');
   if (typeEl) {
     if (tpl === 'guide') {
@@ -2328,6 +2400,7 @@ function buildTemplateHTML() {
   if (currentTemplate === 'tale') return buildTaleTemplate();
   if (currentTemplate === 'artwork') return buildArtworkTemplate();
   if (currentTemplate === 'guide') return buildGuideTemplate();
+  if (currentTemplate === 'organization') return buildOrganizationTemplate();
   return { html: '', css: '' };
 }
 
@@ -2401,7 +2474,7 @@ function getSectionBodyText(sectionNode) {
 
 function inferTemplateFromPageData(page) {
   const savedTemplate = String(page && page.currentTemplate || '').trim().toLowerCase();
-  if (savedTemplate === 'anomaly' || savedTemplate === 'tale' || savedTemplate === 'artwork' || savedTemplate === 'guide') {
+  if (savedTemplate === 'anomaly' || savedTemplate === 'tale' || savedTemplate === 'artwork' || savedTemplate === 'guide' || savedTemplate === 'organization') {
     return savedTemplate;
   }
 
@@ -2409,6 +2482,7 @@ function inferTemplateFromPageData(page) {
   if (isAnomalyFamilyType(type)) return 'anomaly';
   if (isNarrativeFamilyType(type)) return 'tale';
   if (type === 'Artwork') return 'artwork';
+  if (type === 'Organization') return 'organization';
   if (isLoreFamilyType(type) || type === 'Guide' || type === 'Hub') return 'guide';
   return '';
 }
@@ -2449,6 +2523,14 @@ function isTemplateStateEmpty(tpl) {
       String(document.getElementById('tf-guide-video')?.value || '').trim();
     const hasSections = Array.from(document.querySelectorAll('#tf-guide-sections textarea')).some(el => String(el.value || '').trim());
     return !hasPrimary && !hasSections;
+  }
+
+  if (tpl === 'organization') {
+    const hasPrimary = String(document.getElementById('tf-org-name')?.value || '').trim() ||
+      String(document.getElementById('tf-org-type')?.value || '').trim() ||
+      String(document.getElementById('tf-org-description')?.value || '').trim() ||
+      String(document.getElementById('tf-org-hero')?.value || '').trim();
+    return !hasPrimary;
   }
 
   return true;
@@ -3657,6 +3739,73 @@ function buildGuideTemplate() {
   return { html, css };
 }
 
+function buildOrganizationTemplate() {
+  const name = document.getElementById('tf-org-name').value.trim();
+  const type = document.getElementById('tf-org-type').value.trim();
+  const heroUrl = document.getElementById('tf-org-hero').value;
+  const description = document.getElementById('tf-org-description').value.trim();
+
+  let html = '<div class="org-header">\n';
+  html += '  <h1>' + escapeHtml(name || 'Organization') + '</h1>\n';
+  html += '  <p class="org-type">Organization Type: <strong>' + escapeHtml(type || 'Unclassified') + '</strong></p>\n';
+  html += '</div>\n\n';
+
+  if (heroUrl) {
+    html += '<div class="org-hero"><img src="' + heroUrl + '" alt="' + escapeHtml(name || 'Organization') + '" /></div>\n\n';
+  }
+
+  if (description) {
+    html += '<div class="org-section">\n  <h2>Profile</h2>\n  ' + textToHtmlParagraphs(description) + '\n</div>\n';
+  }
+
+  const css = `
+.org-header {
+  border-bottom: 3px solid #8b0000;
+  padding: 28px 24px;
+  margin-bottom: 28px;
+}
+.org-header h1 {
+  font-size: 2rem;
+  color: #f2f2f2;
+  letter-spacing: 3px;
+  margin-bottom: 10px;
+}
+.org-header .org-type {
+  font-size: 0.95rem;
+  color: #d8d8d8;
+  letter-spacing: 1px;
+}
+.org-hero {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.org-hero img {
+  max-width: 100%;
+  max-height: 300px;
+  border: 1px solid #3a3a3a;
+}
+.org-section {
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #2f2f2f;
+}
+.org-section h2 {
+  font-size: 1.2rem;
+  color: #8b0000;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+.org-section p {
+  margin-bottom: 12px;
+  color: #d8d8d8;
+  line-height: 1.7;
+}
+`;
+
+  return { html, css };
+}
+
 // ═════════════════════════════════════════════════════════════
 // IMAGE UPLOAD
 // ═════════════════════════════════════════════════════════════
@@ -3772,6 +3921,20 @@ document.addEventListener('DOMContentLoaded', () => {
     onAnomalyCodeInput();
     schedulePreview();
   });
+
+  // Organization field auto-detection
+  const orgNameEl = document.getElementById('tf-org-name');
+  const orgTypeEl = document.getElementById('tf-org-type');
+  const orgLetterEl = document.getElementById('tf-org-letter');
+  if (orgNameEl) {
+    orgNameEl.addEventListener('input', autoDetectOrgLetter);
+  }
+  if (orgTypeEl) {
+    orgTypeEl.addEventListener('change', autoAssignOrgSlot);
+  }
+  if (orgLetterEl) {
+    orgLetterEl.addEventListener('change', autoAssignOrgSlot);
+  }
 
   initTagPicker();
 
@@ -5340,6 +5503,11 @@ async function submitPage(event) {
     imageAssets: uploadedAssets.imageAssets,
     mediaUrls: uploadedAssets.mediaAssets.map(asset => asset.url),
     mediaAssets: uploadedAssets.mediaAssets,
+    ...(type === 'Organization' && {
+      orgCompartment: String(document.getElementById('tf-org-type')?.value || '').toLowerCase() || '',
+      orgLetter: String(document.getElementById('tf-org-letter')?.value || '').toUpperCase() || '',
+      orgSlot: String(document.getElementById('tf-org-slot')?.value || '').padStart(2, '0') || ''
+    }),
     clearanceLevel: clearanceLevel,
     authorUid: currentUserForSubmit.uid,
     authorEmail: currentUserForSubmit.email,
@@ -5448,15 +5616,19 @@ function resetSubmitForm() {
 
   // Reset template fields
   ['tf-containment', 'tf-description', 'tf-tale-subtitle', 'tf-tale-intro',
-   'tf-art-artist', 'tf-art-medium', 'tf-art-desc', 'tf-guide-intro'].forEach(id => {
+   'tf-art-artist', 'tf-art-medium', 'tf-art-desc', 'tf-guide-intro', 'tf-org-name', 'tf-org-description'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['tf-object-class'].forEach(id => {
+  ['tf-object-class', 'tf-org-type'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.value = 'Alona';
+    if (el) el.value = el.id === 'tf-org-type' ? 'hostile' : 'Alona';
   });
-  ['tf-hero-img', 'tf-tale-hero', 'tf-art-img', 'tf-guide-hero', 'tf-anomaly-audio', 'tf-anomaly-video', 'tf-tale-audio', 'tf-tale-video', 'tf-guide-audio', 'tf-guide-video'].forEach(id => {
+  ['tf-hero-img', 'tf-tale-hero', 'tf-art-img', 'tf-guide-hero', 'tf-org-hero', 'tf-anomaly-audio', 'tf-anomaly-video', 'tf-tale-audio', 'tf-tale-video', 'tf-guide-audio', 'tf-guide-video'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['tf-org-letter', 'tf-org-slot'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });

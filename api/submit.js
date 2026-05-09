@@ -190,7 +190,7 @@ function validateSubmissionMediaOrThrow(payload) {
   const mediaAssets = normalizeMediaAssets(payload.mediaAssets);
   const mediaKinds = new Set(mediaAssets.map(asset => asset.kind));
   const normalizedType = String(payload.type || '').trim().toLowerCase();
-  const mediaEnabledTypes = new Set(['tale', 'anomaly', 'guide', 'legacy', 'lore']);
+  const mediaEnabledTypes = new Set(['tale', 'anomaly', 'guide', 'legacy', 'lore', 'organization']);
   const requiresMediaGate = !mediaEnabledTypes.has(normalizedType);
 
   if (imageAssets.length > 5) {
@@ -884,7 +884,12 @@ module.exports = async function handler(req, res) {
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           upvoteCount: 0,
           featured: false,
-          status: 'approved'
+          status: 'approved',
+          ...(payload.type === 'Organization' && {
+            orgCompartment: payload.orgCompartment,
+            orgLetter: payload.orgLetter,
+            orgSlot: payload.orgSlot
+          })
         });
 
         const pageId = String(body.pageId || existingRequestedPageId || '').trim();

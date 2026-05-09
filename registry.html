@@ -37,6 +37,7 @@
 
     .logs-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .logs-options.subcats { grid-template-columns: repeat(4, 1fr); }
+    .logs-options.oes-compartments { grid-template-columns: repeat(3, 1fr); }
     .logs-option {
       border: 1px solid var(--red-d);
       background: var(--blk-s);
@@ -219,6 +220,14 @@
         { id: 'tl', label: 'Termination List', code: 'TL', format: 'colon', digits: 2, start: 1, end: 999, group: 100, type: 'Anomaly', listKey: 'TL' },
         { id: 'sctor', label: 'Standard Cross Test Operation Reports', code: 'SCTOR', format: 'colon', digits: 2, start: 1, end: 999, group: 100, type: 'Anomaly', listKey: 'SCTOR' }
       ]
+    },
+    organizations: {
+      label: 'Organizations of Concern',
+      children: [
+        { id: 'hostile', label: 'Hostile', code: 'OES-H', format: 'oes', digits: 2, type: 'Organization', isOES: true },
+        { id: 'neutral', label: 'Neutral', code: 'OES-N', format: 'oes', digits: 2, type: 'Organization', isOES: true },
+        { id: 'allied', label: 'Allied', code: 'OES-A', format: 'oes', digits: 2, type: 'Organization', isOES: true }
+      ]
     }
   };
 
@@ -226,6 +235,7 @@
   let selectedSubcat = null;
   let selectedRange = null;
   let livePagesByDesignation = new Map();
+  let liveOESByDesignation = new Map();
   let registryDataLoading = true;
   function copyTextToClipboard(value) {
     const text = String(value || '').trim();
@@ -285,6 +295,19 @@
 
   function buildRangeBuckets(config) {
     const ranges = [];
+    if (config.isOES) {
+      // OES format: A-Z letter ranges
+      for (let letter = 1; letter <= 26; letter++) {
+        ranges.push({
+          start: 0,
+          end: 19,
+          label: letterForIndex(letter),
+          suffix: letterForIndex(letter),
+          isLetter: true
+        });
+      }
+      return ranges;
+    }
     if (config.format === 'sloa') {
       for (let letter = 1; letter <= 26; letter++) {
         ranges.push({
@@ -347,6 +370,10 @@
     }
 
     const node = LOG_TREE[selectedTop];
+    const isOES = selectedTop === 'organizations';
+    const containerClass = isOES ? 'logs-options oes-compartments' : 'logs-options subcats';
+    
+    container.className = containerClass;
     container.innerHTML = node.children.map(child => {
       const active = selectedSubcat && selectedSubcat.id === child.id ? 'active' : '';
       return '<button class="logs-option ' + active + '" type="button" onclick="selectSubcategory(\'' + child.id + '\')">' + child.label + '</button>';
@@ -370,6 +397,17 @@
     }
 
     const ranges = buildRangeBuckets(selectedSubcat);
+    
+    // OES uses special grid layout for letters (6 per row)
+    if (selectedSubcat.isOES) {
+      const letters = ranges.map((range, idx) => {
+        const active = selectedRange && selectedRange.suffix === range.suffix ? 'active' : '';
+        return '<button class="range-chip ' + active + '" type="button" onclick="selectRange(0, 19, \'' + range.suffix + '\')">' + range.label + '</button>';
+      }).join('');
+      container.innerHTML = letters;
+      return;
+    }
+
     container.innerHTML = ranges.map(range => {
       const active = selectedRange && selectedRange.start === range.start && selectedRange.end === range.end && String(selectedRange.suffix || '') === String(range.suffix || '') ? 'active' : '';
       const suffixArg = range.suffix ? ", '" + range.suffix + "'" : '';
@@ -395,6 +433,54 @@
     if (!selectedSubcat || !selectedRange) {
       title.textContent = 'Level 4 // Entries';
       grid.innerHTML = '<div class="empty-note">Choose a range to load entries.</div>';
+      return;
+    }
+
+    // Special handling for OES format
+    if (selectedSubcat.isOES) {
+      const compartment = selectedSubcat.id;
+      const letter = selectedRange.suffix || 'A';
+      title.textContent = 'Level 4 // ' + compartment.toUpperCase() + ' — ' + letter;
+
+      const cards = [];
+      for (let slotNum = 1; slotNum <= 20; slotNum++) {
+        const designation = compartment.toUpperCase()[0] + '-' + letter + '-' + padNumber(slotNum, 2);
+        const docId = compartment + '_' + letter + '_' + padNumber(slotNum, 2);
+        const existing = liveOESByDesignation.get(designation);
+
+        if (existing && existing.title) {
+          const href = existing.slug ? ('page.html?slug=' + encodeURIComponent(existing.slug)) : ('page.html?id=' + encodeURIComponent(existing.id));
+          const descriptionText = existing.description ? escapeHtml(existing.description) : 'This organization has been indexed and approved by Guild administration.';
+          cards.push(
+            '<article class="entry-card">' +
+              '<div class="entry-code">' + designation + '</div>' +
+              '<div class="entry-title">' + escapeHtml(existing.title || designation) + '</div>' +
+              '<div class="entry-status live">Active Entry</div>' +
+              '<div class="entry-copy">' + descriptionText + '</div>' +
+              '<div class="entry-actions">' +
+                '<a class="btn btn-sm btn-s" href="' + href + '">Open</a>' +
+                '<a class="btn btn-sm btn-p" href="submit.html?editId=' + encodeURIComponent(existing.id) + '">Edit</a>' +
+                '<button class="btn btn-sm btn-s" type="button" onclick="copyTextToClipboard(\'' + escapeHtml(href).replace(/'/g, '\\&#39;') + '\')">Copy Link</button>' +
+              '</div>' +
+            '</article>'
+          );
+        } else {
+          cards.push(
+            '<article class="entry-card">' +
+              '<div class="entry-code">' + designation + '</div>' +
+              '<div class="entry-title">[ENCRYPTED INFORMATION]</div>' +
+              '<div class="entry-status enc">Encrypted / Unreconstructed</div>' +
+              '<div class="entry-copy">' + escapeHtml(ENCRYPTED_COPY) + '</div>' +
+              '<div class="entry-copy">' + escapeHtml(ENCRYPTED_COPY_FOLLOWUP) + '</div>' +
+              '<div class="entry-actions">' +
+                '<a class="btn btn-sm btn-p" href="submit.html?reconstruct=1&docId=' + encodeURIComponent(docId) + '&oesType=' + encodeURIComponent(compartment) + '&oesLetter=' + encodeURIComponent(letter) + '&oesSlot=' + padNumber(slotNum, 2) + '">Enter</a>' +
+              '</div>' +
+            '</article>'
+          );
+        }
+      }
+
+      grid.innerHTML = cards.join('');
       return;
     }
 
@@ -469,7 +555,26 @@
     }
 
     livePagesByDesignation = new Map();
+    liveOESByDesignation = new Map();
+    
     pages.forEach(page => {
+      const type = String(page && page.type || '').trim();
+      
+      // Handle OES entries
+      if (type === 'Organization') {
+        const compartment = String(page.orgCompartment || '').toLowerCase();
+        const letter = String(page.orgLetter || '').toUpperCase();
+        const slot = String(page.orgSlot || '').padStart(2, '0');
+        if (compartment && letter && slot) {
+          const designation = compartment.charAt(0).toUpperCase() + '-' + letter + '-' + slot;
+          if (!liveOESByDesignation.has(designation)) {
+            liveOESByDesignation.set(designation, page);
+          }
+        }
+        return; // Don't add to regular livePagesByDesignation
+      }
+
+      // Handle regular entries
       const designation = extractDesignationFromPage(page);
       if (!designation) return;
       const normalized = normalizeDesignation(designation);

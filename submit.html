@@ -454,6 +454,10 @@ render.mount('submission-terminal');</pre>
           <span class="file-name">Termination Log Format</span>
           <span class="file-copy">Termination trial logs and outcomes.</span>
         </button>
+        <button class="file-tile" type="button" data-entry-profile="organizations">
+          <span class="file-name">Organizations of Concern</span>
+          <span class="file-copy">Hostile, neutral, or allied organization entries.</span>
+        </button>
         <button class="file-tile" type="button" data-entry-profile="tale">
           <span class="file-name">Narrative / Field Report</span>
           <span class="file-copy">First-person storytelling only.</span>
@@ -533,6 +537,7 @@ render.mount('submission-terminal');</pre>
             <option value="Report">Field Report</option>
             <option value="Tale">Narrative / Tale</option>
             <option value="Artwork">Artwork</option>
+            <option value="Organization">Organization of Concern</option>
             <option value="Guide">Guide</option>
             <option value="Lore">Archived History</option>
           </select>
@@ -751,6 +756,42 @@ render.mount('submission-terminal');</pre>
 
         <div id="tf-guide-sections"></div>
         <span style="font-size:.72rem;color:var(--wht-f);display:block;margin-top:8px">Guide structure is fixed for consistency. Edit section text and add images only.</span>
+      </div>
+
+      <!-- Organization Template Fields -->
+      <div class="section hidden" style="margin-bottom:24px" id="tpl-fields-organization">
+        <div class="section-hd">Organization Details</div>
+        <div class="g2 mb-md">
+          <div class="fg"><label class="fl" for="tf-org-name">Organization Name</label>
+            <input class="fi" id="tf-org-name" placeholder="e.g. Order of the Ten Truths" required />
+          </div>
+          <div class="fg"><label class="fl" for="tf-org-type">Organization Type</label>
+            <select class="fi" id="tf-org-type" required>
+              <option value="">Select one...</option>
+              <option value="hostile">Hostile</option>
+              <option value="neutral">Neutral</option>
+              <option value="allied">Allied</option>
+            </select>
+          </div>
+        </div>
+        <div class="g2 mb-md">
+          <div class="fg"><label class="fl" for="tf-org-letter">Starting Letter (A-Z)</label>
+            <input class="fi" id="tf-org-letter" placeholder="Auto-detected from name" maxlength="1" style="text-transform:uppercase" oninput="this.value = this.value.toUpperCase()" />
+            <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px">Leave blank to auto-detect from organization name.</span>
+          </div>
+          <div class="fg"><label class="fl" for="tf-org-slot">Slot Number (01-20)</label>
+            <input class="fi" id="tf-org-slot" type="number" min="1" max="20" placeholder="Auto-assigned to next available" />
+            <span style="font-size:.7rem;color:var(--wht-f);display:block;margin-top:4px">Leave blank to auto-assign to next available slot.</span>
+          </div>
+        </div>
+        <div class="fg"><label class="fl">Hero Image</label>
+          <select class="fi" id="tf-org-hero">
+            <option value="">None — No hero image</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Description</label>
+          <textarea class="fta" id="tf-org-description" placeholder="Describe the organization, its goals, and known activities..."></textarea>
+        </div>
       </div>
 
     </div>
