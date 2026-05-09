@@ -30,6 +30,7 @@
     .msg-container { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: 16px; margin-top: 20px; min-height: calc(100vh - 200px); }
     .msg-sidebar { background: linear-gradient(180deg, rgba(18,22,28,.96), rgba(10,11,14,.98)); border: 1px solid #425165; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; box-shadow: 0 12px 34px rgba(0,0,0,.32); }
     .msg-main { background: linear-gradient(180deg, rgba(15,18,24,.98), rgba(8,9,12,.98)); border: 1px solid #425165; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; box-shadow: 0 12px 34px rgba(0,0,0,.34); }
+    .msg-chat-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 14px; align-items: start; }
     .msg-header { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.1px; color: #8fd3ff; font-weight: bold; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
     .msg-header::before { content: ''; display: inline-block; width: 4px; height: 4px; background: var(--red-b); border-radius: 50%; }
     .msg-notifications-badge { background: #8fd3ff; color: #081018; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; margin-left: auto; }
@@ -57,6 +58,16 @@
     .msg-chat-header { border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 14px; margin-bottom: 16px; }
     .msg-chat-title { font-size: 1.1rem; color: var(--wht-b); font-weight: bold; margin-bottom: 4px; }
     .msg-chat-status { font-size: 0.75rem; color: var(--wht-f); }
+    .msg-members-card { border-left: 1px solid rgba(255,255,255,.08); padding-left: 14px; }
+    .msg-members-card-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+    .msg-members-title { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 1px; color: #8fd3ff; font-weight: bold; }
+    .msg-members-count { font-size: 0.66rem; color: var(--wht-f); }
+    .msg-members-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow: auto; }
+    .msg-member { display:flex; align-items:center; gap:10px; padding:8px; border:1px solid rgba(255,255,255,.08); border-radius:8px; background: rgba(255,255,255,.03); }
+    .msg-member-avatar { width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid var(--red-d); background:#111; flex-shrink:0; }
+    .msg-member-meta { min-width:0; }
+    .msg-member-name { color: var(--wht-b); font-size: .82rem; font-weight: bold; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .msg-member-role { color: var(--wht-f); font-size: .66rem; text-transform: uppercase; letter-spacing: .8px; }
     .msg-mobile-toggle { display:none; margin-top:10px; background:rgba(255,255,255,.04); color:var(--wht-b); border:1px solid rgba(255,255,255,.15); padding:8px 10px; border-radius:6px; font-size:.78rem; }
     .msg-chat-actions { display:flex; gap:8px; margin-top:10px; }
     .msg-chat-action-btn { background: transparent; border:1px solid var(--blk-m); color: var(--wht-d); padding:6px 10px; font-size:.74rem; cursor:pointer; }
@@ -98,6 +109,9 @@
     @keyframes msgPulse { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
     
     @media (max-width: 920px) {
+      .msg-chat-layout { grid-template-columns: 1fr; }
+      .msg-members-card { border-left: 0; padding-left: 0; border-top: 1px solid rgba(255,255,255,.08); padding-top: 12px; }
+      .msg-members-list { max-height: 200px; }
       .msg-container { grid-template-columns: 1fr; position: relative; }
       .msg-sidebar { display: none; position: absolute; left: 0; top: 0; width: 100%; z-index: 20; max-height: calc(100vh - 190px); overflow-y: auto; }
       .msg-sidebar.open { display: flex; }
@@ -263,6 +277,7 @@ let outgoingRequests = [];
 let notifications = [];
 let serverNotifications = [];
 let previousThreadTimestamps = new Map();
+let currentThreadData = null;
 let pollingTimer = null;
 let pollIntervalMs = 12000;
 
@@ -503,6 +518,67 @@ function renderNotifications() {
   area.innerHTML = serverRows.concat(localRows).join('');
 }
 
+function getCurrentThreadMembers() {
+  const thread = currentThreadData || {};
+  const participants = Array.isArray(thread.participants) ? thread.participants : [];
+  const participantEmails = Array.isArray(thread.participantEmails) ? thread.participantEmails : [];
+  const participantNames = Array.isArray(thread.participantNames) ? thread.participantNames : [];
+  const participantRoles = Array.isArray(thread.participantRoles) ? thread.participantRoles : [];
+
+  const isGroupThread = String(thread.threadKind || '').includes('guild-') || String(thread.threadKind || '') === 'world-chat';
+  if (!isGroupThread) {
+    return [{
+      uid: currentPeerUid,
+      name: String(document.getElementById('msg-current-name')?.textContent || 'Guild Member'),
+      email: '',
+      role: 'Direct Message',
+      photoURL: 'logo.png'
+    }];
+  }
+
+  const rows = participants.map((uid, idx) => ({
+    uid: String(uid || ''),
+    name: String(participantNames[idx] || 'Guild Member'),
+    email: String(participantEmails[idx] || ''),
+    role: String(participantRoles[idx] || 'member'),
+    photoURL: 'logo.png'
+  })).filter(row => row.uid);
+
+  if (String(thread.threadKind || '') === 'world-chat' && !rows.length) {
+    return [{
+      uid: 'world-chat',
+      name: 'World Chat',
+      email: 'world-chat@redoakerguild.local',
+      role: 'All signed-in users',
+      photoURL: 'logo.png'
+    }];
+  }
+
+  return rows;
+}
+
+function renderMembersList() {
+  const list = document.getElementById('msg-members-list');
+  const count = document.getElementById('msg-members-count');
+  if (!list || !count) return;
+
+  const members = getCurrentThreadMembers();
+  count.textContent = String(members.length) + ' member' + (members.length === 1 ? '' : 's');
+
+  list.innerHTML = members.map(member => {
+    const avatar = escapeHtml(member.photoURL || 'logo.png');
+    const name = escapeHtml(member.name || 'Guild Member');
+    const role = escapeHtml(member.role || 'Member');
+    return '<div class="msg-member">' +
+      '<img class="msg-member-avatar" src="' + avatar + '" alt="' + name + '" loading="lazy" decoding="async" />' +
+      '<div class="msg-member-meta">' +
+        '<div class="msg-member-name">' + name + '</div>' +
+        '<div class="msg-member-role">' + role + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
 function renderFriends() {
   const list = document.getElementById('msg-friends-list');
   if (!list) return;
@@ -607,13 +683,17 @@ function renderMessages() {
     container.innerHTML = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--wht-d);font-style:italic;">Start the conversation!</div>';
     return;
   }
+  const threadKind = String(currentThreadData && currentThreadData.threadKind || '').toLowerCase();
+  const isGroupThread = threadKind === 'guild-staff' || threadKind === 'guild-superiors' || threadKind === 'guild-authority' || threadKind === 'world-chat';
+  const currentChannelLabel = String(document.getElementById('msg-current-name')?.textContent || 'Guild Member');
   container.innerHTML = threadMessages.map(msg => {
     const isSent = msg.senderUid === currentUser.uid;
-    const senderName = String(msg.senderName || 'U');
+    const senderName = String(isGroupThread ? (msg.senderName || currentChannelLabel) : (msg.senderName || 'U'));
     const initials = escapeHtml(senderName.slice(0, 1).toUpperCase());
     return '<div class="msg-message ' + (isSent ? 'sent' : '') + '">' +
       '<div class="msg-message-avatar">' + initials + '</div>' +
       '<div class="msg-message-content">' +
+        (isGroupThread ? '<div style="font-size:.72rem;color:#8fd3ff;font-weight:bold;letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px;">' + escapeHtml(senderName) + '</div>' : '') +
         '<div class="msg-message-text">' + escapeHtml(msg.text || '') + '</div>' +
         '<div class="msg-message-time">' + escapeHtml(formatDateTime(msg.createdAt && msg.createdAt.seconds ? new Date(msg.createdAt.seconds * 1000).toISOString() : msg.createdAt)) + '</div>' +
         (!isSent
@@ -639,6 +719,7 @@ async function openChat(peerUid, peerName) {
   document.getElementById('msg-sub-ban-btn')?.classList.toggle('hidden', isGroupChannel || !hasSuperiorModerationAccess(currentUser));
   renderFriends();
   await loadMessages();
+  renderMembersList();
   setSidebarOpen(false);
   setTimeout(() => {
     const input = document.getElementById('msg-input');
@@ -651,10 +732,14 @@ async function loadMessages() {
   try {
     const payload = await apiGet('thread', { peerUid: currentPeerUid });
     threadMessages = Array.isArray(payload.messages) ? payload.messages : [];
+    currentThreadData = payload.thread || null;
     renderMessages();
+    renderMembersList();
   } catch (_err) {
     threadMessages = [];
+    currentThreadData = null;
     renderMessages();
+    renderMembersList();
   }
 }
 
