@@ -695,7 +695,7 @@ if (document.readyState === 'loading') {
 
 function roleRank(role) {
   const idx = APPLICATION_ROLE_ORDER.indexOf(normalizeApplicationRole(role));
-  return idx === -1 ? 0 : idx;
+  return idx;
 }
 
 function configureSocialApiBase() {

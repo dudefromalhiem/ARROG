@@ -531,14 +531,14 @@ async function getUserAdminFlag(user) {
 async function getUserSubmissionAccessFlag(user) {
   if (!user) return false;
   try {
-    // Staff roles and registered site members should have workshop access
+    // Staff roles resolved from config/roles always have submission access
     if (isOwner(user.email) || isAdmin(user.email) || isModerator(user.email)) return true;
     const doc = await db.collection('users').doc(user.uid).get();
     const data = doc.exists ? (doc.data() || {}) : {};
     const role = normalizeResolvedRole(data.role || 'user');
     // Also check email-based resolved role for cases where user doc hasn't been synced yet
     const emailRole = normalizeResolvedRole(resolveRole(user.email));
-    return data.submissionAccess === true || role === 'site_member' || role === 'contributor' || role === 'moderator' || role === 'admin' || role === 'chief_admin' || emailRole === 'site_member' || emailRole === 'contributor' || emailRole === 'moderator' || emailRole === 'admin' || emailRole === 'chief_admin' || emailRole === 'owner' || data.editorApproved === true;
+    return data.submissionAccess === true || role === 'contributor' || role === 'moderator' || role === 'admin' || role === 'chief_admin' || emailRole === 'contributor' || emailRole === 'moderator' || emailRole === 'admin' || emailRole === 'chief_admin' || emailRole === 'owner' || data.editorApproved === true;
   } catch (_err) {
     // Fallback: re-check email roles even if Firestore fails
     return isOwner(user.email) || isAdmin(user.email) || isModerator(user.email);

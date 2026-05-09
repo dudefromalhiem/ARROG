@@ -1235,6 +1235,8 @@ async function assignRole(db, actor, body) {
     await db.runTransaction(async tx => {
       const rolesSnap = await tx.get(rolesRef);
       const rd = rolesSnap.exists ? (rolesSnap.data() || {}) : {};
+      const userQuery = db.collection('users').where('email', '==', email).limit(1);
+      const userSnap = await tx.get(userQuery);
       const owners = Array.isArray(rd.owners) ? rd.owners.filter(Boolean).map(e => String(e).toLowerCase()) : [];
       const admins = Array.isArray(rd.admins) ? rd.admins.filter(Boolean).map(e => String(e).toLowerCase()) : [];
       const mods = Array.isArray(rd.mods) ? rd.mods.filter(Boolean).map(e => String(e).toLowerCase()) : [];
@@ -1264,7 +1266,6 @@ async function assignRole(db, actor, body) {
       }, { merge: true });
 
       // If a users doc exists, update it to reflect the canonical role
-      const userSnap = await tx.get(db.collection('users').where('email', '==', email).limit(1));
       if (!userSnap.empty) {
         const doc = userSnap.docs[0];
         const uid = doc.id;
