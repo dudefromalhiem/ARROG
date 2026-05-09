@@ -596,12 +596,22 @@ async function listInbox(db, actor) {
   )];
   const userMap = await fetchUsersByUids(db, peerUids);
 
-  threads.sort((a, b) => {
+  // Deduplicate threads by ID
+  const seenThreadIds = new Set();
+  const dedupedThreads = [];
+  threads.forEach(thread => {
+    if (!seenThreadIds.has(thread.id)) {
+      seenThreadIds.add(thread.id);
+      dedupedThreads.push(thread);
+    }
+  });
+
+  dedupedThreads.sort((a, b) => {
     const sa = Number(a?.lastMessageAt?.seconds || a?.updatedAt?.seconds || a?.createdAt?.seconds || 0);
     const sb = Number(b?.lastMessageAt?.seconds || b?.updatedAt?.seconds || b?.createdAt?.seconds || 0);
     return sb - sa;
   });
-  return threads.map(thread => {
+  return dedupedThreads.map(thread => {
     const participants = Array.isArray(thread.participants) ? thread.participants : [];
     const peerUid = participants.find(uid => uid !== actor.uid) || '';
     const peerData = userMap.get(peerUid) || {};

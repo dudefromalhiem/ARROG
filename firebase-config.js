@@ -856,9 +856,16 @@ const ROLE_NAMES = {
   'user': 'User',
   'guest': 'Guest',
   // Legacy aliases
-  'chief-admin': 'Chief Admin',
+  'chief-admin': 'Chief Administrator',
+  'chief-mod': 'Chief of Moderation',
+  'deputy-chief-admin': 'Deputy Chief Administrator',
+  'deputy-chief-mod': 'Deputy Chief of Moderation',
+  'senior-admin': 'Senior Administrator',
+  'senior-mod': 'Senior Moderator',
   'mod': 'Moderator',
-  'editor': 'Contributor'
+  'editor': 'Contributor',
+  'junior-mod': 'Junior Moderator',
+  'junior-admin': 'Junior Administrator'
 };
 
 function normalizeResolvedRole(role) {

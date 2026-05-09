@@ -3848,11 +3848,182 @@ function buildOrganizationTemplate() {
 }
 
 // ═════════════════════════════════════════════════════════════
+// TEXT EDITOR TOOLBAR
+// ═════════════════════════════════════════════════════════════
+
+function initTextEditorToolbar() {
+  const htmlArea = document.getElementById('sf-html');
+  const cssArea = document.getElementById('sf-css');
+  if (!htmlArea) return;
+
+  // Get toolbar elements
+  const fontSizeSelect = document.getElementById('toolbar-font-size');
+  const fontFamilySelect = document.getElementById('toolbar-font-family');
+  const boldBtn = document.getElementById('toolbar-bold');
+  const italicBtn = document.getElementById('toolbar-italic');
+  const underlineBtn = document.getElementById('toolbar-underline');
+  const strikeBtn = document.getElementById('toolbar-strike');
+  const textColorInput = document.getElementById('toolbar-text-color');
+  const highlightColorInput = document.getElementById('toolbar-highlight-color');
+  const redactBtn = document.getElementById('toolbar-redact');
+  const alignLeftBtn = document.getElementById('toolbar-align-left');
+  const alignCenterBtn = document.getElementById('toolbar-align-center');
+  const alignRightBtn = document.getElementById('toolbar-align-right');
+  const statusEl = document.getElementById('toolbar-status');
+
+  // Helper function to get selected text in textarea
+  function getSelectedText() {
+    const start = htmlArea.selectionStart;
+    const end = htmlArea.selectionEnd;
+    return { text: htmlArea.value.substring(start, end), start, end };
+  }
+
+  // Helper function to replace selected text
+  function replaceSelection(newText) {
+    const start = htmlArea.selectionStart;
+    const end = htmlArea.selectionEnd;
+    const before = htmlArea.value.substring(0, start);
+    const after = htmlArea.value.substring(end);
+    htmlArea.value = before + newText + after;
+    htmlArea.selectionStart = start;
+    htmlArea.selectionEnd = start + newText.length;
+    pageEditorState.htmlContent = htmlArea.value;
+    markEditorAsChanged();
+    schedulePreview();
+  }
+
+  // Helper to ensure CSS has a class
+  function ensureCSS(className, css) {
+    if (!cssArea) return;
+    const cssContent = cssArea.value;
+    if (!cssContent.includes('.' + className + ' {') && !cssContent.includes('.' + className + '{')) {
+      cssArea.value = cssContent.trim() + '\n\n' + css;
+      pageEditorState.cssContent = cssArea.value;
+    }
+  }
+
+  // Update status
+  function updateStatus() {
+    const { text } = getSelectedText();
+    if (text.length === 0) {
+      statusEl.textContent = 'Select text to edit';
+      statusEl.style.color = 'var(--wht-f)';
+    } else {
+      statusEl.textContent = `${text.length} char${text.length !== 1 ? 's' : ''} selected`;
+      statusEl.style.color = 'var(--wht-b)';
+    }
+  }
+
+  // Toolbar action handlers
+  boldBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<strong>${text}</strong>`);
+  });
+
+  italicBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<em>${text}</em>`);
+  });
+
+  underlineBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<u>${text}</u>`);
+  });
+
+  strikeBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<s>${text}</s>`);
+  });
+
+  boldBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<strong>${text}</strong>`);
+  });
+
+  fontSizeSelect.addEventListener('change', () => {
+    const { text } = getSelectedText();
+    if (!text || !fontSizeSelect.value) return;
+    const className = 'txt-size-' + fontSizeSelect.value.replace(/[^0-9]/g, '');
+    replaceSelection(`<span class="${className}">${text}</span>`);
+    const css = `.${className} { font-size: ${fontSizeSelect.value}; }`;
+    ensureCSS(className, css);
+  });
+
+  fontFamilySelect.addEventListener('change', () => {
+    const { text } = getSelectedText();
+    if (!text || !fontFamilySelect.value) return;
+    const className = 'txt-font-' + fontFamilySelect.value.replace(/[^a-z]/g, '');
+    replaceSelection(`<span class="${className}">${text}</span>`);
+    const css = `.${className} { font-family: ${fontFamilySelect.value}; }`;
+    ensureCSS(className, css);
+  });
+
+  textColorInput.addEventListener('change', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    const color = textColorInput.value;
+    const className = 'txt-color-' + color.substring(1);
+    replaceSelection(`<span class="${className}">${text}</span>`);
+    const css = `.${className} { color: ${color}; }`;
+    ensureCSS(className, css);
+  });
+
+  highlightColorInput.addEventListener('change', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    const color = highlightColorInput.value;
+    const className = 'txt-hl-' + color.substring(1);
+    replaceSelection(`<span class="${className}">${text}</span>`);
+    const css = `.${className} { background-color: ${color}; padding: 2px 6px; }`;
+    ensureCSS(className, css);
+  });
+
+  redactBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<span class="redacted">${text}</span>`);
+    const redactCss = `.redacted { background-color: #8b0000; color: #8b0000; padding: 2px 6px; user-select: none; }`;
+    ensureCSS('redacted', redactCss);
+  });
+
+  alignLeftBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<div style="text-align: left;">${text}</div>`);
+  });
+
+  alignCenterBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<div style="text-align: center;">${text}</div>`);
+  });
+
+  alignRightBtn.addEventListener('click', () => {
+    const { text } = getSelectedText();
+    if (!text) return;
+    replaceSelection(`<div style="text-align: right;">${text}</div>`);
+  });
+
+  // Update status on selection changes
+  htmlArea.addEventListener('mouseup', updateStatus);
+  htmlArea.addEventListener('keyup', updateStatus);
+  htmlArea.addEventListener('focus', updateStatus);
+
+  updateStatus();
+}
+
+// ═════════════════════════════════════════════════════════════
 // IMAGE UPLOAD
 // ═════════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
   initSubmitExplorer();
+  initTextEditorToolbar();
 
   const zone = document.getElementById('upload-zone');
   const input = document.getElementById('img-input');

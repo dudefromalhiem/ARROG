@@ -852,6 +852,56 @@ render.mount('submission-terminal');</pre>
         <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:12px">
           Write fully custom HTML and CSS. <span style="color:var(--red-b)">JavaScript is not allowed</span> — only HTML and CSS.
         </p>
+        <div class="text-editor-toolbar" id="text-editor-toolbar">
+          <div class="toolbar-group">
+            <label style="font-size:.75rem;color:var(--wht-f)">Font Size:</label>
+            <select id="toolbar-font-size" class="toolbar-select">
+              <option value="">Default</option>
+              <option value="12px">12px</option>
+              <option value="14px">14px</option>
+              <option value="16px">16px</option>
+              <option value="18px">18px</option>
+              <option value="20px">20px</option>
+              <option value="24px">24px</option>
+              <option value="28px">28px</option>
+              <option value="32px">32px</option>
+            </select>
+          </div>
+          <div class="toolbar-group">
+            <label style="font-size:.75rem;color:var(--wht-f)">Font:</label>
+            <select id="toolbar-font-family" class="toolbar-select">
+              <option value="">Default</option>
+              <option value="sans-serif">Sans-serif</option>
+              <option value="serif">Serif</option>
+              <option value="monospace">Monospace</option>
+            </select>
+          </div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn" id="toolbar-bold" title="Bold">B</button>
+            <button class="toolbar-btn" id="toolbar-italic" title="Italic">I</button>
+            <button class="toolbar-btn" id="toolbar-underline" title="Underline">U</button>
+            <button class="toolbar-btn" id="toolbar-strike" title="Strikethrough">S</button>
+          </div>
+          <div class="toolbar-group">
+            <label style="font-size:.75rem;color:var(--wht-f)">Color:</label>
+            <input type="color" id="toolbar-text-color" class="toolbar-color" value="#d8d8d8" title="Text color">
+          </div>
+          <div class="toolbar-group">
+            <label style="font-size:.75rem;color:var(--wht-f)">Highlight:</label>
+            <input type="color" id="toolbar-highlight-color" class="toolbar-color" value="#ffff00" title="Highlight color">
+          </div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn" id="toolbar-redact" title="Redaction (dark red box)">Redact</button>
+          </div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn" id="toolbar-align-left" title="Align left">←</button>
+            <button class="toolbar-btn" id="toolbar-align-center" title="Align center">↔</button>
+            <button class="toolbar-btn" id="toolbar-align-right" title="Align right">→</button>
+          </div>
+          <div style="margin-left:auto;font-size:.75rem;color:var(--wht-f)">
+            <span id="toolbar-status">Select text to edit</span>
+          </div>
+        </div>
         <div class="editor-wrap">
           <div class="editor-pane">
             <div class="editor-label"> HTML</div>
