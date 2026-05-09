@@ -2220,7 +2220,7 @@ async function refreshUsers() {
       // Prefer explicit config role mapping
       const mapped = ROLE_DATA.userRoles && ROLE_DATA.userRoles[email] ? ROLE_DATA.userRoles[email] : u.role || 'user';
       const normalized = mapped || 'user';
-      const key = (normalized === 'owner' || normalized === 'the archivist') ? 'owner' : (normalized.startsWith('admin') ? 'admin' : (normalized.startsWith('mod') || normalized === 'moderator' ? 'mod' : (normalized === 'contributor' ? 'contributor' : (normalized === 'guest' ? 'guest' : 'user'))));
+      const key = (normalized === 'owner' || normalized === 'the archivist') ? 'owner' : (normalized.startsWith('admin') ? 'admin' : (normalized.startsWith('mod') || normalized === 'moderator' ? 'mod' : ((normalized === 'contributor') ? 'contributor' : ((normalized === 'site_member' || normalized === 'user') ? 'user' : (normalized === 'guest' ? 'guest' : 'user')))));
       groups[key].push(u);
     });
 

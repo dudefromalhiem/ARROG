@@ -105,7 +105,7 @@ function normalizeRole(value) {
   if (!role) return ROLES.NEWBIE;
   
   // Legacy mappings for old role names
-  if (role === 'user') return ROLES.NEWBIE;
+  if (role === 'user') return ROLES.SITE_MEMBER;
   if (role === 'editor') return ROLES.CONTRIBUTOR;
   if (role === 'mod') return ROLES.MODERATOR;
   if (role === 'junior_moderator') return ROLES.MODERATOR;

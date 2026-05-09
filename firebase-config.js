@@ -828,6 +828,7 @@ const ROLE_LEVELS = {
   'moderator': 70,
   'junior_moderator': 65,
   'contributor': 60,
+  'site_member': 5,
   'user': 5,
   'guest': 0,
   // Legacy aliases
@@ -851,6 +852,7 @@ const ROLE_NAMES = {
   'moderator': 'Moderator',
   'junior_moderator': 'Junior Moderator',
   'contributor': 'Contributor',
+  'site_member': 'Site Member',
   'user': 'User',
   'guest': 'Guest',
   // Legacy aliases
@@ -862,6 +864,7 @@ const ROLE_NAMES = {
 function normalizeResolvedRole(role) {
   const value = String(role || '').toLowerCase().trim();
   if (!value) return 'user';
+  if (value === 'user') return 'site_member';
   if (value === 'mod') return 'moderator';
   if (value === 'editor') return 'contributor';
   if (value === 'chief-admin') return 'chief_admin';
@@ -940,11 +943,11 @@ function getUserLevel(email) {
   if (ROLE_DATA.admins.includes(e)) return 80;
   if (ROLE_DATA.mods.includes(e)) return 70;
   
-  return ROLE_LEVELS['user'] || 0;
+  return ROLE_LEVELS['site_member'] || ROLE_LEVELS['user'] || 0;
 }
 
 function resolveRole(email) {
-  if (!email) return "user";
+  if (!email) return "site_member";
   const e = email.toLowerCase();
   
   if (BOOTSTRAP_OWNER_SET.has(e)) return "owner";
@@ -957,7 +960,7 @@ function resolveRole(email) {
   
   if (ROLE_DATA.admins.includes(e)) return "admin";
   if (ROLE_DATA.mods.includes(e)) return "moderator";
-  return "user";
+  return "site_member";
 }
 function isModerator(email) {
   return getUserLevel(email) >= 70;
@@ -984,7 +987,8 @@ function clearanceLevelForRole(role) {
   if (normalized === "moderator") return 4;
   if (normalized === "junior_moderator") return 4;
   if (normalized === "contributor") return 4;
-  if (normalized === "user") return 2;
+  if (normalized === "site_member") return 3;
+  if (normalized === "user") return 3;
   return 2;
 }
 
