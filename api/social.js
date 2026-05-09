@@ -931,6 +931,7 @@ async function applyForEditor(db, actor, body, req) {
   }
 
   if (isOwnerEmail(actor.email, roles) || isAdminEmail(actor.email, roles) || isModeratorEmail(actor.email, roles)) {
+    console.warn('[applyForEditor] early-return: actor email is owner/admin/mod', { email: actor.email });
     return { statusCode: 200, payload: { ok: true, alreadyApproved: true, message: 'Your staff role already grants submission access.' } };
   }
 
@@ -940,8 +941,16 @@ async function applyForEditor(db, actor, body, req) {
 
   const userSnap = await db.collection('users').doc(actor.uid).get();
   const userData = userSnap.exists ? (userSnap.data() || {}) : {};
-  const currentRole = normalizeRole(userData.role || 'newbie');
+  console.warn('[applyForEditor] userDoc:', actor.uid, JSON.stringify(userData));
+  let currentRole;
+  if (userData && userData.role) {
+    currentRole = normalizeRole(userData.role);
+  } else {
+    // Treat authenticated users without an explicit role as `site_member` (Level 3)
+    currentRole = normalizeRole(ROLES.SITE_MEMBER);
+  }
   if (isAtLeast(currentRole, requestedRole) || userData.submissionAccess === true) {
+    console.warn('[applyForEditor] early-return: alreadyApproved due to role or submissionAccess', { uid: actor.uid, currentRole, requestedRole, submissionAccess: userData.submissionAccess });
     return { statusCode: 200, payload: { ok: true, alreadyApproved: true } };
   }
 
@@ -952,6 +961,7 @@ async function applyForEditor(db, actor, body, req) {
   const existingData = existing.exists ? (existing.data() || {}) : {};
   const existingStatus = String(existingData.status || '').toLowerCase();
   if (existingStatus === 'pending') {
+    console.warn('[applyForEditor] early-return: alreadyPending application exists', { uid: actor.uid });
     return { statusCode: 200, payload: { ok: true, alreadyPending: true } };
   }
 
