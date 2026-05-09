@@ -309,13 +309,28 @@ function shouldShowTerminal() {
 }
 
 // ═════════════════════════════════════════════════════════════
-// CLEARANCE WELCOME SCREEN (Guest=2, User=2, Mod=4, Admin=5, Owner=6)
+// CLEARANCE WELCOME SCREEN — Role-based for authenticated users only
+// Shows role-specific welcome messages on login
 // ═════════════════════════════════════════════════════════════
 
 function showClearanceWelcome(role) {
   if (document.body.classList.contains('terminal-active')) return;
   if (document.getElementById('clearance-welcome')) return;
+  
+  // Only show welcome for authenticated users (not guests)
+  if (!role || role === 'guest') return;
+
   const level = clearanceLevelForRole(role);
+  const normalizedRole = String(role || '').toLowerCase();
+  
+  // Map role to welcome message
+  const welcomeMessages = {
+    'owner': 'Welcome, Archivist',
+    'admin': 'Welcome, Administrator',
+    'moderator': 'Welcome, Moderator',
+    'user': 'Welcome, Agent'
+  };
+  const welcomeMessage = welcomeMessages[normalizedRole] || 'Welcome, Agent';
 
   // Inject blink keyframes once
   if (!document.getElementById('clearance-blink-style')) {
@@ -364,7 +379,6 @@ function showClearanceWelcome(role) {
     lineHeight: '1.6'
   });
 
-  const welcomeMessage = role === 'guest' ? 'Welcome, Observer' : role === 'owner' ? 'Welcome, Archivist' : 'Welcome, Authorized Personnel';
   box.innerHTML =
     `<div style="font-size:clamp(10px,1.2vw,14px);color:rgba(255,255,255,0.4);letter-spacing:4px;margin-bottom:16px;">RED OAKER GUILD // SECURE TERMINAL</div>` +
     `<div style="font-size:clamp(22px,3vw,48px);font-weight:bold;letter-spacing:6px;margin-bottom:8px;">LEVEL ${level}</div>` +
@@ -375,7 +389,7 @@ function showClearanceWelcome(role) {
   document.body.appendChild(overlay);
 
   // After the blink animation (3s for non-owners, 5s for owners), fade out (1s) then remove
-  const blinkDuration = role === 'owner' ? 5000 : 3000;
+  const blinkDuration = normalizedRole === 'owner' ? 5000 : 3000;
   setTimeout(() => {
     overlay.style.animation = 'clearanceFadeOut 1s ease-out forwards';
     setTimeout(() => overlay.remove(), 1000);
@@ -480,15 +494,8 @@ async function updateAuthUI(user) {
     if (messagingLink) messagingLink.classList.add('hidden');
     if (document.getElementById('footer-submit-link')) document.getElementById('footer-submit-link').classList.add('hidden');
     if (document.getElementById('footer-messaging-link')) document.getElementById('footer-messaging-link').classList.add('hidden');
-    if (!clearanceWelcomeShownThisLoad) {
-      // Wait for the terminal intro to finish so the welcome is not skipped.
-      if (shouldShowTerminal()) {
-        showClearanceWelcomeWhenReady('guest');
-      } else {
-        showClearanceWelcome('guest');
-      }
-      clearanceWelcomeShownThisLoad = true;
-    }
+    // Do NOT show welcome message for guests — only for authenticated users
+    clearanceWelcomeShownThisLoad = true;
   }
 }
 
