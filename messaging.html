@@ -213,6 +213,7 @@
           <button type="button" class="msg-mobile-toggle" id="msg-mobile-toggle">Toggle Inbox</button>
           <div class="msg-chat-actions" id="msg-chat-actions" style="display:none;">
             <button type="button" class="msg-chat-action-btn" id="msg-block-btn">Block User</button>
+            <button type="button" class="msg-chat-action-btn" id="msg-sub-ban-btn">Submission Ban</button>
           </div>
         </div>
         <div class="msg-chat-messages" id="msg-messages" aria-live="polite"></div>
@@ -255,6 +256,7 @@ let threadMessages = [];
 let incomingRequests = [];
 let outgoingRequests = [];
 let notifications = [];
+let serverNotifications = [];
 let previousThreadTimestamps = new Map();
 let pollingTimer = null;
 let pollIntervalMs = 12000;
@@ -285,6 +287,15 @@ function configureSocialApiBase() {
   socialApiBase = window.REDOAK_API && typeof window.REDOAK_API.social === 'function'
     ? window.REDOAK_API.social()
     : '/api/social';
+}
+
+function hasSuperiorModerationAccess(user) {
+  const email = user && user.email ? user.email : '';
+  if (typeof isOwner === 'function' && isOwner(email)) return true;
+  if (typeof resolveRole !== 'function') return false;
+  const role = String(resolveRole(email) || '').toLowerCase();
+  return role === 'senior_administrator' || role === 'senior_admin' || role === 'senior-moderator' || role === 'senior_moderator' ||
+    role === 'deputy_chief_administrator' || role === 'chief_administrator' || role === 'deputy_chief_of_moderation' || role === 'chief_of_moderation';
 }
 
 async function getAuthHeaders() {
@@ -328,6 +339,30 @@ function extractPeer(thread) {
       peerRole: 'group'
     };
   }
+  if (thread && (thread.id === 'guild-superiors' || thread.threadKind === 'guild-superiors')) {
+    return {
+      peerUid: 'guild-superiors',
+      peerName: 'Guild Superiors Channel',
+      peerPhotoURL: 'logo.png',
+      peerRole: 'group'
+    };
+  }
+  if (thread && (thread.id === 'guild-authority' || thread.threadKind === 'guild-authority')) {
+    return {
+      peerUid: 'guild-authority',
+      peerName: 'Guild Authority Channel',
+      peerPhotoURL: 'logo.png',
+      peerRole: 'group'
+    };
+  }
+  if (thread && (thread.id === 'world-chat' || thread.threadKind === 'world-chat')) {
+    return {
+      peerUid: 'world-chat',
+      peerName: 'World Chat',
+      peerPhotoURL: 'logo.png',
+      peerRole: 'group'
+    };
+  }
   if (thread && thread.peer && thread.peer.uid) {
     return {
       peerUid: String(thread.peer.uid || ''),
@@ -359,11 +394,13 @@ function setTab(tab) {
 function updateNotificationBadge() {
   const badge = document.getElementById('notif-count');
   if (!badge) return;
-  if (!notifications.length) {
+  const unreadServer = serverNotifications.filter(item => item && item.read !== true).length;
+  const total = notifications.length + unreadServer;
+  if (!total) {
     badge.style.display = 'none';
     return;
   }
-  badge.textContent = String(notifications.length > 9 ? '9+' : notifications.length);
+  badge.textContent = String(total > 9 ? '9+' : total);
   badge.style.display = 'inline-block';
 }
 
@@ -377,20 +414,36 @@ function addNotification(message) {
 function renderNotifications() {
   const area = document.getElementById('msg-notifications-area');
   if (!area) return;
-  if (!notifications.length) {
-    area.innerHTML = '<div class="msg-empty">No new notifications.</div>';
-    return;
-  }
-  area.innerHTML = notifications.map((note, idx) => {
+  const serverRows = serverNotifications.map((note) => {
+    const ts = note && note.createdAt && note.createdAt.seconds
+      ? new Date(note.createdAt.seconds * 1000).toISOString()
+      : (note && note.createdAt ? note.createdAt : '');
+    return '<div class="msg-notification">' +
+      '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">' +
+      '<strong>' + escapeHtml(note.kind === 'mention' ? 'Mention' : 'Notification') + '</strong>' +
+      '<button type="button" class="msg-request-btn reject" data-read-note="' + escapeHtml(note.id || '') + '">Dismiss</button>' +
+      '</div>' +
+      '<p>' + escapeHtml(note.message || '') + '</p>' +
+      '<p style="font-size:0.75rem;color:var(--wht-f);margin-top:4px">' + escapeHtml(formatDateTime(ts)) + '</p>' +
+    '</div>';
+  });
+
+  const localRows = notifications.map((note, idx) => {
     return '<div class="msg-notification">' +
       '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">' +
       '<strong>Update</strong>' +
       '<button type="button" class="msg-request-btn reject" data-clear-note="' + idx + '">Dismiss</button>' +
       '</div>' +
-      '<p>' + escapeHtml(note.message) + '</p>' +
+      '<p>' + escapeHtml(note.message || '') + '</p>' +
       '<p style="font-size:0.75rem;color:var(--wht-f);margin-top:4px">' + escapeHtml(formatDateTime(note.timestamp)) + '</p>' +
     '</div>';
-  }).join('');
+  });
+
+  if (!serverRows.length && !localRows.length) {
+    area.innerHTML = '<div class="msg-empty">No new notifications.</div>';
+    return;
+  }
+  area.innerHTML = serverRows.concat(localRows).join('');
 }
 
 function renderFriends() {
@@ -519,13 +572,14 @@ async function openChat(peerUid, peerName) {
   currentPeerUid = String(peerUid || '');
   if (!currentPeerUid) return;
   document.getElementById('msg-current-name').textContent = peerName || 'Guild Member';
-  const isStaffChannel = currentPeerUid === 'guild-staff';
-  document.getElementById('msg-current-status').textContent = isStaffChannel ? 'Guild staff channel' : 'Connected';
+  const isGroupChannel = currentPeerUid === 'guild-staff' || currentPeerUid === 'guild-superiors' || currentPeerUid === 'guild-authority' || currentPeerUid === 'world-chat';
+  document.getElementById('msg-current-status').textContent = isGroupChannel ? 'Guild channel' : 'Connected';
   const actions = document.getElementById('msg-chat-actions');
-  if (actions) actions.style.display = isStaffChannel ? 'none' : 'flex';
+  if (actions) actions.style.display = (!isGroupChannel && hasSuperiorModerationAccess(currentUser)) ? 'flex' : 'none';
   document.getElementById('msg-input-area').style.display = 'flex';
   document.getElementById('msg-no-selection').style.display = 'none';
-  document.getElementById('msg-block-btn')?.classList.toggle('hidden', isStaffChannel);
+  document.getElementById('msg-block-btn')?.classList.toggle('hidden', isGroupChannel);
+  document.getElementById('msg-sub-ban-btn')?.classList.toggle('hidden', isGroupChannel || !hasSuperiorModerationAccess(currentUser));
   renderFriends();
   await loadMessages();
   setSidebarOpen(false);
@@ -577,6 +631,16 @@ async function refreshInbox() {
     outgoingRequests = [];
     updateRequestCountBadges();
   }
+
+  try {
+    const notePayload = await apiGet('notifications');
+    serverNotifications = Array.isArray(notePayload.notifications) ? notePayload.notifications : [];
+    updateNotificationBadge();
+    if (currentTab === 'notifications') renderNotifications();
+  } catch (_err) {
+    serverNotifications = [];
+    updateNotificationBadge();
+  }
 }
 
 async function sendMessage() {
@@ -613,6 +677,21 @@ async function blockCurrentPeer() {
     addNotification('User blocked. They can no longer DM you.');
   } catch (_err) {
     addNotification('Unable to block user right now.');
+  }
+}
+
+async function submissionBanCurrentPeer() {
+  if (!currentPeerUid) return;
+  const reason = await window.rogPrompt('Reason for submission ban:', 'Policy violation');
+  if (reason === null) return;
+  const daysRaw = await window.rogPrompt('Ban duration in days (0 = indefinite):', '30');
+  if (daysRaw === null) return;
+  const days = Number.parseInt(String(daysRaw || '0'), 10);
+  try {
+    await apiPost({ action: 'setsubmissionban', targetUid: currentPeerUid, reason: String(reason || '').trim(), days: Number.isFinite(days) ? days : 0, active: true });
+    addNotification('Submission ban applied.');
+  } catch (err) {
+    addNotification((err && err.message) ? err.message : 'Unable to apply submission ban.');
   }
 }
 
@@ -683,6 +762,7 @@ function bindUiEvents() {
 
   document.getElementById('msg-send-btn')?.addEventListener('click', sendMessage);
   document.getElementById('msg-block-btn')?.addEventListener('click', blockCurrentPeer);
+  document.getElementById('msg-sub-ban-btn')?.addEventListener('click', submissionBanCurrentPeer);
   document.getElementById('msg-mobile-toggle')?.addEventListener('click', () => {
     const sidebar = document.querySelector('.msg-sidebar');
     const isOpen = sidebar && sidebar.classList.contains('open');
@@ -739,6 +819,12 @@ function bindUiEvents() {
   });
 
   document.getElementById('msg-notifications-area')?.addEventListener('click', (event) => {
+    const readTarget = event.target.closest('[data-read-note]');
+    if (readTarget) {
+      const id = String(readTarget.getAttribute('data-read-note') || '');
+      apiPost({ action: 'readnotification', id }).then(() => refreshInbox()).catch(() => addNotification('Could not mark notification read.'));
+      return;
+    }
     const target = event.target.closest('[data-clear-note]');
     if (!target) return;
     const idx = Number(target.getAttribute('data-clear-note') || -1);

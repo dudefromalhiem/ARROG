@@ -2213,14 +2213,48 @@ async function refreshUsers() {
       return;
     }
 
-    // Resolve role for display and group users
-    const groups = { owner: [], admin: [], mod: [], contributor: [], user: [], guest: [] };
+    // Resolve role for display and group users with explicit hierarchy buckets
+    const groups = {
+      owner: [],
+      senior_admin: [],
+      admin: [],
+      junior_admin: [],
+      senior_moderator: [],
+      moderator: [],
+      junior_moderator: [],
+      contributor: [],
+      site_member: [],
+      other: []
+    };
+
+    const toHierarchyKey = (rawRole) => {
+      const normalized = String(rawRole || '').toLowerCase().trim();
+      if (!normalized) return 'site_member';
+      if (normalized === 'owner' || normalized === 'the archivist') return 'owner';
+
+      if (normalized === 'senior_administrator' || normalized === 'senior-admin') return 'senior_admin';
+      if (normalized === 'administrator' || normalized === 'admin') return 'admin';
+      if (normalized === 'junior_administrator' || normalized === 'junior_admin' || normalized === 'junior-admin') return 'junior_admin';
+
+      if (normalized === 'senior_moderator' || normalized === 'senior-mod') return 'senior_moderator';
+      if (normalized === 'moderator' || normalized === 'mod') return 'moderator';
+      if (normalized === 'junior_moderator' || normalized === 'junior-mod') return 'junior_moderator';
+
+      if (normalized === 'contributor' || normalized === 'editor') return 'contributor';
+      if (normalized === 'site_member' || normalized === 'user' || normalized === 'newbie' || normalized === 'guest') return 'site_member';
+
+      // Map branch-head legacy roles into nearest visible buckets
+      if (normalized === 'chief_admin' || normalized === 'chief-admin' || normalized === 'deputy_chief_administrator' || normalized === 'deputy-chief-admin') return 'senior_admin';
+      if (normalized === 'chief_of_moderation' || normalized === 'chief-mod' || normalized === 'deputy_chief_of_moderation' || normalized === 'deputy-chief-mod') return 'senior_moderator';
+
+      return 'other';
+    };
+
     users.forEach(u => {
       const email = String(u.email || '').toLowerCase();
       // Prefer explicit config role mapping
       const mapped = ROLE_DATA.userRoles && ROLE_DATA.userRoles[email] ? ROLE_DATA.userRoles[email] : u.role || 'user';
-      const normalized = mapped || 'user';
-      const key = (normalized === 'owner' || normalized === 'the archivist') ? 'owner' : (normalized.startsWith('admin') ? 'admin' : (normalized.startsWith('mod') || normalized === 'moderator' ? 'mod' : ((normalized === 'contributor') ? 'contributor' : ((normalized === 'site_member' || normalized === 'user') ? 'user' : (normalized === 'guest' ? 'guest' : 'user')))));
+      const key = toHierarchyKey(mapped || 'site_member');
       groups[key].push(u);
     });
 
@@ -2236,14 +2270,18 @@ async function refreshUsers() {
       return headerRow + rows;
     };
 
-    // Order: Owners, Admins, Moderators, Contributors, Users, Guests
+    // Order: explicit hierarchy requested for admin user listing
     const html = [];
     html.push(renderGroup('Owners', groups.owner));
+    html.push(renderGroup('Senior Administrators', groups.senior_admin));
     html.push(renderGroup('Administrators', groups.admin));
-    html.push(renderGroup('Moderation Staff', groups.mod));
+    html.push(renderGroup('Junior Administrators', groups.junior_admin));
+    html.push(renderGroup('Senior Moderators', groups.senior_moderator));
+    html.push(renderGroup('Moderators', groups.moderator));
+    html.push(renderGroup('Junior Moderators', groups.junior_moderator));
     html.push(renderGroup('Contributors', groups.contributor));
-    html.push(renderGroup('Registered Users', groups.user));
-    html.push(renderGroup('Guests', groups.guest));
+    html.push(renderGroup('Site Members', groups.site_member));
+    html.push(renderGroup('Other Roles', groups.other));
 
     tbody.innerHTML = html.filter(Boolean).join('') || '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>';
   } catch (err) { 

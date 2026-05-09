@@ -135,6 +135,42 @@ function isModeratorEmail(email, rolesData) {
   return mods.map(value => String(value || '').toLowerCase()).includes(normalizedEmail) || isAdminEmail(email, rolesData);
 }
 
+const SYSTEM_THREAD_IDS = {
+  STAFF: 'guild-staff',
+  SUPERIORS: 'guild-superiors',
+  AUTHORITY: 'guild-authority',
+  WORLD: 'world-chat'
+};
+
+function isSystemThreadId(value) {
+  return Object.values(SYSTEM_THREAD_IDS).includes(String(value || ''));
+}
+
+function isAuthorityRole(role) {
+  return isAtLeast(role, ROLES.MODERATOR);
+}
+
+function isSuperiorRole(role) {
+  const normalized = normalizeRole(role);
+  return normalized === ROLES.OWNER || [
+    ROLES.SENIOR_MODERATOR,
+    ROLES.DEPUTY_CHIEF_OF_MODERATION,
+    ROLES.CHIEF_OF_MODERATION,
+    ROLES.SENIOR_ADMINISTRATOR,
+    ROLES.DEPUTY_CHIEF_ADMINISTRATOR,
+    ROLES.CHIEF_ADMINISTRATOR
+  ].includes(normalized);
+}
+
+function mentionKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+}
+
+function parseMentions(text) {
+  const matches = String(text || '').match(/@([a-zA-Z0-9_.-]{2,50})/g) || [];
+  return [...new Set(matches.map(item => item.slice(1).toLowerCase()))];
+}
+
 function makeThreadId(uidA, uidB) {
   return [String(uidA || ''), String(uidB || '')].sort().join('__');
 }
@@ -372,9 +408,14 @@ async function sendMessage(db, actor, body) {
     db.collection('users').doc(actor.uid).get()
   ]);
 
-  const isGuildStaffChannel = recipientUid === 'guild-staff';
-  const recipientSnap = isGuildStaffChannel
-    ? { exists: true, data: () => ({ uid: 'guild-staff', displayName: 'Guild Staff Channel', email: 'guild-staff@redoakerguild.local', role: 'group' }) }
+  const isGuildStaffChannel = recipientUid === SYSTEM_THREAD_IDS.STAFF;
+  const isSuperiorChannel = recipientUid === SYSTEM_THREAD_IDS.SUPERIORS;
+  const isAuthorityChannel = recipientUid === SYSTEM_THREAD_IDS.AUTHORITY;
+  const isWorldChannel = recipientUid === SYSTEM_THREAD_IDS.WORLD;
+  const isSystemChannel = isGuildStaffChannel || isSuperiorChannel || isAuthorityChannel || isWorldChannel;
+
+  const recipientSnap = isSystemChannel
+    ? { exists: true, data: () => ({ uid: recipientUid, displayName: 'Guild Channel', email: `${recipientUid}@redoakerguild.local`, role: 'group' }) }
     : await db.collection('users').doc(recipientUid).get();
 
   if (!recipientSnap.exists) {
@@ -384,15 +425,26 @@ async function sendMessage(db, actor, body) {
   const recipient = { id: recipientSnap.id, ...(recipientSnap.data() || {}) };
   const sender = senderSnap.exists ? { id: senderSnap.id, ...(senderSnap.data() || {}) } : { id: actor.uid, displayName: actor.name || actor.email.split('@')[0] || 'Agent', email: actor.email };
 
-  if (isGuildStaffChannel && !isModeratorEmail(actor.email, roles)) {
+  const senderData = senderSnap.exists ? (senderSnap.data() || {}) : {};
+  const senderRole = normalizeRole(senderData.role || ROLES.SITE_MEMBER);
+
+  if (isGuildStaffChannel && !isAuthorityRole(senderRole) && !isModeratorEmail(actor.email, roles)) {
     return { statusCode: 403, payload: { error: 'Only moderators, admins, and owners can use the guild staff channel.' } };
   }
 
-  if (await checkBlock(db, actor.uid, recipientUid) || await checkBlock(db, recipientUid, actor.uid)) {
+  if (isSuperiorChannel && !isSuperiorRole(senderRole) && !isOwnerEmail(actor.email, roles)) {
+    return { statusCode: 403, payload: { error: 'Only senior moderators, senior admins, and owner can use this channel.' } };
+  }
+
+  if (isAuthorityChannel && !isAuthorityRole(senderRole) && !isModeratorEmail(actor.email, roles)) {
+    return { statusCode: 403, payload: { error: 'Authority access required.' } };
+  }
+
+  if (!isSystemChannel && (await checkBlock(db, actor.uid, recipientUid) || await checkBlock(db, recipientUid, actor.uid))) {
     return { statusCode: 403, payload: { error: 'Messaging is blocked between these accounts.' } };
   }
 
-  const requestState = await getFriendRequestDoc(db, actor.uid, recipientUid);
+  const requestState = isSystemChannel ? null : await getFriendRequestDoc(db, actor.uid, recipientUid);
   const senderIsAdmin = isAdminEmail(actor.email, roles);
   const senderIsMod = isModeratorEmail(actor.email, roles);
 
@@ -409,18 +461,24 @@ async function sendMessage(db, actor, body) {
     canBypassFriendGate = senderIsMod;
   }
 
-  if (!canBypassFriendGate && !isAcceptedFriendRequest(requestState.data)) {
+  if (!isSystemChannel && !canBypassFriendGate && !isAcceptedFriendRequest(requestState.data)) {
     return { statusCode: 403, payload: { error: recipientIsOwner ? 'You must have an accepted friend request to message The Archivist.' : 'Friend request must be accepted before messaging.' } };
   }
 
   if (isGuildStaffChannel) {
     await syncGuildStaffThread(db, roles);
   }
+  if (isSuperiorChannel) {
+    await syncSystemThread(db, SYSTEM_THREAD_IDS.SUPERIORS, roles);
+  }
+  if (isAuthorityChannel) {
+    await syncSystemThread(db, SYSTEM_THREAD_IDS.AUTHORITY, roles);
+  }
 
-  const threadMeta = isGuildStaffChannel
+  const threadMeta = isSystemChannel
     ? { thread: { threadId: 'guild-staff', exists: true, data: { threadKind: 'guild-staff' } }, recipientIsOwner: false, senderIsOwner: false, senderIsAdmin: true }
     : await ensureThreadAccess(db, actor, recipient, roles);
-  const threadId = isGuildStaffChannel ? 'guild-staff' : threadMeta.thread.threadId;
+  const threadId = isSystemChannel ? recipientUid : threadMeta.thread.threadId;
   const threadRef = db.collection('dmThreads').doc(threadId);
   const now = admin.firestore.FieldValue.serverTimestamp();
   const threadPayload = {
@@ -436,13 +494,25 @@ async function sendMessage(db, actor, body) {
     updatedAt: now
   };
 
-  if (isGuildStaffChannel) {
-    const members = await getGuildStaffMembers(db, roles);
-    threadPayload.participants = members.map(member => member.uid);
-    threadPayload.participantEmails = members.map(member => member.email);
-    threadPayload.participantNames = members.map(member => member.displayName);
-    threadPayload.threadKind = 'guild-staff';
-    threadPayload.title = 'Guild Staff Channel';
+  if (isGuildStaffChannel || isSuperiorChannel || isAuthorityChannel) {
+    const synced = await syncSystemThread(db, threadId, roles);
+    threadPayload.participants = synced.members.map(member => member.uid);
+    threadPayload.participantEmails = synced.members.map(member => member.email);
+    threadPayload.participantNames = synced.members.map(member => member.displayName);
+    threadPayload.threadKind = threadId;
+    threadPayload.title = threadId === SYSTEM_THREAD_IDS.SUPERIORS
+      ? 'Guild Superiors Channel'
+      : (threadId === SYSTEM_THREAD_IDS.AUTHORITY ? 'Guild Authority Channel' : 'Guild Staff Channel');
+    threadPayload.ownerUid = '';
+    threadPayload.ownerConversationOpen = true;
+  }
+
+  if (isWorldChannel) {
+    threadPayload.participants = [];
+    threadPayload.participantEmails = [];
+    threadPayload.participantNames = [];
+    threadPayload.threadKind = SYSTEM_THREAD_IDS.WORLD;
+    threadPayload.title = 'World Chat';
     threadPayload.ownerUid = '';
     threadPayload.ownerConversationOpen = true;
   }
@@ -452,15 +522,22 @@ async function sendMessage(db, actor, body) {
   }
 
   await threadRef.set(threadPayload, { merge: true });
+  const senderName = normalizeText(sender.displayName || actor.name || actor.email.split('@')[0] || 'Agent', 120);
   const messageRef = await threadRef.collection('messages').add({
     senderUid: actor.uid,
     senderEmail: actor.email,
-    senderName: normalizeText(sender.displayName || actor.name || actor.email.split('@')[0] || 'Agent', 120),
+    senderName,
     recipientUid,
     recipientEmail: String(recipient.email || ''),
     recipientName: normalizeText(recipient.displayName || recipient.email || 'Agent', 120),
     text,
     createdAt: now
+  });
+
+  await fanOutMentionNotifications(db, roles, actor, senderName, text, {
+    threadId,
+    messageId: messageRef.id,
+    channel: isSystemChannel ? threadId : 'dm'
   });
 
   return { statusCode: 200, payload: { ok: true, threadId, messageId: messageRef.id } };
@@ -470,11 +547,46 @@ async function listInbox(db, actor) {
   const roles = await getRolesData(db);
   const snap = await db.collection('dmThreads').where('participants', 'array-contains', actor.uid).get();
   const threads = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
-  if (isModeratorEmail(actor.email, roles)) {
+  const actorDoc = await db.collection('users').doc(actor.uid).get();
+  const actorRole = normalizeRole(actorDoc.exists ? (actorDoc.data() || {}).role : ROLES.SITE_MEMBER);
+
+  // World chat is available to all signed-in users.
+  const worldThreadSnap = await db.collection('dmThreads').doc(SYSTEM_THREAD_IDS.WORLD).get();
+  if (worldThreadSnap.exists) {
+    threads.unshift({ id: SYSTEM_THREAD_IDS.WORLD, ...(worldThreadSnap.data() || {}) });
+  } else {
+    await db.collection('dmThreads').doc(SYSTEM_THREAD_IDS.WORLD).set({
+      threadKind: SYSTEM_THREAD_IDS.WORLD,
+      title: 'World Chat',
+      participants: [],
+      participantEmails: [],
+      participantNames: [],
+      ownerUid: '',
+      ownerConversationOpen: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  }
+
+  if (isAuthorityRole(actorRole) || isModeratorEmail(actor.email, roles)) {
     await syncGuildStaffThread(db, roles);
-    const staffThreadSnap = await db.collection('dmThreads').doc('guild-staff').get();
+    await syncSystemThread(db, SYSTEM_THREAD_IDS.AUTHORITY, roles);
+    const [staffThreadSnap, authorityThreadSnap] = await Promise.all([
+      db.collection('dmThreads').doc(SYSTEM_THREAD_IDS.STAFF).get(),
+      db.collection('dmThreads').doc(SYSTEM_THREAD_IDS.AUTHORITY).get()
+    ]);
     if (staffThreadSnap.exists) {
-      threads.unshift({ id: 'guild-staff', ...(staffThreadSnap.data() || {}) });
+      threads.unshift({ id: SYSTEM_THREAD_IDS.STAFF, ...(staffThreadSnap.data() || {}) });
+    }
+    if (authorityThreadSnap.exists) {
+      threads.unshift({ id: SYSTEM_THREAD_IDS.AUTHORITY, ...(authorityThreadSnap.data() || {}) });
+    }
+  }
+
+  if (isSuperiorRole(actorRole) || isOwnerEmail(actor.email, roles)) {
+    await syncSystemThread(db, SYSTEM_THREAD_IDS.SUPERIORS, roles);
+    const superiorsThreadSnap = await db.collection('dmThreads').doc(SYSTEM_THREAD_IDS.SUPERIORS).get();
+    if (superiorsThreadSnap.exists) {
+      threads.unshift({ id: SYSTEM_THREAD_IDS.SUPERIORS, ...(superiorsThreadSnap.data() || {}) });
     }
   }
   const peerUids = [...new Set(
@@ -495,7 +607,11 @@ async function listInbox(db, actor) {
     const peerData = userMap.get(peerUid) || {};
     const peerIndex = participants.indexOf(peerUid);
     const peerNameFromThread = Array.isArray(thread.participantNames) ? thread.participantNames[peerIndex] : '';
-    const isStaffThread = thread.id === 'guild-staff' || thread.threadKind === 'guild-staff';
+    const isStaffThread = thread.id === SYSTEM_THREAD_IDS.STAFF || thread.threadKind === SYSTEM_THREAD_IDS.STAFF;
+    const isWorldThread = thread.id === SYSTEM_THREAD_IDS.WORLD || thread.threadKind === SYSTEM_THREAD_IDS.WORLD;
+    const isAuthorityThread = thread.id === SYSTEM_THREAD_IDS.AUTHORITY || thread.threadKind === SYSTEM_THREAD_IDS.AUTHORITY;
+    const isSuperiorThread = thread.id === SYSTEM_THREAD_IDS.SUPERIORS || thread.threadKind === SYSTEM_THREAD_IDS.SUPERIORS;
+    const isGroupThread = isStaffThread || isWorldThread || isAuthorityThread || isSuperiorThread;
 
     return {
       id: thread.id,
@@ -506,11 +622,16 @@ async function listInbox(db, actor) {
       ownerConversationOpen: thread.ownerConversationOpen === true,
       updatedAt: formatTimestamp(thread.updatedAt || thread.lastMessageAt || thread.createdAt),
       peer: {
-        uid: String(isStaffThread ? 'guild-staff' : peerUid || ''),
-        displayName: normalizeText(isStaffThread ? 'Guild Staff Channel' : (peerData.displayName || peerNameFromThread || peerData.email || 'Guild Member'), 120),
-        email: String(isStaffThread ? 'guild-staff@redoakerguild.local' : peerData.email || '').toLowerCase(),
-        role: String(isStaffThread ? 'group' : peerData.role || 'newbie'),
-        photoURL: normalizeText(isStaffThread ? 'logo.png' : peerData.photoURL || '', 1200)
+        uid: String(isGroupThread ? (thread.id || '') : (peerUid || '')),
+        displayName: normalizeText(
+          isStaffThread
+            ? 'Guild Staff Channel'
+            : (isAuthorityThread ? 'Guild Authority Channel' : (isSuperiorThread ? 'Guild Superiors Channel' : (isWorldThread ? 'World Chat' : (peerData.displayName || peerNameFromThread || peerData.email || 'Guild Member')))),
+          120
+        ),
+        email: String(isGroupThread ? `${thread.id || 'group'}@redoakerguild.local` : (peerData.email || '')).toLowerCase(),
+        role: String(isGroupThread ? 'group' : (peerData.role || 'newbie')),
+        photoURL: normalizeText(isGroupThread ? 'logo.png' : (peerData.photoURL || ''), 1200)
       }
     };
   });
@@ -687,6 +808,139 @@ async function getGuildStaffMembers(db, roles) {
   }).filter(member => member.uid);
 }
 
+async function getSuperiorMembers(db, roles) {
+  const staff = await getGuildStaffMembers(db, roles);
+  const userMap = await fetchUsersByUids(db, staff.map(member => member.uid));
+  return staff.filter(member => {
+    const data = userMap.get(member.uid) || {};
+    const role = normalizeRole(data.role || member.role || ROLES.SITE_MEMBER);
+    return isSuperiorRole(role) || member.role === 'owner';
+  });
+}
+
+async function getAuthorityMembers(db, roles) {
+  const staff = await getGuildStaffMembers(db, roles);
+  const userMap = await fetchUsersByUids(db, staff.map(member => member.uid));
+  return staff.filter(member => {
+    const data = userMap.get(member.uid) || {};
+    const role = normalizeRole(data.role || member.role || ROLES.SITE_MEMBER);
+    return isAuthorityRole(role) || member.role === 'owner';
+  });
+}
+
+async function syncSystemThread(db, threadId, roles) {
+  const threadRef = db.collection('dmThreads').doc(threadId);
+  const existing = await threadRef.get();
+  const existingData = existing.exists ? (existing.data() || {}) : {};
+
+  let members = [];
+  let title = 'Guild Channel';
+  if (threadId === SYSTEM_THREAD_IDS.STAFF) {
+    members = await getGuildStaffMembers(db, roles);
+    title = 'Guild Staff Channel';
+  } else if (threadId === SYSTEM_THREAD_IDS.SUPERIORS) {
+    members = await getSuperiorMembers(db, roles);
+    title = 'Guild Superiors Channel';
+  } else if (threadId === SYSTEM_THREAD_IDS.AUTHORITY) {
+    members = await getAuthorityMembers(db, roles);
+    title = 'Guild Authority Channel';
+  }
+
+  await threadRef.set({
+    participants: members.map(member => member.uid),
+    participantEmails: members.map(member => member.email),
+    participantNames: members.map(member => member.displayName),
+    participantRoles: members.map(member => member.role),
+    threadKind: threadId,
+    title,
+    ownerUid: '',
+    ownerConversationOpen: true,
+    lastMessageAt: existingData.lastMessageAt || existingData.updatedAt || null,
+    lastMessageBy: existingData.lastMessageBy || '',
+    lastMessagePreview: existingData.lastMessagePreview || '',
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { threadId, members };
+}
+
+async function syncGuildStaffThread(db, roles) {
+  return syncSystemThread(db, SYSTEM_THREAD_IDS.STAFF, roles);
+}
+
+async function enqueueNotifications(db, targetUids, payload) {
+  const uniqueTargets = [...new Set((targetUids || []).map(uid => String(uid || '').trim()).filter(Boolean))];
+  if (!uniqueTargets.length) return;
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await Promise.all(uniqueTargets.map(uid => db.collection('notifications').add({
+    uid,
+    read: false,
+    createdAt: now,
+    ...payload
+  })));
+}
+
+async function fanOutMentionNotifications(db, roles, actor, senderName, text, context) {
+  const mentions = parseMentions(text);
+  if (!mentions.length) return;
+
+  const notifyUids = new Set();
+  const staff = await getGuildStaffMembers(db, roles);
+  const byEmail = new Map(staff.map(member => [String(member.email || '').toLowerCase(), member]));
+
+  if (mentions.includes('admins')) {
+    const adminEmails = Array.isArray(roles.admins) ? roles.admins.map(v => String(v || '').toLowerCase()) : [];
+    adminEmails.forEach(email => {
+      const member = byEmail.get(email);
+      if (member && member.uid !== actor.uid) notifyUids.add(member.uid);
+    });
+  }
+
+  if (mentions.includes('mods')) {
+    const modEmails = Array.isArray(roles.mods) ? roles.mods.map(v => String(v || '').toLowerCase()) : [];
+    modEmails.forEach(email => {
+      const member = byEmail.get(email);
+      if (member && member.uid !== actor.uid) notifyUids.add(member.uid);
+    });
+  }
+
+  if (mentions.includes('owner')) {
+    const ownerEmails = Array.isArray(roles.owners) ? roles.owners.map(v => String(v || '').toLowerCase()) : [];
+    ownerEmails.forEach(email => {
+      const member = byEmail.get(email);
+      if (member && member.uid !== actor.uid) notifyUids.add(member.uid);
+    });
+  }
+
+  const userSnap = await db.collection('users').limit(500).get();
+  const mentionMap = new Map();
+  userSnap.docs.forEach(doc => {
+    const data = doc.data() || {};
+    const keys = new Set([
+      mentionKey(data.displayName),
+      mentionKey(String(data.email || '').split('@')[0])
+    ]);
+    keys.forEach(key => {
+      if (key) mentionMap.set(key, doc.id);
+    });
+  });
+
+  mentions.forEach(mention => {
+    const uid = mentionMap.get(mentionKey(mention));
+    if (uid && uid !== actor.uid) notifyUids.add(uid);
+  });
+
+  await enqueueNotifications(db, Array.from(notifyUids), {
+    kind: 'mention',
+    message: `${senderName} mentioned you: ${String(text || '').slice(0, 180)}`,
+    actorUid: actor.uid,
+    actorEmail: actor.email,
+    threadId: context.threadId || '',
+    messageId: context.messageId || '',
+    channel: context.channel || ''
+  });
+}
+
 async function syncGuildStaffThread(db, roles) {
   const members = await getGuildStaffMembers(db, roles);
   const threadRef = db.collection('dmThreads').doc('guild-staff');
@@ -713,14 +967,31 @@ async function syncGuildStaffThread(db, roles) {
 
 async function readThreadMessages(db, actor, peerUid) {
   const roles = await getRolesData(db);
-  if (peerUid === 'guild-staff') {
-    if (!isModeratorEmail(actor.email, roles)) {
-      return { threadId: 'guild-staff', thread: null, messages: [] };
-    }
-    await syncGuildStaffThread(db, roles);
+  const isStaffThread = peerUid === SYSTEM_THREAD_IDS.STAFF;
+  const isSuperiorThread = peerUid === SYSTEM_THREAD_IDS.SUPERIORS;
+  const isAuthorityThread = peerUid === SYSTEM_THREAD_IDS.AUTHORITY;
+  const isWorldThread = peerUid === SYSTEM_THREAD_IDS.WORLD;
+  const isSystemThread = isStaffThread || isSuperiorThread || isAuthorityThread || isWorldThread;
+
+  const actorDoc = await db.collection('users').doc(actor.uid).get();
+  const actorRole = normalizeRole(actorDoc.exists ? (actorDoc.data() || {}).role : ROLES.SITE_MEMBER);
+
+  if (isStaffThread && !isAuthorityRole(actorRole) && !isModeratorEmail(actor.email, roles)) {
+    return { threadId: SYSTEM_THREAD_IDS.STAFF, thread: null, messages: [] };
   }
+  if (isAuthorityThread && !isAuthorityRole(actorRole) && !isModeratorEmail(actor.email, roles)) {
+    return { threadId: SYSTEM_THREAD_IDS.AUTHORITY, thread: null, messages: [] };
+  }
+  if (isSuperiorThread && !isSuperiorRole(actorRole) && !isOwnerEmail(actor.email, roles)) {
+    return { threadId: SYSTEM_THREAD_IDS.SUPERIORS, thread: null, messages: [] };
+  }
+
+  if (isStaffThread || isAuthorityThread || isSuperiorThread) {
+    await syncSystemThread(db, peerUid, roles);
+  }
+
   const threadId = makeThreadId(actor.uid, peerUid);
-  const actualThreadId = peerUid === 'guild-staff' ? 'guild-staff' : threadId;
+  const actualThreadId = isSystemThread ? peerUid : threadId;
   const threadRef = db.collection('dmThreads').doc(actualThreadId);
   const threadSnap = await threadRef.get();
   if (!threadSnap.exists) {
@@ -728,7 +999,7 @@ async function readThreadMessages(db, actor, peerUid) {
   }
 
   const thread = threadSnap.data() || {};
-  if (peerUid !== 'guild-staff' && (!Array.isArray(thread.participants) || !thread.participants.includes(actor.uid))) {
+  if (!isSystemThread && (!Array.isArray(thread.participants) || !thread.participants.includes(actor.uid))) {
     return { threadId: actualThreadId, thread: null, messages: [] };
   }
 
@@ -941,6 +1212,21 @@ async function applyForEditor(db, actor, body, req) {
 
   const userSnap = await db.collection('users').doc(actor.uid).get();
   const userData = userSnap.exists ? (userSnap.data() || {}) : {};
+  const submissionBan = userData.submissionBan && typeof userData.submissionBan === 'object' ? userData.submissionBan : null;
+  const nowMs = Date.now();
+  const bannedUntilMs = submissionBan && submissionBan.until && typeof submissionBan.until.toMillis === 'function'
+    ? submissionBan.until.toMillis()
+    : 0;
+  if (submissionBan && submissionBan.active === true && (!bannedUntilMs || bannedUntilMs > nowMs)) {
+    const untilText = bannedUntilMs ? new Date(bannedUntilMs).toISOString() : 'indefinite';
+    return {
+      statusCode: 403,
+      payload: {
+        error: `Submission access is temporarily blocked. Reason: ${String(submissionBan.reason || 'No reason provided')}. Until: ${untilText}`,
+        code: 'SUBMISSION_BANNED'
+      }
+    };
+  }
   console.warn('[applyForEditor] userDoc:', actor.uid, JSON.stringify(userData));
   let currentRole;
   if (userData && userData.role) {
@@ -1159,6 +1445,79 @@ async function revokeContributor(db, actor, body) {
   return { statusCode: 200, payload: { ok: true } };
 }
 
+async function getActorRoleForModeration(db, actor, roles) {
+  if (isOwnerEmail(actor.email, roles)) return ROLES.OWNER;
+  const snap = await db.collection('users').doc(actor.uid).get();
+  const data = snap.exists ? (snap.data() || {}) : {};
+  if (isAdminEmail(actor.email, roles) && !data.role) return ROLES.ADMINISTRATOR;
+  if (isModeratorEmail(actor.email, roles) && !data.role) return ROLES.MODERATOR;
+  return normalizeRole(data.role || ROLES.SITE_MEMBER);
+}
+
+async function setSubmissionBan(db, actor, body) {
+  const roles = await getRolesData(db);
+  const actorRole = await getActorRoleForModeration(db, actor, roles);
+  if (!isSuperiorRole(actorRole) && !isOwnerEmail(actor.email, roles)) {
+    return { statusCode: 403, payload: { error: 'Only owner, senior admins, and senior moderators can set submission bans.' } };
+  }
+
+  const targetUid = normalizeText(body.targetUid || body.uid || '', 128);
+  const reason = normalizeText(body.reason || '', 500);
+  const days = Number(body.days || 0);
+  const active = body.active !== false;
+  if (!targetUid) return { statusCode: 400, payload: { error: 'Missing target user.' } };
+  if (active && !reason) return { statusCode: 400, payload: { error: 'Reason is required when setting a ban.' } };
+
+  const targetRef = db.collection('users').doc(targetUid);
+  const targetSnap = await targetRef.get();
+  if (!targetSnap.exists) return { statusCode: 404, payload: { error: 'Target user not found.' } };
+
+  const untilTs = active && Number.isFinite(days) && days > 0
+    ? admin.firestore.Timestamp.fromMillis(Date.now() + (days * 24 * 60 * 60 * 1000))
+    : null;
+
+  await targetRef.set({
+    submissionBan: {
+      active: !!active,
+      reason: active ? reason : '',
+      days: active ? Math.max(0, Math.floor(days)) : 0,
+      until: active ? untilTs : null,
+      setByUid: actor.uid,
+      setByEmail: actor.email,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    },
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { statusCode: 200, payload: { ok: true, targetUid } };
+}
+
+async function listNotifications(db, actor) {
+  const snap = await db.collection('notifications')
+    .where('uid', '==', actor.uid)
+    .orderBy('createdAt', 'desc')
+    .limit(100)
+    .get();
+  const notifications = snap.docs.map(doc => ({ id: doc.id, ...(toPlainValue(doc.data()) || {}) }));
+  return { statusCode: 200, payload: { notifications } };
+}
+
+async function markNotificationRead(db, actor, body) {
+  const id = normalizeText(body.id || body.notificationId || '', 128);
+  if (!id) {
+    const snap = await db.collection('notifications').where('uid', '==', actor.uid).where('read', '==', false).limit(200).get();
+    await Promise.all(snap.docs.map(doc => doc.ref.set({ read: true, readAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true })));
+    return { statusCode: 200, payload: { ok: true, markedAll: true } };
+  }
+  const ref = db.collection('notifications').doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) return { statusCode: 404, payload: { error: 'Notification not found.' } };
+  const data = doc.data() || {};
+  if (String(data.uid || '') !== actor.uid) return { statusCode: 403, payload: { error: 'Forbidden.' } };
+  await ref.set({ read: true, readAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  return { statusCode: 200, payload: { ok: true, id } };
+}
+
 async function syncUserRoleFlags(db, actor) {
   // Sync the user's role flags from config/roles to their user document
   // This ensures Firestore rules can trust the isOwner/isAdmin/isModerator flags
@@ -1343,6 +1702,11 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 200, requests);
     }
 
+    if (method === 'GET' && type === 'notifications') {
+      const result = await listNotifications(db, actor);
+      return sendJson(res, result.statusCode, result.payload);
+    }
+
     if (method === 'GET' && type === 'reports') {
       const result = await getUnifiedReports(db, actor);
       return sendJson(res, result.statusCode, result.payload);
@@ -1421,6 +1785,17 @@ module.exports = async function handler(req, res) {
         const result = await revokeContributor(db, actor, body);
         return sendJson(res, result.statusCode, result.payload);
       }
+
+      if (action === 'setsubmissionban') {
+        const result = await setSubmissionBan(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'readnotification') {
+        const result = await markNotificationRead(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
       if (action === 'assignrole') {
         const result = await assignRole(db, actor, body);
         return sendJson(res, result.statusCode, result.payload);

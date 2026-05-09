@@ -322,14 +322,19 @@ const BOOTSTRAP_OWNERS = new Set(
 async function resolveActorAccessProfile(db, uid, email) {
   const normalizedEmail = String(email || '').toLowerCase();
   if (BOOTSTRAP_OWNERS.has(normalizedEmail)) {
-    return { role: ROLES.OWNER, isOwner: true, isAdmin: true, maxClearance: 6 };
+    return { role: ROLES.OWNER, isOwner: true, isAdmin: true, maxClearance: 6, canSubmit: true, submissionBan: null };
   }
 
   let isAdmin = false;
+  let userRole = ROLES.NEWBIE;
+  let submissionAccess = false;
+  let submissionBan = null;
   const userDoc = await db.collection('users').doc(uid).get();
   if (userDoc.exists && userDoc.data()) {
     const userData = userDoc.data();
-    const userRole = normalizeRole(userData.role);
+    userRole = normalizeRole(userData.role);
+    submissionAccess = userData.submissionAccess === true;
+    submissionBan = userData.submissionBan && typeof userData.submissionBan === 'object' ? userData.submissionBan : null;
     if (userData.isAdmin === true || isAtLeast(userRole, ROLES.ADMINISTRATOR)) {
       isAdmin = true;
     }
@@ -340,14 +345,15 @@ async function resolveActorAccessProfile(db, uid, email) {
   const isOwner = owners.map(owner => String(owner || '').toLowerCase()).includes(normalizedEmail);
 
   if (isOwner) {
-    return { role: ROLES.OWNER, isOwner: true, isAdmin: true, maxClearance: 6 };
+    return { role: ROLES.OWNER, isOwner: true, isAdmin: true, maxClearance: 6, canSubmit: true, submissionBan: null };
   }
 
   if (isAdmin) {
-    return { role: ROLES.ADMINISTRATOR, isOwner: false, isAdmin: true, maxClearance: 5 };
+    return { role: ROLES.ADMINISTRATOR, isOwner: false, isAdmin: true, maxClearance: 5, canSubmit: true, submissionBan: null };
   }
 
-  return { role: ROLES.NEWBIE, isOwner: false, isAdmin: false, maxClearance: 4 };
+  const canSubmit = submissionAccess || isAtLeast(userRole, ROLES.CONTRIBUTOR);
+  return { role: userRole, isOwner: false, isAdmin: false, maxClearance: 4, canSubmit, submissionBan };
 }
 
 function stripUndefined(data) {
@@ -704,6 +710,25 @@ module.exports = async function handler(req, res) {
 
     if (method !== 'POST') {
       return sendJson(res, 405, { error: 'Method not allowed.' });
+    }
+
+    const ban = actorProfile && actorProfile.submissionBan && typeof actorProfile.submissionBan === 'object'
+      ? actorProfile.submissionBan
+      : null;
+    const banUntilMs = ban && ban.until && typeof ban.until.toMillis === 'function' ? ban.until.toMillis() : 0;
+    if (ban && ban.active === true && (!banUntilMs || banUntilMs > Date.now())) {
+      const untilText = banUntilMs ? new Date(banUntilMs).toISOString() : 'indefinite';
+      return sendJson(res, 403, {
+        error: `Submission access is blocked. Reason: ${String(ban.reason || 'No reason provided')}. Until: ${untilText}`,
+        code: 'SUBMISSION_BANNED'
+      });
+    }
+
+    if (!actorProfile.isAdmin && !actorProfile.isOwner && !actorProfile.canSubmit) {
+      return sendJson(res, 403, {
+        error: 'Contributor access required to submit or edit workshop entries.',
+        code: 'SUBMISSION_ACCESS_REQUIRED'
+      });
     }
 
     const body = req.body || {};
