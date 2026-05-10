@@ -338,11 +338,10 @@ function showClearanceWelcome(role) {
     style.id = 'clearance-blink-style';
     style.textContent = `
       @keyframes clearanceBlink {
-        0%   { opacity: 1; }
-        18%  { opacity: 0; }
-        26%  { opacity: 1; }
-        52%  { opacity: 0; }
-        60%  { opacity: 1; }
+        0%   { opacity: 0; }
+        12%  { opacity: 1; }
+        24%  { opacity: 0; }
+        36%  { opacity: 1; }
         100% { opacity: 1; }
       }
       @keyframes clearanceFadeOut {

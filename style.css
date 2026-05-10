@@ -3755,6 +3755,44 @@ body::after {
     gap: 12px;
   }
 
+  .wrap,
+  .hdr-in,
+  .section,
+  .card,
+  .intro,
+  .warn,
+  .legacy-block,
+  .page-shell,
+  .doc-wrap,
+  .review-modal-body,
+  .msg-main,
+  .msg-sidebar,
+  .adm-main,
+  .profile-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .g2,
+  .doc-grid-2,
+  .review-upload-grid,
+  .guidebook-grid,
+  .community-grid,
+  .file-grid,
+  .editor-wrap {
+    grid-template-columns: 1fr !important;
+  }
+
+  .hdr-brand {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .nav {
+    max-width: 100%;
+  }
+
   .editor-pane textarea {
     min-height: 150px;
     font-size: 0.75rem;
@@ -4101,6 +4139,36 @@ body::after {
 @media (max-width: 480px) {
   .wrap {
     padding: 10px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .hdr-in,
+  .section,
+  .card,
+  .intro,
+  .warn,
+  .legacy-block,
+  .page-shell,
+  .doc-wrap,
+  .review-modal-body,
+  .msg-main,
+  .msg-sidebar,
+  .adm-main,
+  .profile-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .g2,
+  .doc-grid-2,
+  .review-upload-grid,
+  .guidebook-grid,
+  .community-grid,
+  .file-grid,
+  .editor-wrap {
+    grid-template-columns: 1fr !important;
   }
 
   .section {
