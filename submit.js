@@ -460,7 +460,7 @@ const DOC_DEFAULT_CSS = `
 .doc-editor-page .doc-image-container { margin: 24px 0; width: 100%; }
 .doc-editor-page .doc-image-wrap, .doc-editor-page figure { margin-bottom: 20px; }
 .doc-editor-page .doc-image-wrap img, .doc-editor-page figure img { max-width: 100%; height: auto; border: 1px solid #3a3a3a; background: #0b0b0b; display: block; }
-.doc-editor-page .doc-image-wrap figcaption, .doc-editor-page figure figcaption { margin-top: 10px; color: #aaa; font-size: .85rem; font-style: italic; line-height: 1.4; }
+.doc-editor-page .doc-image-wrap figcaption, .doc-editor-page figure figcaption { margin-top: 6px; color: #aaa; font-size: .85rem; font-style: italic; line-height: 1.45; }
 
 .doc-editor-page .align-left { text-align: left; }
 .doc-editor-page .align-center { text-align: center; }
@@ -1731,7 +1731,13 @@ async function initializeSubmitEditModeFromUrl() {
       seedTemplateCacheFromPage(page, templateForEdit);
     }
     const savedMode = String(page.currentMode || '').trim().toLowerCase();
-    if (docBlocks.length || savedMode === 'doc') {
+    const pageType = String(page.type || '').trim();
+    const inferredDocBlocks = content.trim() ? parseHtmlToDocBlocks(content) : [];
+    const prefersDocumentStudio = pageType === 'Guide' || pageType === 'Lore' || isLoreFamilyType(pageType);
+    if (docBlocks.length || savedMode === 'doc' || (prefersDocumentStudio && inferredDocBlocks.length)) {
+      if (!docBlocks.length && inferredDocBlocks.length) {
+        docBlocks = JSON.parse(JSON.stringify(inferredDocBlocks));
+      }
       switchMode('doc');
       renderDocBlocks();
     } else if (savedMode === 'template' && templateForEdit) {
@@ -1965,11 +1971,9 @@ function updateTypeSpecificUI() {
   const isOrganization = type === 'Organization';
 
   if (isGuide) {
-    switchMode('template');
     selectTemplate('guide');
     setGuideSectionsFixedStructure();
   } else if (isOrganization) {
-    switchMode('template');
     selectTemplate('organization');
   }
 
@@ -2399,11 +2403,34 @@ function addArtworkImage() {
       '<div style="flex:1"><label class="fl">Image ' + n + '</label><select class="fi art-img-select">' + getUploadedImageOptions('') + '</select></div>' +
       '<div style="flex:1"><label class="fl">Placement</label><select class="fi art-img-placement"><option value="inline">Inline</option><option value="left">Left Float</option><option value="right">Right Float</option><option value="center">Centered</option><option value="full">Full Width</option></select></div>' +
       '<div style="flex:1"><label class="fl">URL</label><input class="fi art-img-url" placeholder="https://..." /></div>' +
-      '<button class="btn btn-sm btn-d" onclick="removeArtworkImage(' + n + ')" style="margin-top:20px;height:32px">✕</button>' +
+      '<button class="btn btn-sm btn-s" type="button" onclick="moveArtworkImage(' + n + ',-1)" style="margin-top:20px;height:32px">↑</button>' +
+      '<button class="btn btn-sm btn-s" type="button" onclick="moveArtworkImage(' + n + ',1)" style="margin-top:20px;height:32px">↓</button>' +
+      '<button class="btn btn-sm btn-d" type="button" onclick="removeArtworkImage(' + n + ')" style="margin-top:20px;height:32px">✕</button>' +
+    '</div>';
+  div.innerHTML +=
+    '<div class="fg" style="margin-top:10px">' +
+      '<label class="fl">Caption</label>' +
+      '<input class="fi art-img-caption" placeholder="Optional caption" />' +
     '</div>';
   
   list.appendChild(div);
   div.querySelectorAll('select, input').forEach(el => el.addEventListener('input', schedulePreview));
+}
+
+function moveArtworkImage(n, delta) {
+  const list = document.getElementById('tf-art-images-list');
+  const item = document.getElementById('art-img-' + n);
+  if (!list || !item) return;
+  const siblings = Array.from(list.children);
+  const currentIndex = siblings.indexOf(item);
+  const nextIndex = currentIndex + delta;
+  if (nextIndex < 0 || nextIndex >= siblings.length) return;
+  if (delta < 0) {
+    list.insertBefore(item, siblings[nextIndex]);
+  } else {
+    list.insertBefore(item, siblings[nextIndex].nextSibling);
+  }
+  schedulePreview();
 }
 
 function removeArtworkImage(n) {
@@ -2673,7 +2700,8 @@ function hydrateTemplateFromHtml(tpl, htmlContent) {
       const imageEntries = frames.length
         ? frames.map(frame => ({
             url: String(frame.querySelector('img')?.getAttribute('src') || '').trim(),
-            placement: frame.classList.contains('art-placement-left') ? 'left' : (frame.classList.contains('art-placement-right') ? 'right' : 'inline')
+            placement: frame.classList.contains('art-placement-left') ? 'left' : (frame.classList.contains('art-placement-right') ? 'right' : (frame.classList.contains('art-placement-center') ? 'center' : (frame.classList.contains('art-placement-full') ? 'full' : 'inline'))),
+            caption: String(frame.querySelector('figcaption')?.textContent || '').trim()
           })).filter(item => item.url)
         : Array.from(parsed.querySelectorAll('.art-gallery img')).map(img => ({ url: String(img.getAttribute('src') || '').trim(), placement: 'inline' })).filter(item => item.url);
       if (imageEntries.length) {
@@ -2683,8 +2711,10 @@ function hydrateTemplateFromHtml(tpl, htmlContent) {
           const row = list.lastElementChild;
           const urlInput = row ? row.querySelector('.art-img-url') : null;
           const placementInput = row ? row.querySelector('.art-img-placement') : null;
+          const captionInput = row ? row.querySelector('.art-img-caption') : null;
           if (urlInput) urlInput.value = imageEntry.url;
           if (placementInput) placementInput.value = imageEntry.placement || 'inline';
+          if (captionInput) captionInput.value = imageEntry.caption || '';
         });
       }
     }
@@ -2802,6 +2832,7 @@ function renderDocBlocks() {
     const head = '<div class="doc-block-head"><strong style="font-size:.8rem;color:var(--wht-b);text-transform:uppercase;letter-spacing:1px">' +
       escapeHtml(block.type) +
       '</strong><div class="doc-block-actions">' +
+      '<button class="btn btn-sm btn-s doc-drag-handle" type="button" draggable="true" data-action="drag" data-index="' + idx + '" title="Drag to reorder">↕</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="up" data-index="' + idx + '">↑</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="down" data-index="' + idx + '">↓</button>' +
       '<button class="btn btn-sm btn-s" type="button" data-action="duplicate" data-index="' + idx + '">Clone</button>' +
@@ -2914,6 +2945,15 @@ function moveDocBlock(index, delta) {
   schedulePreview();
 }
 
+function moveDocBlockTo(index, targetIndex) {
+  if (index < 0 || index >= docBlocks.length || targetIndex < 0 || targetIndex >= docBlocks.length || index === targetIndex) return;
+  const [moved] = docBlocks.splice(index, 1);
+  const adjustedTarget = index < targetIndex ? targetIndex - 1 : targetIndex;
+  docBlocks.splice(adjustedTarget, 0, moved);
+  renderDocBlocks();
+  schedulePreview();
+}
+
 function removeDocBlock(index) {
   docBlocks.splice(index, 1);
   renderDocBlocks();
@@ -2933,6 +2973,8 @@ function initDocumentStudio() {
   const adders = document.getElementById('doc-adders');
   const holder = document.getElementById('doc-blocks');
   const formatSelect = document.getElementById('doc-format-select');
+  const fontSizeSelect = document.getElementById('doc-font-size');
+  const fontFamilySelect = document.getElementById('doc-font-family');
   const linkBtn = document.getElementById('doc-link-btn');
   if (!toolbar || !adders || !holder) return;
 
@@ -2963,6 +3005,56 @@ function initDocumentStudio() {
     document.execCommand(btn.getAttribute('data-doc-cmd'), false, btn.getAttribute('data-doc-value'));
     schedulePreview();
   });
+
+  function getDocSelectionRange() {
+    if (!activeDocEditable || !document.contains(activeDocEditable)) return null;
+    const selection = document.getSelection();
+    if (!selection || !selection.rangeCount || selection.isCollapsed) return null;
+    const range = selection.getRangeAt(0);
+    if (!activeDocEditable.contains(range.commonAncestorContainer)) return null;
+    return { selection, range };
+  }
+
+  function applyDocInlineStyle(styleText) {
+    const context = getDocSelectionRange();
+    if (!context) return false;
+    const span = document.createElement('span');
+    span.style.cssText = styleText;
+    span.appendChild(context.range.extractContents());
+    context.range.insertNode(span);
+    context.selection.removeAllRanges();
+    const nextRange = document.createRange();
+    nextRange.selectNodeContents(span);
+    context.selection.addRange(nextRange);
+    activeDocEditable.focus();
+    const index = Number(activeDocEditable.getAttribute('data-index'));
+    if (Number.isFinite(index) && docBlocks[index]) {
+      docBlocks[index].html = activeDocEditable.innerHTML;
+    }
+    markEditorAsChanged();
+    schedulePreview();
+    return true;
+  }
+
+  if (fontSizeSelect) {
+    fontSizeSelect.addEventListener('change', () => {
+      if (!fontSizeSelect.value) return;
+      if (!applyDocInlineStyle('font-size:' + fontSizeSelect.value + '; line-height: 1.35;')) {
+        fontSizeSelect.value = '';
+      }
+      fontSizeSelect.value = '';
+    });
+  }
+
+  if (fontFamilySelect) {
+    fontFamilySelect.addEventListener('change', () => {
+      if (!fontFamilySelect.value) return;
+      if (!applyDocInlineStyle('font-family:' + fontFamilySelect.value + ';')) {
+        fontFamilySelect.value = '';
+      }
+      fontFamilySelect.value = '';
+    });
+  }
 
   if (linkBtn) {
     linkBtn.addEventListener('click', async () => {
@@ -3023,6 +3115,43 @@ function initDocumentStudio() {
         schedulePreview();
       }
     }
+  });
+
+  holder.addEventListener('dragstart', e => {
+    const dragBtn = e.target.closest('[data-action="drag"]');
+    if (!dragBtn) return;
+    docDragIndex = Number(dragBtn.getAttribute('data-index'));
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(docDragIndex));
+    }
+  });
+
+  holder.addEventListener('dragover', e => {
+    const block = e.target.closest('.doc-block');
+    if (!block || docDragIndex < 0) return;
+    e.preventDefault();
+    block.classList.add('drag-over');
+  });
+
+  holder.addEventListener('dragleave', e => {
+    const block = e.target.closest('.doc-block');
+    if (block) block.classList.remove('drag-over');
+  });
+
+  holder.addEventListener('drop', e => {
+    const block = e.target.closest('.doc-block');
+    if (!block || docDragIndex < 0) return;
+    e.preventDefault();
+    block.classList.remove('drag-over');
+    const targetIndex = Number(block.getAttribute('data-index'));
+    moveDocBlockTo(docDragIndex, targetIndex);
+    docDragIndex = -1;
+  });
+
+  holder.addEventListener('dragend', () => {
+    docDragIndex = -1;
+    holder.querySelectorAll('.doc-block.drag-over').forEach(el => el.classList.remove('drag-over'));
   });
 
 
@@ -3351,7 +3480,7 @@ function buildSandboxDocument(html, css) {
     '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src https: data: blob:; media-src https: data: blob:; connect-src https:;">' +
     '<style>' +
     ':root{--red:#8b0000;--red-b:#cc0000;--red-d:#5c0000;--blk:#000;--blk-s:#0a0a0a;--blk-c:#111;--wht:#fff;--wht-m:#ccc;--wht-d:#999;--font-m:"IBM Plex Mono",monospace;--font-d:"Special Elite",monospace;color-scheme:dark}' +
-    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}' +
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-m);line-height:1.7;padding:24px;color:var(--wht-m);background:var(--blk)}img{max-width:100%;height:auto}figure{display:block;margin:0 0 14px}figcaption{margin-top:6px;font-size:.82rem;color:#c3c3c3;line-height:1.45}' +
     '.page-shell{max-width:960px;margin:0 auto;padding:24px}.page-header{padding:24px;border-bottom:2px solid var(--red-d);margin-bottom:24px;background:linear-gradient(180deg,rgba(139,0,0,.1),transparent)}.page-title{font-family:var(--font-d);font-size:2rem;color:var(--wht);text-transform:uppercase;letter-spacing:3px;margin-bottom:8px}.page-subtitle{font-size:.8rem;color:var(--red-b);letter-spacing:2px;text-transform:uppercase}.page-section{margin-bottom:24px;padding:20px;border:1px solid var(--red-d);background:var(--blk-s)}.page-section h2{font-family:var(--font-d);color:var(--wht);text-transform:uppercase;letter-spacing:2px;border-bottom:1px dashed var(--red-d);padding-bottom:8px;margin-bottom:12px}' +
     css.replace(/<\/style>/gi, '') +
     '</style></head><body>' + htmlWithLazyImages + '</body></html>';
@@ -3652,10 +3781,14 @@ function buildArtworkTemplate() {
       const sel = entry.querySelector('.art-img-select');
       const url = entry.querySelector('.art-img-url');
       const placement = entry.querySelector('.art-img-placement');
+      const caption = entry.querySelector('.art-img-caption');
       const finalUrl = (sel && sel.value) || (url && url.value) || '';
       if (finalUrl) {
         const placementValue = String(placement && placement.value || 'inline').toLowerCase();
-        html += '    <div class="art-frame art-placement-' + placementValue + '"><img src="' + escapeAttr(finalUrl) + '" alt="Artwork" /></div>\n';
+        const captionMarkup = caption && String(caption.value || '').trim()
+          ? '<figcaption>' + escapeHtml(caption.value.trim()) + '</figcaption>'
+          : '';
+        html += '    <figure class="art-frame art-placement-' + placementValue + '"><img src="' + escapeAttr(finalUrl) + '" alt="Artwork" />' + captionMarkup + '</figure>\n';
       }
     });
     html += '  </div>\n';
@@ -3680,13 +3813,21 @@ function buildArtworkTemplate() {
   display: block;
   margin-bottom: 32px;
 }
-.art-frame {
+  display: inline-flex;
+  flex-direction: column;
   background: #111111;
   padding: 16px;
   border: 1px solid #3a3a3a;
   display: inline-block;
 }
-.art-frame.art-placement-left { float: left; margin: 0 18px 16px 0; max-width: 45%; }
+.art-frame figcaption {
+  margin-top: 8px;
+  font-size: .75rem;
+  color: #c7c7c7;
+  line-height: 1.45;
+  text-align: left;
+.art-frame.art-placement-center { float: none; margin: 16px auto; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.art-frame.art-placement-full { float: none; margin: 16px 0; width: 100%; display: flex; flex-direction: column; align-items: center; }
 .art-frame.art-placement-right { float: right; margin: 0 0 16px 18px; max-width: 45%; }
 .art-frame.art-placement-inline { float: none; margin: 0 16px 16px 0; }
 .art-frame.art-placement-center { float: none; margin: 16px auto; text-align: center; display: flex; justify-content: center; }
@@ -5075,6 +5216,41 @@ function insertUploadedAssetIntoCurrentEditor(kind, url, label) {
 
   const markup = insertUploadedAssetMarkup(kind, url, label);
 
+  if (currentMode === 'template') {
+    if (currentTemplate === 'artwork' && kind === 'image') {
+      addArtworkImage();
+      const list = document.getElementById('tf-art-images-list');
+      const row = list ? list.lastElementChild : null;
+      if (row) {
+        const select = row.querySelector('.art-img-select');
+        const imageUrl = row.querySelector('.art-img-url');
+        const caption = row.querySelector('.art-img-caption');
+        if (select) select.value = url;
+        if (imageUrl) imageUrl.value = url;
+        if (caption) caption.value = label || '';
+      }
+      captureEditorState('template');
+      schedulePreview();
+      return;
+    }
+
+    const templateFieldMap = {
+      anomaly: { image: 'tf-hero-img', audio: 'tf-anomaly-audio', video: 'tf-anomaly-video' },
+      tale: { image: 'tf-tale-hero', audio: 'tf-tale-audio', video: 'tf-tale-video' },
+      guide: { image: 'tf-guide-hero', audio: 'tf-guide-audio', video: 'tf-guide-video' },
+      organization: { image: 'tf-org-hero' }
+    };
+    const fieldMap = templateFieldMap[currentTemplate] || null;
+    const fieldId = fieldMap && fieldMap[kind];
+    const fieldEl = fieldId ? document.getElementById(fieldId) : null;
+    if (fieldEl) {
+      fieldEl.value = url;
+      captureEditorState('template');
+      schedulePreview();
+      return;
+    }
+  }
+
   if (currentMode === 'code') {
     const htmlField = document.getElementById('sf-html');
     insertMarkupAtCursorInTextarea(htmlField, '\n' + markup + '\n');
@@ -5118,11 +5294,7 @@ function insertUploadedAssetIntoCurrentEditor(kind, url, label) {
     return;
   }
 
-  switchMode('code');
-  const htmlField = document.getElementById('sf-html');
-  insertMarkupAtCursorInTextarea(htmlField, '\n' + markup + '\n');
-  schedulePreview();
-  alert('Inserted into Code Editor for precise placement.');
+  alert('Please switch to a supported editor mode before inserting this asset.');
 }
 
 function insertUploadedImageIntoPage(id) {

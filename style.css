@@ -49,6 +49,7 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   overflow-x: clip;
+  overflow-x: hidden;
   width: 100%;
   max-width: 100%;
 }
@@ -63,6 +64,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: clip;
+  overflow-x: hidden;
   width: 100%;
   max-width: 100%;
 }
@@ -1834,7 +1836,8 @@ hr {
   .adm-main .card div[style*="display:flex"] {
     flex-direction: row !important;
     align-items: center;
-    overflow-x: auto;
+    overflow-x: clip;
+    flex-wrap: wrap;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -2112,7 +2115,8 @@ hr {
   color: var(--wht-d);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-family: var(--font-m)
 }
 
@@ -3151,16 +3155,18 @@ hr {
   .adm-side {
     border-right: none;
     border-bottom: 1px solid var(--red-d);
-    overflow-x: auto;
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 12px;
+    overflow-x: clip;
   }
 
   .adm-side a {
     margin-bottom: 0;
-    white-space: nowrap;
-    flex: 0 0 auto;
+    white-space: normal;
+    flex: 1 1 140px;
+    min-width: 0;
   }
 
   .adm-main {
@@ -3169,7 +3175,7 @@ hr {
 
   .adm-tbl {
     display: block;
-    overflow-x: auto;
+    overflow-x: clip;
     width: 100%;
   }
 
@@ -3225,7 +3231,7 @@ hr {
 
   .doc-table {
     display: block;
-    overflow-x: auto;
+    overflow-x: clip;
     width: 100%;
   }
 
@@ -3769,15 +3775,17 @@ body::after {
     border-radius: 8px;
     padding: 10px;
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    overflow-x: auto;
+    overflow-x: clip;
     -webkit-overflow-scrolling: touch;
   }
 
   .adm-side a {
     margin-bottom: 0;
-    white-space: nowrap;
-    flex: 0 0 auto;
+    white-space: normal;
+    flex: 1 1 120px;
+    min-width: 0;
     padding: 8px 12px;
     font-size: 0.75rem;
     border-radius: 6px;
@@ -3789,7 +3797,7 @@ body::after {
 
   .adm-tbl {
     display: block;
-    overflow-x: auto;
+    overflow-x: clip;
     -webkit-overflow-scrolling: touch;
     font-size: 0.75rem;
   }
@@ -4040,7 +4048,7 @@ body::after {
 
   .doc-table {
     display: block;
-    overflow-x: auto;
+    overflow-x: clip;
     -webkit-overflow-scrolling: touch;
   }
 

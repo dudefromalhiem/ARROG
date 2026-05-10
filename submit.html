@@ -112,6 +112,7 @@
     .doc-adders { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
     .doc-canvas { border:1px solid var(--blk-m); background:var(--blk-b); padding:12px; }
     .doc-block { border:1px solid var(--blk-d); background:rgba(0,0,0,.35); margin-bottom:12px; border-radius:4px; }
+    .doc-block.drag-over { border-color: var(--red-b); box-shadow: 0 0 0 1px rgba(204, 0, 0, .15) inset; }
     .doc-block-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--blk-d); }
     .doc-block-actions { display:flex; gap:6px; }
     .doc-drag-handle { cursor: grab; }
@@ -909,6 +910,29 @@ render.mount('submission-terminal');</pre>
         </p>
 
         <div class="doc-toolbar" id="doc-toolbar">
+          <div class="toolbar-group">
+            <label style="font-size:.75rem;color:var(--wht-f)">Font Size:</label>
+            <select id="doc-font-size" class="toolbar-select">
+              <option value="">Default</option>
+              <option value="12px">12px</option>
+              <option value="14px">14px</option>
+              <option value="16px">16px</option>
+              <option value="18px">18px</option>
+              <option value="20px">20px</option>
+              <option value="24px">24px</option>
+              <option value="28px">28px</option>
+              <option value="32px">32px</option>
+            </select>
+          </div>
+          <div class="toolbar-group">
+            <label style="font-size:.75rem;color:var(--wht-f)">Font:</label>
+            <select id="doc-font-family" class="toolbar-select">
+              <option value="">Default</option>
+              <option value="sans-serif">Sans-serif</option>
+              <option value="serif">Serif</option>
+              <option value="monospace">Monospace</option>
+            </select>
+          </div>
           <button class="btn btn-s" type="button" data-doc-cmd="bold" title="Bold"><strong>B</strong></button>
           <button class="btn btn-s" type="button" data-doc-cmd="italic" title="Italic"><em>I</em></button>
           <button class="btn btn-s" type="button" data-doc-cmd="underline" title="Underline"><u>U</u></button>
