@@ -3558,7 +3558,7 @@ function parseHtmlToDocBlocks(html) {
       return;
     }
     if (tag === 'section' || tag === 'div') {
-      const isSection = node.classList.contains('page-section') || node.classList.contains('rog-section') || node.classList.contains('guide-section');
+      const isSection = node.classList.contains('page-section') || node.classList.contains('rog-section') || node.classList.contains('guide-section') || node.classList.contains('wiki-box');
       if (isSection) {
         const heading = Array.from(node.children || []).find(child => /^h[12]$/i.test(child.tagName) || /^h3$/i.test(child.tagName));
         if (heading && heading.textContent.trim()) {
