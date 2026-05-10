@@ -1735,8 +1735,20 @@ async function initializeSubmitEditModeFromUrl() {
     const inferredDocBlocks = content.trim() ? parseHtmlToDocBlocks(content) : [];
     const prefersDocumentStudio = pageType === 'Guide' || pageType === 'Lore' || isLoreFamilyType(pageType);
     if (docBlocks.length || savedMode === 'doc' || (prefersDocumentStudio && inferredDocBlocks.length)) {
-      if (!docBlocks.length && inferredDocBlocks.length) {
-        docBlocks = JSON.parse(JSON.stringify(inferredDocBlocks));
+      if (!docBlocks.length) {
+        if (inferredDocBlocks.length) {
+          docBlocks = JSON.parse(JSON.stringify(inferredDocBlocks));
+        } else if (content.trim()) {
+          docBlocks = [
+            { type: 'title', text: page.title || 'Archived History' },
+            { type: 'text', html: content }
+          ];
+        } else {
+          docBlocks = [
+            { type: 'title', text: page.title || 'Archived History' },
+            { type: 'text', html: '<p>Start writing here.</p>' }
+          ];
+        }
       }
       switchMode('doc');
       renderDocBlocks();
