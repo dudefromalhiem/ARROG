@@ -1738,16 +1738,6 @@ async function initializeSubmitEditModeFromUrl() {
       if (!docBlocks.length) {
         if (inferredDocBlocks.length) {
           docBlocks = JSON.parse(JSON.stringify(inferredDocBlocks));
-        } else if (content.trim()) {
-          docBlocks = [
-            { type: 'title', text: page.title || 'Archived History' },
-            { type: 'text', html: content }
-          ];
-        } else {
-          docBlocks = [
-            { type: 'title', text: page.title || 'Archived History' },
-            { type: 'text', html: '<p>Start writing here.</p>' }
-          ];
         }
       }
       switchMode('doc');
@@ -3529,53 +3519,98 @@ function parseHtmlToDocBlocks(html) {
     return el.innerHTML || '';
   };
 
-  Array.from(body.childNodes || []).forEach(node => {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const tag = node.tagName.toLowerCase();
-      if (tag === 'h2') {
-        blocks.push({ type: 'title', text: node.textContent.trim() });
-        return;
+  const pushTextBlock = htmlText => {
+    const rich = String(htmlText || '').trim();
+    if (rich) blocks.push({ type: 'text', html: rich });
+  };
+
+  const parseSectionChildren = section => {
+    Array.from(section.childNodes || []).forEach(child => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const childTag = child.tagName.toLowerCase();
+        if (childTag === 'h1' || childTag === 'h2' || childTag === 'h3') return;
       }
-      if (tag === 'div' && node.classList.contains('doc-image-container')) {
-        // collect first image in container
-        const img = node.querySelector('img');
-        if (img && img.src) {
-          blocks.push({ type: 'image', url: img.getAttribute('src'), caption: (node.querySelector('figcaption') || {}).textContent || '', align: node.className.includes('align-left') ? 'left' : node.className.includes('align-right') ? 'right' : 'center' });
-        }
-        return;
-      }
-      if (tag === 'figure' && node.querySelector('img')) {
-        const img = node.querySelector('img');
-        blocks.push({ type: 'image', url: img.getAttribute('src'), caption: (node.querySelector('figcaption') || {}).textContent || '' });
-        return;
-      }
-      if (tag === 'blockquote') {
-        blocks.push({ type: 'quote', text: node.textContent.trim(), source: '' });
-        return;
-      }
-      if (tag === 'ul' || tag === 'ol') {
-        const items = Array.from(node.querySelectorAll('li')).map(li => li.textContent.trim()).join('\n');
-        blocks.push({ type: 'list', items });
-        return;
-      }
-      if (tag === 'pre') {
-        blocks.push({ type: 'code', code: node.textContent || '' });
-        return;
-      }
-      if (tag === 'hr') {
-        blocks.push({ type: 'divider' });
-        return;
-      }
-      // Fallback: treat as rich text
-      const rich = toOriginal(node);
-      if (rich && rich.trim()) blocks.push({ type: 'text', html: rich });
-      return;
-    }
+      parseNode(child);
+    });
+  };
+
+  const parseNode = node => {
+    if (!node) return;
     if (node.nodeType === Node.TEXT_NODE) {
       const txt = node.textContent.trim();
       if (txt) blocks.push({ type: 'text', html: '<p>' + escapeHtml(txt) + '</p>' });
+      return;
     }
-  });
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'div' && node.classList.contains('page-shell')) {
+      Array.from(node.childNodes || []).forEach(parseNode);
+      return;
+    }
+    if (tag === 'header' && node.classList.contains('page-header')) {
+      const title = Array.from(node.children || []).find(child => /^h1$/i.test(child.tagName));
+      if (title && title.textContent.trim()) blocks.push({ type: 'title', text: title.textContent.trim() });
+      const subtitle = node.querySelector('.page-subtitle');
+      if (subtitle && subtitle.textContent.trim()) {
+        pushTextBlock('<p><em>' + escapeHtml(subtitle.textContent.trim()) + '</em></p>');
+      }
+      return;
+    }
+    if (tag === 'section' || tag === 'div') {
+      const isSection = node.classList.contains('page-section') || node.classList.contains('rog-section') || node.classList.contains('guide-section');
+      if (isSection) {
+        const heading = Array.from(node.children || []).find(child => /^h[12]$/i.test(child.tagName) || /^h3$/i.test(child.tagName));
+        if (heading && heading.textContent.trim()) {
+          blocks.push({ type: 'title', text: heading.textContent.trim() });
+        }
+        parseSectionChildren(node);
+        return;
+      }
+    }
+    if (tag === 'h1' || tag === 'h2') {
+      blocks.push({ type: 'title', text: node.textContent.trim() });
+      return;
+    }
+    if (tag === 'p') {
+      pushTextBlock('<p>' + node.innerHTML + '</p>');
+      return;
+    }
+    if (tag === 'div' && node.classList.contains('doc-image-container')) {
+      const img = node.querySelector('img');
+      if (img && img.src) {
+        blocks.push({ type: 'image', url: img.getAttribute('src'), caption: (node.querySelector('figcaption') || {}).textContent || '', align: node.className.includes('align-left') ? 'left' : node.className.includes('align-right') ? 'right' : 'center' });
+      }
+      return;
+    }
+    if (tag === 'figure' && node.querySelector('img')) {
+      const img = node.querySelector('img');
+      blocks.push({ type: 'image', url: img.getAttribute('src'), caption: (node.querySelector('figcaption') || {}).textContent || '' });
+      return;
+    }
+    if (tag === 'blockquote') {
+      blocks.push({ type: 'quote', text: node.textContent.trim(), source: '' });
+      return;
+    }
+    if (tag === 'ul' || tag === 'ol') {
+      const items = Array.from(node.querySelectorAll('li')).map(li => li.textContent.trim()).join('\n');
+      blocks.push({ type: 'list', items });
+      return;
+    }
+    if (tag === 'pre') {
+      blocks.push({ type: 'code', code: node.textContent || '' });
+      return;
+    }
+    if (tag === 'hr') {
+      blocks.push({ type: 'divider' });
+      return;
+    }
+
+    const rich = toOriginal(node);
+    if (rich && rich.trim()) blocks.push({ type: 'text', html: rich });
+  };
+
+  Array.from(body.childNodes || []).forEach(parseNode);
 
   return blocks;
 }

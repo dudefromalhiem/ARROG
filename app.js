@@ -361,7 +361,7 @@ function showClearanceWelcome(role) {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: '999999',
     pointerEvents: 'none',
-    animation: 'clearanceBlink 3s ease-in-out forwards'
+    animation: 'clearanceBlink 1s ease-in-out forwards'
   });
 
   const box = document.createElement('div');
@@ -387,12 +387,7 @@ function showClearanceWelcome(role) {
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
-  // After the blink animation (3s for non-owners, 5s for owners), fade out (1s) then remove
-  const blinkDuration = normalizedRole === 'owner' ? 5000 : 3000;
-  setTimeout(() => {
-    overlay.style.animation = 'clearanceFadeOut 1s ease-out forwards';
-    setTimeout(() => overlay.remove(), 1000);
-  }, blinkDuration);
+  setTimeout(() => overlay.remove(), 1000);
 }
 
 function showClearanceWelcomeWhenReady(role) {
