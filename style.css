@@ -3014,6 +3014,9 @@ hr {
 
 /* Mobile Overrides */
 @media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
 
   .fi,
   .fse,
@@ -3320,6 +3323,10 @@ hr {
 }
 
 @media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+
   .wrap {
     padding: 10px;
   }
