@@ -395,8 +395,8 @@ hr {
 }
 
 .hdr-logo {
-  width: 48px;
-  height: 48px;
+  width: clamp(40px, 8vw, 52px);
+  height: clamp(40px, 8vw, 52px);
   border-radius: 50%;
   border: 2px solid var(--red);
   object-fit: cover
@@ -693,8 +693,11 @@ hr {
   }
 
   .hdr-title {
-    font-size: .92rem;
-    letter-spacing: 1.2px
+    font-size: clamp(0.75rem, 2.5vw, 0.95rem);
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis
   }
 
   .nav {
@@ -4222,13 +4225,17 @@ body::after {
   }
 
   .hdr-logo {
-    width: 36px;
-    height: 36px;
+    width: clamp(36px, 6vw, 44px);
+    height: clamp(36px, 6vw, 44px);
+    flex-shrink: 0;
   }
 
   .hdr-title {
-    font-size: 0.85rem;
+    font-size: clamp(0.75rem, 2.5vw, 0.95rem);
     letter-spacing: 0.8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .nav {

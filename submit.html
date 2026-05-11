@@ -742,6 +742,10 @@ render.mount('submission-terminal');</pre>
       <!-- Anomaly Template Fields -->
       <div class="section" style="margin-bottom:24px" id="tpl-fields-anomaly">
         <div class="section-hd">Anomaly Details</div>
+        <div style="margin-bottom:16px;padding:12px;background:rgba(204,0,0,.08);border:1px solid var(--red-d);border-radius:4px">
+          <button type="button" id="tf-anomaly-redact-btn" class="btn btn-sm btn-s" style="margin-right:8px" title="Redact selected text (Ctrl+Shift+R)">▓ Redact Selection</button>
+          <span style="font-size:.7rem;color:var(--wht-f)">Select text above to redact with ||text||</span>
+        </div>
         <div class="g2 mb-md">
             <div class="fg"><label class="fl" id="tf-class-label">Object Class</label>
             <select class="fi" id="tf-object-class">
@@ -754,6 +758,15 @@ render.mount('submission-terminal');</pre>
           <select class="fi" id="tf-hero-img">
             <option value="">None — No hero image</option>
           </select>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <select class="fi" id="tf-hero-align">
+              <option value="center">Center</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+            <input class="fi" id="tf-hero-width" placeholder="max-width (e.g. 800px or 100%)" />
+            <input class="fi" id="tf-hero-caption" placeholder="Caption (optional)" />
+          </div>
           <span style="font-size:.7rem;color:var(--wht-f)">Upload images above, then select one here.</span>
         </div>
         <div class="fg"><label class="fl" id="tf-containment-label">Containment Procedures</label>
@@ -786,12 +799,25 @@ render.mount('submission-terminal');</pre>
       <!-- Tale Template Fields -->
       <div class="section hidden" style="margin-bottom:24px" id="tpl-fields-tale">
         <div class="section-hd">Tale Details</div>
+        <div style="margin-bottom:16px;padding:12px;background:rgba(204,0,0,.08);border:1px solid var(--red-d);border-radius:4px">
+          <button type="button" id="tf-tale-redact-btn" class="btn btn-sm btn-s" style="margin-right:8px" title="Redact selected text (Ctrl+Shift+R)">▓ Redact Selection</button>
+          <span style="font-size:.7rem;color:var(--wht-f)">Select text above to redact with ||text||</span>
+        </div>
         <div class="fg"><label class="fl">Subtitle / Tagline</label><input class="fi" id="tf-tale-subtitle" placeholder="e.g. A Guild Member's Account" /></div>
         <div class="fg">
           <label class="fl">Hero Image</label>
           <select class="fi" id="tf-tale-hero">
             <option value="">None — No hero image</option>
           </select>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <select class="fi" id="tf-tale-hero-align">
+              <option value="center">Center</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+            <input class="fi" id="tf-tale-hero-width" placeholder="max-width (e.g. 800px or 100%)" />
+            <input class="fi" id="tf-tale-hero-caption" placeholder="Caption (optional)" />
+          </div>
         </div>
         <div class="fg"><label class="fl">Prologue / Opening</label>
           <textarea class="fta" id="tf-tale-intro" placeholder="Write the opening passage..."></textarea>
@@ -841,6 +867,15 @@ render.mount('submission-terminal');</pre>
           <select class="fi" id="tf-guide-hero">
             <option value="">None — No hero image</option>
           </select>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <select class="fi" id="tf-guide-hero-align">
+              <option value="center">Center</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+            <input class="fi" id="tf-guide-hero-width" placeholder="max-width (e.g. 800px or 100%)" />
+            <input class="fi" id="tf-guide-hero-caption" placeholder="Caption (optional)" />
+          </div>
         </div>
         <div class="doc-grid-2">
           <div class="fg">
@@ -944,6 +979,7 @@ render.mount('submission-terminal');</pre>
           <button class="btn btn-s" type="button" data-doc-cmd="insertOrderedList" title="Numbered List">1. List</button>
           <button class="btn btn-s" type="button" id="doc-link-btn" title="Insert Link">Link</button>
           <button class="btn btn-s" type="button" data-doc-cmd="removeFormat" title="Clear Formatting">Clear</button>
+          <button class="btn btn-s" type="button" id="doc-redact-btn" title="Redact Selection (Ctrl+Shift+R)">▓ Redact</button>
           <select class="fi" id="doc-format-select" aria-label="Paragraph style">
             <option value="">Block Style</option>
             <option value="P">Paragraph</option>
@@ -1007,6 +1043,7 @@ render.mount('submission-terminal');</pre>
             <button class="toolbar-btn" id="toolbar-italic" title="Italic">I</button>
             <button class="toolbar-btn" id="toolbar-underline" title="Underline">U</button>
             <button class="toolbar-btn" id="toolbar-strike" title="Strikethrough">S</button>
+            <button class="toolbar-btn" id="toolbar-redact" title="Redact Selection">█</button>
           </div>
           <div class="toolbar-group">
             <label style="font-size:.75rem;color:var(--wht-f)">Color:</label>

@@ -1734,11 +1734,12 @@ async function initializeSubmitEditModeFromUrl() {
     const pageType = String(page.type || '').trim();
     const inferredDocBlocks = content.trim() ? parseHtmlToDocBlocks(content) : [];
     const prefersDocumentStudio = pageType === 'Guide' || pageType === 'Lore' || isLoreFamilyType(pageType);
-    if (docBlocks.length || savedMode === 'doc' || (prefersDocumentStudio && inferredDocBlocks.length)) {
-      if (!docBlocks.length) {
-        if (inferredDocBlocks.length) {
-          docBlocks = JSON.parse(JSON.stringify(inferredDocBlocks));
-        }
+    console.log('[INIT_EDIT] Page type:', pageType, 'Inferred blocks:', inferredDocBlocks.length, 'Saved blocks:', docBlocks.length, 'Prefers doc:', prefersDocumentStudio);
+    
+    if (docBlocks.length || savedMode === 'doc' || prefersDocumentStudio) {
+      if (!docBlocks.length && inferredDocBlocks.length) {
+        console.log('[INIT_EDIT] Using inferred blocks from HTML parser');
+        docBlocks = JSON.parse(JSON.stringify(inferredDocBlocks));
       }
       switchMode('doc');
       renderDocBlocks();
@@ -2315,6 +2316,9 @@ function selectTemplate(tpl) {
 
   // Initialize Quill editors for this template
   initializeQuillEditorsForTemplate(tpl);
+  
+  // Initialize redaction buttons for template
+  initTemplateRedactionButtons();
 
   schedulePreview();
 }
@@ -2823,13 +2827,19 @@ function isMediaDocBlockType(type) {
 
 function renderDocBlocks() {
   const holder = document.getElementById('doc-blocks');
-  if (!holder) return;
+  if (!holder) {
+    console.warn('[RENDER_DOC_BLOCKS] No holder element found #doc-blocks');
+    return;
+  }
 
   if (!docBlocks.length) {
+    console.log('[RENDER_DOC_BLOCKS] No blocks to render, showing empty state');
     holder.innerHTML = '<div class="no-results">No blocks yet. Use the + buttons above to build your page.</div>';
     return;
   }
 
+  console.log('[RENDER_DOC_BLOCKS] Rendering ' + docBlocks.length + ' blocks');
+  
   holder.innerHTML = docBlocks.map((block, idx) => {
     const head = '<div class="doc-block-head"><strong style="font-size:.8rem;color:var(--wht-b);text-transform:uppercase;letter-spacing:1px">' +
       escapeHtml(block.type) +
@@ -3069,6 +3079,13 @@ function initDocumentStudio() {
       activeDocEditable.focus();
       document.execCommand('createLink', false, url);
       schedulePreview();
+    });
+  }
+
+  const redactBtn = document.getElementById('doc-redact-btn');
+  if (redactBtn) {
+    redactBtn.addEventListener('click', () => {
+      redactSelection();
     });
   }
 
@@ -3315,6 +3332,39 @@ function initDocumentStudio() {
 
   holder.addEventListener('change', e => {
     if (e.target.hasAttribute('data-field')) handleBlockValueChange(e.target);
+  });
+}
+
+function initTemplateRedactionButtons() {
+  ['tf-anomaly-redact-btn', 'tf-tale-redact-btn'].forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const activeEl = document.activeElement;
+        // Redact text in textarea or input
+        if (activeEl && (activeEl.tagName === 'TEXTAREA' || (activeEl.tagName === 'INPUT' && activeEl.type === 'text'))) {
+          const ta = activeEl;
+          const start = ta.selectionStart || 0;
+          const end = ta.selectionEnd || 0;
+          const val = ta.value || '';
+          const sel = val.slice(start, end) || '';
+          if (!sel) {
+            alert('Select some text first to redact.');
+            return;
+          }
+          const wrapped = '||' + sel + '||';
+          ta.value = val.slice(0, start) + wrapped + val.slice(end);
+          ta.selectionStart = start + 2;
+          ta.selectionEnd = start + 2 + sel.length;
+          ta.focus();
+          schedulePreview();
+          markEditorAsChanged();
+        } else {
+          alert('Click in a text field first, then select text to redact.');
+        }
+      });
+    }
   });
 }
 
@@ -3649,7 +3699,13 @@ function buildAnomalyTemplate() {
   html += '</div>\n\n';
 
   if (heroUrl) {
-    html += '<div class="rog-hero"><img src="' + heroUrl + '" alt="' + escapeHtml(itemNum) + '" /></div>\n\n';
+    const align = String(document.getElementById('tf-hero-align')?.value || 'center');
+    const width = String(document.getElementById('tf-hero-width')?.value || '').trim();
+    const caption = String(document.getElementById('tf-hero-caption')?.value || '').trim();
+    const styleAttr = width ? ' style="max-width:' + escapeAttr(width) + '"' : '';
+    html += '<div class="doc-image-container doc-image-stack align-' + align + '"' + styleAttr + '>\n';
+    html += '  <figure class="doc-image-wrap"><img src="' + escapeAttr(heroUrl) + '" alt="' + escapeAttr(itemNum) + '" />' + (caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '') + '</figure>\n';
+    html += '</div>\n\n';
   }
 
   if (containment) {
@@ -3748,7 +3804,13 @@ function buildTaleTemplate() {
   html += '</div>\n\n';
 
   if (heroUrl) {
-    html += '<div class="tale-hero"><img src="' + heroUrl + '" alt="Tale illustration" /></div>\n\n';
+    const align = String(document.getElementById('tf-tale-hero-align')?.value || 'center');
+    const width = String(document.getElementById('tf-tale-hero-width')?.value || '').trim();
+    const caption = String(document.getElementById('tf-tale-hero-caption')?.value || '').trim();
+    const styleAttr = width ? ' style="max-width:' + escapeAttr(width) + '"' : '';
+    html += '<div class="doc-image-container doc-image-stack align-' + align + '"' + styleAttr + '>\n';
+    html += '  <figure class="doc-image-wrap"><img src="' + escapeAttr(heroUrl) + '" alt="Tale illustration" />' + (caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '') + '</figure>\n';
+    html += '</div>\n\n';
   }
 
   if (intro) {
@@ -3900,7 +3962,13 @@ function buildGuideTemplate() {
   html += '</div>\n\n';
 
   if (heroUrl) {
-    html += '<div class="guide-hero"><img src="' + heroUrl + '" alt="Guide illustration" /></div>\n\n';
+    const align = String(document.getElementById('tf-guide-hero-align')?.value || 'center');
+    const width = String(document.getElementById('tf-guide-hero-width')?.value || '').trim();
+    const caption = String(document.getElementById('tf-guide-hero-caption')?.value || '').trim();
+    const styleAttr = width ? ' style="max-width:' + escapeAttr(width) + '"' : '';
+    html += '<div class="doc-image-container doc-image-stack align-' + align + '"' + styleAttr + '>\n';
+    html += '  <figure class="doc-image-wrap"><img src="' + escapeAttr(heroUrl) + '" alt="Guide illustration" />' + (caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '') + '</figure>\n';
+    html += '</div>\n\n';
   }
 
   // Table of contents
