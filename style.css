@@ -1124,24 +1124,56 @@ hr {
 }
 
 .home-page .intro-logo {
-  width: clamp(320px, 72vw, 520px);
-  height: clamp(320px, 72vw, 520px);
-  transform: translate(-50%, -50%);
-  left: 50%;
-  top: 50%;
+  position: relative;
+  grid-area: 1 / 1;
+  width: min(82vw, 560px);
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  transform: none;
+  left: auto;
+  top: auto;
+  margin-bottom: 0;
+  z-index: 0;
+}
+
+.home-page .intro-hero {
+  display: grid;
+  place-items: center;
+  min-height: clamp(320px, 52vw, 620px);
+  padding: clamp(28px, 6vw, 84px) 16px clamp(24px, 5vw, 48px);
+  overflow: visible;
+}
+
+.home-page .intro-t {
+  grid-area: 1 / 1;
+  z-index: 1;
+  padding-inline: 12px;
+}
+
+.home-page .intro {
+  width: 100%;
 }
 
 @media (max-width: 768px) {
   .home-page .intro-logo {
-    width: clamp(260px, 64vw, 360px);
-    height: clamp(260px, 64vw, 360px);
+    width: min(88vw, 420px);
+  }
+
+  .home-page .intro-hero {
+    min-height: clamp(280px, 58vw, 440px);
+    padding: 24px 12px 20px;
   }
 }
 
 @media (max-width: 480px) {
   .home-page .intro-logo {
-    width: clamp(220px, 70vw, 280px);
-    height: clamp(220px, 70vw, 280px);
+    width: min(90vw, 320px);
+  }
+
+  .home-page .intro-hero {
+    min-height: clamp(250px, 68vw, 360px);
+    padding: 20px 10px 16px;
   }
 }
 
