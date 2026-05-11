@@ -304,8 +304,8 @@ window.addEventListener('keydown', event => {
 });
 
 function shouldShowTerminal() {
-  // Always show the terminal intro on page load.
-  return true;
+  // Check localStorage for skip preference
+  return !localStorage.getItem('skipLoadingAnimation');
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -314,6 +314,9 @@ function shouldShowTerminal() {
 // ═════════════════════════════════════════════════════════════
 
 function showClearanceWelcome(role) {
+  // Skip if loading animation is disabled
+  if (localStorage.getItem('skipLoadingAnimation')) return;
+  
   if (document.body.classList.contains('terminal-active')) return;
   if (document.getElementById('clearance-welcome')) return;
   

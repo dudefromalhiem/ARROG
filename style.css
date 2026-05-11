@@ -381,51 +381,46 @@ hr {
   margin: 0 auto;
   padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
+  justify-content: space-between;
   width: 100%;
   position: relative
 }
 
 .hdr-brand {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
-  text-align: center;
   text-decoration: none
 }
 
 .hdr-logo {
-  width: clamp(84px, 14vw, 136px);
-  height: clamp(84px, 14vw, 136px);
+  width: clamp(40px, 8vw, 52px);
+  height: clamp(40px, 8vw, 52px);
   border-radius: 50%;
-  border: 3px solid var(--red);
-  object-fit: cover;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 14px 28px rgba(0, 0, 0, .45)
+  border: 1px solid var(--red);
+  object-fit: cover
 }
 
 .hdr-title {
   font-family: var(--font-d);
-  font-size: clamp(.95rem, 1.8vw, 1.35rem);
+  font-size: 1.2rem;
   color: var(--red-b);
   text-transform: uppercase;
-  letter-spacing: 2.2px;
-  line-height: 1.25;
-  white-space: normal
+  letter-spacing: 3px;
+  line-height: 1;
+  white-space: nowrap
 }
 
 .nav {
   display: flex;
-  gap: 18px;
+  gap: 20px;
   list-style: none;
   align-items: center;
-  flex: 0 0 auto;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-left: 0
+  flex: 1;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  margin-left: 22px
 }
 
 .nav a {
@@ -1628,10 +1623,10 @@ hr {
 .term.mobile .term-body {
   padding: 10px 10px 8px;
   font-size: 11px;
-  overflow-y: hidden;
+  overflow-y: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;
-  overscroll-behavior: none
+  overscroll-behavior: contain
 }
 
 .term.mobile .term-body::-webkit-scrollbar {
@@ -1641,32 +1636,32 @@ hr {
 }
 
 .term.mobile .term-stream {
-  min-height: 100%;
-  height: 100%;
-  overflow: hidden
+  min-height: auto;
+  height: auto;
+  overflow: visible
 }
 
 .term.mobile .term-code {
-  position: absolute;
-  inset: 0;
-  padding: 8px 8px 64px;
+  position: relative;
+  inset: auto;
+  padding: 8px 8px 60px;
   gap: 2px
 }
 
 @media (max-width: 768px) {
   .term-skip {
-    top: max(10px, env(safe-area-inset-top));
-    right: max(10px, env(safe-area-inset-right));
-    bottom: auto;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    right: max(16px, env(safe-area-inset-right));
+    top: auto;
     left: auto;
-    padding: 6px 8px;
+    padding: 8px 12px;
     z-index: 10040;
   }
 
   .term-skip .btn {
-    min-height: 36px;
-    padding: 6px 10px;
-    font-size: 0.66rem;
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 0.7rem;
   }
 
   .load-monocode,
@@ -4804,75 +4799,25 @@ body::after {
   padding: 14px 0 16px;
 }
 
-.hdr-in {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.hdr-brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 8px;
-}
-
-.hdr-logo {
+.intro-logo {
   width: clamp(104px, 16vw, 160px);
   height: clamp(104px, 16vw, 160px);
-}
-
-.hdr-title {
-  white-space: normal;
-  text-align: center;
-  overflow: visible;
-  text-overflow: clip;
+  filter: drop-shadow(0 0 14px rgba(204, 0, 0, 0.35));
+  animation: logoDrift 4.6s ease-in-out infinite;
 }
 
 @media (max-width: 920px) {
-  .hdr {
-    padding: 12px 0 14px;
-  }
-
-  .hdr-logo {
+  .intro-logo {
     width: clamp(84px, 20vw, 126px);
     height: clamp(84px, 20vw, 126px);
-  }
-
-  .hdr-title {
-    font-size: clamp(0.82rem, 2.8vw, 1rem);
-    letter-spacing: 1px;
   }
 }
 
 @media (max-width: 480px) {
-  .hdr {
-    padding: 10px 0 12px;
-  }
-
-  .hdr-in {
-    gap: 8px;
-  }
-
-  .hdr-brand {
-    gap: 6px;
-  }
-
-  .hdr-logo {
+  .intro-logo {
     width: clamp(72px, 24vw, 106px);
     height: clamp(72px, 24vw, 106px);
     flex-shrink: 0;
-  }
-
-  .hdr-title {
-    font-size: clamp(0.78rem, 3.2vw, 0.92rem);
-    letter-spacing: 0.9px;
-    white-space: normal;
-    text-align: center;
   }
 }
 
@@ -4884,21 +4829,6 @@ body::after {
   background:
     linear-gradient(140deg, rgba(204, 0, 0, 0.06), transparent 35%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
-}
-
-.intro::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(120deg, transparent 28%, rgba(255, 255, 255, 0.08) 50%, transparent 72%);
-  transform: translateX(-140%);
-  animation: introSweep 5.8s ease-in-out infinite;
-}
-
-.intro-logo {
-  filter: drop-shadow(0 0 14px rgba(204, 0, 0, 0.35));
-  animation: logoDrift 4.6s ease-in-out infinite;
 }
 
 .legacy-block,
