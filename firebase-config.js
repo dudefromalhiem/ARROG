@@ -561,6 +561,12 @@ function renderUserMenuHTML(displayLabel) {
             <option value="off">Off</option>
           </select>
         </div>
+        <div class="user-menu-setting" onclick="event.stopPropagation()">
+          <label class="user-menu-setting-label" for="skip-loading-anim-toggle">
+            <input type="checkbox" id="skip-loading-anim-toggle" style="margin-right:8px;cursor:pointer" onchange="toggleSkipLoadingAnimation(this.checked)">
+            Skip Loading Animation
+          </label>
+        </div>
         <button class="user-menu-item" type="button" role="menuitem" onclick="location.href='messaging.html'; closeUserMenus();">Messages</button>
         <button class="user-menu-item" type="button" role="menuitem" onclick="location.href='profile.html'; closeUserMenus();">Profile</button>
         <button class="user-menu-item" type="button" role="menuitem" onclick="auth.signOut(); closeUserMenus();">Log Out</button>

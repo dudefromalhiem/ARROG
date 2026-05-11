@@ -735,6 +735,7 @@ function getSameDocumentAnchorTarget(href, currentHref) {
 function renderSubmitUserMenu(user) {
   const label = String((user && user.displayName) || 'Agent').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const autosaveValue = submitAutosaveEnabled ? 'on' : 'off';
+  const skipLoadingAnim = localStorage.getItem('skipLoadingAnimation') ? ' checked' : '';
   return '' +
     '<div class="user-menu" data-user-menu>' +
       '<button class="nav-btn user-menu-trigger" type="button" onclick="toggleUserMenu(this, event)" aria-haspopup="true" aria-expanded="false">' +
@@ -748,6 +749,12 @@ function renderSubmitUserMenu(user) {
             '<option value="on"' + (autosaveValue === 'on' ? ' selected' : '') + '>On</option>' +
             '<option value="off"' + (autosaveValue === 'off' ? ' selected' : '') + '>Off</option>' +
           '</select>' +
+        '</div>' +
+        '<div class="user-menu-setting" onclick="event.stopPropagation()">' +
+          '<label class="user-menu-setting-label">' +
+            '<input type="checkbox" id="skip-loading-anim-toggle" style="margin-right:8px;cursor:pointer"' + skipLoadingAnim + ' onchange="toggleSkipLoadingAnimation(this.checked)">' +
+            'Skip Loading Animation' +
+          '</label>' +
         '</div>' +
         '<button class="user-menu-item" type="button" role="menuitem" onclick="changeUsername(); closeUserMenus();">Change Username</button>' +
         '<button class="user-menu-item" type="button" role="menuitem" onclick="auth.signOut(); closeUserMenus();">Log Out</button>' +

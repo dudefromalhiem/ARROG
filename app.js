@@ -308,6 +308,14 @@ function shouldShowTerminal() {
   return !localStorage.getItem('skipLoadingAnimation');
 }
 
+function toggleSkipLoadingAnimation(enabled) {
+  if (enabled) {
+    localStorage.setItem('skipLoadingAnimation', 'true');
+  } else {
+    localStorage.removeItem('skipLoadingAnimation');
+  }
+}
+
 // ═════════════════════════════════════════════════════════════
 // CLEARANCE WELCOME SCREEN — Role-based for authenticated users only
 // Shows role-specific welcome messages on login
