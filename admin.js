@@ -543,6 +543,9 @@ async function renderAdminBootstrap(user) {
     adminInfo.innerHTML =
       `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Role: <span style="color:var(--red-b);text-transform:uppercase">${roleDisplayName}</span> (Level ${level})
        <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
+    
+    // Load and display version with auto-update check
+    initializeVersionDisplay();
     navAuth.innerHTML = renderUserMenuHTML(displayLabel);
     applyTabVisibilityForRole(user, isAdminUser);
 
@@ -2529,3 +2532,74 @@ async function removeStaffRole(kind, email) {
     alert('Failed to remove role: ' + err.message);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+ *  VERSION MANAGEMENT
+ * ═══════════════════════════════════════════════════════════════ */
+
+let currentAppVersion = null;
+let latestGitHubVersion = null;
+let versionCheckInterval = null;
+
+async function initializeVersionDisplay() {
+  try {
+    // Load local version
+    const versionResponse = await fetch('./version.json');
+    const versionData = await versionResponse.json();
+    currentAppVersion = versionData.version;
+    
+    const versionEl = document.getElementById('current-version');
+    if (versionEl) {
+      versionEl.textContent = currentAppVersion;
+    }
+    
+    // Initial check for updates
+    await checkForUpdates(versionData.githubRepo);
+    
+    // Check for updates every 5 minutes
+    versionCheckInterval = setInterval(() => {
+      checkForUpdates(versionData.githubRepo);
+    }, 5 * 60 * 1000);
+  } catch (error) {
+    console.warn('Failed to initialize version display:', error);
+    const versionEl = document.getElementById('current-version');
+    if (versionEl) versionEl.textContent = 'unknown';
+  }
+}
+
+async function checkForUpdates(gitHubRepo) {
+  try {
+    const [owner, repo] = gitHubRepo.split('/');
+    const apiUrl = https://api.github.com/repos///releases/latest;
+    
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      console.warn('Failed to fetch GitHub releases:', response.status);
+      return;
+    }
+    
+    const releaseData = await response.json();
+    const latestVersion = releaseData.tag_name ? releaseData.tag_name.replace(/^v/, '') : null;
+    
+    if (latestVersion && latestVersion !== currentAppVersion) {
+      latestGitHubVersion = latestVersion;
+      displayUpdateIndicator(latestVersion);
+      console.info(Update available:  (current: ));
+    }
+  } catch (error) {
+    console.warn('Error checking for GitHub updates:', error);
+  }
+}
+
+function displayUpdateIndicator(newVersion) {
+  const indicator = document.getElementById('update-indicator');
+  if (indicator) {
+    indicator.style.display = 'inline';
+    indicator.title = Update available: v;
+    indicator.innerHTML = • Update available (v);
+  }
+}
+
+window.addEventListener('beforeunload', () => {
+  if (versionCheckInterval) clearInterval(versionCheckInterval);
+});
