@@ -1125,6 +1125,127 @@ hr {
   line-height: 1.8
 }
 
+.home-page .hdr-in {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 10px 18px;
+}
+
+.home-page .hdr-brand {
+  gap: 12px;
+}
+
+.home-page .hdr-logo {
+  width: clamp(84px, 18vw, 124px);
+  height: clamp(84px, 18vw, 124px);
+}
+
+.home-page .hdr-title {
+  font-size: clamp(1rem, 2.5vw, 1.4rem);
+  letter-spacing: clamp(1px, .7vw, 3px);
+}
+
+.home-page .wrap {
+  width: min(100%, 1160px);
+  padding: clamp(12px, 3vw, 24px);
+}
+
+.home-page .intro {
+  padding: 0 clamp(12px, 3vw, 24px) 56px;
+}
+
+.home-page .intro-hero {
+  padding: clamp(40px, 10vw, 88px) 16px clamp(28px, 7vw, 48px);
+}
+
+.home-page .intro-logo {
+  width: clamp(240px, 60vw, 420px);
+  height: clamp(240px, 60vw, 420px);
+}
+
+.home-page .intro-t {
+  font-size: clamp(2rem, 7vw, 3.2rem);
+  letter-spacing: clamp(3px, 1.4vw, 8px);
+}
+
+.home-page .intro-cl {
+  font-size: clamp(.8rem, 2.8vw, 1.2rem);
+  letter-spacing: clamp(2px, 1vw, 6px);
+}
+
+.home-page .intro-sub {
+  max-width: 640px;
+}
+
+@media (max-width: 768px) {
+  .home-page .hdr-logo {
+    width: clamp(96px, 24vw, 140px);
+    height: clamp(96px, 24vw, 140px);
+  }
+
+  .home-page .intro-hero {
+    padding: 34px 12px 24px;
+  }
+
+  .home-page .intro-logo {
+    width: clamp(180px, 48vw, 280px);
+    height: clamp(180px, 48vw, 280px);
+  }
+
+  .home-page .intro-t {
+    font-size: clamp(1.45rem, 6vw, 2.2rem);
+    letter-spacing: clamp(2px, 1vw, 5px);
+  }
+
+  .home-page .intro-cl {
+    font-size: .9rem;
+    letter-spacing: clamp(1.5px, .8vw, 4px);
+  }
+}
+
+@media (max-width: 480px) {
+  .home-page .hdr-in {
+    padding: 10px 12px;
+  }
+
+  .home-page .hdr-brand {
+    gap: 10px;
+  }
+
+  .home-page .hdr-logo {
+    width: clamp(104px, 28vw, 152px);
+    height: clamp(104px, 28vw, 152px);
+  }
+
+  .home-page .intro {
+    padding: 0 10px 42px;
+  }
+
+  .home-page .intro-hero {
+    padding: 28px 10px 18px;
+  }
+
+  .home-page .intro-logo {
+    width: clamp(150px, 44vw, 220px);
+    height: clamp(150px, 44vw, 220px);
+  }
+
+  .home-page .intro-t {
+    font-size: clamp(1.15rem, 6.8vw, 1.9rem);
+    letter-spacing: clamp(1px, .7vw, 4px);
+  }
+
+  .home-page .intro-cl {
+    font-size: .72rem;
+    letter-spacing: clamp(1px, .6vw, 3px);
+    margin: 28px auto 18px;
+  }
+
+  .home-page .intro-sub {
+    font-size: .92rem;
+  }
+}
+
 @media(max-width:768px) {
   .intro-hero {
     padding: 48px 16px 32px
@@ -3014,10 +3135,6 @@ hr {
 
 /* Mobile Overrides */
 @media (max-width: 768px) {
-  html {
-    font-size: 15px;
-  }
-
   .fi,
   .fse,
   .fta,
@@ -3323,10 +3440,6 @@ hr {
 }
 
 @media (max-width: 480px) {
-  html {
-    font-size: 14px;
-  }
-
   .wrap {
     padding: 10px;
   }
