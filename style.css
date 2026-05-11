@@ -1494,6 +1494,10 @@ hr {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.term.mobile {
+  overflow: visible;
   font-family: 'Courier New', monospace;
   color: var(--wht-m);
   background:
@@ -1608,15 +1612,16 @@ hr {
 
 .term-skip {
   position: fixed;
-  bottom: max(20px, env(safe-area-inset-bottom));
-  right: max(20px, env(safe-area-inset-right));
+  bottom: 16px;
+  right: 16px;
   z-index: 10020;
   background: rgba(0, 0, 0, .88);
   padding: 10px 14px;
   border: 1px solid var(--red-d);
   -webkit-backdrop-filter: blur(1px);
   backdrop-filter: blur(1px);
-  pointer-events: auto
+  pointer-events: auto;
+  visibility: visible !important;
 }
 
 .term-skip .btn {
@@ -1630,7 +1635,11 @@ hr {
   -ms-overflow-style: none;
   scrollbar-width: none;
   overscroll-behavior: auto;
-  max-height: calc(100vh - 140px)
+  max-height: 60vh;
+  position: absolute;
+  width: 100%;
+  top: 0;
+  left: 0;
 }
 
 .term.mobile .term-body::-webkit-scrollbar {
@@ -1649,7 +1658,7 @@ hr {
 .term.mobile .term-code {
   position: relative;
   inset: auto;
-  padding: 8px 8px 70px;
+  padding: 8px 8px 8px;
   gap: 2px;
   display: flex;
   flex-direction: column
@@ -1658,20 +1667,23 @@ hr {
 @media (max-width: 768px) {
   .term-skip {
     position: fixed;
-    bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
-    right: max(20px, calc(env(safe-area-inset-right) + 12px));
+    bottom: 16px;
+    right: 16px;
     top: auto;
     left: auto;
     padding: 10px 14px;
     z-index: 10050;
     background: rgba(0, 0, 0, .92);
     border: 1px solid var(--red-d);
+    pointer-events: auto;
+    visibility: visible !important;
   }
 
   .term-skip .btn {
     min-height: 40px;
     padding: 10px 14px;
     font-size: 0.75rem;
+    pointer-events: auto;
   }
 
   .load-monocode,
