@@ -110,8 +110,8 @@
     .doc-toolbar .btn { min-width:44px; }
     .doc-toolbar .fi { max-width:160px; }
     .doc-adders { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-    .doc-canvas { border:1px solid var(--blk-m); background:var(--blk-b); padding:12px; }
-    .doc-block { border:1px solid var(--blk-d); background:rgba(255,255,255,.04); margin-bottom:12px; border-radius:4px; }
+    .doc-canvas { border:1px solid var(--blk-m); background:var(--blk-b); padding:12px; min-height:200px; }
+    .doc-block { border:1px solid var(--blk-d); background:rgba(255,255,255,.06); color:var(--wht-m); margin-bottom:12px; border-radius:4px; min-height:50px; }
     .doc-block.drag-over { border-color: var(--red-b); box-shadow: 0 0 0 1px rgba(204, 0, 0, .15) inset; }
     .doc-block-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--blk-d); }
     .doc-block-actions { display:flex; gap:6px; }
@@ -612,6 +612,17 @@ render.mount('submission-terminal');</pre>
       </div>
 
     <div id="submit-create-workspace">
+
+    <!-- ═══ INTRO SECTION ═══ -->
+    <section class="intro">
+      <div class="intro-hero">
+        <img src="logo.png" alt="" class="intro-logo" />
+        <h1 class="intro-t">Red Oaker Guild</h1>
+      </div>
+      <div class="intro-cl">Clearance Level 2 Required | Classified Document</div>
+      <div class="intro-r"></div>
+      <p class="intro-sub">Necessary for observation, shelter, and understanding.</p>
+    </section>
 
     <!-- ═══ PAGE HERO ═══ -->
     <div class="create-hero">
