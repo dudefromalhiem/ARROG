@@ -563,7 +563,7 @@ function renderUserMenuHTML(displayLabel) {
         </div>
         <div class="user-menu-setting" onclick="event.stopPropagation()">
           <label class="user-menu-setting-label" for="skip-loading-anim-toggle">
-            <input type="checkbox" id="skip-loading-anim-toggle" style="margin-right:8px;cursor:pointer" onchange="toggleSkipLoadingAnimation(this.checked)">
+            <input type="checkbox" id="skip-loading-anim-toggle" style="margin-right:8px;cursor:pointer" ${localStorage.getItem('skipLoadingAnimation') ? 'checked' : ''} onchange="toggleSkipLoadingAnimation(this.checked)">
             Skip Loading Animation
           </label>
         </div>

@@ -1099,11 +1099,13 @@ hr {
 
 .intro-cl {
   font-family: var(--font-m);
-  font-size: .7rem;
+  font-size: 1.2rem;
   color: var(--red-b);
   letter-spacing: 6px;
   text-transform: uppercase;
-  margin-bottom: 16px
+  margin: 40px auto 24px;
+  text-align: center;
+  display: block
 }
 
 .intro-r {
@@ -1137,8 +1139,9 @@ hr {
   }
 
   .intro-cl {
-    font-size: .6rem;
-    letter-spacing: 4px
+    font-size: 0.95rem;
+    letter-spacing: 4px;
+    margin: 32px auto 20px
   }
 }
 
