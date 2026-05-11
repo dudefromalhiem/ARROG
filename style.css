@@ -3781,7 +3781,6 @@ body::after {
   .doc-grid-2,
   .review-upload-grid,
   .guidebook-grid,
-  .community-grid,
   .file-grid,
   .editor-wrap {
     grid-template-columns: 1fr !important;
@@ -4168,7 +4167,6 @@ body::after {
   .doc-grid-2,
   .review-upload-grid,
   .guidebook-grid,
-  .community-grid,
   .file-grid,
   .editor-wrap {
     grid-template-columns: 1fr !important;

@@ -91,14 +91,6 @@
     .upvote-label { color: var(--wht-d); font-size:.74rem; }
     .upvote-rank-link { color:var(--red-b);text-decoration:none;font-size:.75rem;text-transform:uppercase;letter-spacing:1px;padding:8px 12px;border:1px solid var(--red-d);background:rgba(139,0,0,0.12); }
     .upvote-rank-link:hover { border-color: var(--red-b); background: rgba(139,0,0,0.24); }
-    .community-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:14px; margin-top:24px; }
-    .community-panel { border:1px solid var(--blk-m); background: var(--blk-b); padding:12px; }
-    .community-panel .comments-title { margin-bottom:10px; font-size:.9rem; }
-    .community-results { display:grid; gap:8px; margin-top:10px; }
-    .community-result { border:1px solid var(--blk-m); padding:8px 10px; background: rgba(255,255,255,0.02); cursor:pointer; }
-    .community-result.on { border-color: var(--red-b); }
-    .community-meta { font-size:.75rem; color: var(--wht-f); margin-top:6px; line-height:1.5; }
-    @media (max-width: 920px) { .community-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -254,44 +246,6 @@ render.mount('archive-viewer');</pre>
       </div>
     </div>
     <div class="comment-list" id="comment-list"></div>
-  </section>
-
-  <section id="community-section" class="section hidden comments-wrap">
-    <div class="comments-head">
-      <div class="comments-title">Profile & Messages</div>
-      <div class="comments-status" id="community-status">Sign in to use direct messages, block, and reports.</div>
-    </div>
-
-    <div class="community-grid">
-      <div class="community-panel">
-        <div class="comments-title">Your Profile</div>
-        <div id="community-profile-card" class="community-meta"></div>
-      </div>
-
-      <div class="community-panel">
-        <div class="comments-title">Direct Message</div>
-        <div class="fg" style="margin-bottom:8px">
-          <label class="fl" for="dm-search">Find user</label>
-          <input class="fi" id="dm-search" type="text" placeholder="Search a username or email" />
-        </div>
-        <div class="community-results" id="dm-search-results"></div>
-        <div class="fg" style="margin-top:12px;margin-bottom:8px">
-          <label class="fl" for="dm-message">Message</label>
-          <textarea class="fta" id="dm-message" maxlength="1200" placeholder="Write a direct message"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-p" id="dm-send-btn" type="button">Send Message</button>
-          <button class="btn btn-s" id="dm-block-btn" type="button">Block Selected</button>
-          <button class="btn btn-s" id="dm-report-btn" type="button">Report Selected</button>
-        </div>
-        <div class="community-meta" id="dm-status">Select a user to begin.</div>
-      </div>
-
-      <div class="community-panel">
-        <div class="comments-title">Selected Profile</div>
-        <div id="selected-profile-card" class="community-meta">No user selected.</div>
-      </div>
-    </div>
   </section>
 
 </main>
@@ -593,19 +547,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (adminLink) adminLink.remove();
     }
 
-    const communitySection = document.getElementById('community-section');
-    if (communitySection) communitySection.classList.toggle('hidden', !user);
-    renderCommunityProfile(user);
-    if (!user) {
-      currentSocialUser = null;
-      currentSocialUsers = [];
-      renderSelectedSocialUser(null);
-      renderSocialSearchResults([]);
-    }
+
 
     updateCommentComposerAuthState();
     updateCommentComposerMode();
-    updateCommunityState();
     renderComments();
     await loadUpvoteStatus();
   });
@@ -617,9 +562,7 @@ let currentCommentUserIsAdmin = false;
 let currentCommentUserCanModerate = false;
 let currentComments = [];
 let selectedCommentReportId = '';
-let socialApiBase = '/api/social';
-let currentSocialUser = null;
-let currentSocialUsers = [];
+
 
 function configureSocialApiBase() {
   try {
@@ -665,16 +608,7 @@ function bindCommentComposerEvents() {
   }
 }
 
-function bindCommunityEvents() {
-  const search = document.getElementById('dm-search');
-  const sendBtn = document.getElementById('dm-send-btn');
-  const blockBtn = document.getElementById('dm-block-btn');
-  const reportBtn = document.getElementById('dm-report-btn');
-  if (search) search.addEventListener('input', () => fetchSocialUsers(search.value));
-  if (sendBtn) sendBtn.addEventListener('click', sendDirectMessage);
-  if (blockBtn) blockBtn.addEventListener('click', blockSelectedUser);
-  if (reportBtn) reportBtn.addEventListener('click', reportSelectedUser);
-}
+
 
 function getCommentsPageRef() {
   return {
@@ -1301,223 +1235,17 @@ function startReplyComment(id, authorName) {
   updateCommentComposerMode();
 }
 
-function renderCommunityProfile(user) {
-  const host = document.getElementById('community-profile-card');
-  if (!host) return;
-  if (!user) {
-    host.innerHTML = 'Sign in to view your profile.';
-    return;
-  }
 
-  const role = isOwner(user.email) ? 'owner' : (isAdmin(user.email) ? 'admin' : (isModerator(user.email) ? 'moderator' : 'user'));
-  host.innerHTML = [
-    '<div><strong>' + escapeHtml(user.displayName || 'Agent') + '</strong></div>',
-    '<div>' + escapeHtml(user.email || '') + '</div>',
-    '<div>Role: ' + escapeHtml(role) + '</div>'
-  ].join('');
-}
 
-function renderSelectedSocialUser(user) {
-  const host = document.getElementById('selected-profile-card');
-  const status = document.getElementById('dm-status');
-  if (!host) return;
-  if (!user) {
-    host.textContent = 'No user selected.';
-    if (status) status.textContent = 'Select a user to begin.';
-    return;
-  }
 
-  host.innerHTML = [
-    '<div><strong>' + escapeHtml(user.displayName || 'Agent') + '</strong></div>',
-    '<div>' + escapeHtml(user.email || '') + '</div>',
-    '<div>Role: ' + escapeHtml(user.role || 'user') + '</div>'
-  ].join('');
-  if (status) status.textContent = 'Ready to message ' + (user.displayName || 'Agent') + '.';
-}
 
-function renderSocialSearchResults(users) {
-  const host = document.getElementById('dm-search-results');
-  if (!host) return;
-  currentSocialUsers = Array.isArray(users) ? users : [];
-  if (!currentSocialUsers.length) {
-    host.innerHTML = '<div class="community-meta">No matching users found.</div>';
-    return;
-  }
 
-  host.innerHTML = currentSocialUsers.map(user => {
-    const selected = currentSocialUser && currentSocialUser.uid === user.uid ? ' on' : '';
-    return '<button type="button" class="community-result' + selected + '" data-uid="' + escapeHtml(user.uid || '') + '" data-name="' + escapeHtml(user.displayName || '') + '" data-email="' + escapeHtml(user.email || '') + '" data-role="' + escapeHtml(user.role || 'user') + '" onclick="chooseSocialUser(this.dataset.uid, this.dataset.name, this.dataset.email, this.dataset.role)">' +
-      '<div><strong>' + escapeHtml(user.displayName || 'Agent') + '</strong></div>' +
-      '<div class="community-meta">' + escapeHtml(user.email || '') + ' • ' + escapeHtml(user.role || 'user') + '</div>' +
-    '</button>';
-  }).join('');
-}
 
-function updateCommunityState() {
-  const status = document.getElementById('community-status');
-  const search = document.getElementById('dm-search');
-  const message = document.getElementById('dm-message');
-  const sendBtn = document.getElementById('dm-send-btn');
-  const blockBtn = document.getElementById('dm-block-btn');
-  const reportBtn = document.getElementById('dm-report-btn');
-  const canUse = !!currentCommentUser;
 
-  if (status) {
-    status.textContent = canUse
-      ? 'Search for a user, then send a message, block them, or report them.'
-      : 'Sign in to use direct messages, block, and reports.';
-  }
 
-  [search, message, sendBtn, blockBtn, reportBtn].forEach(element => {
-    if (element) element.disabled = !canUse;
-  });
-}
 
-function chooseSocialUser(uid, displayName, email, role) {
-  currentSocialUser = {
-    uid: String(uid || '').trim(),
-    displayName: String(displayName || '').trim(),
-    email: String(email || '').trim(),
-    role: String(role || 'user').trim()
-  };
-  renderSelectedSocialUser(currentSocialUser);
-  renderSocialSearchResults(currentSocialUsers);
-}
 
-async function fetchSocialUsers(queryText) {
-  const results = document.getElementById('dm-search-results');
-  if (!results) return;
-  if (!currentCommentUser) {
-    results.innerHTML = '<div class="community-meta">Sign in to search users.</div>';
-    return;
-  }
 
-  const query = String(queryText || '').trim();
-  if (!query) {
-    results.innerHTML = '<div class="community-meta">Type at least one character to search users.</div>';
-    return;
-  }
-
-  try {
-    const response = await fetch(socialApiBase + '?type=searchUsers&q=' + encodeURIComponent(query), {
-      headers: await getCommentsAuthHeaders()
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Could not search users.');
-    renderSocialSearchResults(Array.isArray(data.users) ? data.users : []);
-  } catch (err) {
-    results.innerHTML = '<div class="community-meta">Search failed: ' + escapeHtml(err.message) + '</div>';
-  }
-}
-
-async function sendDirectMessage() {
-  const status = document.getElementById('dm-status');
-  const messageInput = document.getElementById('dm-message');
-  if (!currentCommentUser) {
-    if (status) status.textContent = 'Sign in to send messages.';
-    return;
-  }
-  if (!currentSocialUser || !currentSocialUser.uid) {
-    if (status) status.textContent = 'Select a user first.';
-    return;
-  }
-
-  const text = String(messageInput && messageInput.value || '').trim();
-  if (!text) {
-    if (status) status.textContent = 'Write a message before sending.';
-    return;
-  }
-
-  try {
-    if (status) status.textContent = 'Sending message...';
-    const response = await fetch(socialApiBase, {
-      method: 'POST',
-      headers: await getCommentsAuthHeaders(),
-      body: JSON.stringify({
-        action: 'message',
-        recipientUid: currentSocialUser.uid,
-        text
-      })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Could not send message.');
-    if (messageInput) messageInput.value = '';
-    if (status) status.textContent = 'Message sent to ' + (currentSocialUser.displayName || 'Agent') + '.';
-  } catch (err) {
-    if (status) status.textContent = 'Message failed: ' + err.message;
-  }
-}
-
-async function blockSelectedUser() {
-  const status = document.getElementById('dm-status');
-  if (!currentCommentUser) {
-    if (status) status.textContent = 'Sign in to block users.';
-    return;
-  }
-  if (!currentSocialUser || !currentSocialUser.uid) {
-    if (status) status.textContent = 'Select a user first.';
-    return;
-  }
-
-  const reason = await window.rogPrompt('Reason for blocking this user (optional):', '');
-  if (reason === null) return;
-
-  try {
-    if (status) status.textContent = 'Blocking user...';
-    const response = await fetch(socialApiBase, {
-      method: 'POST',
-      headers: await getCommentsAuthHeaders(),
-      body: JSON.stringify({
-        action: 'block',
-        targetUid: currentSocialUser.uid,
-        reason
-      })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Could not block user.');
-    if (status) status.textContent = 'User blocked.';
-  } catch (err) {
-    if (status) status.textContent = 'Block failed: ' + err.message;
-  }
-}
-
-async function reportSelectedUser() {
-  const status = document.getElementById('dm-status');
-  if (!currentCommentUser) {
-    if (status) status.textContent = 'Sign in to report users.';
-    return;
-  }
-  if (!currentSocialUser || !currentSocialUser.uid) {
-    if (status) status.textContent = 'Select a user first.';
-    return;
-  }
-
-  const reason = await window.rogPrompt('Reason for reporting this user:', '');
-  if (reason === null) return;
-  const trimmed = String(reason || '').trim();
-  if (!trimmed) {
-    if (status) status.textContent = 'Report cancelled.';
-    return;
-  }
-
-  try {
-    if (status) status.textContent = 'Submitting report...';
-    const response = await fetch(socialApiBase, {
-      method: 'POST',
-      headers: await getCommentsAuthHeaders(),
-      body: JSON.stringify({
-        action: 'report',
-        targetUid: currentSocialUser.uid,
-        reason: trimmed
-      })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Could not submit report.');
-    if (status) status.textContent = 'User report submitted.';
-  } catch (err) {
-    if (status) status.textContent = 'Report failed: ' + err.message;
-  }
-}
 
 async function confirmEditDocument(editHref) {
   const ok = await window.rogConfirm('Open this document in the unified submit editor?');
