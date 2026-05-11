@@ -4284,6 +4284,12 @@ function initializeQuillEditorsForTemplate(tpl) {
       break;
 
     case 'anomaly':
+      if (document.getElementById('tf-containment')) {
+        initializeQuillEditor('tf-containment', { placeholder: 'Describe how this anomaly is contained...' });
+      }
+      if (document.getElementById('tf-description')) {
+        initializeQuillEditor('tf-description', { placeholder: 'Describe the anomaly in detail...' });
+      }
       // Initialize Quill for anomaly subsections
       const anomalySections = document.getElementById('tf-subsections');
       if (anomalySections) {
@@ -4297,6 +4303,9 @@ function initializeQuillEditorsForTemplate(tpl) {
       break;
 
     case 'guide':
+      if (document.getElementById('tf-guide-intro')) {
+        initializeQuillEditor('tf-guide-intro', { placeholder: 'Write the introduction...' });
+      }
       // Initialize Quill for guide sections
       const guideSections = document.getElementById('tf-guide-sections');
       if (guideSections) {
