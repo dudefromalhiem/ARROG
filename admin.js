@@ -544,8 +544,12 @@ async function renderAdminBootstrap(user) {
       `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Role: <span style="color:var(--red-b);text-transform:uppercase">${roleDisplayName}</span> (Level ${level})
        <button class="btn btn-sm btn-p" onclick="changeUsername()" style="margin-left:12px; font-size:0.7rem; padding:4px 8px;">✎ Change Username</button>`;
     
-    // Load and display version with auto-update check
-    initializeVersionDisplay();
+    // Load and display version with auto-update check (don't block auth if fails)
+    try {
+      initializeVersionDisplay().catch(err => console.warn('Version display failed:', err));
+    } catch (e) {
+      console.warn('Version initialization error:', e);
+    }
     navAuth.innerHTML = renderUserMenuHTML(displayLabel);
     applyTabVisibilityForRole(user, isAdminUser);
 
@@ -2570,7 +2574,7 @@ async function initializeVersionDisplay() {
 async function checkForUpdates(gitHubRepo) {
   try {
     const [owner, repo] = gitHubRepo.split('/');
-    const apiUrl = https://api.github.com/repos///releases/latest;
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
     
     const response = await fetch(apiUrl);
     if (!response.ok) {
@@ -2584,7 +2588,7 @@ async function checkForUpdates(gitHubRepo) {
     if (latestVersion && latestVersion !== currentAppVersion) {
       latestGitHubVersion = latestVersion;
       displayUpdateIndicator(latestVersion);
-      console.info(Update available:  (current: ));
+      console.info(`Update available: ${latestVersion} (current: ${currentAppVersion})`);
     }
   } catch (error) {
     console.warn('Error checking for GitHub updates:', error);
@@ -2595,8 +2599,8 @@ function displayUpdateIndicator(newVersion) {
   const indicator = document.getElementById('update-indicator');
   if (indicator) {
     indicator.style.display = 'inline';
-    indicator.title = Update available: v;
-    indicator.innerHTML = • Update available (v);
+    indicator.title = `Update available: v${newVersion}`;
+    indicator.innerHTML = `• Update available (v${newVersion})`;
   }
 }
 
