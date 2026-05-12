@@ -2239,17 +2239,17 @@ async function refreshUsers() {
       if (!normalized) return 'site_member';
       if (normalized === 'owner' || normalized === 'the_archivist') return 'owner';
 
-      // Senior/Deputy Chief Admin variants
-      if (normalized === 'chief_administrator' || normalized === 'chief_admin' || normalized === 'chief-admin' || 
-          normalized === 'deputy_chief_administrator' || normalized === 'deputy_chief_admin' || normalized === 'deputy-chief-admin') return 'senior_admin';
-      if (normalized === 'senior_administrator' || normalized === 'senior_admin' || normalized === 'senior-admin') return 'senior_admin';
+      // Admin variants -> map to ROLE_LEVELS canonical keys
+      if (normalized === 'chief_administrator' || normalized === 'chief_admin' || normalized === 'chief-admin' ||
+        normalized === 'deputy_chief_administrator' || normalized === 'deputy_chief_admin' || normalized === 'deputy-chief-admin') return 'chief_admin';
+      if (normalized === 'senior_administrator' || normalized === 'senior_admin' || normalized === 'senior-admin') return 'senior-admin';
       if (normalized === 'administrator' || normalized === 'admin') return 'admin';
       if (normalized === 'junior_administrator' || normalized === 'junior_admin' || normalized === 'junior-admin') return 'junior_admin';
 
-      // Senior/Deputy Chief Mod variants
+      // Mod variants -> map to ROLE_LEVELS canonical keys
       if (normalized === 'chief_of_moderation' || normalized === 'chief_moderator' || normalized === 'chief_mod' || normalized === 'chief-mod' ||
-          normalized === 'deputy_chief_of_moderation' || normalized === 'deputy_chief_moderator' || normalized === 'deputy_chief_mod' || normalized === 'deputy-chief-mod') return 'senior_moderator';
-      if (normalized === 'senior_moderator' || normalized === 'senior_mod' || normalized === 'senior-mod') return 'senior_moderator';
+        normalized === 'deputy_chief_of_moderation' || normalized === 'deputy_chief_moderator' || normalized === 'deputy_chief_mod' || normalized === 'deputy-chief-mod') return 'chief-mod';
+      if (normalized === 'senior_moderator' || normalized === 'senior_mod' || normalized === 'senior-mod') return 'senior-mod';
       if (normalized === 'moderator' || normalized === 'mod') return 'moderator';
       if (normalized === 'junior_moderator' || normalized === 'junior_mod' || normalized === 'junior-mod') return 'junior_moderator';
 
@@ -2424,16 +2424,46 @@ async function refreshRolesDisplay() {
     '</div>';
   };
 
+  const normalizeRole = (role) => {
+    const str = String(role || '').toLowerCase().trim().replace(/\s+/g, '_');
+    const roleMap = {
+      'chief_administrator': 'chief_admin',
+      'chief_admin': 'chief_admin',
+      'chief-admin': 'chief_admin',
+      'deputy_chief_administrator': 'chief_admin',
+      'deputy-chief-admin': 'chief_admin',
+      'senior_administrator': 'senior-admin',
+      'senior-admin': 'senior-admin',
+      'administrator': 'admin',
+      'admin': 'admin',
+      'junior_administrator': 'junior_admin',
+      'junior-admin': 'junior_admin',
+
+      'chief_of_moderation': 'chief-mod',
+      'chief_moderator': 'chief-mod',
+      'chief-mod': 'chief-mod',
+      'deputy_chief_moderator': 'chief-mod',
+      'deputy-chief-mod': 'chief-mod',
+      'senior_moderator': 'senior-mod',
+      'senior-mod': 'senior-mod',
+      'moderator': 'moderator',
+      'mod': 'moderator',
+      'junior_moderator': 'junior_moderator',
+      'junior-mod': 'junior_moderator'
+    };
+    return roleMap[str] || str;
+  };
+
   // Administrative Staff (level >=75 and <100)
   const adminStaff = Object.entries(ROLE_DATA.userRoles)
     .filter(([email, role]) => {
       const normalizedRole = normalizeRole(role);
-      const level = ROLE_LEVELS[normalizedRole] || 0;
+      const level = ROLE_LEVELS[normalizedRole] || ROLE_LEVELS[normalizedRole.replace(/_/g,'-')] || 0;
       return level >= 75 && level < 100;
     })
     .sort(([, a], [, b]) => {
-      const levelA = ROLE_LEVELS[normalizeRole(a)] || 0;
-      const levelB = ROLE_LEVELS[normalizeRole(b)] || 0;
+      const levelA = ROLE_LEVELS[normalizeRole(a)] || ROLE_LEVELS[normalizeRole(a).replace(/_/g,'-')] || 0;
+      const levelB = ROLE_LEVELS[normalizeRole(b)] || ROLE_LEVELS[normalizeRole(b).replace(/_/g,'-')] || 0;
       return levelB - levelA;
     });
 
@@ -2458,12 +2488,12 @@ async function refreshRolesDisplay() {
   const modStaff = Object.entries(ROLE_DATA.userRoles)
     .filter(([email, role]) => {
       const normalizedRole = normalizeRole(role);
-      const level = ROLE_LEVELS[normalizedRole] || 0;
+      const level = ROLE_LEVELS[normalizedRole] || ROLE_LEVELS[normalizedRole.replace(/_/g,'-')] || 0;
       return level >= 10 && level < 75;
     })
     .sort(([, a], [, b]) => {
-      const levelA = ROLE_LEVELS[normalizeRole(a)] || 0;
-      const levelB = ROLE_LEVELS[normalizeRole(b)] || 0;
+      const levelA = ROLE_LEVELS[normalizeRole(a)] || ROLE_LEVELS[normalizeRole(a).replace(/_/g,'-')] || 0;
+      const levelB = ROLE_LEVELS[normalizeRole(b)] || ROLE_LEVELS[normalizeRole(b).replace(/_/g,'-')] || 0;
       return levelB - levelA;
     });
 
@@ -2582,6 +2612,54 @@ async function removeStaffRole(kind, email) {
 /* ═══════════════════════════════════════════════════════════════
  *  VERSION MANAGEMENT
  * ═══════════════════════════════════════════════════════════════ */
+
+/* Debug helper: log normalized roles and derived levels for quick inspection in console
+   Usage: open admin page and run `debugNormalizedRoles()` in the console. */
+window.debugNormalizedRoles = function() {
+  try {
+    const entries = Object.entries(ROLE_DATA.userRoles || {});
+    const normalizeLocal = (role) => {
+      const str = String(role || '').toLowerCase().trim().replace(/\s+/g, '_');
+      const roleMap = {
+        'chief_administrator': 'chief_admin',
+        'chief_admin': 'chief_admin',
+        'chief-admin': 'chief_admin',
+        'deputy_chief_administrator': 'chief_admin',
+        'deputy-chief-admin': 'chief_admin',
+        'senior_administrator': 'senior-admin',
+        'senior-admin': 'senior-admin',
+        'administrator': 'admin',
+        'admin': 'admin',
+        'junior_administrator': 'junior_admin',
+
+        'chief_of_moderation': 'chief-mod',
+        'chief_moderator': 'chief-mod',
+        'chief-mod': 'chief-mod',
+        'deputy_chief_moderator': 'chief-mod',
+        'deputy-chief-mod': 'chief-mod',
+        'senior_moderator': 'senior-mod',
+        'senior-mod': 'senior-mod',
+        'moderator': 'moderator',
+        'mod': 'moderator',
+        'junior_moderator': 'junior_moderator',
+        'junior-mod': 'junior_moderator'
+      };
+      return roleMap[str] || str;
+    };
+
+    const list = entries.map(([email, role]) => {
+      const normalized = normalizeLocal(role);
+      const altNormalized = normalized.replace(/_/g,'-');
+      const level = ROLE_LEVELS[normalized] || ROLE_LEVELS[altNormalized] || 0;
+      return { email, role, normalized, level };
+    });
+    console.table(list);
+    return list;
+  } catch (e) {
+    console.error('debugNormalizedRoles failed', e);
+    return null;
+  }
+};
 
 let currentAppVersion = null;
 let latestGitHubVersion = null;

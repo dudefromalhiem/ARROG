@@ -61,7 +61,7 @@
 <main class="wrap profile-shell" id="main-content">
   <div class="section">
     <div class="section-hd">Profile</div>
-    <div class="profile-warning" id="profile-warning">Profiles are name-only. Users who attempt to add profile images may be banned.</div>
+    <div class="profile-warning" id="profile-warning">Explicit usernames may be banned</div>
     <div class="profile-status" id="profile-role" style="margin-bottom:12px">Role: User</div>
 
     <div class="profile-grid">
@@ -275,7 +275,7 @@ function applyProfileMode(isEditable, viewerSignedIn) {
   }
   if (warning) {
     warning.textContent = isEditable
-      ? 'Profiles are name-only. Users who attempt to add profile images may be banned.'
+      ? 'Explicit usernames may be banned'
       : 'Viewing public profile. Sign in to use profile actions.';
   }
 }

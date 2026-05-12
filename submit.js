@@ -1752,6 +1752,15 @@ async function initializeSubmitEditModeFromUrl() {
       }
       switchMode('doc');
       renderDocBlocks();
+      // If rendering produced no visible blocks (parser hiccup), fallback to code-mode
+      if ((!docBlocks || docBlocks.length === 0) && content.trim()) {
+        console.warn('[INIT_EDIT] Document Studio produced no blocks — falling back to code mode to avoid blank editor');
+        const sfHtml = document.getElementById('sf-html');
+        if (sfHtml) sfHtml.value = content || DEFAULT_NEW_PAGE_HTML;
+        switchMode('code');
+        // Ensure preview is updated so user sees content
+        setTimeout(() => { updatePreview(); }, 120);
+      }
     } else if (savedMode === 'template' && templateForEdit) {
       switchMode('template');
       selectTemplate(templateForEdit);
