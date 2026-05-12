@@ -2496,7 +2496,8 @@ async function refreshRolesDisplay() {
       const sourceRole = user.role || user.roleName || ROLE_DATA.userRoles[email] || '';
       const normalizedRole = normalizeRole(sourceRole);
       const level = getRoleLevelValue(normalizedRole);
-      if (level >= 10 || normalizedRole === 'owner') {
+      // Only merge elevated roles (contributors and above) or explicit owners
+      if (level >= 60 || normalizedRole === 'owner') {
         ROLE_DATA.userRoles[email] = normalizedRole;
       }
     });
@@ -2566,12 +2567,13 @@ async function refreshRolesDisplay() {
     }).join('');
   }
 
-  // Moderation Staff (level >=10 and <75)
+  // Moderation Staff (junior moderators and moderators)
   const modStaff = Object.entries(ROLE_DATA.userRoles)
     .filter(([email, role]) => {
       const normalizedRole = normalizeRole(role);
       const level = getRoleLevelValue(normalizedRole);
-      return level >= 10 && level < 75;
+      // Moderator-range: include junior_moderator (65) and moderator (70)
+      return level >= 65 && level < 75;
     })
     .sort(([, a], [, b]) => {
       const levelA = getRoleLevelValue(a);
