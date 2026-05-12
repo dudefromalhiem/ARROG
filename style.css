@@ -1272,6 +1272,53 @@ hr {
   }
 }
 
+/* Mobile-specific header/title adjustments to avoid overlap with large hero logos */
+@media (max-width: 640px) {
+  .hdr-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .hdr-logo {
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    border-radius: 50%;
+    flex-shrink: 0;
+    z-index: 280;
+  }
+
+  /* Push the textual title lower so it cannot visually collide with centered hero logos */
+  .hdr-title {
+    margin-top: 6px;
+    font-size: 0.95rem;
+    line-height: 1.05;
+    z-index: 275;
+    text-align: center;
+  }
+
+  /* Ensure application panels and authority content render above any accidental overlays */
+  .app-panel, .authority-header, .authority-card, .app-card, .section {
+    z-index: 1000 !important;
+    position: relative !important;
+    background-clip: padding-box;
+  }
+
+  .app-panel > *, .authority-header > *, .authority-card > *, .app-card > * {
+    color: var(--wht) !important;
+    z-index: 1001 !important;
+  }
+
+  /* Defensive: hide terminal/clearance overlays on small phones if still present */
+  #clearance-welcome, .term, .term.mobile {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
 /* Mobile: hide lengthy intro/terminal overlays that block content on phones */
 @media (max-width: 768px) {
   #clearance-welcome { display: none !important; visibility: hidden !important; pointer-events: none !important; }
