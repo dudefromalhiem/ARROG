@@ -2403,40 +2403,48 @@ async function refreshRolesDisplay() {
   };
 
   // Administrative Staff (level >=75 and <100)
-  const adminStaff = Object.entries(ROLE_DATA.userRoles).filter(([email, role]) => {
-    const level = ROLE_LEVELS[role] || 0;
-    return level >= 75 && level < 100;
-  });
+  const adminStaff = Object.entries(ROLE_DATA.userRoles)
+    .filter(([email, role]) => {
+      const level = ROLE_LEVELS[role] || 0;
+      return level >= 75 && level < 100;
+    })
+    .sort(([, a], [, b]) => (ROLE_LEVELS[b] || 0) - (ROLE_LEVELS[a] || 0));
+
   if (adminStaff.length === 0) {
     adminList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No administrative staff assigned yet.</p>';
   } else {
     adminList.innerHTML = adminStaff.map(([email, role]) => {
       const canRevoke = canEditRole(email, currentEmail);
       const roleName = ROLE_NAMES[role] || role;
+      const normalizedEmail = String(email || '').toLowerCase();
       return `
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
-          <span>${email} <span style="color:var(--wht-d)">(${roleName})</span></span>
-          ${canRevoke ? renderRoleEditor(email, role) : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid rgba(204,0,0,.3);margin-bottom:4px;font-family:monospace;font-size:.85rem;background:rgba(139,0,0,.08)">
+          <span>${escapeHtml(normalizedEmail)} <span style="color:var(--wht-d)">(${escapeHtml(roleName)})</span></span>
+          ${canRevoke ? renderRoleEditor(email, role) : '<span style="color:var(--wht-d);font-size:.75rem">No actions</span>'}
         </div>
       `;
     }).join('');
   }
 
   // Moderation Staff (level >=10 and <75)
-  const modStaff = Object.entries(ROLE_DATA.userRoles).filter(([email, role]) => {
-    const level = ROLE_LEVELS[role] || 0;
-    return level >= 10 && level < 75;
-  });
+  const modStaff = Object.entries(ROLE_DATA.userRoles)
+    .filter(([email, role]) => {
+      const level = ROLE_LEVELS[role] || 0;
+      return level >= 10 && level < 75;
+    })
+    .sort(([, a], [, b]) => (ROLE_LEVELS[b] || 0) - (ROLE_LEVELS[a] || 0));
+
   if (modStaff.length === 0) {
     modList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No moderation staff assigned yet.</p>';
   } else {
     modList.innerHTML = modStaff.map(([email, role]) => {
       const canRevoke = canEditRole(email, currentEmail);
       const roleName = ROLE_NAMES[role] || role;
+      const normalizedEmail = String(email || '').toLowerCase();
       return `
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--wht-f);margin-bottom:4px;font-family:monospace;font-size:.85rem">
-          <span>${email} <span style="color:var(--wht-d)">(${roleName})</span></span>
-          ${canRevoke ? renderRoleEditor(email, role) : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid rgba(139,0,0,.3);margin-bottom:4px;font-family:monospace;font-size:.85rem">
+          <span>${escapeHtml(normalizedEmail)} <span style="color:var(--wht-d)">(${escapeHtml(roleName)})</span></span>
+          ${canRevoke ? renderRoleEditor(email, role) : '<span style="color:var(--wht-d);font-size:.75rem">No actions</span>'}
         </div>
       `;
     }).join('');

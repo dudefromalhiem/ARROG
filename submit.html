@@ -120,9 +120,11 @@
     .doc-block-body { padding:10px; }
     .doc-editable {
       min-height:90px; border:1px solid var(--blk-m); padding:10px; background:#0d0d0d; color:var(--wht-m);
-      line-height:1.7;
+      line-height:1.7; word-break: break-word; overflow-wrap: break-word;
     }
     .doc-editable:focus { outline:1px solid var(--red-b); }
+    .doc-editable * { color: var(--wht-m) !important; background: transparent !important; }
+    .doc-editable { color: var(--wht-m) !important; }
     .doc-block:focus-within { border-color: var(--red-b); }
     .doc-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .doc-image-preview { max-width:100%; height:auto; display:block; margin-top:8px; border:1px solid var(--blk-m); }
