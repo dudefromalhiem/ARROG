@@ -980,13 +980,11 @@ hr {
   justify-content: center;
   gap: 24px;
   flex-wrap: wrap;
-  padding: 48px 24px;
-  margin: 64px auto;
-  margin-bottom: 48px;
-  max-width: 1200px;
-  border-top: 2px solid var(--red);
-  border-bottom: 2px solid var(--red);
-  background: linear-gradient(180deg, rgba(139, 0, 0, .08), transparent);
+  padding: 12px 0 0;
+  margin: 0;
+  max-width: 100%;
+  border: none;
+  background: transparent;
 }
 
 .network-link {
@@ -1020,16 +1018,6 @@ hr {
   height: 20px;
   display: block;
   opacity: 0.9;
-}
-
-/* Larger outer wrapper for network links */
-.network-outer {
-  max-width: 1180px;
-  margin: 36px auto 24px;
-  padding: 12px 18px;
-  border: 1px solid rgba(204,0,0,0.06);
-  background: linear-gradient(180deg, rgba(0,0,0,0.36), rgba(0,0,0,0.18));
-  border-radius: 8px;
 }
 
 /* Footer */
@@ -5074,6 +5062,7 @@ body::after {
   background: linear-gradient(90deg, var(--red-b), transparent);
 }
 
+/* Remove decorative bars for the Network block specifically */
 .card-t {
   letter-spacing: 1.4px;
 }
