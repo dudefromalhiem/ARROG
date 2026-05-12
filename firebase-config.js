@@ -822,7 +822,7 @@ if (document.readyState === 'loading') {
  * ═══════════════════════════════════════════════════════════════ */
 
 // Bootstrap — only used if Firestore config/roles doesn't exist yet
-const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com"];
+const _BOOTSTRAP = ["jaimejoselaureano@gmail.com", "dudefromalhiem@gmail.com", "Elementor11234@gmail.com"];
 const BOOTSTRAP_OWNER_SET = new Set(_BOOTSTRAP.map(email => String(email || '').toLowerCase()));
 
 // Role definitions

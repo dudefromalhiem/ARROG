@@ -339,6 +339,27 @@
           </div>
         </div>
 
+        <!-- Junior Moderator -->
+        <div class="authority-card">
+          <div class="authority-card-title">Junior Moderator</div>
+          <div class="authority-label">Level 3.5</div>
+          <div class="authority-content">
+            Entry-level moderation support role assisting full moderators.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Monitor community behavior and flag issues</li>
+              <li>Assist in triage of reports</li>
+              <li>Make recommendations to Moderators and Senior Moderators</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Support Moderation staff by handling routine monitoring tasks and escalating issues as needed. Actual enforced permissions are equivalent to moderation support as configured by site policy.
+          </div>
+        </div>
+
         <!-- Site Member -->
         <div class="authority-card">
           <div class="authority-card-title">Site Member</div>
@@ -501,6 +522,27 @@
         </div>
 
         <!-- Senior Administrator -->
+        <!-- Junior Administrator -->
+        <div class="authority-card">
+          <div class="authority-card-title">Junior Administrator</div>
+          <div class="authority-label">Level 4.5</div>
+          <div class="authority-content">
+            Support role for administrative tasks and content approval.
+          </div>
+          <div class="authority-label">Authority</div>
+          <div class="authority-content">
+            <ul>
+              <li>Edit and propose page changes</li>
+              <li>Assist in content approvals (requires senior sign-off for major changes)</li>
+              <li>Manage assigned site sections under supervision</li>
+            </ul>
+          </div>
+          <div class="authority-label">Responsibility</div>
+          <div class="authority-content">
+            Maintain site sections and assist Administrators. Actual operational permissions reflect the site's configured admin-support role and may be constrained compared to full Administrators.
+          </div>
+        </div>
+
         <div class="authority-card">
           <div class="authority-card-title">Senior Administrator</div>
           <div class="authority-label">Level 5+</div>
@@ -669,8 +711,10 @@ let currentApplicationStatus = 'none';
 const ROLE_META = window.REDOAK_ROLES || {};
 const APPLICATION_ROLE_ORDER = (ROLE_META.getApplicationRoleOptions ? ROLE_META.getApplicationRoleOptions() : [
   { value: 'contributor', label: 'Contributor' },
-  { value: 'moderator', label: 'Junior Moderator' },
-  { value: 'administrator', label: 'Junior Admin' }
+  { value: 'junior_moderator', label: 'Junior Moderator' },
+  { value: 'moderator', label: 'Moderator' },
+  { value: 'junior_admin', label: 'Junior Admin' },
+  { value: 'administrator', label: 'Administrator' }
 ]).map(option => option.value);
 
 function normalizeApplicationRole(value) {

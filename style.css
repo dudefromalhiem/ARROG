@@ -1126,22 +1126,23 @@ hr {
 .home-page .intro-logo {
   position: relative;
   grid-area: 1 / 1;
-  width: min(82vw, 560px);
-  max-width: 100%;
+  width: 100%;
+  max-width: 250px; /* desktop: constrain to 200-250px range */
   height: auto;
   aspect-ratio: 1 / 1;
   transform: none;
   left: auto;
   top: auto;
-  margin-bottom: 0;
+  margin: 0 auto 0; /* center horizontally within grid */
   z-index: 0;
 }
 
 .home-page .intro-hero {
   display: grid;
   place-items: center;
-  min-height: clamp(320px, 52vw, 620px);
-  padding: clamp(28px, 6vw, 84px) 16px clamp(24px, 5vw, 48px);
+  min-height: clamp(260px, 44vw, 520px);
+  padding: clamp(20px, 5vw, 64px) 16px clamp(18px, 4.5vw, 40px);
+  padding-top: calc(56px + 12px);
   overflow: visible;
 }
 
@@ -1151,18 +1152,27 @@ hr {
   padding-inline: 12px;
 }
 
+/* Move the hero title slightly lower so it sits closer to the clearance label */
+.home-page .intro-t {
+  align-self: end;
+  margin-bottom: 6px;
+}
+
 .home-page .intro {
   width: 100%;
 }
 
 @media (max-width: 768px) {
   .home-page .intro-logo {
-    width: min(88vw, 420px);
+    /* scale down on mobile */
+    width: min(60vw, 140px);
+    max-width: 140px;
   }
 
   .home-page .intro-hero {
-    min-height: clamp(280px, 58vw, 440px);
-    padding: 24px 12px 20px;
+    min-height: clamp(220px, 48vw, 380px);
+    padding: 18px 12px 18px;
+    padding-top: calc(52px + 8px);
   }
 }
 
@@ -1172,8 +1182,9 @@ hr {
   }
 
   .home-page .intro-hero {
-    min-height: clamp(250px, 68vw, 360px);
-    padding: 20px 10px 16px;
+    min-height: clamp(200px, 60vw, 320px);
+    padding: 14px 10px 12px;
+    padding-top: calc(48px + 6px);
   }
 }
 
@@ -3135,10 +3146,15 @@ hr {
   }
 
   .intro-hero {
-    padding: 40px 12px 24px;
+    margin: 40px auto 24px;
   }
 
   .intro-logo {
+
+  /* Reduce top spacing for clearance label on home page */
+  .home-page .intro-cl {
+    margin: 12px auto 8px;
+  }
     width: 140px;
     height: 140px;
   }

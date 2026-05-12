@@ -2342,7 +2342,7 @@ async function loadRolesManager(container) {
     <div style="margin:10px 0 24px;padding:12px;border:1px solid var(--blk-m);background:rgba(255,255,255,.02)">
       <div style="font-size:.78rem;color:var(--wht-f);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Hierarchy Guide</div>
       <div style="font-size:.8rem;color:var(--wht-d);line-height:1.7">
-        Owner / Archivist &gt; Chief Administrator &gt; Deputy Chief Administrator &gt; Senior Administrator &gt; Administrator &gt; Chief of Moderation &gt; Deputy Chief of Moderation &gt; Senior Moderator &gt; Moderator &gt; Junior Moderator
+        Owner / Archivist &gt; Chief Administrator &gt; Deputy Chief Administrator &gt; Senior Administrator &gt; Administrator &gt; Junior Administrator &gt; Chief of Moderation &gt; Deputy Chief of Moderation &gt; Senior Moderator &gt; Moderator &gt; Junior Moderator
       </div>
     </div>
     <div style="margin-top:8px;padding:12px;border:1px solid var(--blk-m);background:rgba(255,255,255,.02);font-size:.78rem;color:var(--wht-d);line-height:1.7">
@@ -2557,13 +2557,32 @@ async function initializeVersionDisplay() {
       versionEl.textContent = currentAppVersion;
     }
     
+    // Update UI helper
+    const setCheckedAt = (txt) => {
+      const wrap = document.getElementById('version-check');
+      const when = document.getElementById('version-checked-at');
+      if (when) when.textContent = txt || '-';
+      if (wrap) wrap.style.display = txt ? 'block' : 'none';
+    };
+
+    setCheckedAt('Checking...');
+
     // Initial check for updates
-    await checkForUpdates(versionData.githubRepo);
-    
+    await checkForUpdates(versionData.githubRepo).finally(() => {
+      setCheckedAt(new Date().toLocaleString());
+    });
+
     // Check for updates every 5 minutes
     versionCheckInterval = setInterval(() => {
-      checkForUpdates(versionData.githubRepo);
+      checkForUpdates(versionData.githubRepo).finally(() => setCheckedAt(new Date().toLocaleString()));
     }, 5 * 60 * 1000);
+
+    // Also check when tab/window gains focus
+    window.addEventListener('focus', () => {
+      try {
+        checkForUpdates(versionData.githubRepo).finally(() => setCheckedAt(new Date().toLocaleString()));
+      } catch (e) { /* ignore */ }
+    });
   } catch (error) {
     console.warn('Failed to initialize version display:', error);
     const versionEl = document.getElementById('current-version');
@@ -2576,9 +2595,14 @@ async function checkForUpdates(gitHubRepo) {
     const [owner, repo] = gitHubRepo.split('/');
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
     
-    const response = await fetch(apiUrl);
+    const response = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github.v3+json' } });
     if (!response.ok) {
       console.warn('Failed to fetch GitHub releases:', response.status);
+      // update UI to indicate no remote releases found
+      const indicator = document.getElementById('update-indicator');
+      if (indicator) indicator.style.display = 'none';
+      const when = document.getElementById('version-checked-at');
+      if (when) when.textContent = `Error: ${response.status}`;
       return;
     }
     
@@ -2590,8 +2614,15 @@ async function checkForUpdates(gitHubRepo) {
       displayUpdateIndicator(latestVersion);
       console.info(`Update available: ${latestVersion} (current: ${currentAppVersion})`);
     }
+    // If no update, ensure indicator is hidden
+    else {
+      const indicator = document.getElementById('update-indicator');
+      if (indicator) indicator.style.display = 'none';
+    }
   } catch (error) {
     console.warn('Error checking for GitHub updates:', error);
+    const when = document.getElementById('version-checked-at');
+    if (when) when.textContent = 'Error';
   }
 }
 

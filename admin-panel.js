@@ -23,9 +23,10 @@ function getRoleOptions(type) {
     return getPublicRoleOptions();
   }
 
+  // Include junior roles and order by rank (lower -> higher)
   const roles = type === 'assignable'
-    ? ['contributor', 'moderator', 'senior_moderator', 'deputy_chief_of_moderation', 'chief_of_moderation', 'administrator', 'senior_administrator', 'deputy_chief_administrator', 'chief_administrator']
-    : ['newbie', 'site_member', 'contributor', 'moderator', 'senior_moderator', 'deputy_chief_of_moderation', 'chief_of_moderation', 'administrator', 'senior_administrator', 'deputy_chief_administrator', 'chief_administrator'];
+    ? ['contributor', 'junior_moderator', 'moderator', 'senior_moderator', 'deputy_chief_of_moderation', 'chief_of_moderation', 'junior_admin', 'administrator', 'senior_administrator', 'deputy_chief_administrator', 'chief_administrator']
+    : ['newbie', 'site_member', 'contributor', 'junior_moderator', 'moderator', 'senior_moderator', 'deputy_chief_of_moderation', 'chief_of_moderation', 'junior_admin', 'administrator', 'senior_administrator', 'deputy_chief_administrator', 'chief_administrator'];
 
   return roles.map(value => ({ value, label: getRoleLabel(value) }));
 }
