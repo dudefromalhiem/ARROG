@@ -528,6 +528,34 @@ function setCachedHomeData(key, data) {
   } catch (_err) { }
 }
 
+function normalizeTimeValue(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  if (typeof value === 'object') {
+    if (typeof value.toDate === 'function') {
+      const dt = value.toDate();
+      const ts = dt && dt.getTime ? dt.getTime() : 0;
+      return Number.isFinite(ts) ? ts : 0;
+    }
+    if (typeof value.seconds === 'number') {
+      return value.seconds * 1000 + (typeof value.nanoseconds === 'number' ? Math.floor(value.nanoseconds / 1000000) : 0);
+    }
+  }
+  return 0;
+}
+
+function comparePageRecency(a, b) {
+  return normalizeTimeValue(b && (b.updatedAt || b.createdAt)) - normalizeTimeValue(a && (a.updatedAt || a.createdAt));
+}
+
+function comparePageCreatedAt(a, b) {
+  return normalizeTimeValue(b && b.createdAt) - normalizeTimeValue(a && a.createdAt);
+}
+
 // ═════════════════════════════════════════════════════════════
 // RENDER FUNCTIONS
 // ═════════════════════════════════════════════════════════════
@@ -910,26 +938,18 @@ function loadData() {
   // Then try to overlay with live Firestore data (non-blocking)
   try {
     // 1. Featured Pages
-    db.collection('pages').where('featured', '==', true).orderBy('createdAt', 'desc').limit(4).get()
+    db.collection('pages').get()
       .then(function (snap) {
-        const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+          .filter(function (row) { return row && row.featured === true; })
+          .sort(comparePageCreatedAt)
+          .slice(0, 4);
         renderFeatured(rows);
         setCachedHomeData('featured', rows);
       })
       .catch(function (err) {
-        console.warn('Featured query failed, trying fallback:', err.message);
-        // Fallback: Fetch without orderBy if index is missing
-        db.collection('pages').where('featured', '==', true).limit(10).get()
-          .then(function (snap) {
-            const rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-            rows.sort((a, b) => (new Date(b.createdAt || 0)) - (new Date(a.createdAt || 0)));
-            renderFeatured(rows.slice(0, 4));
-            setCachedHomeData('featured', rows.slice(0, 4));
-          })
-          .catch(function (finalErr) {
-            console.error('Final featured fallback failed:', finalErr);
-            renderFeatured(null, true);
-          });
+        console.warn('Featured query failed, using in-memory filter:', err.message);
+        renderFeatured(null, true);
       });
 
     // 2. Site News
@@ -1077,42 +1097,30 @@ function renderTopRatedAnomalies(anomalies, isError = false) {
 
     return '<a href="' + url + '" style="text-decoration:none;color:inherit">' +
       '<div class="card">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
-          '<div style="flex:1">' +
-            '<div class="card-t">' + escapeHtmlApp(title) + '</div>' +
-            '<div class="card-b" style="font-size:.75rem;color:var(--wht-f)">by ' + escapeHtmlApp(author) + '</div>' +
-          '</div>' +
-          '<div style="font-family:var(--font-d);color:var(--red-b);font-weight:bold;text-align:right">' +
-            '<div style="font-size:1.1rem">▲ ' + upvotes + '</div>' +
-            '<div style="font-size:.65rem;letter-spacing:1px">UPVOTES</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-    '</a>';
-  }).join('');
-}
+        const snap = await db.collection('pages').get();
+        const allRows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        const anomalyRows = allRows
+          .filter(function (row) { return row && row.type === 'Anomaly' && row.status === 'approved'; })
+          .sort(function (a, b) {
+            const upvoteDelta = Number(b.upvoteCount || 0) - Number(a.upvoteCount || 0);
+            if (upvoteDelta !== 0) return upvoteDelta;
+            return comparePageRecency(a, b);
+          })
+          .slice(0, 10);
 
-// ═════════════════════════════════════════════════════════════
-// BOOT
-// ═════════════════════════════════════════════════════════════
+        if (anomalyRows.length > 0) {
+          renderTopRatedAnomalies(anomalyRows);
+          setCachedHomeData('top-rated', anomalyRows);
+        } else {
+          const newestRows = allRows
+            .filter(function (row) { return row && row.type === 'Anomaly' && row.status === 'approved'; })
+            .sort(comparePageCreatedAt)
+            .slice(0, 10);
 
-let appBooted = false;
-function bootApp() {
-  if (appBooted) return;
-  appBooted = true;
-  const skipBtn = document.querySelector('.term-skip button');
-  if (skipBtn) skipBtn.addEventListener('click', skipTerminal);
-  if (shouldShowTerminal()) runTerminal();
-  else skipTerminal();
-  configureSocialApiBase();
-  auth.onAuthStateChanged(updateAuthUI);
-  const applyBtn = document.getElementById('admin-apply-btn');
-  if (applyBtn) applyBtn.addEventListener('click', applyForAdminFromHome);
-  loadData();
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bootApp, { once: true });
-} else {
-  bootApp();
-}
+          if (newestRows.length > 0) {
+            renderTopRatedAnomalies(newestRows);
+            setCachedHomeData('top-rated', newestRows);
+          } else {
+            renderTopRatedAnomalies([]);
+          }
+        }
