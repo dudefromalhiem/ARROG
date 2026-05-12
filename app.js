@@ -1013,59 +1013,33 @@ function loadData() {
 
 async function loadTopRatedAnomalies() {
   try {
-    // Reverted to pure client-side Firestore query
+    const snap = await db.collection('pages').get();
+    const allRows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+    const anomalyRows = allRows
+      .filter(function (row) { return row && row.type === 'Anomaly' && row.status === 'approved'; })
+      .sort(function (a, b) {
+        const upvoteDelta = Number(b.upvoteCount || 0) - Number(a.upvoteCount || 0);
+        if (upvoteDelta !== 0) return upvoteDelta;
+        return comparePageRecency(a, b);
+      })
+      .slice(0, 10);
 
+    if (anomalyRows.length > 0) {
+      renderTopRatedAnomalies(anomalyRows);
+      setCachedHomeData('top-rated', anomalyRows);
+      return;
+    }
 
+    const newestRows = allRows
+      .filter(function (row) { return row && row.type === 'Anomaly' && row.status === 'approved'; })
+      .sort(comparePageCreatedAt)
+      .slice(0, 10);
 
-    // Fall back to Firestore query
-    try {
-      let rows = [];
-      try {
-        const snap = await db.collection('pages')
-          .where('type', '==', 'Anomaly')
-          .where('status', '==', 'approved')
-          .orderBy('upvoteCount', 'desc')
-          .limit(10)
-          .get();
-
-        if (!snap.empty) {
-          rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-        }
-      } catch (innerErr) {
-        console.warn('Firestore upvoteCount query failed, falling back to in-memory sort:', innerErr.message);
-        // Resilient Fallback: Get all and sort in memory
-        const snap = await db.collection('pages')
-          .where('type', '==', 'Anomaly')
-          .where('status', '==', 'approved')
-          .get();
-        rows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-        rows.sort((a, b) => (b.upvoteCount || 0) - (a.upvoteCount || 0));
-        rows = rows.slice(0, 10);
-      }
-
-      if (rows.length > 0) {
-        renderTopRatedAnomalies(rows);
-        setCachedHomeData('top-rated', rows);
-      } else {
-        // Try newest anomalies as a secondary fallback
-        const snap = await db.collection('pages')
-          .where('type', '==', 'Anomaly')
-          .where('status', '==', 'approved')
-          .orderBy('createdAt', 'desc')
-          .limit(10)
-          .get();
-
-        const newestRows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-        if (newestRows.length > 0) {
-          renderTopRatedAnomalies(newestRows);
-          setCachedHomeData('top-rated', newestRows);
-        } else {
-          renderTopRatedAnomalies([]); // Shows "No anomalies available"
-        }
-      }
-    } catch (fsErr) {
-      console.error('All Firestore fallback attempts failed for top anomalies:', fsErr);
-      throw fsErr;
+    if (newestRows.length > 0) {
+      renderTopRatedAnomalies(newestRows);
+      setCachedHomeData('top-rated', newestRows);
+    } else {
+      renderTopRatedAnomalies([]);
     }
   } catch (err) {
     console.error('Failed to load top-rated anomalies:', err);
@@ -1087,9 +1061,8 @@ function renderTopRatedAnomalies(anomalies, isError = false) {
     return;
   }
 
-  grid.innerHTML = anomalies.map(function (item, index) {
+  grid.innerHTML = anomalies.map(function (item) {
     const title = String(item.title || '[Untitled]');
-    const excerpt = String(item.slug || '');
     const upvotes = Number(item.upvoteCount || 0);
     const slug = String(item.slug || '');
     const author = String(item.authorName || 'Unknown Agent');
@@ -1097,30 +1070,40 @@ function renderTopRatedAnomalies(anomalies, isError = false) {
 
     return '<a href="' + url + '" style="text-decoration:none;color:inherit">' +
       '<div class="card">' +
-        const snap = await db.collection('pages').get();
-        const allRows = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-        const anomalyRows = allRows
-          .filter(function (row) { return row && row.type === 'Anomaly' && row.status === 'approved'; })
-          .sort(function (a, b) {
-            const upvoteDelta = Number(b.upvoteCount || 0) - Number(a.upvoteCount || 0);
-            if (upvoteDelta !== 0) return upvoteDelta;
-            return comparePageRecency(a, b);
-          })
-          .slice(0, 10);
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+          '<div style="flex:1">' +
+            '<div class="card-t">' + escapeHtmlApp(title) + '</div>' +
+            '<div class="card-b" style="font-size:.75rem;color:var(--wht-f)">by ' + escapeHtmlApp(author) + '</div>' +
+          '</div>' +
+          '<div style="font-family:var(--font-d);color:var(--red-b);font-weight:bold;text-align:right">' +
+            '<div style="font-size:1.1rem">* ' + upvotes + '</div>' +
+            '<div style="font-size:.65rem;letter-spacing:1px">UPVOTES</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</a>';
+  }).join('');
+}
 
-        if (anomalyRows.length > 0) {
-          renderTopRatedAnomalies(anomalyRows);
-          setCachedHomeData('top-rated', anomalyRows);
-        } else {
-          const newestRows = allRows
-            .filter(function (row) { return row && row.type === 'Anomaly' && row.status === 'approved'; })
-            .sort(comparePageCreatedAt)
-            .slice(0, 10);
+// BOOT
 
-          if (newestRows.length > 0) {
-            renderTopRatedAnomalies(newestRows);
-            setCachedHomeData('top-rated', newestRows);
-          } else {
-            renderTopRatedAnomalies([]);
-          }
-        }
+let appBooted = false;
+function bootApp() {
+  if (appBooted) return;
+  appBooted = true;
+  const skipBtn = document.querySelector('.term-skip button');
+  if (skipBtn) skipBtn.addEventListener('click', skipTerminal);
+  if (shouldShowTerminal()) runTerminal();
+  else skipTerminal();
+  configureSocialApiBase();
+  auth.onAuthStateChanged(updateAuthUI);
+  const applyBtn = document.getElementById('admin-apply-btn');
+  if (applyBtn) applyBtn.addEventListener('click', applyForAdminFromHome);
+  loadData();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootApp, { once: true });
+} else {
+  bootApp();
+}

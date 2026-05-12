@@ -2071,22 +2071,32 @@ hr {
 }
 
 /* Submit Editor Layout */
+#submit-panel,
+#submit-editor-shell,
+#submit-create-workspace {
+  min-width: 0;
+}
+
 .editor-wrap {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
-  min-height: 70vh
+  min-height: 70vh;
+  align-items: start;
 }
 
 .editor-pane {
   display: flex;
   flex-direction: column;
-  gap: 16px
+  gap: 16px;
+  min-width: 0;
 }
 
 .editor-pane textarea {
   flex: 1;
   min-height: 200px;
+  width: 100%;
+  box-sizing: border-box;
   resize: vertical;
   font-family: 'IBM Plex Mono', monospace;
   font-size: .8rem;
@@ -2096,7 +2106,7 @@ hr {
   background: var(--blk-c);
   border: 1px solid var(--red-d);
   color: var(--wht-m);
-  transition: border-color var(--tr)
+  transition: border-color var(--tr);
 }
 
 .editor-pane textarea:focus {
@@ -2118,6 +2128,18 @@ hr {
 
 .editor-label .icon {
   font-size: 1.1rem
+}
+
+.doc-canvas,
+.doc-editable,
+.preview-frame {
+  min-width: 0;
+}
+
+.doc-editable {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media(max-width:768px) {
