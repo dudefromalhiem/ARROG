@@ -1140,6 +1140,9 @@ hr {
 .home-page .intro-hero {
   display: grid;
   place-items: center;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto 24px;
   min-height: clamp(260px, 44vw, 520px);
   padding: clamp(20px, 5vw, 64px) 16px clamp(18px, 4.5vw, 40px);
   padding-top: calc(56px + 12px);
@@ -1178,7 +1181,8 @@ hr {
 
 @media (max-width: 480px) {
   .home-page .intro-logo {
-    width: min(90vw, 320px);
+    width: min(55vw, 120px);
+    max-width: 120px;
   }
 
   .home-page .intro-hero {
@@ -1547,18 +1551,16 @@ hr {
 /* Terminal overlay */
 .term {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   height: 100dvh;
   z-index: 9999;
   background: var(--blk);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .term.mobile {
@@ -1696,11 +1698,11 @@ hr {
 .term.mobile .term-body {
   padding: 10px 10px 8px;
   font-size: 11px;
-  overflow-y: auto;
+  overflow-y: hidden;
   -ms-overflow-style: none;
   scrollbar-width: none;
   overscroll-behavior: auto;
-  max-height: 60vh;
+  max-height: 100%;
   position: absolute;
   width: 100%;
   top: 0;
@@ -1714,8 +1716,8 @@ hr {
 }
 
 .term.mobile .term-stream {
-  min-height: auto;
-  height: auto;
+  min-height: 100%;
+  height: 100%;
   overflow: visible;
   width: 100%
 }
