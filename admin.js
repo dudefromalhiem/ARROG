@@ -155,6 +155,52 @@ function getRoleDisplayNameForUserRecord(userRecord) {
   return getRoleDisplayName(user);
 }
 
+// Canonical role normalization used across admin UI.
+function normalizeRole(role) {
+  try {
+    if (typeof normalizeResolvedRole === 'function') {
+      return normalizeResolvedRole(role);
+    }
+  } catch (e) {
+    /* fall through to local normalization */
+  }
+  const str = String(role || '').toLowerCase().trim().replace(/[-\s]+/g, '_');
+  const roleMap = {
+    // admin variants
+    'chief_administrator': 'chief_admin',
+    'chief-admin': 'chief_admin',
+    'deputy_chief_administrator': 'deputy-chief-admin',
+    'deputy-chief-admin': 'deputy-chief-admin',
+    'senior_administrator': 'senior-admin',
+    'senior-admin': 'senior-admin',
+    'administrator': 'admin',
+    'admin': 'admin',
+    'junior_administrator': 'junior_admin',
+    'junior-admin': 'junior_admin',
+
+    // mod variants
+    'chief_of_moderation': 'chief-mod',
+    'chief_moderator': 'chief-mod',
+    'chief-mod': 'chief-mod',
+    'deputy_chief_moderator': 'deputy-chief-mod',
+    'deputy-chief-mod': 'deputy-chief-mod',
+    'senior_moderator': 'senior-mod',
+    'senior-mod': 'senior-mod',
+    'moderator': 'moderator',
+    'mod': 'moderator',
+    'junior_moderator': 'junior_moderator',
+    'junior-mod': 'junior_moderator',
+
+    // other legacy
+    'editor': 'contributor',
+    'site_member': 'site_member',
+    'user': 'user',
+    'guest': 'guest',
+    'owner': 'owner'
+  };
+  return roleMap[str] || str;
+}
+
 function getCurrentRole() {
   return getRoleDisplayName(currentUserDoc);
 }
@@ -2361,21 +2407,7 @@ async function refreshRolesDisplay() {
   const roleAdminApplications = document.getElementById('role-admin-applications');
   if (!adminList || !modList || !ownersList) return;
 
-  // Normalize role string to lowercase for consistent lookup - maps role names to canonical forms
-  const normalizeRole = (role) => {
-    const str = String(role || '').toLowerCase().trim().replace(/\s+/g, '_');
-    // Map common role name variants to canonical forms in ROLE_LEVELS
-    const roleMap = {
-      'chief_administrator': 'chief_admin',
-      'chief_of_moderation': 'chief-mod',
-      'deputy_chief_administrator': 'deputy-chief-admin',
-      'deputy_chief_moderator': 'deputy-chief-mod',
-      'deputy_chief_of_moderation': 'deputy-chief-mod',
-      'senior_administrator': 'senior-admin',
-      'senior_moderator': 'senior-mod',
-    };
-    return roleMap[str] || str;
-  };
+  // Normalize role strings in stored ROLE_DATA using canonical function
 
   // Refresh from Firestore
   try {
@@ -2424,35 +2456,7 @@ async function refreshRolesDisplay() {
     '</div>';
   };
 
-  const normalizeRole = (role) => {
-    const str = String(role || '').toLowerCase().trim().replace(/\s+/g, '_');
-    const roleMap = {
-      'chief_administrator': 'chief_admin',
-      'chief_admin': 'chief_admin',
-      'chief-admin': 'chief_admin',
-      'deputy_chief_administrator': 'chief_admin',
-      'deputy-chief-admin': 'chief_admin',
-      'senior_administrator': 'senior-admin',
-      'senior-admin': 'senior-admin',
-      'administrator': 'admin',
-      'admin': 'admin',
-      'junior_administrator': 'junior_admin',
-      'junior-admin': 'junior_admin',
-
-      'chief_of_moderation': 'chief-mod',
-      'chief_moderator': 'chief-mod',
-      'chief-mod': 'chief-mod',
-      'deputy_chief_moderator': 'chief-mod',
-      'deputy-chief-mod': 'chief-mod',
-      'senior_moderator': 'senior-mod',
-      'senior-mod': 'senior-mod',
-      'moderator': 'moderator',
-      'mod': 'moderator',
-      'junior_moderator': 'junior_moderator',
-      'junior-mod': 'junior_moderator'
-    };
-    return roleMap[str] || str;
-  };
+  // Use canonical normalizeRole for filtering/sorting below
 
   // Administrative Staff (level >=75 and <100)
   const adminStaff = Object.entries(ROLE_DATA.userRoles)
@@ -2696,6 +2700,25 @@ async function fetchGitHubCommitCount(gitHubRepo) {
   const commits = await response.json();
   return Array.isArray(commits) && commits.length > 0 ? commits.length : 0;
 }
+
+// Debug helper to inspect GitHub API responses for version lookup
+window.debugFetchGitHubVersion = async function(gitHubRepo) {
+  try {
+    const [owner, repo] = String(gitHubRepo || '').split('/');
+    if (!owner || !repo) { console.warn('Invalid repo'); return null; }
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`;
+    const resp = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    console.log('GitHub response status:', resp.status);
+    console.log('Link header:', resp.headers.get('link'));
+    console.log('Rate limit remaining:', resp.headers.get('x-ratelimit-remaining'));
+    const body = await resp.clone().text();
+    try { console.log('Response JSON keys:', Object.keys(JSON.parse(body || '{}'))); } catch(e) { console.log('Response body length:', body.length); }
+    return { status: resp.status, link: resp.headers.get('link'), rateRemaining: resp.headers.get('x-ratelimit-remaining'), bodyPreview: body.substring(0, 200) };
+  } catch (e) {
+    console.error('debugFetchGitHubVersion failed', e);
+    return null;
+  }
+};
 
 async function refreshLiveVersion(gitHubRepo) {
   const versionEl = document.getElementById('current-version');
