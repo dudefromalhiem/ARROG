@@ -2360,6 +2360,11 @@ hr {
   display: block;
   width: 100%;
   box-sizing: border-box;
+  color: var(--wht-m) !important;
+  background: var(--blk-b);
+  padding: 12px;
+  border: 1px solid var(--blk-m);
+  min-height: 60px;
 }
 
 @media(max-width:768px) {
