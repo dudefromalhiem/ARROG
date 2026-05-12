@@ -875,14 +875,55 @@ const ROLE_NAMES = {
 };
 
 function normalizeResolvedRole(role) {
-  const value = String(role || '').toLowerCase().trim();
-  if (!value) return 'user';
-  if (value === 'user') return 'site_member';
-  if (value === 'mod') return 'moderator';
-  if (value === 'editor') return 'contributor';
-  if (value === 'chief-admin') return 'chief_admin';
-  if (value === 'junior-mod') return 'junior_moderator';
-  if (value === 'junior-admin') return 'junior_admin';
+  const raw = String(role || '').toLowerCase().trim();
+  if (!raw) return 'user';
+  const value = raw.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const roleMap = {
+    'user': 'site_member',
+    'site_member': 'site_member',
+    'site member': 'site_member',
+    'member': 'site_member',
+    'mod': 'moderator',
+    'moderator': 'moderator',
+    'moderator_role': 'moderator',
+    'editor': 'contributor',
+    'contributor': 'contributor',
+    'chief_admin': 'chief_admin',
+    'chief_administrator': 'chief_admin',
+    'chief administrator': 'chief_admin',
+    'chief-admin': 'chief_admin',
+    'deputy_chief_admin': 'deputy-chief-admin',
+    'deputy_chief_administrator': 'deputy-chief-admin',
+    'deputy chief administrator': 'deputy-chief-admin',
+    'deputy-chief-admin': 'deputy-chief-admin',
+    'senior_admin': 'senior-admin',
+    'senior_administrator': 'senior-admin',
+    'senior administrator': 'senior-admin',
+    'senior-admin': 'senior-admin',
+    'junior_admin': 'junior_admin',
+    'junior_administrator': 'junior_admin',
+    'junior administrator': 'junior_admin',
+    'junior-admin': 'junior_admin',
+    'chief_mod': 'chief-mod',
+    'chief_moderation': 'chief-mod',
+    'chief of moderation': 'chief-mod',
+    'chief-moderation': 'chief-mod',
+    'chief_moderator': 'chief-mod',
+    'deputy_chief_mod': 'deputy-chief-mod',
+    'deputy_chief_moderation': 'deputy-chief-mod',
+    'deputy chief moderation': 'deputy-chief-mod',
+    'deputy-chief-mod': 'deputy-chief-mod',
+    'senior_mod': 'senior-mod',
+    'senior_moderator': 'senior-mod',
+    'senior moderator': 'senior-mod',
+    'senior-mod': 'senior-mod',
+    'junior_mod': 'junior-mod',
+    'junior_moderator': 'junior_moderator',
+    'junior moderator': 'junior_moderator',
+    'junior-mod': 'junior_moderator'
+  };
+  if (roleMap[raw]) return roleMap[raw];
+  if (roleMap[value]) return roleMap[value];
   return value;
 }
 
