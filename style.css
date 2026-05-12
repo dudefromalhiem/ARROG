@@ -2363,6 +2363,14 @@ hr {
   color: var(--wht-m);
 }
 
+@media (max-width: 768px) {
+  .doc-editable,
+  .doc-editable * {
+    color: var(--wht-m) !important;
+    background-color: transparent !important;
+  }
+}
+
 @media(max-width:768px) {
   .editor-wrap {
     grid-template-columns: 1fr
@@ -3265,6 +3273,32 @@ hr {
 .doc-editable {
   animation: none !important !important;
   transition: none !important !important;
+}
+
+/* Mobile: Force all editor text visible */
+@media (max-width: 768px) {
+  #submit-editor-shell,
+  #doc-mode,
+  #doc-blocks,
+  .doc-canvas,
+  .doc-block,
+  .doc-block-body,
+  .doc-editable,
+  .editor-wrap,
+  .editor-pane,
+  .section,
+  main {
+    color: var(--wht) !important;
+  }
+  
+  #submit-editor-shell *,
+  #doc-mode *,
+  .doc-canvas *,
+  .doc-block *,
+  .editor-wrap *,
+  main * {
+    color: var(--wht-m) !important;
+  }
 }
 
 .tc {
