@@ -1200,6 +1200,53 @@ hr {
   pointer-events: none;
 }
 
+/* Fix: ensure application/authority content remains visible on small devices
+   and guard against overlay effects (terminal/intro) that can darken text. */
+.app-panel,
+.authority-header,
+.authority-card,
+.app-card,
+.section {
+  /* keep panels above accidental low-opacity overlays inside panels */
+  position: relative;
+  z-index: 2;
+  color: var(--wht) !important;
+}
+
+.app-panel * , .authority-header * , .authority-card * , .app-card * , .section * {
+  color: inherit !important;
+}
+
+/* More readable content color for descriptive blocks */
+.authority-content,
+.app-copy,
+.app-point,
+.app-status,
+.app-kicker,
+.section-hd {
+  color: var(--wht-m) !important;
+}
+
+/* Mobile safety: reduce intro logo size and ensure title sits above it */
+@media (max-width: 420px) {
+  .intro-logo {
+    width: 160px;
+    height: 160px;
+    opacity: .95;
+    position: relative;
+    transform: none;
+    left: auto;
+    top: auto;
+    margin-bottom: 8px;
+    z-index: 0;
+  }
+  .intro-t {
+    margin-top: 8px;
+    z-index: 2;
+    position: relative;
+  }
+}
+
 .home-page .intro-hero {
   display: grid;
   place-items: center;
