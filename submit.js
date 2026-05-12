@@ -527,6 +527,8 @@ const DOC_DEFAULT_CSS = `
   display: inline-block;
   width: 0.6em;
   height: 1em;
+  background: #8b0000;
+  border-radius: inherit;
 }
 `;
 
