@@ -2545,6 +2545,68 @@ let currentAppVersion = null;
 let latestGitHubVersion = null;
 let versionCheckInterval = null;
 
+function formatCommitVersion(commitCount) {
+  const numericCount = Number(commitCount);
+  if (!Number.isFinite(numericCount) || numericCount < 0) return 'unknown';
+  return `${numericCount}/100`;
+}
+
+async function fetchGitHubCommitCount(gitHubRepo) {
+  const [owner, repo] = String(gitHubRepo || '').split('/');
+  if (!owner || !repo) throw new Error('Invalid GitHub repository');
+
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`;
+  const response = await fetch(apiUrl, {
+    headers: {
+      Accept: 'application/vnd.github+json'
+    },
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub commit lookup failed (${response.status})`);
+  }
+
+  const linkHeader = response.headers.get('link') || '';
+  const lastPageMatch = linkHeader.match(/<[^>]+[?&]page=(\d+)[^>]*>;\s*rel="last"/i);
+  if (lastPageMatch) {
+    return Number(lastPageMatch[1]);
+  }
+
+  const commits = await response.json();
+  return Array.isArray(commits) && commits.length > 0 ? commits.length : 0;
+}
+
+async function refreshLiveVersion(gitHubRepo) {
+  const versionEl = document.getElementById('current-version');
+  const indicator = document.getElementById('update-indicator');
+
+  try {
+    const commitCount = await fetchGitHubCommitCount(gitHubRepo);
+    const liveVersion = formatCommitVersion(commitCount);
+    currentAppVersion = liveVersion;
+    latestGitHubVersion = liveVersion;
+
+    if (versionEl) {
+      versionEl.textContent = liveVersion;
+    }
+    if (indicator) {
+      indicator.style.display = 'none';
+    }
+
+    return liveVersion;
+  } catch (error) {
+    console.warn('Failed to refresh live version:', error);
+    if (versionEl) {
+      versionEl.textContent = currentAppVersion || 'unknown';
+    }
+    if (indicator) {
+      indicator.style.display = 'none';
+    }
+    throw error;
+  }
+}
+
 async function initializeVersionDisplay() {
   try {
     // Load local version
@@ -2565,73 +2627,32 @@ async function initializeVersionDisplay() {
       if (wrap) wrap.style.display = txt ? 'block' : 'none';
     };
 
-    setCheckedAt('Checking...');
+    setCheckedAt('Checking live commit count...');
 
-    // Initial check for updates
-    await checkForUpdates(versionData.githubRepo).finally(() => {
-      setCheckedAt(new Date().toLocaleString());
-    });
+    const updateLiveVersion = async () => {
+      await refreshLiveVersion(versionData.githubRepo).finally(() => {
+        setCheckedAt(new Date().toLocaleString());
+      });
+    };
 
-    // Check for updates every 5 minutes
+    // Initial live fetch
+    await updateLiveVersion();
+
+    // Refresh every 5 minutes
     versionCheckInterval = setInterval(() => {
-      checkForUpdates(versionData.githubRepo).finally(() => setCheckedAt(new Date().toLocaleString()));
+      updateLiveVersion().catch(() => {});
     }, 5 * 60 * 1000);
 
-    // Also check when tab/window gains focus
+    // Also refresh when tab/window gains focus
     window.addEventListener('focus', () => {
       try {
-        checkForUpdates(versionData.githubRepo).finally(() => setCheckedAt(new Date().toLocaleString()));
+        updateLiveVersion().catch(() => {});
       } catch (e) { /* ignore */ }
     });
   } catch (error) {
     console.warn('Failed to initialize version display:', error);
     const versionEl = document.getElementById('current-version');
     if (versionEl) versionEl.textContent = 'unknown';
-  }
-}
-
-async function checkForUpdates(gitHubRepo) {
-  try {
-    const [owner, repo] = gitHubRepo.split('/');
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
-    
-    const response = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github.v3+json' } });
-    if (!response.ok) {
-      console.warn('Failed to fetch GitHub releases:', response.status);
-      // update UI to indicate no remote releases found
-      const indicator = document.getElementById('update-indicator');
-      if (indicator) indicator.style.display = 'none';
-      const when = document.getElementById('version-checked-at');
-      if (when) when.textContent = `Error: ${response.status}`;
-      return;
-    }
-    
-    const releaseData = await response.json();
-    const latestVersion = releaseData.tag_name ? releaseData.tag_name.replace(/^v/, '') : null;
-    
-    if (latestVersion && latestVersion !== currentAppVersion) {
-      latestGitHubVersion = latestVersion;
-      displayUpdateIndicator(latestVersion);
-      console.info(`Update available: ${latestVersion} (current: ${currentAppVersion})`);
-    }
-    // If no update, ensure indicator is hidden
-    else {
-      const indicator = document.getElementById('update-indicator');
-      if (indicator) indicator.style.display = 'none';
-    }
-  } catch (error) {
-    console.warn('Error checking for GitHub updates:', error);
-    const when = document.getElementById('version-checked-at');
-    if (when) when.textContent = 'Error';
-  }
-}
-
-function displayUpdateIndicator(newVersion) {
-  const indicator = document.getElementById('update-indicator');
-  if (indicator) {
-    indicator.style.display = 'inline';
-    indicator.title = `Update available: v${newVersion}`;
-    indicator.innerHTML = `• Update available (v${newVersion})`;
   }
 }
 
