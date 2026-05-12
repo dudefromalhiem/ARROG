@@ -988,14 +988,16 @@ hr {
 }
 
 .network-link {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 10px 14px;
-  background: rgba(139, 0, 0, .15);
-  border: 2px solid var(--red-d);
-  border-radius: 6px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   text-decoration: none;
   color: var(--wht-m);
   font-size: .85rem;
@@ -1003,19 +1005,17 @@ hr {
   transition: all var(--tr);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  line-height: 0;
 }
 
 .network-link:hover {
-  background: rgba(139, 0, 0, .25);
-  color: var(--red-b);
-  border-color: var(--red-b);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(204, 0, 0, .2);
+  transform: translateY(-1px) scale(1.03);
 }
 
 .network-icon {
-  width: 20px;
-  height: 20px;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
   display: block;
   opacity: 0.9;
 }
@@ -1797,9 +1797,9 @@ hr {
 @media (max-width: 768px) {
   .term-skip {
     position: fixed;
-    bottom: 16px;
-    right: 16px;
-    top: auto;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    right: calc(env(safe-area-inset-right, 0px) + 10px);
+    bottom: auto;
     left: auto;
     padding: 10px 14px;
     z-index: 10050;

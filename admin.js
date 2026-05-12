@@ -2719,7 +2719,7 @@ let versionCheckInterval = null;
 function formatCommitVersion(commitCount) {
   const numericCount = Number(commitCount);
   if (!Number.isFinite(numericCount) || numericCount < 0) return 'unknown';
-  return `${numericCount}/100`;
+  return String(numericCount / 100);
 }
 
 async function fetchGitHubCommitCount(gitHubRepo) {
