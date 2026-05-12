@@ -1217,6 +1217,31 @@ hr {
   color: inherit !important;
 }
 
+/* Ensure pseudo overlays used for subtle lighting don't cover content */
+.app-panel::before,
+.authority-header::before,
+.section::before {
+  z-index: 0;
+  mix-blend-mode: normal;
+  opacity: 1;
+}
+
+.app-panel > *,
+.authority-header > *,
+.authority-card > *,
+.app-card > * {
+  position: relative;
+  z-index: 3;
+}
+
+/* Slightly lift panel backgrounds to improve contrast against page background */
+.app-panel,
+.authority-header,
+.authority-card,
+.app-card {
+  background: linear-gradient(180deg, rgba(28,28,28,0.98), rgba(12,12,12,0.98));
+}
+
 /* More readable content color for descriptive blocks */
 .authority-content,
 .app-copy,
@@ -1228,7 +1253,7 @@ hr {
 }
 
 /* Mobile safety: reduce intro logo size and ensure title sits above it */
-@media (max-width: 420px) {
+@media (max-width: 640px) {
   .intro-logo {
     width: 160px;
     height: 160px;
