@@ -1297,16 +1297,6 @@ hr {
   #clearance-welcome, .term, .term.mobile { display: none !important; visibility: hidden !important; pointer-events: none !important; }
 }
 
-/* TEMP DEBUG: visible outline to verify authority section is above overlays on phones
-   Remove this block after verification */
-@media (max-width: 640px) {
-  .authority-section, .authority-header, .authority-card {
-    outline: 3px solid rgba(50, 220, 100, 0.95) !important;
-    box-shadow: 0 6px 18px rgba(50, 220, 100, 0.12) !important;
-    background-color: rgba(0,0,0,0.02) !important;
-  }
-}
-
 /* Mobile: hide lengthy intro/terminal overlays that block content on phones */
 @media (max-width: 768px) {
   #clearance-welcome { display: none !important; visibility: hidden !important; pointer-events: none !important; }
@@ -1324,6 +1314,12 @@ hr {
 
   /* Make role editor controls easier to tap */
   #admin-list > div, #mod-list > div, #owners-list > div { padding: 12px 14px; }
+
+  .back-to-top {
+    right: auto;
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  }
 }
 
 .home-page .intro-hero {
@@ -1924,10 +1920,11 @@ hr {
   .term-skip {
     position: fixed;
     top: calc(env(safe-area-inset-top, 0px) + 10px);
-    right: calc(env(safe-area-inset-right, 0px) + 10px);
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    right: auto;
     bottom: auto;
-    left: auto;
-    padding: 10px 14px;
+    max-width: calc(100vw - 20px);
+    padding: 10px 12px;
     z-index: 10050;
     background: rgba(0, 0, 0, .92);
     border: 1px solid var(--red-d);
@@ -1937,8 +1934,8 @@ hr {
 
   .term-skip .btn {
     min-height: 40px;
-    padding: 10px 14px;
-    font-size: 0.75rem;
+    padding: 10px 12px;
+    font-size: 0.72rem;
     pointer-events: auto;
   }
 

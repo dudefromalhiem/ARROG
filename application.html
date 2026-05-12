@@ -258,15 +258,6 @@
       .authority-card-title { font-size: 0.95rem; }
       .authority-label { font-size: 0.7rem; }
       .authority-content { font-size: 0.8rem; }
-    }
-</head>
-<body>
-  </style>
-  </head>
-<body class="application-page">
-  <style>
-    /* Page-scoped mobile adjustments to keep title clear of hero/logo */
-    @media (max-width: 640px) {
       .application-page .hdr-title {
         margin-top: 20px !important;
         display: block !important;
@@ -275,15 +266,19 @@
       .application-page .app-hero .app-title {
         margin-top: 18px !important;
       }
-      /* Ensure hero/app panels are above overlays */
       .application-page .app-panel, .application-page .authority-header, .application-page .authority-card {
         z-index: 1100 !important;
         position: relative !important;
       }
-      /* Defensive: hide terminal overlays on this page for small screens */
-      .application-page #clearance-welcome, .application-page .term, .application-page .term.mobile { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+      .application-page #clearance-welcome, .application-page .term, .application-page .term.mobile {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
     }
-  </style>
+</style>
+</head>
+<body class="application-page">
 <header class="hdr">
   <div class="hdr-in">
     <a href="index.html" class="hdr-brand">

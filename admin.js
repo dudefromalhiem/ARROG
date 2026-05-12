@@ -227,6 +227,13 @@ function normalizeRole(role) {
   return str;
 }
 
+function pickHigherRole(existingRole, candidateRole) {
+  const existingLevel = getRoleLevelValue(existingRole);
+  const candidateLevel = getRoleLevelValue(candidateRole);
+  if (candidateLevel > existingLevel) return normalizeRole(candidateRole);
+  return normalizeRole(existingRole || candidateRole);
+}
+
 function getRoleLevelValue(role) {
   const normalized = String(typeof normalizeRole === 'function' ? normalizeRole(role) : role || '').toLowerCase();
   return ROLE_LEVELS[normalized] || ROLE_LEVELS[normalized.replace(/_/g, '-')] || 0;
@@ -2344,7 +2351,10 @@ async function refreshUsers() {
     users.forEach(u => {
       try {
         const email = String(u.email || '').toLowerCase();
-        const mapped = (ROLE_DATA.userRoles && ROLE_DATA.userRoles[email]) ? ROLE_DATA.userRoles[email] : (u.role || 'user');
+        const mapped = pickHigherRole(
+          ROLE_DATA.userRoles && ROLE_DATA.userRoles[email] ? ROLE_DATA.userRoles[email] : '',
+          u.roleName || u.role || resolveRole(email) || 'user'
+        );
         const bucket = getRoleBucketKey(mapped || 'site_member');
         if (!groups[bucket]) {
           groups.other.push(u);
@@ -2494,22 +2504,13 @@ async function refreshRolesDisplay() {
       const user = docSnap.data() || {};
       const email = String(user.email || '').toLowerCase();
       if (!email) return;
-      // Resolve role: prefer explicit canonical `role`, then existing cached role,
-      // then attempt to map a human-readable `roleName` back to a canonical key.
-      let sourceRole = '';
-      if (user.role) sourceRole = user.role;
-      else if (ROLE_DATA.userRoles[email]) sourceRole = ROLE_DATA.userRoles[email];
-      else if (user.roleName) {
-        const rn = String(user.roleName || '').toLowerCase().trim();
-        const match = Object.keys(ROLE_NAMES).find(k => String(ROLE_NAMES[k] || '').toLowerCase() === rn);
-        if (match) sourceRole = match;
-      }
+      const sourceRole = pickHigherRole(
+        ROLE_DATA.userRoles[email] || '',
+        user.roleName || user.role || resolveRole(email) || ''
+      );
       const normalizedRole = normalizeRole(sourceRole);
       const level = getRoleLevelValue(normalizedRole);
-      // Only merge elevated roles (contributors and above) or explicit owners
-      if (level >= 60 || normalizedRole === 'owner') {
-        ROLE_DATA.userRoles[email] = normalizedRole;
-      }
+      if (level >= 60 || normalizedRole === 'owner') ROLE_DATA.userRoles[email] = normalizedRole;
     });
   } catch (e) {
     console.warn('[ADMIN] Could not merge users collection into roles view', e);
@@ -2517,13 +2518,13 @@ async function refreshRolesDisplay() {
 
   // Set userRoles for backward compatibility
   ROLE_DATA.owners.forEach(email => {
-    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'owner';
+    ROLE_DATA.userRoles[email] = pickHigherRole(ROLE_DATA.userRoles[email], 'owner');
   });
   ROLE_DATA.admins.forEach(email => {
-    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'admin';
+    ROLE_DATA.userRoles[email] = pickHigherRole(ROLE_DATA.userRoles[email], 'admin');
   });
   ROLE_DATA.mods.forEach(email => {
-    if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'mod';
+    ROLE_DATA.userRoles[email] = pickHigherRole(ROLE_DATA.userRoles[email], 'mod');
   });
 
   const currentEmail = auth.currentUser?.email;
