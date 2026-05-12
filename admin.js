@@ -2402,10 +2402,10 @@ async function refreshRolesDisplay() {
     '</div>';
   };
 
-  // Administrative Staff (level >=60 and <100)
+  // Administrative Staff (level >=75 and <100)
   const adminStaff = Object.entries(ROLE_DATA.userRoles).filter(([email, role]) => {
     const level = ROLE_LEVELS[role] || 0;
-    return level >= 60 && level < 100;
+    return level >= 75 && level < 100;
   });
   if (adminStaff.length === 0) {
     adminList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No administrative staff assigned yet.</p>';
@@ -2422,10 +2422,10 @@ async function refreshRolesDisplay() {
     }).join('');
   }
 
-  // Moderation Staff (level >=10 and <60)
+  // Moderation Staff (level >=10 and <75)
   const modStaff = Object.entries(ROLE_DATA.userRoles).filter(([email, role]) => {
     const level = ROLE_LEVELS[role] || 0;
-    return level >= 10 && level < 60;
+    return level >= 10 && level < 75;
   });
   if (modStaff.length === 0) {
     modList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No moderation staff assigned yet.</p>';
