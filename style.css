@@ -23,7 +23,7 @@
   --font-d: 'Special Elite', monospace;
   --tr: .15s ease;
   /* Alias variables kept for pages that used older token names */
-  --blk-b: var(--blk);
+  --blk-b: var(--blk-s);
   --blk-m: var(--blk-p);
   --blk-d: var(--blk-e);
   --wht-b: var(--wht);
@@ -960,6 +960,45 @@ hr {
 .back-to-top:hover {
   background: var(--red);
   color: var(--wht)
+}
+
+/* Network Section */
+.network {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 32px 16px;
+  margin-bottom: 32px;
+  border-top: 1px solid var(--blk-m);
+  border-bottom: 1px solid var(--blk-m);
+}
+
+.network-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(139, 0, 0, .1);
+  border: 1px solid var(--red-d);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--wht-m);
+  font-size: .85rem;
+  transition: all var(--tr);
+}
+
+.network-link:hover {
+  background: rgba(139, 0, 0, .2);
+  color: var(--red-b);
+  border-color: var(--red-b);
+}
+
+.network-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 /* Footer */
@@ -3189,6 +3228,7 @@ hr {
   .intro-t {
     font-size: 1.35rem;
     letter-spacing: 3px;
+    margin-bottom: 12px;
   }
 
   .legacy-block {

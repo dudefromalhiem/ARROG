@@ -976,10 +976,10 @@ function resolveRole(email) {
   return "site_member";
 }
 function isModerator(email) {
-  return getUserLevel(email) >= 70;
+  return getUserLevel(email) >= 65;
 }
 function isAdmin(email) {
-  return getUserLevel(email) >= 80;
+  return getUserLevel(email) >= 75;
 }
 function isOwner(email) {
   return getUserLevel(email) >= 100;
