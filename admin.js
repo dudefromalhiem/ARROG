@@ -2330,12 +2330,33 @@ async function refreshUsers() {
       return 'other';
     };
 
+    // Safely bucket users into groups. Use canonical normalizeRole and level-based mapping
     users.forEach(u => {
-      const email = String(u.email || '').toLowerCase();
-      // Prefer explicit config role mapping
-      const mapped = ROLE_DATA.userRoles && ROLE_DATA.userRoles[email] ? ROLE_DATA.userRoles[email] : u.role || 'user';
-      const key = toHierarchyKey(mapped || 'site_member');
-      groups[key].push(u);
+      try {
+        const email = String(u.email || '').toLowerCase();
+        const mapped = (ROLE_DATA.userRoles && ROLE_DATA.userRoles[email]) ? ROLE_DATA.userRoles[email] : (u.role || 'user');
+        const normalized = String(typeof normalizeRole === 'function' ? normalizeRole(mapped) : (mapped || '')).toLowerCase().replace(/-/g, '_');
+        let level = ROLE_LEVELS[normalized] || ROLE_LEVELS[normalized.replace(/_/g,'-')] || 0;
+
+        // Bucket by level and explicit name hints
+        let bucket = 'other';
+        if (normalized === 'owner' || level >= 100) bucket = 'owner';
+        else if (level >= 90) bucket = 'senior_admin';
+        else if (level >= 80) bucket = 'admin';
+        else if (level >= 75) bucket = 'junior_admin';
+        else if ((/senior/.test(normalized) && level >= 70)) bucket = 'senior_moderator';
+        else if (level >= 70) bucket = 'moderator';
+        else if (level >= 65) bucket = 'junior_moderator';
+        else if (level >= 60) bucket = 'contributor';
+        else if (level >= 5) bucket = 'site_member';
+        else bucket = 'other';
+
+        if (!groups[bucket]) bucket = 'other';
+        groups[bucket].push(u);
+      } catch (e) {
+        console.error('Error bucketing user', u, e);
+        groups.other.push(u);
+      }
     });
 
     // Helper to render a group as table rows with a section header
@@ -2365,6 +2386,7 @@ async function refreshUsers() {
 
     tbody.innerHTML = html.filter(Boolean).join('') || '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">No users found.</td></tr>';
   } catch (err) { 
+    console.error('[ADMIN] refreshUsers failed', err);
     tbody.innerHTML = '<tr><td colspan="4" class="tc" style="padding:24px;color:var(--wht-f)">Connect Firebase.</td></tr>';
   }
 }
