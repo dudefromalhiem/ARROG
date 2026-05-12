@@ -164,7 +164,7 @@ function normalizeRole(role) {
   } catch (e) {
     /* fall through to local normalization */
   }
-  const str = String(role || '').toLowerCase().trim().replace(/[-\s]+/g, '_');
+  const str = String(role || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
   const roleMap = {
     // admin variants
     'chief_administrator': 'chief_admin',
@@ -198,7 +198,32 @@ function normalizeRole(role) {
     'guest': 'guest',
     'owner': 'owner'
   };
-  return roleMap[str] || str;
+  if (roleMap[str]) return roleMap[str];
+
+  // Pattern-based fallbacks for unrecognized variants
+  if (/owner/.test(str)) return 'owner';
+
+  // Admin patterns
+  if (/chief.*admin/.test(str) || /admin.*chief/.test(str)) return 'chief_admin';
+  if (/deputy.*chief.*admin/.test(str) || /deputy.*admin/.test(str)) return 'deputy-chief-admin';
+  if (/senior.*admin/.test(str)) return 'senior-admin';
+  if (/(^|_)admin(_|$)|administrator/.test(str)) return 'admin';
+
+  // Moderator patterns
+  if (/chief.*mod|chief.*moder/.test(str) || /moderation.*chief/.test(str)) return 'chief-mod';
+  if (/deputy.*chief.*mod|deputy.*mod/.test(str)) return 'deputy-chief-mod';
+  if (/senior.*mod|senior.*moder/.test(str)) return 'senior-mod';
+  if (/(^|_)mod(_|$)|moderator/.test(str)) return 'moderator';
+
+  // Junior patterns
+  if (/junior.*admin/.test(str)) return 'junior_admin';
+  if (/junior.*mod/.test(str)) return 'junior_moderator';
+
+  // Other legacy mappings
+  if (/editor/.test(str)) return 'contributor';
+  if (/contributor/.test(str)) return 'contributor';
+
+  return str;
 }
 
 function getCurrentRole() {
@@ -2678,27 +2703,58 @@ function formatCommitVersion(commitCount) {
 async function fetchGitHubCommitCount(gitHubRepo) {
   const [owner, repo] = String(gitHubRepo || '').split('/');
   if (!owner || !repo) throw new Error('Invalid GitHub repository');
+  const headers = { Accept: 'application/vnd.github+json' };
 
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`;
-  const response = await fetch(apiUrl, {
-    headers: {
-      Accept: 'application/vnd.github+json'
-    },
-    cache: 'no-store'
-  });
+  // First try lightweight request asking for 1 commit and inspect Link header
+  const firstUrl = `https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`;
+  const response = await fetch(firstUrl, { headers, cache: 'no-store' });
+
+  if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+    throw new Error('GitHub API rate limit exceeded');
+  }
 
   if (!response.ok) {
     throw new Error(`GitHub commit lookup failed (${response.status})`);
   }
 
   const linkHeader = response.headers.get('link') || '';
-  const lastPageMatch = linkHeader.match(/<[^>]+[?&]page=(\d+)[^>]*>;\s*rel="last"/i);
+  const lastPageMatch = linkHeader.match(/[?&]page=(\d+)[^>]*>;\s*rel="last"/i);
   if (lastPageMatch) {
+    // If we have a last page number with per_page=1, that value equals the commit count
     return Number(lastPageMatch[1]);
   }
 
-  const commits = await response.json();
-  return Array.isArray(commits) && commits.length > 0 ? commits.length : 0;
+  // No Link header — try a larger page to estimate total commits
+  const secondUrl = `https://api.github.com/repos/${owner}/${repo}/commits?per_page=100`;
+  const response2 = await fetch(secondUrl, { headers, cache: 'no-store' });
+
+  if (response2.status === 403 && response2.headers.get('x-ratelimit-remaining') === '0') {
+    throw new Error('GitHub API rate limit exceeded');
+  }
+
+  if (!response2.ok) {
+    // Fall back to whatever the first response returned
+    const commitsFallback = await response.json().catch(() => []);
+    return Array.isArray(commitsFallback) ? commitsFallback.length : 0;
+  }
+
+  const linkHeader2 = response2.headers.get('link') || '';
+  const lastPageMatch2 = linkHeader2.match(/[?&]page=(\d+)[^>]*>;\s*rel="last"/i);
+  if (lastPageMatch2) {
+    const lastPage = Number(lastPageMatch2[1]);
+    // Fetch the last page to compute exact total
+    const lastPageResp = await fetch(`${secondUrl}&page=${lastPage}`, { headers, cache: 'no-store' });
+    if (lastPageResp.ok) {
+      const lastPageCommits = await lastPageResp.json().catch(() => []);
+      const perPage = 100;
+      const total = (lastPage - 1) * perPage + (Array.isArray(lastPageCommits) ? lastPageCommits.length : 0);
+      return total;
+    }
+  }
+
+  // No pagination info — assume total is <=100 and return length
+  const commits2 = await response2.json().catch(() => []);
+  return Array.isArray(commits2) ? commits2.length : 0;
 }
 
 // Debug helper to inspect GitHub API responses for version lookup
