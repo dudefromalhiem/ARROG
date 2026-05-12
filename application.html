@@ -270,10 +270,23 @@
         z-index: 1100 !important;
         position: relative !important;
       }
-      .application-page #clearance-welcome, .application-page .term, .application-page .term.mobile {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
+      .application-page .app-shell,
+      .application-page .app-shell *,
+      .application-page .authority-section,
+      .application-page .authority-section *,
+      .application-page .app-card,
+      .application-page .app-card * {
+        color: var(--wht) !important;
+      }
+      .application-page .authority-content,
+      .application-page .app-copy,
+      .application-page .app-point,
+      .application-page .authority-card-title,
+      .application-page .authority-label,
+      .application-page .authority-branch-title,
+      .application-page .app-kicker,
+      .application-page .app-title {
+        color: var(--wht) !important;
       }
     }
 </style>
