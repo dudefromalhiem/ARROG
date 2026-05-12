@@ -1272,34 +1272,16 @@ hr {
   }
 }
 
-/* Mobile-specific header/title adjustments to avoid overlap with large hero logos */
+/* Mobile: only shift application hero title and protect panels from overlays */
 @media (max-width: 640px) {
-  .hdr-brand {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
+  /* Move the application/authority hero title lower so it doesn't overlap large hero imagery */
+  .app-hero .app-title {
+    margin-top: 18px;
+    display: block;
   }
+  .app-hero .app-kicker { margin-top: 6px; }
 
-  .hdr-logo {
-    width: 48px;
-    height: 48px;
-    margin: 0;
-    border-radius: 50%;
-    flex-shrink: 0;
-    z-index: 280;
-  }
-
-  /* Push the textual title lower so it cannot visually collide with centered hero logos */
-  .hdr-title {
-    margin-top: 6px;
-    font-size: 0.95rem;
-    line-height: 1.05;
-    z-index: 275;
-    text-align: center;
-  }
-
-  /* Ensure application panels and authority content render above any accidental overlays */
+  /* Ensure application panels and authority content render above accidental overlays */
   .app-panel, .authority-header, .authority-card, .app-card, .section {
     z-index: 1000 !important;
     position: relative !important;
@@ -1312,10 +1294,16 @@ hr {
   }
 
   /* Defensive: hide terminal/clearance overlays on small phones if still present */
-  #clearance-welcome, .term, .term.mobile {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
+  #clearance-welcome, .term, .term.mobile { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+}
+
+/* TEMP DEBUG: visible outline to verify authority section is above overlays on phones
+   Remove this block after verification */
+@media (max-width: 640px) {
+  .authority-section, .authority-header, .authority-card {
+    outline: 3px solid rgba(50, 220, 100, 0.95) !important;
+    box-shadow: 0 6px 18px rgba(50, 220, 100, 0.12) !important;
+    background-color: rgba(0,0,0,0.02) !important;
   }
 }
 
