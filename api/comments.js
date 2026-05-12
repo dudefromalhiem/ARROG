@@ -248,7 +248,7 @@ async function listComments(db, pageId, slug, actor) {
         data: {
           ...data,
           authorName: normalizeText(data.authorName || profile.displayName || data.authorEmail || 'Agent', 120),
-          authorPhotoURL: normalizeText(data.authorPhotoURL || profile.photoURL || '', 1200)
+          authorPhotoURL: ''
         }
       };
     });
@@ -336,7 +336,7 @@ module.exports = async function handler(req, res) {
         authorUid: actor.uid,
         authorEmail: actor.email,
         authorName: normalizeText(body.authorName || userData.displayName || actor.name || actor.email.split('@')[0] || 'Agent', 120),
-        authorPhotoURL: normalizeText(userData.photoURL || '', 1200),
+        authorPhotoURL: '',
         parentId: parentId || '',
         status: 'active',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),

@@ -291,7 +291,7 @@ async function searchUsers(db, queryText) {
     .map(user => ({
       uid: String(user.uid || user.id || ''),
       displayName: normalizeText(user.displayName || user.email || 'Agent', 120),
-      photoURL: normalizeText(user.photoURL || '', 1200)
+      photoURL: ''
     }))
     .filter(user => user.uid);
 }
@@ -319,7 +319,7 @@ async function getPublicProfileByUid(db, uid, actor = null) {
     role: String(data.role || 'newbie'),
     roleName: normalizeText(data.roleName || '', 120),
     bio: normalizeText(data.bio || '', 500),
-    photoURL: normalizeText(data.photoURL || '', 1200)
+    photoURL: ''
   };
 
   const roles = await getRolesData(db);
@@ -641,7 +641,7 @@ async function listInbox(db, actor) {
         ),
         email: String(isGroupThread ? `${thread.id || 'group'}@redoakerguild.local` : (peerData.email || '')).toLowerCase(),
         role: String(isGroupThread ? 'group' : (peerData.role || 'newbie')),
-        photoURL: normalizeText(isGroupThread ? 'logo.png' : (peerData.photoURL || ''), 1200)
+        photoURL: ''
       }
     };
   });
@@ -692,11 +692,11 @@ async function addFriendRequest(db, actor, body) {
     requesterUid: actor.uid,
     requesterEmail: actor.email,
     requesterName: normalizeText(senderData.displayName || actor.name || actor.email.split('@')[0] || 'Agent', 120),
-    requesterPhotoURL: normalizeText(senderData.photoURL || '', 1200),
+    requesterPhotoURL: '',
     targetUid,
     targetEmail: String(targetData.email || '').toLowerCase(),
     targetName: normalizeText(targetData.displayName || targetData.email || 'Agent', 120),
-    targetPhotoURL: normalizeText(targetData.photoURL || '', 1200),
+    targetPhotoURL: '',
     note,
     status: 'pending',
     acceptedAt: null,

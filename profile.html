@@ -28,9 +28,8 @@
   <link rel="stylesheet" href="style.css" />
   <style>
     .profile-shell { max-width: 840px; margin: 0 auto; }
-    .profile-grid { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+    .profile-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
     .profile-card { border:1px solid var(--blk-m); background:var(--blk-b); padding:14px; }
-    .profile-avatar { width: 180px; height: 180px; border-radius: 50%; object-fit: cover; border:2px solid var(--red-d); background:#111; display:block; margin: 8px auto; }
     .profile-warning { border:1px solid var(--red-g); background: rgba(139,0,0,.12); color: var(--wht); font-weight: 700; padding: 10px 12px; margin-bottom: 12px; }
     .profile-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .profile-status { font-size:.8rem; color:var(--wht-f); margin-top:8px; }
@@ -62,23 +61,10 @@
 <main class="wrap profile-shell" id="main-content">
   <div class="section">
     <div class="section-hd">Profile</div>
-    <div class="profile-warning" id="profile-warning">Any user with inappropriate profile images will be banned.</div>
+    <div class="profile-warning" id="profile-warning">Profiles are name-only. Users who attempt to add profile images may be banned.</div>
     <div class="profile-status" id="profile-role" style="margin-bottom:12px">Role: User</div>
 
     <div class="profile-grid">
-      <div class="profile-card">
-        <div class="card-t">Profile Picture</div>
-        <img id="profile-avatar" class="profile-avatar" src="logo.png" alt="Profile picture" loading="lazy" decoding="async" />
-        <div class="fg" id="profile-upload-group">
-          <label class="fl" for="profile-picture">Upload picture</label>
-          <input class="fi" id="profile-picture" type="file" accept="image/*" />
-          <div style="font-size:.75rem;color:var(--wht-d);margin-top:6px">Max size: 230 KB (will be auto-compressed)</div>
-        </div>
-        <div class="profile-actions" id="profile-upload-actions">
-          <button class="btn btn-p" id="profile-upload-btn" type="button">Upload</button>
-        </div>
-      </div>
-
       <div class="profile-card">
         <div class="card-t">Identity</div>
         <div class="fg">
@@ -236,15 +222,13 @@ async function optimizeProfileImage(file) {
 async function loadProfile(user) {
   const username = document.getElementById('profile-username');
   const bio = document.getElementById('profile-bio');
-  const avatar = document.getElementById('profile-avatar');
-  if (!username || !bio || !avatar) return;
+  if (!username || !bio) return;
 
   try {
     const doc = await db.collection('users').doc(user.uid).get();
     const data = doc.exists ? (doc.data() || {}) : {};
     username.value = data.displayName || user.displayName || '';
     bio.value = data.bio || '';
-    avatar.src = data.photoURL || user.photoURL || 'logo.png';
     document.getElementById('profile-role').textContent = 'Role: ' + (data.roleName || data.role || (isOwner(user.email) ? 'The Archivist' : isAdmin(user.email) ? 'Admin' : isModerator(user.email) ? 'Moderator' : 'User'));
     setProfileStatus('Profile loaded.', false);
   } catch (err) {
@@ -271,8 +255,6 @@ function applyProfileMode(isEditable, viewerSignedIn) {
   const username = document.getElementById('profile-username');
   const bio = document.getElementById('profile-bio');
   const saveBtn = document.getElementById('profile-save-btn');
-  const uploadGroup = document.getElementById('profile-upload-group');
-  const uploadActions = document.getElementById('profile-upload-actions');
   const viewActions = document.getElementById('profile-view-actions');
   const warning = document.getElementById('profile-warning');
 
@@ -285,8 +267,6 @@ function applyProfileMode(isEditable, viewerSignedIn) {
     bio.classList.toggle('profile-readonly', !isEditable);
   }
   if (saveBtn) saveBtn.style.display = isEditable ? 'inline-block' : 'none';
-  if (uploadGroup) uploadGroup.style.display = isEditable ? 'block' : 'none';
-  if (uploadActions) uploadActions.style.display = isEditable ? 'flex' : 'none';
   if (viewActions) {
     viewActions.classList.toggle('hidden', isEditable);
     Array.from(viewActions.querySelectorAll('button')).forEach(btn => {
@@ -295,7 +275,7 @@ function applyProfileMode(isEditable, viewerSignedIn) {
   }
   if (warning) {
     warning.textContent = isEditable
-      ? 'Any user with inappropriate profile images will be banned.'
+      ? 'Profiles are name-only. Users who attempt to add profile images may be banned.'
       : 'Viewing public profile. Sign in to use profile actions.';
   }
 }
@@ -399,77 +379,13 @@ async function saveProfile() {
       email: user.email || '',
       displayName: username,
       bio: bio,
+      photoURL: '',
       updatedAt: new Date().toISOString(),
       lastLogin: new Date().toISOString()
     }, { merge: true });
     setProfileStatus('Profile saved.', false);
   } catch (err) {
     setProfileStatus('Save failed: ' + err.message, true);
-  }
-}
-
-async function uploadProfilePicture() {
-  const user = auth.currentUser;
-  if (!user) {
-    setProfileStatus('Please sign in first.', true);
-    return;
-  }
-
-  const picker = document.getElementById('profile-picture');
-  const file = picker && picker.files && picker.files[0] ? picker.files[0] : null;
-  if (!file) {
-    setProfileStatus('Select an image first.', true);
-    return;
-  }
-
-  try {
-    setProfileStatus('Uploading profile picture...', false);
-    const optimized = await optimizeProfileImage(file);
-    let photoURL = '';
-    const previousPhotoURL = String(user.photoURL || '').trim();
-
-    if (!storage || typeof storage.ref !== 'function') {
-      throw new Error('Storage service unavailable. Please try again shortly.');
-    }
-
-    const path = 'uploads/' + user.uid + '/profile/avatar.jpg';
-    const ref = storage.ref(path);
-    try {
-      await ref.putString(optimized, 'data_url', { contentType: 'image/jpeg' });
-      photoURL = String(await ref.getDownloadURL() || '').trim();
-    } catch (storageErr) {
-      const reason = storageErr && storageErr.message ? storageErr.message : 'Storage upload failed.';
-      throw new Error('Could not store profile image in cloud storage: ' + reason);
-    }
-
-    if (!/^https?:\/\//i.test(photoURL) || /^data:/i.test(photoURL)) {
-      throw new Error('Invalid uploaded profile URL. Please retry the upload.');
-    }
-
-    await user.updateProfile({ photoURL: photoURL });
-    
-    // Sync user role flags before writing to ensure permission checks pass
-    try {
-      const token = await user.getIdToken();
-      await fetch('/api/social?type=sync-user', {
-        method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-      }).catch(() => {});
-    } catch (syncErr) {
-      if (window.rogLogger) rogLogger.warn('Could not sync user role flags:', syncErr);
-    }
-    
-    await db.collection('users').doc(user.uid).set({
-      photoURL: photoURL,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-    await deletePreviousProfileImageIfSafe(storage, user.uid, previousPhotoURL, photoURL);
-
-    const avatar = document.getElementById('profile-avatar');
-    if (avatar) avatar.src = photoURL;
-    setProfileStatus('Profile picture updated.', false);
-  } catch (err) {
-    setProfileStatus('Upload failed: ' + err.message, true);
   }
 }
 
@@ -497,7 +413,6 @@ auth.onAuthStateChanged(async user => {
       viewedProfileData = await loadPublicProfile(queryUid);
       document.getElementById('profile-username').value = viewedProfileData.displayName || '';
       document.getElementById('profile-bio').value = viewedProfileData.bio || '';
-      document.getElementById('profile-avatar').src = viewedProfileData.photoURL || 'logo.png';
       applyProfileMode(false, false);
       setProfileStatus('Viewing profile of ' + (viewedProfileData.displayName || 'Agent') + '.', false);
     } catch (err) {
@@ -535,7 +450,6 @@ auth.onAuthStateChanged(async user => {
       viewedProfileData = await loadPublicProfile(queryUid);
       document.getElementById('profile-username').value = viewedProfileData.displayName || '';
       document.getElementById('profile-bio').value = viewedProfileData.bio || '';
-      document.getElementById('profile-avatar').src = viewedProfileData.photoURL || 'logo.png';
       document.getElementById('profile-role').textContent = 'Role: ' + (viewedProfileData.roleName || viewedProfileData.role || 'User');
       applyProfileMode(false, true);
       setProfileStatus('Viewing profile of ' + (viewedProfileData.displayName || 'Agent') + '.', false);
@@ -550,7 +464,6 @@ auth.onAuthStateChanged(async user => {
 
 configureSocialApiBase();
 document.getElementById('profile-save-btn')?.addEventListener('click', saveProfile);
-document.getElementById('profile-upload-btn')?.addEventListener('click', uploadProfilePicture);
 document.getElementById('profile-message-btn')?.addEventListener('click', openMessageToViewedProfile);
 document.getElementById('profile-add-friend-btn')?.addEventListener('click', addFriendFromProfile);
 document.getElementById('profile-report-btn')?.addEventListener('click', reportFromProfile);

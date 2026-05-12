@@ -41,7 +41,7 @@
     .comment-thread { display:grid; gap:10px; }
     .comment-replies { margin-left: 16px; padding-left: 12px; border-left: 1px solid var(--blk-m); display:grid; gap:10px; }
     .comment-head { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
-    .comment-avatar { width:34px; height:34px; border-radius:50%; border:1px solid var(--red-d); object-fit:cover; background:#111; flex:0 0 auto; }
+    .comment-avatar { display:none; }
     .comment-meta { font-size:.72rem; color: var(--wht-f); display:flex; gap:8px; flex-wrap:wrap; margin-bottom:2px; }
     .comment-author-link { color: var(--wht); font-weight:700; text-decoration:none; }
     .comment-author-link:hover { color: var(--red-b); text-decoration:underline; }
@@ -871,7 +871,6 @@ function renderCommentNode(comment, depth = 0) {
   const editedIndicator = comment.editedAt ? '<span style="font-size:.7rem;color:var(--wht-f);margin-left:8px">(edited ' + escapeCommentHtml(formatCommentDate(comment.editedAt)) + ')</span>' : '';
   const authorName = escapeCommentHtml(comment.authorName || 'Agent');
   const authorUid = escapeCommentHtml(comment.authorUid || '');
-  const authorPhoto = escapeCommentHtml(comment.authorPhotoURL || 'logo.png');
   const profileHref = comment.authorUid ? ('profile.html?uid=' + encodeURIComponent(comment.authorUid || '')) : '';
   const authorLabel = profileHref
     ? ('<a class="comment-author-link" href="' + escapeCommentHtml(profileHref) + '">' + authorName + '</a>')
@@ -891,7 +890,6 @@ function renderCommentNode(comment, depth = 0) {
   return '<div class="comment-thread" data-depth="' + depth + '">' +
     '<article class="comment-item">' +
       '<div class="comment-head">' +
-        '<img class="comment-avatar" src="' + authorPhoto + '" alt="' + authorName + '" loading="lazy" decoding="async" />' +
         '<div style="min-width:0;flex:1">' +
           '<div class="comment-meta">' +
             authorLabel +
