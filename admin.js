@@ -143,9 +143,10 @@ function getRoleDisplayName(userDoc) {
 
 function getRoleDisplayNameForUserRecord(userRecord) {
   const user = userRecord || {};
-  const email = String(user.email || '').toLowerCase();
-  const explicitRole = String(user.role || '').toLowerCase().trim();
-  const resolvedRole = email ? resolveRole(email) : '';
+  const email = String(user.email || '').toLowerCase().trim();
+  const explicitRole = String(user.role || '').toLowerCase();
+  let resolvedRole = '';
+  if (email) resolvedRole = resolveRole(email);
   const roleKey = resolvedRole || explicitRole;
 
   if (roleKey && ROLE_NAMES[roleKey]) return ROLE_NAMES[roleKey];
@@ -2493,7 +2494,16 @@ async function refreshRolesDisplay() {
       const user = docSnap.data() || {};
       const email = String(user.email || '').toLowerCase();
       if (!email) return;
-      const sourceRole = user.role || user.roleName || ROLE_DATA.userRoles[email] || '';
+      // Resolve role: prefer explicit canonical `role`, then existing cached role,
+      // then attempt to map a human-readable `roleName` back to a canonical key.
+      let sourceRole = '';
+      if (user.role) sourceRole = user.role;
+      else if (ROLE_DATA.userRoles[email]) sourceRole = ROLE_DATA.userRoles[email];
+      else if (user.roleName) {
+        const rn = String(user.roleName || '').toLowerCase().trim();
+        const match = Object.keys(ROLE_NAMES).find(k => String(ROLE_NAMES[k] || '').toLowerCase() === rn);
+        if (match) sourceRole = match;
+      }
       const normalizedRole = normalizeRole(sourceRole);
       const level = getRoleLevelValue(normalizedRole);
       // Only merge elevated roles (contributors and above) or explicit owners

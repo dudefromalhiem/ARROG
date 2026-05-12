@@ -1272,6 +1272,25 @@ hr {
   }
 }
 
+/* Mobile: hide lengthy intro/terminal overlays that block content on phones */
+@media (max-width: 768px) {
+  #clearance-welcome { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+  .term { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+
+  /* Admin UI: stacked layout and larger touch targets */
+  .adm { flex-direction: column; gap: 12px; }
+  .adm-side { width: 100%; order: 1; }
+  .adm-main { order: 2; }
+  .adm-side a { display: block; padding: 12px 14px; font-size: 0.95rem; }
+  .adm-side .on { padding-left: 12px; }
+
+  .adm .fi, .adm input.fi, .adm select.fi, .adm textarea.fi { min-height: 44px; font-size: 1rem; padding: 10px 12px; }
+  .adm .btn, .adm .btn-sm { min-height: 44px; padding: 10px 14px; font-size: 0.95rem; }
+
+  /* Make role editor controls easier to tap */
+  #admin-list > div, #mod-list > div, #owners-list > div { padding: 12px 14px; }
+}
+
 .home-page .intro-hero {
   display: grid;
   place-items: center;
