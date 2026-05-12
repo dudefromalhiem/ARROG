@@ -1185,17 +1185,17 @@ hr {
   position: relative;
   grid-area: 1 / 1;
   width: 100%;
-  max-width: 240px;
+  max-width: 280px;
   height: auto;
   aspect-ratio: 1 / 1;
   transform: none;
   left: auto;
   top: auto;
   margin: 0 auto 0;
-  opacity: .25;
+  opacity: .95;
   animation: none;
   transition: none;
-  filter: drop-shadow(0 0 18px rgba(139, 0, 0, .18));
+  filter: drop-shadow(0 0 20px rgba(139, 0, 0, .22));
   z-index: 0;
   pointer-events: none;
 }
@@ -1243,9 +1243,9 @@ hr {
 
 @media (max-width: 480px) {
   .home-page .intro-logo {
-    width: min(72vw, 140px);
-    max-width: 140px;
-    opacity: .25;
+    width: min(78vw, 180px);
+    max-width: 180px;
+    opacity: .95;
   }
 
   .home-page .intro-hero {
