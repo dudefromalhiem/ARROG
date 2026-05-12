@@ -226,6 +226,33 @@ function normalizeRole(role) {
   return str;
 }
 
+function getRoleLevelValue(role) {
+  const normalized = String(typeof normalizeRole === 'function' ? normalizeRole(role) : role || '').toLowerCase();
+  return ROLE_LEVELS[normalized] || ROLE_LEVELS[normalized.replace(/_/g, '-')] || 0;
+}
+
+function getRoleBucketKey(role) {
+  const normalized = String(typeof normalizeRole === 'function' ? normalizeRole(role) : role || '').toLowerCase();
+  const level = getRoleLevelValue(normalized);
+
+  if (normalized === 'owner' || level >= 100) return 'owner';
+  if (/chief.*admin/.test(normalized)) return 'chief_admin';
+  if (/deputy.*chief.*admin/.test(normalized)) return 'deputy_chief_admin';
+  if (/senior.*admin/.test(normalized)) return 'senior_admin';
+  if (/(^|_)admin(_|$)|administrator/.test(normalized)) return 'admin';
+  if (/junior.*admin/.test(normalized)) return 'junior_admin';
+
+  if (/chief.*mod|moderation.*chief/.test(normalized)) return 'chief_mod';
+  if (/deputy.*chief.*mod/.test(normalized)) return 'deputy_chief_mod';
+  if (/senior.*mod/.test(normalized)) return 'senior_mod';
+  if (/(^|_)mod(_|$)|moderator/.test(normalized)) return 'moderator';
+  if (/junior.*mod/.test(normalized)) return 'junior_mod';
+
+  if (/contributor|editor/.test(normalized) || level >= 60) return 'contributor';
+  if (level >= 5) return 'site_member';
+  return 'other';
+}
+
 function getCurrentRole() {
   return getRoleDisplayName(currentUserDoc);
 }
@@ -2261,12 +2288,16 @@ async function refreshUsers() {
     // Build full user list from Firestore
     const users = snap.docs.map(d => {
       const u = d.data() || {};
+      const email = String(u.email || '').toLowerCase();
+      const roleSource = String(u.role || u.roleName || 'user');
       return {
         uid: d.id,
-        email: String(u.email || '').toLowerCase(),
+        email,
         displayName: String(u.displayName || u.email || 'Unknown Agent'),
-        role: String(u.role || 'user'),
+        role: roleSource,
         roleName: String(u.roleName || ''),
+        sortRole: normalizeRole(roleSource),
+        sortLevel: getRoleLevelValue(roleSource),
         lastLogin: u.lastLogin || u.updatedAt || null,
         raw: u
       };
@@ -2294,70 +2325,47 @@ async function refreshUsers() {
     // Resolve role for display and group users with explicit hierarchy buckets
     const groups = {
       owner: [],
+      chief_admin: [],
+      deputy_chief_admin: [],
       senior_admin: [],
       admin: [],
       junior_admin: [],
-      senior_moderator: [],
+      chief_mod: [],
+      deputy_chief_mod: [],
+      senior_mod: [],
       moderator: [],
-      junior_moderator: [],
+      junior_mod: [],
       contributor: [],
       site_member: [],
       other: []
     };
 
-    const toHierarchyKey = (rawRole) => {
-      const normalized = String(rawRole || '').toLowerCase().trim().replace(/\s+/g, '_');
-      if (!normalized) return 'site_member';
-      if (normalized === 'owner' || normalized === 'the_archivist') return 'owner';
-
-      // Admin variants -> map to ROLE_LEVELS canonical keys
-      if (normalized === 'chief_administrator' || normalized === 'chief_admin' || normalized === 'chief-admin' ||
-        normalized === 'deputy_chief_administrator' || normalized === 'deputy_chief_admin' || normalized === 'deputy-chief-admin') return 'chief_admin';
-      if (normalized === 'senior_administrator' || normalized === 'senior_admin' || normalized === 'senior-admin') return 'senior-admin';
-      if (normalized === 'administrator' || normalized === 'admin') return 'admin';
-      if (normalized === 'junior_administrator' || normalized === 'junior_admin' || normalized === 'junior-admin') return 'junior_admin';
-
-      // Mod variants -> map to ROLE_LEVELS canonical keys
-      if (normalized === 'chief_of_moderation' || normalized === 'chief_moderator' || normalized === 'chief_mod' || normalized === 'chief-mod' ||
-        normalized === 'deputy_chief_of_moderation' || normalized === 'deputy_chief_moderator' || normalized === 'deputy_chief_mod' || normalized === 'deputy-chief-mod') return 'chief-mod';
-      if (normalized === 'senior_moderator' || normalized === 'senior_mod' || normalized === 'senior-mod') return 'senior-mod';
-      if (normalized === 'moderator' || normalized === 'mod') return 'moderator';
-      if (normalized === 'junior_moderator' || normalized === 'junior_mod' || normalized === 'junior-mod') return 'junior_moderator';
-
-      if (normalized === 'contributor' || normalized === 'editor') return 'contributor';
-      if (normalized === 'site_member' || normalized === 'user' || normalized === 'newbie' || normalized === 'guest') return 'site_member';
-
-      return 'other';
-    };
-
-    // Safely bucket users into groups. Use canonical normalizeRole and level-based mapping
     users.forEach(u => {
       try {
         const email = String(u.email || '').toLowerCase();
         const mapped = (ROLE_DATA.userRoles && ROLE_DATA.userRoles[email]) ? ROLE_DATA.userRoles[email] : (u.role || 'user');
-        const normalized = String(typeof normalizeRole === 'function' ? normalizeRole(mapped) : (mapped || '')).toLowerCase().replace(/-/g, '_');
-        let level = ROLE_LEVELS[normalized] || ROLE_LEVELS[normalized.replace(/_/g,'-')] || 0;
-
-        // Bucket by level and explicit name hints
-        let bucket = 'other';
-        if (normalized === 'owner' || level >= 100) bucket = 'owner';
-        else if (level >= 90) bucket = 'senior_admin';
-        else if (level >= 80) bucket = 'admin';
-        else if (level >= 75) bucket = 'junior_admin';
-        else if ((/senior/.test(normalized) && level >= 70)) bucket = 'senior_moderator';
-        else if (level >= 70) bucket = 'moderator';
-        else if (level >= 65) bucket = 'junior_moderator';
-        else if (level >= 60) bucket = 'contributor';
-        else if (level >= 5) bucket = 'site_member';
-        else bucket = 'other';
-
-        if (!groups[bucket]) bucket = 'other';
+        const bucket = getRoleBucketKey(mapped || 'site_member');
+        if (!groups[bucket]) {
+          groups.other.push(u);
+          return;
+        }
         groups[bucket].push(u);
       } catch (e) {
         console.error('Error bucketing user', u, e);
         groups.other.push(u);
       }
     });
+
+    const sortBucket = arr => arr.sort((a, b) => {
+      const levelA = Number(a.sortLevel ?? getRoleLevelValue(a.sortRole || a.role || 'user'));
+      const levelB = Number(b.sortLevel ?? getRoleLevelValue(b.sortRole || b.role || 'user'));
+      if (levelB !== levelA) return levelB - levelA;
+      const nameA = String(a.displayName || a.email || '').toLowerCase();
+      const nameB = String(b.displayName || b.email || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    Object.keys(groups).forEach(key => sortBucket(groups[key]));
 
     // Helper to render a group as table rows with a section header
     const renderGroup = (label, arr) => {
@@ -2374,12 +2382,16 @@ async function refreshUsers() {
     // Order: explicit hierarchy requested for admin user listing
     const html = [];
     html.push(renderGroup('Owners', groups.owner));
+    html.push(renderGroup('Chief Administrators', groups.chief_admin));
+    html.push(renderGroup('Deputy Chief Administrators', groups.deputy_chief_admin));
     html.push(renderGroup('Senior Administrators', groups.senior_admin));
     html.push(renderGroup('Administrators', groups.admin));
     html.push(renderGroup('Junior Administrators', groups.junior_admin));
-    html.push(renderGroup('Senior Moderators', groups.senior_moderator));
+    html.push(renderGroup('Chief Moderators', groups.chief_mod));
+    html.push(renderGroup('Deputy Chief Moderators', groups.deputy_chief_mod));
+    html.push(renderGroup('Senior Moderators', groups.senior_mod));
     html.push(renderGroup('Moderators', groups.moderator));
-    html.push(renderGroup('Junior Moderators', groups.junior_moderator));
+    html.push(renderGroup('Junior Moderators', groups.junior_mod));
     html.push(renderGroup('Contributors', groups.contributor));
     html.push(renderGroup('Site Members', groups.site_member));
     html.push(renderGroup('Other Roles', groups.other));
@@ -2473,6 +2485,25 @@ async function refreshRolesDisplay() {
     }
   } catch(e) { /* keep cached */ }
 
+  // Also pull role data from the users collection so staff still appears even
+  // when config/roles is incomplete or uses a different source of truth.
+  try {
+    const usersSnap = await db.collection('users').get();
+    usersSnap.docs.forEach(docSnap => {
+      const user = docSnap.data() || {};
+      const email = String(user.email || '').toLowerCase();
+      if (!email) return;
+      const sourceRole = user.role || user.roleName || ROLE_DATA.userRoles[email] || '';
+      const normalizedRole = normalizeRole(sourceRole);
+      const level = getRoleLevelValue(normalizedRole);
+      if (level >= 10 || normalizedRole === 'owner') {
+        ROLE_DATA.userRoles[email] = normalizedRole;
+      }
+    });
+  } catch (e) {
+    console.warn('[ADMIN] Could not merge users collection into roles view', e);
+  }
+
   // Set userRoles for backward compatibility
   ROLE_DATA.owners.forEach(email => {
     if (!ROLE_DATA.userRoles[email]) ROLE_DATA.userRoles[email] = 'owner';
@@ -2509,12 +2540,12 @@ async function refreshRolesDisplay() {
   const adminStaff = Object.entries(ROLE_DATA.userRoles)
     .filter(([email, role]) => {
       const normalizedRole = normalizeRole(role);
-      const level = ROLE_LEVELS[normalizedRole] || ROLE_LEVELS[normalizedRole.replace(/_/g,'-')] || 0;
+      const level = getRoleLevelValue(normalizedRole);
       return level >= 75 && level < 100;
     })
     .sort(([, a], [, b]) => {
-      const levelA = ROLE_LEVELS[normalizeRole(a)] || ROLE_LEVELS[normalizeRole(a).replace(/_/g,'-')] || 0;
-      const levelB = ROLE_LEVELS[normalizeRole(b)] || ROLE_LEVELS[normalizeRole(b).replace(/_/g,'-')] || 0;
+      const levelA = getRoleLevelValue(a);
+      const levelB = getRoleLevelValue(b);
       return levelB - levelA;
     });
 
@@ -2539,12 +2570,12 @@ async function refreshRolesDisplay() {
   const modStaff = Object.entries(ROLE_DATA.userRoles)
     .filter(([email, role]) => {
       const normalizedRole = normalizeRole(role);
-      const level = ROLE_LEVELS[normalizedRole] || ROLE_LEVELS[normalizedRole.replace(/_/g,'-')] || 0;
+      const level = getRoleLevelValue(normalizedRole);
       return level >= 10 && level < 75;
     })
     .sort(([, a], [, b]) => {
-      const levelA = ROLE_LEVELS[normalizeRole(a)] || ROLE_LEVELS[normalizeRole(a).replace(/_/g,'-')] || 0;
-      const levelB = ROLE_LEVELS[normalizeRole(b)] || ROLE_LEVELS[normalizeRole(b).replace(/_/g,'-')] || 0;
+      const levelA = getRoleLevelValue(a);
+      const levelB = getRoleLevelValue(b);
       return levelB - levelA;
     });
 
@@ -2824,7 +2855,7 @@ async function refreshLiveVersion(gitHubRepo) {
     if (indicator) {
       indicator.style.display = 'none';
     }
-    throw error;
+    return currentAppVersion || 'unknown';
   }
 }
 
