@@ -3079,7 +3079,19 @@ hr {
 
 /* Utility */
 .hidden {
-  display: none !important
+  display: none !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Disable reveal animations on editor elements */
+#doc-mode,
+#doc-blocks,
+.doc-canvas,
+.doc-block,
+.doc-editable {
+  animation: none !important !important;
+  transition: none !important !important;
 }
 
 .tc {

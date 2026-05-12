@@ -2236,6 +2236,9 @@ function switchMode(mode) {
     renderDocBlocks();
     if (docMode) {
       docMode.classList.remove('hidden');
+      // Disable animations on doc editor to prevent reveal interruptions
+      docMode.style.animation = 'none !important';
+      docMode.style.transition = 'none !important';
     }
   } else if (mode === 'code') {
     restoreEditorState('code');
@@ -2935,6 +2938,14 @@ function renderDocBlocks() {
 
     return '<div class="doc-block" data-index="' + idx + '">' + head + '<div class="doc-block-body">' + body + '</div></div>';
   }).join('');
+  
+  // Disable animations on rendered blocks to prevent reveal interruptions
+  holder.style.animation = 'none !important';
+  holder.style.transition = 'none !important';
+  holder.querySelectorAll('.doc-block, .doc-editable').forEach(el => {
+    el.style.animation = 'none !important';
+    el.style.transition = 'none !important';
+  });
 }
 
 function updateDocImagePreviewInBlock(blockEl, url) {

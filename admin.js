@@ -2235,24 +2235,26 @@ async function refreshUsers() {
     };
 
     const toHierarchyKey = (rawRole) => {
-      const normalized = String(rawRole || '').toLowerCase().trim();
+      const normalized = String(rawRole || '').toLowerCase().trim().replace(/\s+/g, '_');
       if (!normalized) return 'site_member';
-      if (normalized === 'owner' || normalized === 'the archivist') return 'owner';
+      if (normalized === 'owner' || normalized === 'the_archivist') return 'owner';
 
-      if (normalized === 'senior_administrator' || normalized === 'senior-admin') return 'senior_admin';
+      // Senior/Deputy Chief Admin variants
+      if (normalized === 'chief_administrator' || normalized === 'chief_admin' || normalized === 'chief-admin' || 
+          normalized === 'deputy_chief_administrator' || normalized === 'deputy_chief_admin' || normalized === 'deputy-chief-admin') return 'senior_admin';
+      if (normalized === 'senior_administrator' || normalized === 'senior_admin' || normalized === 'senior-admin') return 'senior_admin';
       if (normalized === 'administrator' || normalized === 'admin') return 'admin';
       if (normalized === 'junior_administrator' || normalized === 'junior_admin' || normalized === 'junior-admin') return 'junior_admin';
 
-      if (normalized === 'senior_moderator' || normalized === 'senior-mod') return 'senior_moderator';
+      // Senior/Deputy Chief Mod variants
+      if (normalized === 'chief_of_moderation' || normalized === 'chief_moderator' || normalized === 'chief_mod' || normalized === 'chief-mod' ||
+          normalized === 'deputy_chief_of_moderation' || normalized === 'deputy_chief_moderator' || normalized === 'deputy_chief_mod' || normalized === 'deputy-chief-mod') return 'senior_moderator';
+      if (normalized === 'senior_moderator' || normalized === 'senior_mod' || normalized === 'senior-mod') return 'senior_moderator';
       if (normalized === 'moderator' || normalized === 'mod') return 'moderator';
-      if (normalized === 'junior_moderator' || normalized === 'junior-mod') return 'junior_moderator';
+      if (normalized === 'junior_moderator' || normalized === 'junior_mod' || normalized === 'junior-mod') return 'junior_moderator';
 
       if (normalized === 'contributor' || normalized === 'editor') return 'contributor';
       if (normalized === 'site_member' || normalized === 'user' || normalized === 'newbie' || normalized === 'guest') return 'site_member';
-
-      // Map branch-head legacy roles into nearest visible buckets
-      if (normalized === 'chief_admin' || normalized === 'chief-admin' || normalized === 'deputy_chief_administrator' || normalized === 'deputy-chief-admin') return 'senior_admin';
-      if (normalized === 'chief_of_moderation' || normalized === 'chief-mod' || normalized === 'deputy_chief_of_moderation' || normalized === 'deputy-chief-mod') return 'senior_moderator';
 
       return 'other';
     };
@@ -2359,6 +2361,22 @@ async function refreshRolesDisplay() {
   const roleAdminApplications = document.getElementById('role-admin-applications');
   if (!adminList || !modList || !ownersList) return;
 
+  // Normalize role string to lowercase for consistent lookup - maps role names to canonical forms
+  const normalizeRole = (role) => {
+    const str = String(role || '').toLowerCase().trim().replace(/\s+/g, '_');
+    // Map common role name variants to canonical forms in ROLE_LEVELS
+    const roleMap = {
+      'chief_administrator': 'chief_admin',
+      'chief_of_moderation': 'chief-mod',
+      'deputy_chief_administrator': 'deputy-chief-admin',
+      'deputy_chief_moderator': 'deputy-chief-mod',
+      'deputy_chief_of_moderation': 'deputy-chief-mod',
+      'senior_administrator': 'senior-admin',
+      'senior_moderator': 'senior-mod',
+    };
+    return roleMap[str] || str;
+  };
+
   // Refresh from Firestore
   try {
     const doc = await db.collection('config').doc('roles').get();
@@ -2368,6 +2386,10 @@ async function refreshRolesDisplay() {
       ROLE_DATA.admins = (d.admins || []).map(e => e.toLowerCase());
       ROLE_DATA.mods = (d.mods || []).map(e => e.toLowerCase());
       ROLE_DATA.userRoles = d.userRoles || {};
+      // Normalize all roles in userRoles to lowercase
+      Object.keys(ROLE_DATA.userRoles).forEach(email => {
+        ROLE_DATA.userRoles[email] = normalizeRole(ROLE_DATA.userRoles[email]);
+      });
       ROLE_DATA.adminAppointments = d.adminAppointments || {};
     }
   } catch(e) { /* keep cached */ }
@@ -2405,22 +2427,28 @@ async function refreshRolesDisplay() {
   // Administrative Staff (level >=75 and <100)
   const adminStaff = Object.entries(ROLE_DATA.userRoles)
     .filter(([email, role]) => {
-      const level = ROLE_LEVELS[role] || 0;
+      const normalizedRole = normalizeRole(role);
+      const level = ROLE_LEVELS[normalizedRole] || 0;
       return level >= 75 && level < 100;
     })
-    .sort(([, a], [, b]) => (ROLE_LEVELS[b] || 0) - (ROLE_LEVELS[a] || 0));
+    .sort(([, a], [, b]) => {
+      const levelA = ROLE_LEVELS[normalizeRole(a)] || 0;
+      const levelB = ROLE_LEVELS[normalizeRole(b)] || 0;
+      return levelB - levelA;
+    });
 
   if (adminStaff.length === 0) {
     adminList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No administrative staff assigned yet.</p>';
   } else {
     adminList.innerHTML = adminStaff.map(([email, role]) => {
       const canRevoke = canEditRole(email, currentEmail);
-      const roleName = ROLE_NAMES[role] || role;
+      const normalizedRole = normalizeRole(role);
+      const roleName = ROLE_NAMES[normalizedRole] || normalizedRole;
       const normalizedEmail = String(email || '').toLowerCase();
       return `
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid rgba(204,0,0,.3);margin-bottom:4px;font-family:monospace;font-size:.85rem;background:rgba(139,0,0,.08)">
           <span>${escapeHtml(normalizedEmail)} <span style="color:var(--wht-d)">(${escapeHtml(roleName)})</span></span>
-          ${canRevoke ? renderRoleEditor(email, role) : '<span style="color:var(--wht-d);font-size:.75rem">No actions</span>'}
+          ${canRevoke ? renderRoleEditor(email, normalizedRole) : '<span style="color:var(--wht-d);font-size:.75rem">No actions</span>'}
         </div>
       `;
     }).join('');
@@ -2429,22 +2457,28 @@ async function refreshRolesDisplay() {
   // Moderation Staff (level >=10 and <75)
   const modStaff = Object.entries(ROLE_DATA.userRoles)
     .filter(([email, role]) => {
-      const level = ROLE_LEVELS[role] || 0;
+      const normalizedRole = normalizeRole(role);
+      const level = ROLE_LEVELS[normalizedRole] || 0;
       return level >= 10 && level < 75;
     })
-    .sort(([, a], [, b]) => (ROLE_LEVELS[b] || 0) - (ROLE_LEVELS[a] || 0));
+    .sort(([, a], [, b]) => {
+      const levelA = ROLE_LEVELS[normalizeRole(a)] || 0;
+      const levelB = ROLE_LEVELS[normalizeRole(b)] || 0;
+      return levelB - levelA;
+    });
 
   if (modStaff.length === 0) {
     modList.innerHTML = '<p style="color:var(--wht-f);font-size:.85rem;padding:8px 0">No moderation staff assigned yet.</p>';
   } else {
     modList.innerHTML = modStaff.map(([email, role]) => {
       const canRevoke = canEditRole(email, currentEmail);
-      const roleName = ROLE_NAMES[role] || role;
+      const normalizedRole = normalizeRole(role);
+      const roleName = ROLE_NAMES[normalizedRole] || normalizedRole;
       const normalizedEmail = String(email || '').toLowerCase();
       return `
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid rgba(139,0,0,.3);margin-bottom:4px;font-family:monospace;font-size:.85rem">
           <span>${escapeHtml(normalizedEmail)} <span style="color:var(--wht-d)">(${escapeHtml(roleName)})</span></span>
-          ${canRevoke ? renderRoleEditor(email, role) : '<span style="color:var(--wht-d);font-size:.75rem">No actions</span>'}
+          ${canRevoke ? renderRoleEditor(email, normalizedRole) : '<span style="color:var(--wht-d);font-size:.75rem">No actions</span>'}
         </div>
       `;
     }).join('');
