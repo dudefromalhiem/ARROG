@@ -256,6 +256,7 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+<script src="permissions.js"></script>
 <script src="firebase-config.js"></script>
 
 <script>
@@ -299,6 +300,21 @@ function formatDateTime(value) {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return '';
   return dt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function normalizedRole(value) {
+  return typeof normalizeRole === 'function' ? normalizeRole(value) : String(value || '').toLowerCase();
+}
+
+function isContributorRole(value) {
+  const roles = window.REDOAK_ROLES || {};
+  return normalizedRole(value) === (roles.CONTRIBUTOR || 'contributor');
+}
+
+function canMessageTarget(role) {
+  const roles = window.REDOAK_ROLES || {};
+  if (typeof isAtLeast !== 'function' || !roles.JUNIOR_MODERATOR) return false;
+  return isAtLeast(role, roles.JUNIOR_MODERATOR);
 }
 
 function configureSocialApiBase() {
@@ -598,7 +614,14 @@ function renderFriends() {
     const isActive = row.peer.peerUid === currentPeerUid;
     const preview = escapeHtml(String(row.thread.lastMessagePreview || 'No messages yet'));
     const isGroup = row.peer.peerRole === 'group';
-    const profileLinks = isGroup ? '<span class="msg-item-profile-link" style="cursor:default">Channel</span>' : '<a href="profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '" data-open-profile="1" style="color:var(--wht-b);text-decoration:none">' + escapeHtml(row.peer.peerName) + '</a><a class="msg-item-profile-link" href="profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '" data-open-profile="1">Profile</a>';
+    const profileHref = row.peer.peerUid && row.peer.peerUid !== currentUser.uid
+      ? 'profile.html?uid=' + encodeURIComponent(row.peer.peerUid || '') + '&view=public'
+      : '';
+    const profileLinks = isGroup
+      ? '<span class="msg-item-profile-link" style="cursor:default">Channel</span>'
+      : (profileHref
+        ? '<a href="' + profileHref + '" data-open-profile="1" style="color:var(--wht-b);text-decoration:none">' + escapeHtml(row.peer.peerName) + '</a><a class="msg-item-profile-link" href="' + profileHref + '" data-open-profile="1">Profile</a>'
+        : '<span style="color:var(--wht-b);text-decoration:none">' + escapeHtml(row.peer.peerName) + '</span><span class="msg-item-profile-link" style="cursor:default;opacity:.6">Profile unavailable</span>');
     const groupTitle = isGroup ? '<div style="color:var(--wht-b);font-weight:bold;font-size:0.9rem;margin-bottom:4px;">' + escapeHtml(row.peer.peerName) + '</div>' : '';
     return '<button type="button" class="msg-item ' + (isGroup ? 'group ' : '') + (isActive ? 'active' : '') + '" data-peer-uid="' + escapeHtml(row.peer.peerUid) + '" data-peer-name="' + escapeHtml(row.peer.peerName) + '">' +
       '<div class="msg-item-name"><span class="msg-item-status"></span>' + groupTitle + profileLinks + '</div>' +
@@ -641,14 +664,25 @@ async function renderRequests() {
   if (query.length >= 2) {
     try {
       const result = await apiGet('searchusers', { q: query });
-      const users = (result.users || []).filter(u => u.uid && u.uid !== currentUser.uid).slice(0, 20);
-      directoryHtml = users.length ? users.map(u => {
+      const users = (result.users || [])
+        .filter(u => u.uid && u.uid !== currentUser.uid)
+        .filter(u => !isContributorRole(u.role));
+      const visibleUsers = users.slice(0, 20);
+      directoryHtml = visibleUsers.length ? visibleUsers.map(u => {
+        const role = normalizedRole(u.role);
+        const profileHref = 'profile.html?uid=' + encodeURIComponent(u.uid) + '&view=public';
+        const canMessage = canMessageTarget(role);
         return '<div class="msg-request-card">' +
           '<div class="msg-request-header">' +
             '<span class="msg-request-name">' + escapeHtml(u.displayName || 'Guild Member') + '</span>' +
-            '<div class="msg-request-actions"><button type="button" class="msg-request-btn" data-request-uid="' + escapeHtml(u.uid) + '" data-request-name="' + escapeHtml(u.displayName || 'Guild Member') + '">Send Request</button></div>' +
+            '<div class="msg-request-actions">' +
+              '<a class="msg-request-btn" href="' + profileHref + '" style="text-decoration:none;display:inline-flex;align-items:center;">View Profile</a>' +
+              (canMessage
+                ? '<button type="button" class="msg-request-btn" data-request-uid="' + escapeHtml(u.uid) + '" data-request-name="' + escapeHtml(u.displayName || 'Guild Member') + '">Send Request</button>'
+                : '<span class="msg-request-btn reject" style="cursor:default;pointer-events:none;">Message Restricted</span>') +
+            '</div>' +
           '</div>' +
-          '<p style="font-size:0.8rem;color:var(--wht-f);">Send friend request to start messaging.</p>' +
+          '<p style="font-size:0.8rem;color:var(--wht-f);">' + escapeHtml(u.roleName || u.role || 'Guild Member') + '</p>' +
         '</div>';
       }).join('') : '<div class="msg-empty">No matching members found.</div>';
     } catch (_err) {

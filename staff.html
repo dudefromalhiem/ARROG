@@ -159,14 +159,21 @@ function renderAdminRoster(items) {
     const role = escapeHtmlStaff((ROLE_META.ROLE_LABELS && ROLE_META.ROLE_LABELS[normalizedRole]) || item.role || 'Authority');
     const date = formatDateTime(item.appointedAt);
     const uid = encodeURIComponent(String(item.uid || ''));
+    const hasUid = !!String(item.uid || '').trim();
     const encodedName = encodeURIComponent(String(item.displayName || 'Agent'));
+    const profileAction = hasUid
+      ? '<a class="btn btn-s" href="profile.html?uid=' + uid + '&view=public">View Profile</a>'
+      : '<span class="btn btn-s" style="opacity:.55;cursor:not-allowed">Profile unavailable</span>';
+    const messageAction = hasUid
+      ? '<button class="btn btn-s" type="button" data-uid="' + uid + '" data-name="' + encodedName + '" onclick="openDirectMessage(this.dataset.uid, this.dataset.name)">Message Admin</button>'
+      : '<span class="btn btn-s" style="opacity:.55;cursor:not-allowed">Message unavailable</span>';
     return '<div class="card">' +
       '<div class="card-t">' + name + '</div>' +
       '<div class="card-m">' + role + '</div>' +
       '<div class="card-b">Appointed ' + date + '</div>' +
       '<div style="margin-top:12px;display:flex;gap:8px">' +
-        '<a class="btn btn-s" href="profile.html?uid=' + uid + '">View Profile</a>' +
-        '<button class="btn btn-s" type="button" onclick="openDirectMessage(\'' + uid + '\', \'' + encodedName + '\')">Message Admin</button>' +
+        profileAction +
+        messageAction +
       '</div>' +
     '</div>';
   }).join('');

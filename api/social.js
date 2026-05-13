@@ -296,6 +296,7 @@ async function searchUsers(db, queryText) {
   const query = normalizeText(queryText || '', 80).toLowerCase();
   if (!query) return [];
 
+  const roles = await getRolesData(db);
   const snap = await db.collection('users').limit(300).get();
   return snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
     .filter(user => {
@@ -305,6 +306,30 @@ async function searchUsers(db, queryText) {
     .map(user => ({
       uid: String(user.uid || user.id || ''),
       displayName: normalizeText(user.displayName || user.email || 'Agent', 120),
+      role: (() => {
+        const rawEmail = String(user.email || '').toLowerCase();
+        const explicitRole = normalizeRole(user.role || ROLES.NEWBIE);
+        if (isOwnerEmail(rawEmail, roles)) return ROLES.OWNER;
+        if (isAdminEmail(rawEmail, roles) && !isAtLeast(explicitRole, ROLES.ADMINISTRATOR)) {
+          return isAtLeast(explicitRole, ROLES.MODERATOR) ? explicitRole : ROLES.ADMINISTRATOR;
+        }
+        if (isModeratorEmail(rawEmail, roles) && !isAtLeast(explicitRole, ROLES.MODERATOR)) {
+          return isAtLeast(explicitRole, ROLES.CONTRIBUTOR) ? explicitRole : ROLES.MODERATOR;
+        }
+        return explicitRole;
+      })(),
+      roleName: (() => {
+        const rawEmail = String(user.email || '').toLowerCase();
+        const explicitRole = normalizeRole(user.role || ROLES.NEWBIE);
+        if (isOwnerEmail(rawEmail, roles)) return roleLabel(ROLES.OWNER);
+        if (isAdminEmail(rawEmail, roles) && !isAtLeast(explicitRole, ROLES.ADMINISTRATOR)) {
+          return roleLabel(isAtLeast(explicitRole, ROLES.MODERATOR) ? explicitRole : ROLES.ADMINISTRATOR);
+        }
+        if (isModeratorEmail(rawEmail, roles) && !isAtLeast(explicitRole, ROLES.MODERATOR)) {
+          return roleLabel(isAtLeast(explicitRole, ROLES.CONTRIBUTOR) ? explicitRole : ROLES.MODERATOR);
+        }
+        return roleLabel(explicitRole);
+      })(),
       photoURL: ''
     }))
     .filter(user => user.uid);

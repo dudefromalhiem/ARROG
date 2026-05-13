@@ -395,9 +395,21 @@ auth.onAuthStateChanged(async user => {
   const submitLink = document.getElementById('submit-link');
   const nav = document.getElementById('nav');
   let adminLink = nav ? nav.querySelector('#admin-link') : null;
-  const queryUid = String(new URLSearchParams(window.location.search).get('uid') || '').trim();
+  const query = new URLSearchParams(window.location.search);
+  const queryUid = String(query.get('uid') || '').trim();
+  const requestMode = String(query.get('view') || '').trim().toLowerCase();
   const viewingOther = !!queryUid && (!user || queryUid !== user.uid);
   currentProfileUid = queryUid || (user ? user.uid : '');
+
+  if (requestMode === 'public' && !queryUid) {
+    navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
+    if (messagingLink) messagingLink.classList.add('hidden');
+    if (submitLink) submitLink.classList.add('hidden');
+    if (adminLink) adminLink.remove();
+    applyProfileMode(false, !!user);
+    setProfileStatus('Missing profile target.', true);
+    return;
+  }
 
   if (!user) {
     navAuth.innerHTML = '<button class="nav-btn" onclick="location.href=\'index.html\'">Sign In</button>';
