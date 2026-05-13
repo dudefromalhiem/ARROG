@@ -1679,6 +1679,96 @@ async function listContributors(db, actor) {
   return { statusCode: 200, payload: { contributors: Array.from(map.values()) } };
 }
 
+async function hasStaffPanelAccess(db, actor, roles) {
+  const actorRole = await getActorRoleForModeration(db, actor, roles);
+  return isAtLeast(actorRole, ROLES.MODERATOR) || isModeratorEmail(actor.email, roles) || isOwnerEmail(actor.email, roles);
+}
+
+function canViewUnredactedEmails(actorRole, actor, roles) {
+  return isOwnerEmail(actor.email, roles) || actorRole === ROLES.CHIEF_ADMINISTRATOR || actorRole === ROLES.CHIEF_OF_MODERATION;
+}
+
+async function listUsersForAdmin(db, actor, query = {}) {
+  const roles = await getRolesData(db);
+  const actorRole = await getActorRoleForModeration(db, actor, roles);
+  const hasAccess = await hasStaffPanelAccess(db, actor, roles);
+  if (!hasAccess) {
+    return { statusCode: 403, payload: { error: 'Moderator access required.' } };
+  }
+
+  const emailFilter = normalizeText(query.email || query.q || '', 120).toLowerCase();
+  const roleFilter = normalizeRole(query.role || '');
+  const canViewEmail = canViewUnredactedEmails(actorRole, actor, roles);
+
+  const snap = await db.collection('users').limit(800).get();
+  const users = snap.docs
+    .map(doc => ({ id: doc.id, ...(toPlainValue(doc.data() || {})) }))
+    .filter(user => {
+      if (emailFilter) {
+        const email = String(user.email || '').toLowerCase();
+        const displayName = String(user.displayName || '').toLowerCase();
+        if (!email.includes(emailFilter) && !displayName.includes(emailFilter)) return false;
+      }
+      if (query.role) {
+        const role = normalizeRole(user.role || ROLES.NEWBIE);
+        if (role !== roleFilter) return false;
+      }
+      return true;
+    })
+    .map(user => {
+      const rawEmail = String(user.email || '').toLowerCase();
+      const submissionBan = user.submissionBan && typeof user.submissionBan === 'object' ? user.submissionBan : null;
+      return {
+        uid: String(user.uid || user.id || ''),
+        email: canViewEmail || String(user.uid || user.id || '') === actor.uid ? rawEmail : '[Redacted]',
+        role: normalizeRole(user.role || ROLES.NEWBIE),
+        roleName: normalizeText(user.roleName || '', 120),
+        submissionAccess: user.submissionAccess === true,
+        createdAt: user.createdAt || user.joinedAt || null,
+        submissionBan: submissionBan ? {
+          active: submissionBan.active === true,
+          reason: normalizeText(submissionBan.reason || '', 300),
+          days: Number(submissionBan.days || 0),
+          hours: Number(submissionBan.hours || 0),
+          permanent: submissionBan.permanent === true,
+          until: submissionBan.until || null
+        } : null
+      };
+    })
+    .sort((a, b) => {
+      const aTs = Number(a?.createdAt?.seconds || 0);
+      const bTs = Number(b?.createdAt?.seconds || 0);
+      return bTs - aTs;
+    });
+
+  return { statusCode: 200, payload: { users } };
+}
+
+async function listApplicationsForAdmin(db, actor, query = {}) {
+  const roles = await getRolesData(db);
+  const hasAccess = await hasStaffPanelAccess(db, actor, roles);
+  if (!hasAccess) {
+    return { statusCode: 403, payload: { error: 'Moderator access required.' } };
+  }
+
+  const statusFilter = normalizeText(query.status || '', 40).toLowerCase();
+  const roleFilter = normalizeRole(query.role || '');
+
+  const snap = await db.collection('applications').orderBy('submittedAt', 'desc').limit(400).get();
+  const applications = snap.docs
+    .map(doc => ({ id: doc.id, ...(toPlainValue(doc.data() || {})) }))
+    .filter(app => {
+      if (statusFilter && String(app.status || '').toLowerCase() !== statusFilter) return false;
+      if (query.role) {
+        const role = normalizeRole(app.roleApplied || app.requestedRole || '');
+        if (role !== roleFilter) return false;
+      }
+      return true;
+    });
+
+  return { statusCode: 200, payload: { applications } };
+}
+
 async function assignRole(db, actor, body) {
   const rolesRef = db.collection('config').doc('roles');
   const roles = await getRolesData(db);
@@ -1825,6 +1915,16 @@ module.exports = async function handler(req, res) {
       return sendJson(res, result.statusCode, result.payload);
     }
 
+    if (method === 'GET' && type === 'usersforadmin') {
+      const result = await listUsersForAdmin(db, actor, req.query || {});
+      return sendJson(res, result.statusCode, result.payload);
+    }
+
+    if (method === 'GET' && type === 'applicationsforadmin') {
+      const result = await listApplicationsForAdmin(db, actor, req.query || {});
+      return sendJson(res, result.statusCode, result.payload);
+    }
+
     if (method === 'GET' && type === 'sync-user') {
       const result = await syncUserRoleFlags(db, actor);
       return sendJson(res, result.statusCode, result.payload);
@@ -1906,6 +2006,16 @@ module.exports = async function handler(req, res) {
 
       if (action === 'assignrole') {
         const result = await assignRole(db, actor, body);
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'searchusersforadmin') {
+        const result = await listUsersForAdmin(db, actor, body || {});
+        return sendJson(res, result.statusCode, result.payload);
+      }
+
+      if (action === 'getapplicationsforadmin') {
+        const result = await listApplicationsForAdmin(db, actor, body || {});
         return sendJson(res, result.statusCode, result.payload);
       }
 

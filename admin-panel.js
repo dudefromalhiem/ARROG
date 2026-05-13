@@ -4,6 +4,23 @@ let currentUser = null;
 let userPermissions = null;
 const ROLE_META = typeof window !== 'undefined' ? (window.REDOAK_ROLES || {}) : {};
 
+const FALLBACK_ROLE_LADDER = [
+  'newbie',
+  'site_member',
+  'contributor',
+  'junior_moderator',
+  'moderator',
+  'senior_moderator',
+  'deputy_chief_of_moderation',
+  'chief_of_moderation',
+  'junior_admin',
+  'administrator',
+  'senior_administrator',
+  'deputy_chief_administrator',
+  'chief_administrator',
+  'owner'
+];
+
 function getRoleLabel(role) {
   const normalized = typeof normalizeRole === 'function' ? normalizeRole(role) : String(role || '').trim().toLowerCase();
   if (ROLE_META.ROLE_LABELS && ROLE_META.ROLE_LABELS[normalized]) return ROLE_META.ROLE_LABELS[normalized];
@@ -59,20 +76,55 @@ async function initAdminPanel() {
       // Check admin permissions
       const tokenResult = await user.getIdTokenResult();
       userPermissions = tokenResult.claims;
+          // Refresh server-side role flags and profile to determine access
+          let syncResult = null;
+          try {
+            const syncResp = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('type=sync-user') : '/api/social?type=sync-user'), {
+              headers: { 'Authorization': `Bearer ${await currentUser.getIdToken()}` }
+            });
+            if (syncResp.ok) syncResult = await syncResp.json();
+          } catch (e) {
+            // ignore
+          }
 
-      // Verify user can access admin panel
-      if (!tokenResult.claims.admin_user) {
-        showAlert('error', 'You do not have admin access');
-        setTimeout(() => window.location.href = 'index.html', 2000);
-        return;
-      }
+          // Determine access: allow if token claim or server-side flags indicate admin/mod
+          const isClaimAdmin = Boolean(tokenResult.claims && (tokenResult.claims.admin_user || tokenResult.claims.admin || tokenResult.claims.isAdmin));
+          const isServerAdmin = Boolean(syncResult && syncResult.isAdmin === true);
+          const isServerMod = Boolean(syncResult && syncResult.isModerator === true);
+          const isOwner = Boolean(syncResult && syncResult.isOwner === true) || Boolean(tokenResult.claims && tokenResult.claims.isOwner);
 
-      initializeRoleControls();
+          if (!(isClaimAdmin || isServerAdmin || isServerMod || isOwner)) {
+            showAlert('error', 'You do not have admin access');
+            setTimeout(() => window.location.href = 'index.html', 2000);
+            return;
+          }
 
-      // Load initial data
-      loadUsers();
-      loadApplications();
-      loadAuditLogs();
+          // Fetch current user's profile to determine chief-level roles for redaction/roles-page access
+          let profile = null;
+          try {
+            const profileResp = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('type=profile&uid=' + encodeURIComponent(currentUser.uid)) : '/api/social?type=profile&uid=' + encodeURIComponent(currentUser.uid)), {
+              headers: { 'Authorization': `Bearer ${await currentUser.getIdToken()}` }
+            });
+            if (profileResp.ok) {
+              const body = await profileResp.json();
+              profile = body.profile || null;
+            }
+          } catch (e) {
+            // ignore
+          }
+
+          // allow role controls for admins/chiefs/owner
+          const viewerRole = profile && profile.role ? (typeof normalizeRole === 'function' ? normalizeRole(profile.role) : profile.role) : '';
+          const viewerIsChief = isOwner || viewerRole === 'chief_administrator' || viewerRole === 'chief_of_moderation';
+
+          initializeRoleControls();
+
+          // Load initial data
+          loadUsers();
+          loadApplications();
+          loadAuditLogs();
+          // expose flags for rendering decisions
+              window.__ADMIN_PANEL_FLAGS = { isOwner, isServerAdmin, isServerMod, viewerIsChief, viewerRole };
     });
   } catch (err) {
     showAlert('error', 'Failed to initialize admin panel: ' + err.message);
@@ -103,7 +155,7 @@ function showAlert(type, message) {
 async function loadUsers() {
   try {
     const token = await currentUser.getIdToken();
-    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('action=getUsersForAdmin') : '/api/social?action=getUsersForAdmin'), {
+    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('type=usersforadmin') : '/api/social?type=usersforadmin'), {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
@@ -125,13 +177,9 @@ async function searchUsers() {
     const role = document.getElementById('filter-role').value;
 
     const token = await currentUser.getIdToken();
-    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('action=searchUsers') : '/api/social?action=searchUsers'), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, role })
+    const qs = `type=usersforadmin&email=${encodeURIComponent(email || '')}&role=${encodeURIComponent(role || '')}`;
+    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social(qs) : `/api/social?${qs}`), {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
 
     if (!response.ok) {
@@ -159,15 +207,21 @@ function renderUsersTable(users) {
     return;
   }
 
+  const flags = window.__ADMIN_PANEL_FLAGS || {};
+  const canViewEmails = Boolean(flags.isOwner || flags.viewerIsChief);
+  const canAssignRoles = Boolean(flags.isOwner || flags.viewerIsChief);
+  const viewerRole = typeof normalizeRole === 'function' ? normalizeRole(flags.viewerRole || '') : String(flags.viewerRole || '').toLowerCase();
+
   tbody.innerHTML = users.map(user => `
     <tr>
-      <td>${escapeHtml(user.email)}</td>
+      <td>${canViewEmails ? escapeHtml(user.email) : '[Redacted]'}</td>
       <td><span class="role-badge ${getRoleBadgeClass(user.role)}">${getRoleLabel(user.role)}</span></td>
-      <td><span class="status ${user.submissionAccess ? 'approved' : 'pending'}">${user.submissionAccess ? 'Active' : 'Inactive'}</span></td>
+      <td><span class="status ${user.submissionBan && user.submissionBan.active ? 'denied' : (user.submissionAccess ? 'approved' : 'pending')}">${user.submissionBan && user.submissionBan.active ? 'Banned' : (user.submissionAccess ? 'Active' : 'Inactive')}</span></td>
       <td>${new Date(user.createdAt?.seconds * 1000).toLocaleDateString()}</td>
       <td>
-        <button class="secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="openRoleModal('${user.uid}', '${user.email}', '${user.role}', 'promote')">↑ Promote</button>
-        ${user.role !== 'newbie' ? `<button class="secondary" style="padding: 6px 12px; font-size: 0.85rem; margin-left: 5px;" onclick="openRoleModal('${user.uid}', '${user.email}', '${user.role}', 'demote')">↓ Demote</button>` : ''}
+        ${canAssignRoles ? `<button class="secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="openRoleModal('${user.uid}', '${user.email}', '${user.role}', 'promote')">↑ Promote</button>` : ''}
+        ${canAssignRoles && user.role !== 'newbie' ? `<button class="secondary" style="padding: 6px 12px; font-size: 0.85rem; margin-left: 5px;" onclick="openRoleModal('${user.uid}', '${user.email}', '${user.role}', 'demote')">↓ Demote</button>` : ''}
+        ${canViewerBanTarget(viewerRole, user.role, flags, user.uid) ? `<button class="secondary" style="padding: 6px 12px; font-size: 0.85rem; margin-left: 5px;" onclick='openBanDialog(${JSON.stringify({ uid: user.uid, email: user.email, role: user.role, submissionBan: user.submissionBan || null })})'>${user.submissionBan && user.submissionBan.active ? '⛔ Unban' : '🚫 Ban'}</button>` : ''}
       </td>
     </tr>
   `).join('');
@@ -199,13 +253,9 @@ async function loadApplications() {
     const role = document.getElementById('filter-app-role').value;
 
     const token = await currentUser.getIdToken();
-    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('action=getApplications') : '/api/social?action=getApplications'), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ status, role })
+    const qs = `type=applicationsforadmin&status=${encodeURIComponent(status || '')}&role=${encodeURIComponent(role || '')}`;
+    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social(qs) : `/api/social?${qs}`), {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
 
     if (!response.ok) {
@@ -397,6 +447,119 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+function roleRank(role) {
+  const normalized = typeof normalizeRole === 'function' ? normalizeRole(role) : String(role || '').toLowerCase();
+  const ladder = Array.isArray(ROLE_META.PUBLIC_ROLE_LADDER) && ROLE_META.PUBLIC_ROLE_LADDER.length
+    ? ROLE_META.PUBLIC_ROLE_LADDER
+    : FALLBACK_ROLE_LADDER;
+  if (normalized === 'owner') return 999;
+  const idx = ladder.indexOf(normalized);
+  return idx === -1 ? -1 : idx;
+}
+
+function canViewerBanTarget(viewerRole, targetRole, flags, targetUid) {
+  if (!currentUser || !targetUid || currentUser.uid === targetUid) return false;
+  const normalizedViewer = typeof normalizeRole === 'function' ? normalizeRole(viewerRole) : String(viewerRole || '').toLowerCase();
+  const viewerIsStaff = Boolean(flags && (flags.isOwner || flags.viewerIsChief || flags.isServerMod || flags.isServerAdmin));
+  if (!viewerIsStaff) return false;
+  return roleRank(normalizedViewer) > roleRank(targetRole);
+}
+
+function getAllowedBanDurations(viewerRole, flags) {
+  const role = typeof normalizeRole === 'function' ? normalizeRole(viewerRole) : String(viewerRole || '').toLowerCase();
+  const options = ['3h', '1d'];
+  if (roleRank(role) >= roleRank('administrator')) options.push('3d');
+  if (roleRank(role) >= roleRank('senior_administrator')) options.push('7d', '30d');
+  if (roleRank(role) >= roleRank('chief_administrator')) options.push('90d');
+  if (flags && (flags.isOwner || role === 'chief_administrator' || role === 'chief_of_moderation')) options.push('perm');
+  return options;
+}
+
+function parseBanDuration(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === '3h') return { hours: 3 };
+  if (v === '1d') return { days: 1 };
+  if (v === '3d') return { days: 3 };
+  if (v === '7d') return { days: 7 };
+  if (v === '30d') return { days: 30 };
+  if (v === '90d') return { days: 90 };
+  if (v === 'perm' || v === 'permanent') return { permanent: true };
+  return null;
+}
+
+async function openBanDialog(user) {
+  try {
+    const flags = window.__ADMIN_PANEL_FLAGS || {};
+    const viewerRole = typeof normalizeRole === 'function' ? normalizeRole(flags.viewerRole || '') : String(flags.viewerRole || '').toLowerCase();
+
+    if (user && user.submissionBan && user.submissionBan.active) {
+      const remove = window.confirm('Remove current ban for this user?');
+      if (!remove) return;
+      const token = await currentUser.getIdToken();
+      const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social() : '/api/social'), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'setsubmissionban',
+          targetUid: user.uid,
+          active: false
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to remove ban');
+      showAlert('success', 'Ban removed.');
+      loadUsers();
+      return;
+    }
+
+    const allowed = getAllowedBanDurations(viewerRole, flags);
+    const choice = window.prompt(`Select ban duration: ${allowed.join(', ')}`);
+    if (!choice) return;
+    if (!allowed.includes(String(choice).trim().toLowerCase())) {
+      showAlert('warning', 'Invalid duration selected.');
+      return;
+    }
+    const reason = window.prompt('Enter ban reason (required):');
+    if (!reason || String(reason).trim().length < 5) {
+      showAlert('warning', 'A reason of at least 5 characters is required.');
+      return;
+    }
+
+    const duration = parseBanDuration(choice);
+    if (!duration) {
+      showAlert('warning', 'Could not parse ban duration.');
+      return;
+    }
+
+    const token = await currentUser.getIdToken();
+    const response = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social() : '/api/social'), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'setsubmissionban',
+        targetUid: user.uid,
+        reason: String(reason).trim(),
+        active: true,
+        ...duration
+      })
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Failed to apply ban');
+
+    showAlert('success', 'Ban applied successfully.');
+    loadUsers();
+  } catch (err) {
+    showAlert('error', err.message || 'Failed to apply ban');
+  }
 }
 
 function logout() {

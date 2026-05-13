@@ -3275,7 +3275,7 @@ hr {
   transition: none !important;
 }
 
-/* Mobile: Force all editor text visible in red */
+/* Mobile: Keep editor text color consistent with desktop theme */
 @media (max-width: 768px) {
   #submit-editor-shell,
   #submit-editor-shell *,
@@ -3299,7 +3299,7 @@ hr {
   .section *,
   main,
   main * {
-    color: var(--red-b) !important;
+    color: var(--wht-m) !important;
     background-color: transparent !important;
     opacity: 1 !important;
     visibility: visible !important;
