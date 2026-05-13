@@ -69,6 +69,27 @@ function pageKeyMatches(a, b) {
   return false;
 }
 
+function isActiveSubmissionBan(ban) {
+  if (!ban || typeof ban !== 'object') return false;
+  if (ban.active !== true) return false;
+  const untilMs = ban.until && typeof ban.until.toMillis === 'function' ? ban.until.toMillis() : 0;
+  return !untilMs || untilMs > Date.now();
+}
+
+async function ensureNoActiveSubmissionBan(db, actor) {
+  const doc = await db.collection('users').doc(actor.uid).get();
+  const data = doc.exists ? (doc.data() || {}) : {};
+  const ban = data.submissionBan && typeof data.submissionBan === 'object' ? data.submissionBan : null;
+  if (isActiveSubmissionBan(ban)) {
+    const untilMs = ban.until && typeof ban.until.toMillis === 'function' ? ban.until.toMillis() : 0;
+    const untilText = untilMs ? new Date(untilMs).toISOString() : 'indefinite';
+    const err = new Error(`Submission access is blocked. Reason: ${String(ban.reason || 'No reason provided')}. Until: ${untilText}`);
+    err.statusCode = 403;
+    err.code = 'SUBMISSION_BANNED';
+    throw err;
+  }
+}
+
 /**
  * POST /api/upvote.js
  * 
@@ -137,6 +158,12 @@ module.exports = async (req, res) => {
 
     const app = initAdmin();
     const db = admin.firestore(app);
+
+    try {
+      await ensureNoActiveSubmissionBan(db, user);
+    } catch (banErr) {
+      return security.sendError(res, banErr.statusCode || 403, banErr.message);
+    }
 
     // Resolve page by ID first, then slug-as-ID, then slug fallback.
     let resolvedPageId = hasValidPageId ? pageId : '';

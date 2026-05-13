@@ -103,6 +103,27 @@ async function verifyUserIfPresent(req) {
   }
 }
 
+function isActiveSubmissionBan(ban) {
+  if (!ban || typeof ban !== 'object') return false;
+  if (ban.active !== true) return false;
+  const untilMs = ban.until && typeof ban.until.toMillis === 'function' ? ban.until.toMillis() : 0;
+  return !untilMs || untilMs > Date.now();
+}
+
+async function ensureNoActiveSubmissionBan(db, actor) {
+  const doc = await db.collection('users').doc(actor.uid).get();
+  const data = doc.exists ? (doc.data() || {}) : {};
+  const ban = data.submissionBan && typeof data.submissionBan === 'object' ? data.submissionBan : null;
+  if (isActiveSubmissionBan(ban)) {
+    const untilMs = ban.until && typeof ban.until.toMillis === 'function' ? ban.until.toMillis() : 0;
+    const untilText = untilMs ? new Date(untilMs).toISOString() : 'indefinite';
+    const err = new Error(`Submission access is blocked. Reason: ${String(ban.reason || 'No reason provided')}. Until: ${untilText}`);
+    err.statusCode = 403;
+    err.code = 'SUBMISSION_BANNED';
+    throw err;
+  }
+}
+
 // SECURITY FIX: Load bootstrap owner emails from environment variable to avoid
 // leaking owner addresses in source control.
 const BOOTSTRAP_OWNERS = new Set(
@@ -173,6 +194,7 @@ async function storeCommentReport(db, actor, body) {
 }
 
 async function handleCommentVote(db, actor, body) {
+  await ensureNoActiveSubmissionBan(db, actor);
   const id = normalizeText(body.id || '', 128);
   const voteType = normalizeText(body.voteType || '', 10);
 
@@ -296,6 +318,8 @@ module.exports = async function handler(req, res) {
         return sendJson(res, voteResult.statusCode, voteResult.payload);
       }
 
+      await ensureNoActiveSubmissionBan(db, actor);
+
       const pageId = normalizeText(body.pageId || '', 128);
       const slug = normalizeText(body.slug || '', 160);
       const pageTitle = normalizeText(body.pageTitle || '', 220);
@@ -349,6 +373,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (method === 'DELETE') {
+      await ensureNoActiveSubmissionBan(db, actor);
       const body = req.body || {};
       const id = normalizeText(body.id || req.query?.id || '', 128);
       if (!id) return sendJson(res, 400, { error: 'Missing comment id.' });
@@ -369,6 +394,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (method === 'PATCH') {
+      await ensureNoActiveSubmissionBan(db, actor);
       const body = req.body || {};
       const id = normalizeText(body.id || '', 128);
       const content = normalizeText(body.content || '', 1200);

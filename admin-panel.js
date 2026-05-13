@@ -117,6 +117,25 @@ async function initAdminPanel() {
           const viewerRole = profile && profile.role ? (typeof normalizeRole === 'function' ? normalizeRole(profile.role) : profile.role) : '';
           const viewerIsChief = isOwner || viewerRole === 'chief_administrator' || viewerRole === 'chief_of_moderation';
 
+          let selfRecord = null;
+          try {
+            const selfResp = await fetch((window.REDOAK_API && window.REDOAK_API.social ? window.REDOAK_API.social('type=usersforadmin&email=' + encodeURIComponent(currentUser.email)) : '/api/social?type=usersforadmin&email=' + encodeURIComponent(currentUser.email)), {
+              headers: { 'Authorization': `Bearer ${await currentUser.getIdToken()}` }
+            });
+            if (selfResp.ok) {
+              const body = await selfResp.json();
+              selfRecord = Array.isArray(body.users) ? body.users.find(item => String(item.uid || '') === currentUser.uid) || null : null;
+            }
+          } catch (e) {
+            // ignore
+          }
+
+          if (selfRecord && selfRecord.submissionBan && selfRecord.submissionBan.active) {
+            showAlert('error', 'Your staff access is temporarily suspended by an active ban.');
+            setTimeout(() => window.location.href = 'index.html', 2500);
+            return;
+          }
+
           initializeRoleControls();
 
           // Load initial data

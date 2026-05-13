@@ -261,6 +261,13 @@ function getRoleBucketKey(role) {
   return 'other';
 }
 
+function isActiveSubmissionBan(ban) {
+  if (!ban || typeof ban !== 'object') return false;
+  if (ban.active !== true) return false;
+  const untilMs = ban.until && typeof ban.until.toMillis === 'function' ? ban.until.toMillis() : 0;
+  return !untilMs || untilMs > Date.now();
+}
+
 function getCurrentRole() {
   return getRoleDisplayName(currentUserDoc);
 }
@@ -302,7 +309,7 @@ function isModOnlyRole() {
 }
 
 function canModeratorOpenTab(tab) {
-  const allowed = new Set(['submissions', 'reports', 'applications', 'contributors']);
+  const allowed = new Set(['submissions', 'reports', 'applications', 'contributors', 'users']);
   return allowed.has(String(tab || ''));
 }
 
@@ -542,6 +549,8 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   const isOwnerUser = isOwner(user.email);
   const isAdminUser = isAdmin(user.email);
   const isModUser = isModerator(user.email);
+  const isChiefAdminUser = getUserLevel(user.email) >= getRoleLevelValue('chief-admin');
+  const isChiefModUser = getUserLevel(user.email) >= getRoleLevelValue('chief-mod');
   const isModOnly = !isOwnerUser && !isAdminUser;
 
   // Owner and admin see all tabs
@@ -555,11 +564,11 @@ function applyTabVisibilityForRole(user, hasAdminAccess = false) {
   if (configTab) configTab.classList.toggle('hidden', isModOnly);
 
   // Users tab: visible to owner, admin, and anyone with manageUsers perm
-  const canViewUsersTab = isOwnerUser || isAdminUser || hasAdminAccess || hasPermission(currentUserDoc, 'manageUsers');
+  const canViewUsersTab = isOwnerUser || isAdminUser || isModUser || hasAdminAccess || hasPermission(currentUserDoc, 'manageUsers');
   if (usersTab) usersTab.classList.toggle('hidden', !canViewUsersTab);
 
   // Roles tab: owner always, admin if delegated
-  const canManageRoles = isOwnerUser || (isAdminUser && GUILD_PERMISSIONS['adminCanManageRoles']);
+  const canManageRoles = isOwnerUser || isChiefAdminUser || isChiefModUser || (isAdminUser && GUILD_PERMISSIONS['adminCanManageRoles']);
   if (rolesTab) rolesTab.classList.toggle('hidden', !canManageRoles);
 
   if (isModOnly && !canModeratorOpenTab(activeTab)) {
@@ -600,10 +609,27 @@ async function renderAdminBootstrap(user) {
     const canOpenAdminPanel = await getUserAdminFlag(user);
     const isAdminUser = isAdmin(user.email);
     const isOwnerUser = isOwner(user.email);
+    const isModUser = isModerator(user.email);
     currentUserIsAdminFlag = isAdminUser || isOwnerUser;
     
     // Sync owner status
     if (isOwnerUser) currentUserDoc.isOwner = true;
+
+    // Submission bans also block staff from opening the admin shell while active.
+    const activeBan = currentUserDoc && currentUserDoc.submissionBan && typeof currentUserDoc.submissionBan === 'object'
+      ? currentUserDoc.submissionBan
+      : null;
+    if (isActiveSubmissionBan(activeBan) && (isAdminUser || isModUser || isOwnerUser)) {
+      adminLoading.classList.add('hidden');
+      adminDenied.classList.remove('hidden');
+      adminDenied.style.display = 'block';
+      adminDenied.querySelector('.section-hd').textContent = 'Access Suspended';
+      adminDenied.querySelector('p').innerHTML = 'Your staff access is temporarily suspended by an active ban.';
+      adminPanel.classList.add('hidden');
+      adminPanel.style.display = 'none';
+      navAuth.innerHTML = renderUserMenuHTML(user.displayName || 'Agent');
+      return;
+    }
 
     // Sync user role flags to Firestore to ensure permission checks pass
     try {
@@ -658,7 +684,7 @@ async function renderAdminBootstrap(user) {
       console.warn('Version initialization error:', e);
     }
     navAuth.innerHTML = renderUserMenuHTML(displayLabel);
-    applyTabVisibilityForRole(user, isAdminUser);
+    applyTabVisibilityForRole(user, isAdminUser || isModUser);
 
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('editId');
@@ -2450,9 +2476,9 @@ function buildVisibleRoleOptions(currentLevel) {
 async function loadRolesManager(container) {
   const user = auth.currentUser;
   const isOwnerUser = isOwner(user?.email);
-  const canManageRoles = isOwner(user?.email) || (isAdmin(user?.email) && GUILD_PERMISSIONS['adminCanManageRoles']);
+  const canManageRoles = isOwner(user?.email) || getUserLevel(user?.email) >= getRoleLevelValue('chief-admin') || getUserLevel(user?.email) >= getRoleLevelValue('chief-mod') || (isAdmin(user?.email) && GUILD_PERMISSIONS['adminCanManageRoles']);
   if (!canManageRoles) {
-    container.innerHTML = '<p style="color:var(--red-b)">⚠ Roles management requires Owner clearance or Admin with role management permission.</p>';
+    container.innerHTML = '<p style="color:var(--red-b)">⚠ Roles management requires Owner, Chief Administrator, Chief of Moderation, or Admin with role management permission.</p>';
     return;
   }
   const currentLevel = getUserLevel(user?.email);
