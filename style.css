@@ -2360,7 +2360,7 @@ hr {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  color: var(--wht-m);
+  color: var(--red-b);
 }
 
 @media (max-width: 768px) {
@@ -3271,33 +3271,38 @@ hr {
 .doc-canvas,
 .doc-block,
 .doc-editable {
-  animation: none !important !important;
-  transition: none !important !important;
+  animation: none !important;
+  transition: none !important;
 }
 
-/* Mobile: Force all editor text visible */
+/* Mobile: Force all editor text visible in red */
 @media (max-width: 768px) {
   #submit-editor-shell,
-  #doc-mode,
-  #doc-blocks,
-  .doc-canvas,
-  .doc-block,
-  .doc-block-body,
-  .doc-editable,
-  .editor-wrap,
-  .editor-pane,
-  .section,
-  main {
-    color: var(--wht) !important;
-  }
-  
   #submit-editor-shell *,
+  #doc-mode,
   #doc-mode *,
+  #doc-blocks,
+  #doc-blocks *,
+  .doc-canvas,
   .doc-canvas *,
+  .doc-block,
   .doc-block *,
+  .doc-block-body,
+  .doc-block-body *,
+  .doc-editable,
+  .doc-editable *,
+  .editor-wrap,
   .editor-wrap *,
+  .editor-pane,
+  .editor-pane *,
+  .section,
+  .section *,
+  main,
   main * {
-    color: var(--wht-m) !important;
+    color: var(--red-b) !important;
+    background-color: transparent !important;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 }
 
