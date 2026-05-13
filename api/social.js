@@ -1481,14 +1481,16 @@ async function getActorRoleForModeration(db, actor, roles) {
 async function setSubmissionBan(db, actor, body) {
   const roles = await getRolesData(db);
   const actorRole = await getActorRoleForModeration(db, actor, roles);
-  if (!isSuperiorRole(actorRole) && !isOwnerEmail(actor.email, roles)) {
-    return { statusCode: 403, payload: { error: 'Only owner, senior admins, and senior moderators can set submission bans.' } };
-  }
+  const rolesConfig = roles || {};
+  const actorRoleNormalized = normalizeRole(actorRole || ROLES.SITE_MEMBER);
 
   const targetUid = normalizeText(body.targetUid || body.uid || '', 128);
   const reason = normalizeText(body.reason || '', 500);
-  const days = Number(body.days || 0);
+  const days = Number.isFinite(Number(body.days)) ? Number(body.days) : 0;
+  const hours = Number.isFinite(Number(body.hours)) ? Number(body.hours) : 0;
+  const permanent = body.permanent === true || String(body.days || '').toLowerCase() === 'permanent' || String(body.days || '').toLowerCase() === 'perm';
   const active = body.active !== false;
+
   if (!targetUid) return { statusCode: 400, payload: { error: 'Missing target user.' } };
   if (active && !reason) return { statusCode: 400, payload: { error: 'Reason is required when setting a ban.' } };
 
@@ -1496,22 +1498,101 @@ async function setSubmissionBan(db, actor, body) {
   const targetSnap = await targetRef.get();
   if (!targetSnap.exists) return { statusCode: 404, payload: { error: 'Target user not found.' } };
 
-  const untilTs = active && Number.isFinite(days) && days > 0
-    ? admin.firestore.Timestamp.fromMillis(Date.now() + (days * 24 * 60 * 60 * 1000))
-    : null;
+  const targetData = targetSnap.data() || {};
+  const targetRole = normalizeRole(targetData.role || ROLES.SITE_MEMBER);
+
+  // Prevent banning peers or superiors: actor must be strictly higher than target
+  const actorAtLeastTarget = isAtLeast(actorRoleNormalized, targetRole);
+  const targetAtLeastActor = isAtLeast(targetRole, actorRoleNormalized);
+  const actorHigherThanTarget = actorAtLeastTarget && !targetAtLeastActor;
+  if (!actorHigherThanTarget && !isOwnerEmail(actor.email, rolesConfig)) {
+    return { statusCode: 403, payload: { error: 'You may only ban users with lower role level than your own.' } };
+  }
+
+  // Determine requested duration in milliseconds
+  let untilTs = null;
+  if (permanent) {
+    untilTs = null;
+  } else if (hours > 0) {
+    untilTs = admin.firestore.Timestamp.fromMillis(Date.now() + (hours * 60 * 60 * 1000));
+  } else if (days > 0) {
+    untilTs = admin.firestore.Timestamp.fromMillis(Date.now() + (days * 24 * 60 * 60 * 1000));
+  }
+
+  // Permission matrix by duration
+  //  - 3 hours or 1 day: Moderator or above
+  //  - 3 days: Administrator or above
+  //  - 7 days: Senior Administrator or above
+  //  - 30 days: Senior Administrator or above
+  //  - 90 days: Chief Administrator or above
+  //  - permanent: Chief Administrator, Chief of Moderation, or Owner
+
+  function canIssueByDuration() {
+    if (permanent) {
+      return (
+        actorRoleNormalized === ROLES.OWNER ||
+        actorRoleNormalized === ROLES.CHIEF_ADMINISTRATOR ||
+        actorRoleNormalized === ROLES.CHIEF_OF_MODERATION
+      );
+    }
+    const totalHours = hours > 0 ? hours : (days > 0 ? days * 24 : 0);
+    if (totalHours > 0 && totalHours <= 3) {
+      return isAtLeast(actorRoleNormalized, ROLES.MODERATOR);
+    }
+    if (totalHours >= 24 && totalHours < (3 * 24)) { // 1 day
+      return isAtLeast(actorRoleNormalized, ROLES.MODERATOR);
+    }
+    if (totalHours >= (3 * 24) && totalHours < (7 * 24)) { // 3 days
+      return isAtLeast(actorRoleNormalized, ROLES.ADMINISTRATOR);
+    }
+    if (totalHours >= (7 * 24) && totalHours < (30 * 24)) { // 7 days
+      return isAtLeast(actorRoleNormalized, ROLES.SENIOR_ADMINISTRATOR);
+    }
+    if (totalHours >= (30 * 24) && totalHours < (90 * 24)) { // 30 days
+      return isAtLeast(actorRoleNormalized, ROLES.SENIOR_ADMINISTRATOR);
+    }
+    if (totalHours >= (90 * 24)) { // 90+ days
+      return isAtLeast(actorRoleNormalized, ROLES.CHIEF_ADMINISTRATOR);
+    }
+    // default fallback: require superior
+    return isSuperiorRole(actorRoleNormalized) || isOwnerEmail(actor.email, rolesConfig);
+  }
+
+  if (!canIssueByDuration()) {
+    return { statusCode: 403, payload: { error: 'You do not have permission to issue this duration of ban.' } };
+  }
 
   await targetRef.set({
     submissionBan: {
       active: !!active,
       reason: active ? reason : '',
-      days: active ? Math.max(0, Math.floor(days)) : 0,
+      days: active ? (days > 0 ? Math.max(0, Math.floor(days)) : 0) : 0,
+      hours: active ? (hours > 0 ? Math.max(0, Math.floor(hours)) : 0) : 0,
       until: active ? untilTs : null,
+      permanent: !!permanent,
       setByUid: actor.uid,
       setByEmail: actor.email,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     },
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
+
+  // Log moderation action
+  try {
+    await logRoleChange(db, {
+      action: active ? 'set_submission_ban' : 'clear_submission_ban',
+      actorUid: actor.uid,
+      actorEmail: actor.email,
+      targetUid,
+      reason,
+      days: days || 0,
+      hours: hours || 0,
+      permanent: !!permanent,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    console.warn('Failed to log submission ban action', err);
+  }
 
   return { statusCode: 200, payload: { ok: true, targetUid } };
 }
