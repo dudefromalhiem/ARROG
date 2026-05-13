@@ -2426,6 +2426,23 @@ function canEditRole(targetEmail, currentEmail) {
   return currentLevel > targetLevel;
 }
 
+function buildVisibleRoleOptions(currentLevel) {
+  const visibleRoles = [
+    { value: 'site_member', label: 'Site Member' },
+    { value: 'contributor', label: 'Contributor' },
+    { value: 'junior_moderator', label: 'Junior Moderator' },
+    { value: 'moderator', label: 'Moderator' },
+    { value: 'junior_admin', label: 'Junior Admin' },
+    { value: 'admin', label: 'Admin' },
+    { value: 'chief_admin', label: 'Chief Admin' }
+  ];
+
+  return visibleRoles
+    .filter(role => getRoleLevelValue(role.value) < currentLevel)
+    .map(role => `<option value="${role.value}">${role.label}</option>`)
+    .join('');
+}
+
 async function loadRolesManager(container) {
   const user = auth.currentUser;
   const isOwnerUser = isOwner(user?.email);
@@ -2435,9 +2452,7 @@ async function loadRolesManager(container) {
     return;
   }
   const currentLevel = getUserLevel(user?.email);
-  const roleOptions = Object.keys(ROLE_LEVELS).filter(role => ROLE_LEVELS[role] < currentLevel && role !== 'owner' && role !== 'user' && role !== 'guest').map(role => 
-    `<option value="${role}">${ROLE_NAMES[role]}</option>`
-  ).join('');
+    const roleOptions = buildVisibleRoleOptions(currentLevel);
   container.innerHTML = `
     <h3 style="margin-bottom:16px">Roles Management${isOwnerUser ? ' (Owner)' : ' (Admin)'}</h3>
     <p style="font-size:.8rem;color:var(--wht-d);margin-bottom:24px">Assign staff roles. Changes take effect on next login. Roles are stored in Firebase config.</p>
@@ -2529,10 +2544,7 @@ async function refreshRolesDisplay() {
 
   const currentEmail = auth.currentUser?.email;
   const currentLevel = getUserLevel(currentEmail);
-  const roleOptions = Object.keys(ROLE_LEVELS)
-    .filter(role => role !== 'owner' && role !== 'user' && role !== 'guest' && (ROLE_LEVELS[role] || 0) < currentLevel)
-    .map(role => `<option value="${role}">${ROLE_NAMES[role] || role}</option>`)
-    .join('');
+  const roleOptions = buildVisibleRoleOptions(currentLevel);
 
   const renderRoleEditor = (email, role) => {
     const canModify = canEditRole(email, currentEmail);
