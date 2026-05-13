@@ -2428,13 +2428,16 @@ function canEditRole(targetEmail, currentEmail) {
 
 function buildVisibleRoleOptions(currentLevel) {
   const visibleRoles = [
-    { value: 'site_member', label: 'Site Member' },
-    { value: 'contributor', label: 'Contributor' },
-    { value: 'junior_moderator', label: 'Junior Moderator' },
+    { value: 'chief_admin', label: 'Chief Administrator' },
+    { value: 'deputy-chief-admin', label: 'Deputy Chief Administrator' },
+    { value: 'senior-admin', label: 'Senior Administrator' },
+    { value: 'admin', label: 'Administrator' },
+    { value: 'junior_admin', label: 'Junior Administrator' },
+    { value: 'chief-mod', label: 'Chief of Moderation' },
+    { value: 'deputy-chief-mod', label: 'Deputy Chief of Moderation' },
+    { value: 'senior-mod', label: 'Senior Moderator' },
     { value: 'moderator', label: 'Moderator' },
-    { value: 'junior_admin', label: 'Junior Admin' },
-    { value: 'admin', label: 'Admin' },
-    { value: 'chief_admin', label: 'Chief Admin' }
+    { value: 'junior_moderator', label: 'Junior Moderator' }
   ];
 
   return visibleRoles
@@ -2475,7 +2478,7 @@ async function loadRolesManager(container) {
     <div style="margin:10px 0 24px;padding:12px;border:1px solid var(--blk-m);background:rgba(255,255,255,.02)">
       <div style="font-size:.78rem;color:var(--wht-f);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Hierarchy Guide</div>
       <div style="font-size:.8rem;color:var(--wht-d);line-height:1.7">
-        Owner / Archivist &gt; Chief Administrator &gt; Deputy Chief Administrator &gt; Senior Administrator &gt; Administrator &gt; Junior Administrator &gt; Chief of Moderation &gt; Deputy Chief of Moderation &gt; Senior Moderator &gt; Moderator &gt; Junior Moderator
+        Chief Administrator &gt; Deputy Chief Administrator &gt; Senior Administrator &gt; Administrator &gt; Junior Administrator &gt; Chief of Moderation &gt; Deputy Chief of Moderation &gt; Senior Moderator &gt; Moderator &gt; Junior Moderator
       </div>
     </div>
     <div style="margin-top:8px;padding:12px;border:1px solid var(--blk-m);background:rgba(255,255,255,.02);font-size:.78rem;color:var(--wht-d);line-height:1.7">
