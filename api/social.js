@@ -28,6 +28,20 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function addCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+}
+
+function handleCorsPreflight(req, res) {
+  if (String(req.method || '').toUpperCase() !== 'OPTIONS') return false;
+  addCorsHeaders(res);
+  res.status(200).end();
+  return true;
+}
+
 function getBearerToken(req) {
   const header = String(req.headers.authorization || req.headers.Authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
@@ -1665,6 +1679,9 @@ async function assignRole(db, actor, body) {
 
 module.exports = async function handler(req, res) {
   try {
+    addCorsHeaders(res);
+    if (handleCorsPreflight(req, res)) return;
+
     const app = initAdmin();
     const db = admin.firestore(app);
     const method = String(req.method || 'GET').toUpperCase();
@@ -1816,6 +1833,7 @@ module.exports = async function handler(req, res) {
 
     return sendJson(res, 405, { error: 'Method not allowed.' });
   } catch (err) {
+    addCorsHeaders(res);
     return sendJson(res, Number(err.statusCode || 500), { error: err.message || 'Server error.' });
   }
 };

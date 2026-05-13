@@ -538,7 +538,7 @@ async function getUserSubmissionAccessFlag(user) {
     const role = normalizeResolvedRole(data.role || 'user');
     // Also check email-based resolved role for cases where user doc hasn't been synced yet
     const emailRole = normalizeResolvedRole(resolveRole(user.email));
-    return data.submissionAccess === true || role === 'contributor' || role === 'moderator' || role === 'admin' || role === 'chief_admin' || emailRole === 'contributor' || emailRole === 'moderator' || emailRole === 'admin' || emailRole === 'chief_admin' || emailRole === 'owner' || data.editorApproved === true;
+    return data.submissionAccess === true || role === 'contributor' || role === 'junior_moderator' || role === 'moderator' || role === 'senior_moderator' || role === 'deputy_chief_of_moderation' || role === 'chief_of_moderation' || role === 'junior_admin' || role === 'administrator' || role === 'senior_administrator' || role === 'deputy_chief_administrator' || role === 'chief_administrator' || emailRole === 'contributor' || emailRole === 'junior_moderator' || emailRole === 'moderator' || emailRole === 'senior_moderator' || emailRole === 'deputy_chief_of_moderation' || emailRole === 'chief_of_moderation' || emailRole === 'junior_admin' || emailRole === 'administrator' || emailRole === 'senior_administrator' || emailRole === 'deputy_chief_administrator' || emailRole === 'chief_administrator' || emailRole === 'owner' || data.editorApproved === true;
   } catch (_err) {
     // Fallback: re-check email roles even if Firestore fails
     return isOwner(user.email) || isAdmin(user.email) || isModerator(user.email);
@@ -828,33 +828,58 @@ const BOOTSTRAP_OWNER_SET = new Set(_BOOTSTRAP.map(email => String(email || '').
 // Role definitions
 const ROLE_LEVELS = {
   'owner': 100,
-  'chief_admin': 90,
-  'admin': 80,
+  'chief_administrator': 95,
+  'deputy_chief_administrator': 90,
+  'senior_administrator': 85,
+  'administrator': 80,
   'junior_admin': 75,
-  'moderator': 70,
+  'chief_of_moderation': 70,
+  'deputy_chief_of_moderation': 68,
+  'senior_moderator': 67,
+  'moderator': 66,
   'junior_moderator': 65,
   'contributor': 60,
   'site_member': 5,
   'user': 5,
   'guest': 0,
   // Legacy aliases
-  'chief-admin': 90,
-  'mod': 70,
-  'editor': 60,
+  'chief_admin': 95,
+  'chief-admin': 95,
+  'chief admin': 95,
   'chief-mod': 70,
-  'deputy-chief-admin': 80,
-  'senior-admin': 80,
-  'deputy-chief-mod': 70,
-  'senior-mod': 70,
+  'chief_mod': 70,
+  'chief of moderation': 70,
+  'mod': 66,
+  'editor': 60,
+  'deputy-chief-admin': 90,
+  'deputy-chief-mod': 68,
+  'deputy-chief-administrator': 90,
+  'deputy-chief-moderation': 68,
+  'senior-admin': 85,
+  'senior-mod': 67,
+  'senior-administrator': 85,
+  'senior-moderator': 67,
   'junior-mod': 65,
-  'junior-admin': 75
+  'junior-admin': 75,
+  'junior administrator': 75,
+  'junior moderator': 65,
+  'admin': 80,
+  'chief administrator': 95,
+  'deputy chief administrator': 90,
+  'senior administrator': 85,
+  'chief moderator': 70
 };
 
 const ROLE_NAMES = {
   'owner': 'The Archivist',
-  'chief_admin': 'Chief Admin',
-  'admin': 'Admin',
-  'junior_admin': 'Junior Admin',
+  'chief_administrator': 'Chief Administrator',
+  'deputy_chief_administrator': 'Deputy Chief Administrator',
+  'senior_administrator': 'Senior Administrator',
+  'administrator': 'Administrator',
+  'junior_admin': 'Junior Administrator',
+  'chief_of_moderation': 'Chief of Moderation',
+  'deputy_chief_of_moderation': 'Deputy Chief of Moderation',
+  'senior_moderator': 'Senior Moderator',
   'moderator': 'Moderator',
   'junior_moderator': 'Junior Moderator',
   'contributor': 'Contributor',
@@ -862,16 +887,26 @@ const ROLE_NAMES = {
   'user': 'User',
   'guest': 'Guest',
   // Legacy aliases
+  'chief_admin': 'Chief Administrator',
   'chief-admin': 'Chief Administrator',
+  'chief admin': 'Chief Administrator',
   'chief-mod': 'Chief of Moderation',
+  'chief_mod': 'Chief of Moderation',
+  'admin': 'Administrator',
   'deputy-chief-admin': 'Deputy Chief Administrator',
+  'deputy-chief-administrator': 'Deputy Chief Administrator',
   'deputy-chief-mod': 'Deputy Chief of Moderation',
+  'deputy-chief-moderation': 'Deputy Chief of Moderation',
   'senior-admin': 'Senior Administrator',
+  'senior-administrator': 'Senior Administrator',
   'senior-mod': 'Senior Moderator',
+  'senior-moderator': 'Senior Moderator',
   'mod': 'Moderator',
   'editor': 'Contributor',
   'junior-mod': 'Junior Moderator',
-  'junior-admin': 'Junior Administrator'
+  'junior-admin': 'Junior Administrator',
+  'junior administrator': 'Junior Administrator',
+  'junior moderator': 'Junior Moderator'
 };
 
 function normalizeResolvedRole(role) {
@@ -888,36 +923,36 @@ function normalizeResolvedRole(role) {
     'moderator_role': 'moderator',
     'editor': 'contributor',
     'contributor': 'contributor',
-    'chief_admin': 'chief_admin',
-    'chief_administrator': 'chief_admin',
-    'chief administrator': 'chief_admin',
-    'chief-admin': 'chief_admin',
-    'deputy_chief_admin': 'deputy-chief-admin',
-    'deputy_chief_administrator': 'deputy-chief-admin',
-    'deputy chief administrator': 'deputy-chief-admin',
-    'deputy-chief-admin': 'deputy-chief-admin',
-    'senior_admin': 'senior-admin',
-    'senior_administrator': 'senior-admin',
-    'senior administrator': 'senior-admin',
-    'senior-admin': 'senior-admin',
+    'chief_admin': 'chief_administrator',
+    'chief_administrator': 'chief_administrator',
+    'chief administrator': 'chief_administrator',
+    'chief-admin': 'chief_administrator',
+    'deputy_chief_admin': 'deputy_chief_administrator',
+    'deputy_chief_administrator': 'deputy_chief_administrator',
+    'deputy chief administrator': 'deputy_chief_administrator',
+    'deputy-chief-admin': 'deputy_chief_administrator',
+    'senior_admin': 'senior_administrator',
+    'senior_administrator': 'senior_administrator',
+    'senior administrator': 'senior_administrator',
+    'senior-admin': 'senior_administrator',
     'junior_admin': 'junior_admin',
     'junior_administrator': 'junior_admin',
     'junior administrator': 'junior_admin',
     'junior-admin': 'junior_admin',
-    'chief_mod': 'chief-mod',
-    'chief_moderation': 'chief-mod',
-    'chief of moderation': 'chief-mod',
-    'chief-moderation': 'chief-mod',
-    'chief_moderator': 'chief-mod',
-    'deputy_chief_mod': 'deputy-chief-mod',
-    'deputy_chief_moderation': 'deputy-chief-mod',
-    'deputy chief moderation': 'deputy-chief-mod',
-    'deputy-chief-mod': 'deputy-chief-mod',
-    'senior_mod': 'senior-mod',
-    'senior_moderator': 'senior-mod',
-    'senior moderator': 'senior-mod',
-    'senior-mod': 'senior-mod',
-    'junior_mod': 'junior-mod',
+    'chief_mod': 'chief_of_moderation',
+    'chief_moderation': 'chief_of_moderation',
+    'chief of moderation': 'chief_of_moderation',
+    'chief-moderation': 'chief_of_moderation',
+    'chief_moderator': 'chief_of_moderation',
+    'deputy_chief_mod': 'deputy_chief_of_moderation',
+    'deputy_chief_moderation': 'deputy_chief_of_moderation',
+    'deputy chief moderation': 'deputy_chief_of_moderation',
+    'deputy-chief-mod': 'deputy_chief_of_moderation',
+    'senior_mod': 'senior_moderator',
+    'senior_moderator': 'senior_moderator',
+    'senior moderator': 'senior_moderator',
+    'senior-mod': 'senior_moderator',
+    'junior_mod': 'junior_moderator',
     'junior_moderator': 'junior_moderator',
     'junior moderator': 'junior_moderator',
     'junior-mod': 'junior_moderator'
@@ -1012,7 +1047,7 @@ function resolveRole(email) {
     if (mapped && mapped !== 'user') return mapped;
   }
   
-  if (ROLE_DATA.admins.includes(e)) return "admin";
+  if (ROLE_DATA.admins.includes(e)) return "administrator";
   if (ROLE_DATA.mods.includes(e)) return "moderator";
   return "site_member";
 }
@@ -1035,9 +1070,14 @@ function adminHasDelegation(email, permissionKey) {
 function clearanceLevelForRole(role) {
   const normalized = normalizeResolvedRole(role);
   if (normalized === "owner") return 6;
-  if (normalized === "chief_admin") return 6;
-  if (normalized === "admin") return 5;
+  if (normalized === "chief_administrator") return 6;
+  if (normalized === "deputy_chief_administrator") return 6;
+  if (normalized === "senior_administrator") return 5;
+  if (normalized === "administrator") return 5;
   if (normalized === "junior_admin") return 5;
+  if (normalized === "chief_of_moderation") return 4;
+  if (normalized === "deputy_chief_of_moderation") return 4;
+  if (normalized === "senior_moderator") return 4;
   if (normalized === "moderator") return 4;
   if (normalized === "junior_moderator") return 4;
   if (normalized === "contributor") return 4;

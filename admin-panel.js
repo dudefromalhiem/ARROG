@@ -181,8 +181,8 @@ function updateUserStats(users) {
   const stats = {
     total: users.length,
     contributors: normalizedRoles.filter(role => role === 'contributor').length,
-    moderators: normalizedRoles.filter(role => role === 'moderator' || role === 'senior_moderator' || role === 'deputy_chief_of_moderation' || role === 'chief_of_moderation').length,
-    admins: normalizedRoles.filter(role => role === 'administrator' || role === 'senior_administrator' || role === 'deputy_chief_administrator' || role === 'chief_administrator').length
+    moderators: normalizedRoles.filter(role => role === 'junior_moderator' || role === 'moderator' || role === 'senior_moderator' || role === 'deputy_chief_of_moderation' || role === 'chief_of_moderation').length,
+    admins: normalizedRoles.filter(role => role === 'junior_admin' || role === 'administrator' || role === 'senior_administrator' || role === 'deputy_chief_administrator' || role === 'chief_administrator').length
   };
 
   document.getElementById('stat-total-users').textContent = stats.total;
@@ -379,8 +379,8 @@ function getRoleBadgeClass(role) {
   const normalized = typeof normalizeRole === 'function' ? normalizeRole(role) : String(role || '').trim().toLowerCase();
   if (!normalized || normalized === 'newbie' || normalized === 'site_member') return 'badge-newbie';
   if (normalized === 'contributor') return 'contributor';
-  if (normalized === 'moderator' || normalized === 'senior_moderator' || normalized === 'deputy_chief_of_moderation' || normalized === 'chief_of_moderation') return 'moderator';
-  if (normalized === 'administrator' || normalized === 'senior_administrator' || normalized === 'deputy_chief_administrator' || normalized === 'chief_administrator') return 'administrator';
+  if (normalized === 'junior_moderator' || normalized === 'moderator' || normalized === 'senior_moderator' || normalized === 'deputy_chief_of_moderation' || normalized === 'chief_of_moderation') return 'moderator';
+  if (normalized === 'junior_admin' || normalized === 'administrator' || normalized === 'senior_administrator' || normalized === 'deputy_chief_administrator' || normalized === 'chief_administrator') return 'administrator';
   if (normalized === 'owner') return 'chief';
   return 'badge-newbie';
 }

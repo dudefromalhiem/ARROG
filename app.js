@@ -333,15 +333,8 @@ function showClearanceWelcome(role) {
 
   const level = clearanceLevelForRole(role);
   const normalizedRole = String(role || '').toLowerCase();
-  
-  // Map role to welcome message
-  const welcomeMessages = {
-    'owner': 'Welcome, Archivist',
-    'admin': 'Welcome, Administrator',
-    'moderator': 'Welcome, Moderator',
-    'user': 'Welcome, Agent'
-  };
-  const welcomeMessage = welcomeMessages[normalizedRole] || 'Welcome, Agent';
+  const roleLabel = (typeof ROLE_NAMES !== 'undefined' && ROLE_NAMES[normalizedRole]) ? ROLE_NAMES[normalizedRole] : '';
+  const welcomeMessage = roleLabel ? `Welcome, ${roleLabel}` : 'Welcome, Agent';
 
   // Inject blink keyframes once
   if (!document.getElementById('clearance-blink-style')) {

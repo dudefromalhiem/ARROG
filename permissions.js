@@ -11,12 +11,14 @@ const ROLES = {
   CONTRIBUTOR: 'contributor',                          // Level 4 — Entry into active participation
 
   // Moderation Branch
+  JUNIOR_MODERATOR: 'junior_moderator',                // Level 5 — Entry moderation authority
   MODERATOR: 'moderator',                              // Level 4+ — Frontline enforcement
   SENIOR_MODERATOR: 'senior_moderator',                // Level 5 — Experienced moderation authority
   DEPUTY_CHIEF_OF_MODERATION: 'deputy_chief_of_moderation', // Level 5 — Second-in-command
   CHIEF_OF_MODERATION: 'chief_of_moderation',          // Level 4+ — Head of moderation
 
   // Administrative Branch
+  JUNIOR_ADMIN: 'junior_admin',                        // Level 5 — Entry administration authority
   ADMINISTRATOR: 'administrator',                      // Level 5 — Core operational staff
   SENIOR_ADMINISTRATOR: 'senior_administrator',        // Level 5+ — Oversees major site sections
   DEPUTY_CHIEF_ADMINISTRATOR: 'deputy_chief_administrator', // Level 6 — Second-in-command
@@ -31,13 +33,15 @@ const PUBLIC_ROLE_LADDER = [
   ROLES.NEWBIE,
   ROLES.SITE_MEMBER,
   ROLES.CONTRIBUTOR,
+  ROLES.JUNIOR_MODERATOR,
   ROLES.MODERATOR,
   ROLES.SENIOR_MODERATOR,
+  ROLES.DEPUTY_CHIEF_OF_MODERATION,
+  ROLES.CHIEF_OF_MODERATION,
+  ROLES.JUNIOR_ADMIN,
   ROLES.ADMINISTRATOR,
   ROLES.SENIOR_ADMINISTRATOR,
-  ROLES.DEPUTY_CHIEF_OF_MODERATION,
   ROLES.DEPUTY_CHIEF_ADMINISTRATOR,
-  ROLES.CHIEF_OF_MODERATION,
   ROLES.CHIEF_ADMINISTRATOR
 ];
 
@@ -47,10 +51,12 @@ const ROLE_LABELS = {
   [ROLES.NEWBIE]: 'Newbie',
   [ROLES.SITE_MEMBER]: 'Site Member',
   [ROLES.CONTRIBUTOR]: 'Contributor',
+  [ROLES.JUNIOR_MODERATOR]: 'Junior Moderator',
   [ROLES.MODERATOR]: 'Moderator',
   [ROLES.SENIOR_MODERATOR]: 'Senior Moderator',
   [ROLES.DEPUTY_CHIEF_OF_MODERATION]: 'Deputy Chief of Moderation',
   [ROLES.CHIEF_OF_MODERATION]: 'Chief of Moderation',
+  [ROLES.JUNIOR_ADMIN]: 'Junior Administrator',
   [ROLES.ADMINISTRATOR]: 'Administrator',
   [ROLES.SENIOR_ADMINISTRATOR]: 'Senior Administrator',
   [ROLES.DEPUTY_CHIEF_ADMINISTRATOR]: 'Deputy Chief Administrator',
@@ -108,11 +114,15 @@ function normalizeRole(value) {
   if (role === 'user') return ROLES.SITE_MEMBER;
   if (role === 'editor') return ROLES.CONTRIBUTOR;
   if (role === 'mod') return ROLES.MODERATOR;
-  if (role === 'junior_moderator') return ROLES.MODERATOR;
-  if (role === 'junior-moderator') return ROLES.MODERATOR;
-  if (role === 'junior_admin' || role === 'junior-admin') return ROLES.ADMINISTRATOR;
+  if (role === 'junior_moderator' || role === 'junior-moderator' || role === 'junior moderator' || role === 'junior-mod') return ROLES.JUNIOR_MODERATOR;
+  if (role === 'junior_admin' || role === 'junior-admin' || role === 'junior administrator') return ROLES.JUNIOR_ADMIN;
   if (role === 'admin') return ROLES.ADMINISTRATOR;
-  if (role === 'chief-admin' || role === 'chiefadmin' || role === 'chief_admin') return ROLES.CHIEF_ADMINISTRATOR;
+  if (role === 'chief-admin' || role === 'chiefadmin' || role === 'chief_admin' || role === 'chief administrator') return ROLES.CHIEF_ADMINISTRATOR;
+  if (role === 'deputy-chief-admin' || role === 'deputy_chief_admin' || role === 'deputy chief administrator') return ROLES.DEPUTY_CHIEF_ADMINISTRATOR;
+  if (role === 'senior-admin' || role === 'senior_admin' || role === 'senior administrator') return ROLES.SENIOR_ADMINISTRATOR;
+  if (role === 'chief-mod' || role === 'chief_mod' || role === 'chief of moderation') return ROLES.CHIEF_OF_MODERATION;
+  if (role === 'deputy-chief-mod' || role === 'deputy_chief_mod' || role === 'deputy chief moderation') return ROLES.DEPUTY_CHIEF_OF_MODERATION;
+  if (role === 'senior-mod' || role === 'senior_mod' || role === 'senior moderator') return ROLES.SENIOR_MODERATOR;
   
   // All other roles
   return ALL_ROLES.includes(role) ? role : ROLES.NEWBIE;
@@ -211,7 +221,7 @@ function getRoleDisplayName(userDoc) {
  * @returns {string} - Formatted hierarchy string
  */
 function getRoleHierarchyText() {
-  return 'Role Hierarchy (low to high): Newbie -> Site Member -> Contributor -> Moderator -> Senior Moderator -> Administrator -> Senior Administrator -> Deputy Chief of Moderation -> Deputy Chief Administrator -> Chief of Moderation -> Chief Administrator. Owner is internal-only and unrestricted.';
+  return 'Role Hierarchy (low to high): Newbie -> Site Member -> Contributor -> Junior Moderator -> Moderator -> Senior Moderator -> Deputy Chief of Moderation -> Chief of Moderation -> Junior Administrator -> Administrator -> Senior Administrator -> Deputy Chief Administrator -> Chief Administrator. Owner is internal-only and unrestricted.';
 }
 
 /**
@@ -231,6 +241,7 @@ function isValidRoleLevel(level) {
 function getValidRoleNames(level) {
   if (level === 6) {
     return [
+      ROLE_LABELS[ROLES.JUNIOR_ADMIN],
       ROLE_LABELS[ROLES.ADMINISTRATOR],
       ROLE_LABELS[ROLES.SENIOR_ADMINISTRATOR],
       ROLE_LABELS[ROLES.DEPUTY_CHIEF_ADMINISTRATOR],
@@ -239,6 +250,7 @@ function getValidRoleNames(level) {
   }
   if (level === 5) {
     return [
+      ROLE_LABELS[ROLES.JUNIOR_MODERATOR],
       ROLE_LABELS[ROLES.MODERATOR],
       ROLE_LABELS[ROLES.SENIOR_MODERATOR],
       ROLE_LABELS[ROLES.DEPUTY_CHIEF_OF_MODERATION],
@@ -253,10 +265,12 @@ function getValidRoleNames(level) {
 function getAssignableRoleOptions() {
   return [
     ROLES.CONTRIBUTOR,
+    ROLES.JUNIOR_MODERATOR,
     ROLES.MODERATOR,
     ROLES.SENIOR_MODERATOR,
     ROLES.DEPUTY_CHIEF_OF_MODERATION,
     ROLES.CHIEF_OF_MODERATION,
+    ROLES.JUNIOR_ADMIN,
     ROLES.ADMINISTRATOR,
     ROLES.SENIOR_ADMINISTRATOR,
     ROLES.DEPUTY_CHIEF_ADMINISTRATOR,
@@ -265,14 +279,14 @@ function getAssignableRoleOptions() {
 }
 
 function getPublicRoleOptions() {
-  return [ROLES.NEWBIE, ROLES.SITE_MEMBER, ROLES.CONTRIBUTOR, ROLES.MODERATOR, ROLES.SENIOR_MODERATOR, ROLES.DEPUTY_CHIEF_OF_MODERATION, ROLES.CHIEF_OF_MODERATION, ROLES.ADMINISTRATOR, ROLES.SENIOR_ADMINISTRATOR, ROLES.DEPUTY_CHIEF_ADMINISTRATOR, ROLES.CHIEF_ADMINISTRATOR].map(role => ({ value: role, label: ROLE_LABELS[role] || role }));
+  return [ROLES.NEWBIE, ROLES.SITE_MEMBER, ROLES.CONTRIBUTOR, ROLES.JUNIOR_MODERATOR, ROLES.MODERATOR, ROLES.SENIOR_MODERATOR, ROLES.DEPUTY_CHIEF_OF_MODERATION, ROLES.CHIEF_OF_MODERATION, ROLES.JUNIOR_ADMIN, ROLES.ADMINISTRATOR, ROLES.SENIOR_ADMINISTRATOR, ROLES.DEPUTY_CHIEF_ADMINISTRATOR, ROLES.CHIEF_ADMINISTRATOR].map(role => ({ value: role, label: ROLE_LABELS[role] || role }));
 }
 
 function getApplicationRoleOptions() {
   return [
     { value: ROLES.CONTRIBUTOR, label: 'Contributor' },
-    { value: ROLES.MODERATOR, label: 'Junior Moderator' },
-    { value: ROLES.ADMINISTRATOR, label: 'Junior Admin' }
+    { value: ROLES.JUNIOR_MODERATOR, label: 'Junior Moderator' },
+    { value: ROLES.JUNIOR_ADMIN, label: 'Junior Administrator' }
   ];
 }
 

@@ -643,8 +643,9 @@ async function renderAdminBootstrap(user) {
 
     const displayLabel = user.displayName || 'Agent';
     const role = resolveRole(user.email);
-    const roleDisplayName = role.charAt(0).toUpperCase() + role.slice(1);
-    const level = role === 'owner' ? 6 : role === 'admin' ? 6 : role === 'mod' ? 5 : 3;
+    const roleDisplayName = (typeof ROLE_NAMES !== 'undefined' && ROLE_NAMES[role]) ? ROLE_NAMES[role] : role.charAt(0).toUpperCase() + role.slice(1);
+    const roleLevel = getRoleLevelValue(role);
+    const level = role === 'owner' ? 6 : roleLevel >= 75 ? 6 : roleLevel >= 65 ? 5 : 3;
 
     adminInfo.innerHTML =
       `Logged in as <span style="color:var(--red-b)">${displayLabel}</span> — Role: <span style="color:var(--red-b);text-transform:uppercase">${roleDisplayName}</span> (Level ${level})
@@ -2428,14 +2429,14 @@ function canEditRole(targetEmail, currentEmail) {
 
 function buildVisibleRoleOptions(currentLevel) {
   const visibleRoles = [
-    { value: 'chief_admin', label: 'Chief Administrator' },
-    { value: 'deputy-chief-admin', label: 'Deputy Chief Administrator' },
-    { value: 'senior-admin', label: 'Senior Administrator' },
-    { value: 'admin', label: 'Administrator' },
+    { value: 'chief_administrator', label: 'Chief Administrator' },
+    { value: 'deputy_chief_administrator', label: 'Deputy Chief Administrator' },
+    { value: 'senior_administrator', label: 'Senior Administrator' },
+    { value: 'administrator', label: 'Administrator' },
     { value: 'junior_admin', label: 'Junior Administrator' },
-    { value: 'chief-mod', label: 'Chief of Moderation' },
-    { value: 'deputy-chief-mod', label: 'Deputy Chief of Moderation' },
-    { value: 'senior-mod', label: 'Senior Moderator' },
+    { value: 'chief_of_moderation', label: 'Chief of Moderation' },
+    { value: 'deputy_chief_of_moderation', label: 'Deputy Chief of Moderation' },
+    { value: 'senior_moderator', label: 'Senior Moderator' },
     { value: 'moderator', label: 'Moderator' },
     { value: 'junior_moderator', label: 'Junior Moderator' }
   ];
