@@ -2318,25 +2318,23 @@ async function loadUsers(container) {
 async function refreshUsers() {
   const tbody = document.getElementById('users-tbody');
   try {
-    const snap = await db.collection('users').get();
-
-    // Build full user list from Firestore
-    const users = snap.docs.map(d => {
-      const u = d.data() || {};
-      const email = String(u.email || '').toLowerCase();
-      const roleSource = String(u.role || u.roleName || 'user');
+    const response = await callSocialApi('GET', {}, '?type=usersforadmin');
+    const users = Array.isArray(response.users) ? response.users.map(user => {
+      const email = String(user.email || '').toLowerCase();
+      const roleSource = String(user.role || user.roleName || 'user');
       return {
-        uid: d.id,
+        uid: String(user.uid || ''),
         email,
-        displayName: String(u.displayName || u.email || 'Unknown Agent'),
+        displayName: String(user.displayName || user.email || 'Unknown Agent'),
         role: roleSource,
-        roleName: String(u.roleName || ''),
+        roleName: String(user.roleName || ''),
         sortRole: normalizeRole(roleSource),
         sortLevel: getRoleLevelValue(roleSource),
-        lastLogin: u.lastLogin || u.updatedAt || null,
-        raw: u
+        lastLogin: user.lastLogin || user.updatedAt || user.createdAt || null,
+        raw: user,
+        submissionBan: user.submissionBan || null
       };
-    });
+    }) : [];
 
     // Include any configured owners/admins/mods that don't have user docs yet
     ROLE_DATA.owners.forEach(email => {

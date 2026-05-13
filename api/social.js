@@ -1717,12 +1717,26 @@ async function listUsersForAdmin(db, actor, query = {}) {
     })
     .map(user => {
       const rawEmail = String(user.email || '').toLowerCase();
+      const explicitRole = normalizeRole(user.role || ROLES.NEWBIE);
+      const emailIsOwner = isOwnerEmail(rawEmail, roles);
+      const emailIsAdmin = isAdminEmail(rawEmail, roles);
+      const emailIsMod = isModeratorEmail(rawEmail, roles);
+      let effectiveRole = explicitRole;
+
+      if (emailIsOwner) {
+        effectiveRole = ROLES.OWNER;
+      } else if (emailIsAdmin && !isAtLeast(explicitRole, ROLES.ADMINISTRATOR)) {
+        effectiveRole = isAtLeast(explicitRole, ROLES.MODERATOR) ? explicitRole : ROLES.ADMINISTRATOR;
+      } else if (emailIsMod && !isAtLeast(explicitRole, ROLES.MODERATOR)) {
+        effectiveRole = isAtLeast(explicitRole, ROLES.CONTRIBUTOR) ? explicitRole : ROLES.MODERATOR;
+      }
+
       const submissionBan = user.submissionBan && typeof user.submissionBan === 'object' ? user.submissionBan : null;
       return {
         uid: String(user.uid || user.id || ''),
         email: canViewEmail || String(user.uid || user.id || '') === actor.uid ? rawEmail : '[Redacted]',
-        role: normalizeRole(user.role || ROLES.NEWBIE),
-        roleName: normalizeText(user.roleName || '', 120),
+        role: effectiveRole,
+        roleName: normalizeText(user.roleName || roleLabel(effectiveRole), 120),
         submissionAccess: user.submissionAccess === true,
         createdAt: user.createdAt || user.joinedAt || null,
         submissionBan: submissionBan ? {
