@@ -372,7 +372,7 @@ function showClearanceWelcome(role) {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: '999999',
     pointerEvents: 'none',
-    animation: 'clearanceBlink 1s ease-in-out forwards'
+    animation: 'clearanceBlink 1.8s ease-in-out forwards'
   });
 
   const box = document.createElement('div');
@@ -398,7 +398,7 @@ function showClearanceWelcome(role) {
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
-  setTimeout(() => overlay.remove(), 1000);
+  setTimeout(() => overlay.remove(), 1800);
 }
 
 function showClearanceWelcomeWhenReady(role) {

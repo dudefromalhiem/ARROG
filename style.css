@@ -1243,12 +1243,12 @@ hr {
 }
 
 /* More readable content color for descriptive blocks */
-.authority-content,
-.app-copy,
-.app-point,
-.app-status,
-.app-kicker,
-.section-hd {
+.application-page .authority-content,
+.application-page .app-copy,
+.application-page .app-point,
+.application-page .app-status,
+.application-page .app-kicker,
+.application-page .section-hd {
   color: var(--wht-m) !important;
 }
 
