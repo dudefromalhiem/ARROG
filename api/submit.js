@@ -499,6 +499,36 @@ async function processLargeContentForStorage(app, submissionId, payload) {
       delete payload.cssContent; // Remove from Firestore
     }
   }
+
+  // Also process any stored version snapshots to avoid embedding large HTML/CSS
+  if (Array.isArray(payload.versions)) {
+    for (let i = 0; i < payload.versions.length; i++) {
+      try {
+        const ver = payload.versions[i];
+        if (!ver || typeof ver !== 'object' || !ver.data) continue;
+        const vdata = ver.data;
+
+        if (vdata.htmlContent) {
+          const htmlUrl = await uploadLargeContentToStorage(app, submissionId, `version-html-${i}`, String(vdata.htmlContent));
+          if (htmlUrl) {
+            vdata.htmlContentStorageUrl = htmlUrl;
+            delete vdata.htmlContent;
+          }
+        }
+
+        if (vdata.cssContent) {
+          const cssUrl = await uploadLargeContentToStorage(app, submissionId, `version-css-${i}`, String(vdata.cssContent));
+          if (cssUrl) {
+            vdata.cssContentStorageUrl = cssUrl;
+            delete vdata.cssContent;
+          }
+        }
+      } catch (err) {
+        // Don't fail the whole save if a single version upload fails; log and continue
+        console.error('Failed to process version content for storage:', err);
+      }
+    }
+  }
 }
 
 async function generateUniqueAnomalyId(db, subtype) {
@@ -972,7 +1002,23 @@ module.exports = async function handler(req, res) {
       }
 
       // Restore the selected version's data as the current state
-      const restoredData = restoredVersion.data;
+      const restoredData = { ...restoredVersion.data };
+
+      // If the version stores content in Cloud Storage, fetch it so the restored draft contains HTML/CSS
+      try {
+        if (!restoredData.htmlContent && restoredData.htmlContentStorageUrl) {
+          restoredData.htmlContent = await fetchContentFromStorage(restoredData.htmlContentStorageUrl);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch version HTML content from storage during restore:', err);
+      }
+      try {
+        if (!restoredData.cssContent && restoredData.cssContentStorageUrl) {
+          restoredData.cssContent = await fetchContentFromStorage(restoredData.cssContentStorageUrl);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch version CSS content from storage during restore:', err);
+      }
       const newVersion = buildDraftVersionSnapshot(
         {
           ...restoredData,
