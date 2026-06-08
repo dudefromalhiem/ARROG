@@ -8,6 +8,7 @@ const MAX_TAGS = 24;
 const MAX_HTML_BYTES = 512 * 1024 * 1024; // 512MB
 const MAX_CSS_BYTES = 50 * 1024 * 1024; // 50MB
 const FIRESTORE_DOC_SIZE_LIMIT = 1024 * 1024; // 1MB - Firestore hard limit
+const FIRESTORE_TEXT_CHUNK_BYTES = 900 * 1024; // Keep chunk payloads comfortably below 1MB
 const CONTENT_STORAGE_THRESHOLD = 500 * 1024; // 500KB - threshold for Cloud Storage
 
 function initAdmin() {
@@ -45,7 +46,7 @@ function getRequestIp(req) {
 /**
  * Upload content to Cloud Storage if it exceeds the threshold
  * Returns the GCS URL if uploaded, or null if content is kept in Firestore
- * 
+ *
  * @param {object} app - Firebase app instance
  * @param {string} submissionId - Submission ID
  * @param {string} contentType - 'html' or 'css'
@@ -80,7 +81,7 @@ async function uploadLargeContentToStorage(app, submissionId, contentType, conte
 
 /**
  * Fetch content from Cloud Storage URL
- * 
+ *
  * @param {string} gcsUrl - GCS public URL
  * @returns {Promise<string>} Content from storage
  */
@@ -93,6 +94,69 @@ async function fetchContentFromStorage(gcsUrl) {
     console.error('Failed to fetch content from Cloud Storage:', err);
     throw err;
   }
+}
+
+function getUtf8ByteLength(value) {
+  return Buffer.byteLength(String(value || ''), 'utf8');
+}
+
+function splitTextIntoChunks(text, maxBytes = FIRESTORE_TEXT_CHUNK_BYTES) {
+  const source = String(text || '');
+  if (!source) return [];
+
+  const chunks = [];
+  let current = '';
+  let currentBytes = 0;
+
+  for (const char of source) {
+    const charBytes = getUtf8ByteLength(char);
+    if (current && currentBytes + charBytes > maxBytes) {
+      chunks.push(current);
+      current = char;
+      currentBytes = charBytes;
+    } else {
+      current += char;
+      currentBytes += charBytes;
+    }
+  }
+
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+async function replaceChunkCollection(batch, docRef, chunks, fieldName) {
+  const existingChunks = await docRef.collection('chunks').get();
+  existingChunks.docs.forEach(chunkDoc => batch.delete(chunkDoc.ref));
+
+  chunks.forEach((chunk, index) => {
+    const chunkRef = docRef.collection('chunks').doc(String(index).padStart(6, '0'));
+    batch.set(chunkRef, {
+      field: fieldName,
+      index,
+      text: chunk,
+      byteLength: getUtf8ByteLength(chunk),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  });
+}
+
+async function hydrateChunkedTextContent(docRef, data, fieldName) {
+  const chunked = Boolean(data && data[`${fieldName}Chunked`]);
+  const chunkCount = Number(data && data[`${fieldName}ChunkCount`] || 0);
+  if (!chunked || chunkCount < 1) {
+    return String(data && data[fieldName] || data && (fieldName === 'htmlContent' ? data.content : '') || '');
+  }
+
+  const chunkRefs = Array.from({ length: chunkCount }, (_, index) => docRef.collection('chunks').doc(String(index).padStart(6, '0')));
+  const chunkSnaps = await Promise.all(chunkRefs.map(chunkRef => chunkRef.get()));
+  return chunkSnaps.map((snap, index) => {
+    if (!snap.exists) {
+      console.warn(`Missing chunk ${index} for ${fieldName} on ${docRef.id}`);
+      return '';
+    }
+    const chunkData = snap.data() || {};
+    return String(chunkData.text || '');
+  }).join('');
 }
 
 function sanitizeHtmlContent(html) {
@@ -127,6 +191,50 @@ function sanitizeCssOrThrow(css) {
     throw err;
   }
   return source;
+}
+
+function getUtf8ByteLength(value) {
+  return Buffer.byteLength(String(value || ''), 'utf8');
+}
+
+function splitTextIntoChunks(text, maxBytes = FIRESTORE_TEXT_CHUNK_BYTES) {
+  const source = String(text || '');
+  if (!source) return [];
+
+  const chunks = [];
+  let current = '';
+  let currentBytes = 0;
+
+  for (const char of source) {
+    const charBytes = getUtf8ByteLength(char);
+    if (current && currentBytes + charBytes > maxBytes) {
+      chunks.push(current);
+      current = char;
+      currentBytes = charBytes;
+    } else {
+      current += char;
+      currentBytes += charBytes;
+    }
+  }
+
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+async function replaceChunkCollection(batch, docRef, chunks, fieldName) {
+  const existingChunks = await docRef.collection('chunks').get();
+  existingChunks.docs.forEach(chunkDoc => batch.delete(chunkDoc.ref));
+
+  chunks.forEach((chunk, index) => {
+    const chunkRef = docRef.collection('chunks').doc(String(index).padStart(6, '0'));
+    batch.set(chunkRef, {
+      field: fieldName,
+      index,
+      text: chunk,
+      byteLength: getUtf8ByteLength(chunk),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  });
 }
 
 function sanitizePlainText(input, maxLength) {
@@ -469,11 +577,12 @@ function buildSubmissionPayload(body, actor) {
  * Modifies the payload in place to reference storage URLs instead of inline content
  * 
  * @param {object} app - Firebase app instance
- * @param {string} submissionId - Submission ID
+ * @param {object} db - Firestore instance
+ * @param {object} docRef - Parent document reference
  * @param {object} payload - Submission payload with content
  * @returns {Promise<void>}
  */
-async function processLargeContentForStorage(app, submissionId, payload) {
+async function processLargeContentForStorage(db, docRef, payload) {
   // Validate sizes first
   if (payload.htmlContent) {
     validateHtmlSizeOrThrow(payload.htmlContent);
@@ -482,25 +591,44 @@ async function processLargeContentForStorage(app, submissionId, payload) {
     validateHtmlSizeOrThrow(payload.cssContent); // CSS uses same MAX_CSS_BYTES check
   }
 
-  // Upload HTML content to Cloud Storage if it exceeds threshold
+  const batch = db.batch();
+
   if (payload.htmlContent) {
-    const htmlUrl = await uploadLargeContentToStorage(app, submissionId, 'html', payload.htmlContent);
-    if (htmlUrl) {
-      payload.htmlContentStorageUrl = htmlUrl;
-      delete payload.htmlContent; // Remove from Firestore
+    const htmlContent = String(payload.htmlContent || '');
+    const htmlBytes = getUtf8ByteLength(htmlContent);
+    if (htmlBytes > FIRESTORE_TEXT_CHUNK_BYTES) {
+      const htmlChunks = splitTextIntoChunks(htmlContent, FIRESTORE_TEXT_CHUNK_BYTES);
+      payload.htmlContentChunked = true;
+      payload.htmlContentChunkCount = htmlChunks.length;
+      payload.htmlContentChunkBytes = htmlBytes;
+      delete payload.htmlContentStorageUrl;
+      delete payload.htmlContent;
+      await replaceChunkCollection(batch, docRef, htmlChunks, 'htmlContent');
+    } else {
+      delete payload.htmlContentChunked;
+      delete payload.htmlContentChunkCount;
+      delete payload.htmlContentChunkBytes;
+      delete payload.htmlContentStorageUrl;
+      const existingChunks = await docRef.collection('chunks').get();
+      existingChunks.docs.forEach(chunkDoc => batch.delete(chunkDoc.ref));
     }
+  } else {
+    delete payload.htmlContentChunked;
+    delete payload.htmlContentChunkCount;
+    delete payload.htmlContentChunkBytes;
+    delete payload.htmlContentStorageUrl;
+    const existingChunks = await docRef.collection('chunks').get();
+    existingChunks.docs.forEach(chunkDoc => batch.delete(chunkDoc.ref));
   }
 
-  // Upload CSS content to Cloud Storage if it exceeds threshold
   if (payload.cssContent) {
-    const cssUrl = await uploadLargeContentToStorage(app, submissionId, 'css', payload.cssContent);
+    const cssUrl = await uploadLargeContentToStorage(db.app || admin.app(), docRef.id, 'css', payload.cssContent);
     if (cssUrl) {
       payload.cssContentStorageUrl = cssUrl;
-      delete payload.cssContent; // Remove from Firestore
+      delete payload.cssContent;
     }
   }
 
-  // Also process any stored version snapshots to avoid embedding large HTML/CSS
   if (Array.isArray(payload.versions)) {
     for (let i = 0; i < payload.versions.length; i++) {
       try {
@@ -509,7 +637,7 @@ async function processLargeContentForStorage(app, submissionId, payload) {
         const vdata = ver.data;
 
         if (vdata.htmlContent) {
-          const htmlUrl = await uploadLargeContentToStorage(app, submissionId, `version-html-${i}`, String(vdata.htmlContent));
+          const htmlUrl = await uploadLargeContentToStorage(db.app || admin.app(), docRef.id, `version-html-${i}`, String(vdata.htmlContent));
           if (htmlUrl) {
             vdata.htmlContentStorageUrl = htmlUrl;
             delete vdata.htmlContent;
@@ -517,18 +645,20 @@ async function processLargeContentForStorage(app, submissionId, payload) {
         }
 
         if (vdata.cssContent) {
-          const cssUrl = await uploadLargeContentToStorage(app, submissionId, `version-css-${i}`, String(vdata.cssContent));
+          const cssUrl = await uploadLargeContentToStorage(db.app || admin.app(), docRef.id, `version-css-${i}`, String(vdata.cssContent));
           if (cssUrl) {
             vdata.cssContentStorageUrl = cssUrl;
             delete vdata.cssContent;
           }
         }
       } catch (err) {
-        // Don't fail the whole save if a single version upload fails; log and continue
         console.error('Failed to process version content for storage:', err);
       }
     }
   }
+
+  batch.set(docRef, stripUndefined(payload), { merge: true });
+  await batch.commit();
 }
 
 async function generateUniqueAnomalyId(db, subtype) {
@@ -708,6 +838,13 @@ module.exports = async function handler(req, res) {
           return sendJson(res, 404, { error: 'Submission not found.' });
         }
         const data = doc.data() || {};
+        if (data.htmlContentChunked) {
+          data.htmlContent = await hydrateChunkedTextContent(doc.ref, data, 'htmlContent');
+        } else if (data.contentChunked && !data.content) {
+          const restoredContent = await hydrateChunkedTextContent(doc.ref, data, 'content');
+          data.content = restoredContent;
+          if (!data.htmlContent) data.htmlContent = restoredContent;
+        }
         if (!adminAccess && data.authorUid !== actor.uid) {
           return sendJson(res, 403, { error: 'Forbidden.' });
         }
@@ -852,8 +989,7 @@ module.exports = async function handler(req, res) {
         payload.versions = [buildDraftVersionSnapshot(payload, actor.uid, draftTrigger)];
       }
 
-      await processLargeContentForStorage(app, submissionRef.id, payload);
-      await submissionRef.set(stripUndefined(payload), { merge: true });
+      await processLargeContentForStorage(db, submissionRef, payload);
       return sendJson(res, 200, { id: submissionRef.id, status: 'draft' });
     }
 
@@ -923,20 +1059,11 @@ module.exports = async function handler(req, res) {
         });
 
         const pageId = String(body.pageId || existingRequestedPageId || '').trim();
-        let publishedPageId = pageId;
-        
-        // Process large content for the page before saving
-        // Use the pageId if available, otherwise use the submissionId as the storage path
-        const pageStorageId = pageId || submissionRef.id || 'page';
-        await processLargeContentForStorage(app, pageStorageId, pagePayload);
-        
-        if (pageId) {
-          await db.collection('pages').doc(pageId).set(pagePayload, { merge: true });
-        } else {
-          const pageRef = await db.collection('pages').add(pagePayload);
-          body.pageId = pageRef.id;
-          publishedPageId = pageRef.id;
-        }
+        const pageRef = pageId ? db.collection('pages').doc(pageId) : db.collection('pages').doc();
+        const publishedPageId = pageRef.id;
+
+        await processLargeContentForStorage(db, pageRef, pagePayload);
+        body.pageId = publishedPageId;
 
         if (String(payload.type || '').trim().toLowerCase() === 'lore') {
           await db.collection('loreIndex').doc(publishedPageId).set(stripUndefined({
@@ -972,8 +1099,7 @@ module.exports = async function handler(req, res) {
         return sendJson(res, 200, { id: submissionRef.id, pageId: body.pageId || pageId || null, status: 'approved' });
       }
 
-      await processLargeContentForStorage(app, submissionRef.id, payload);
-      await submissionRef.set(stripUndefined(payload), { merge: true });
+      await processLargeContentForStorage(db, submissionRef, payload);
       return sendJson(res, 200, { id: submissionRef.id, status: 'pending' });
     }
 
@@ -1052,7 +1178,7 @@ module.exports = async function handler(req, res) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      await submissionRef.set(updatedPayload, { merge: true });
+      await processLargeContentForStorage(db, submissionRef, updatedPayload);
       return sendJson(res, 200, { 
         id: submissionRef.id, 
         status: 'draft',

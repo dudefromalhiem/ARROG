@@ -277,6 +277,36 @@ render.mount('archive-viewer');</pre>
  *  Supports: ?id=<firestoreId>, ?slug=<slug>, or /pages/<slug>
  * ═══════════════════════════════════════════════════════════════ */
 
+async function hydrateChunkedTextContent(docRef, data, fieldName) {
+  const chunked = Boolean(data && data[`${fieldName}Chunked`]);
+  const chunkCount = Number(data && data[`${fieldName}ChunkCount`] || 0);
+  if (!chunked || chunkCount < 1) {
+    return String(data && data[fieldName] || data && (fieldName === 'htmlContent' ? data.content : '') || '');
+  }
+
+  const chunkRefs = Array.from({ length: chunkCount }, (_, index) => docRef.collection('chunks').doc(String(index).padStart(6, '0')));
+  const chunkSnaps = await Promise.all(chunkRefs.map(chunkRef => chunkRef.get()));
+  return chunkSnaps.map(snap => {
+    if (!snap.exists) return '';
+    const chunkData = snap.data() || {};
+    return String(chunkData.text || '');
+  }).join('');
+}
+
+async function hydratePageContent(docRef, pageData) {
+  const page = { ...pageData };
+  if (page.htmlContentChunked) {
+    page.htmlContent = await hydrateChunkedTextContent(docRef, page, 'htmlContent');
+  } else if (!page.htmlContent && page.contentChunked) {
+    const restoredContent = await hydrateChunkedTextContent(docRef, page, 'content');
+    page.content = restoredContent;
+    page.htmlContent = restoredContent;
+  } else if (!page.htmlContent && page.content) {
+    page.htmlContent = page.content;
+  }
+  return page;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   configureCommentsApiBase();
   configureSocialApiBase();
@@ -312,7 +342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const docData = doc.data() || {};
         pageDocData = docData;
         docId = doc.id;
-        if (docData.htmlContent || docData.content) {
+        if (docData.htmlContent || docData.content || docData.htmlContentChunked || docData.contentChunked) {
           page = docData;
         }
       }
@@ -324,7 +354,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const docData = doc.data() || {};
         pageDocData = docData;
         docId = doc.id;
-        if (docData.htmlContent || docData.content) {
+        if (docData.htmlContent || docData.content || docData.htmlContentChunked || docData.contentChunked) {
           page = docData;
         }
       }
@@ -361,6 +391,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     if (!page) { showError(); return; }
+
+    if (docId && page) {
+      const docRef = db.collection('pages').doc(docId);
+      page = await hydratePageContent(docRef, page);
+    }
     
     // Fetch large content from Cloud Storage if it's stored there
     if (page.htmlContentStorageUrl && !page.htmlContent) {

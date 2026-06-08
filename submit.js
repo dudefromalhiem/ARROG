@@ -369,6 +369,36 @@ function isAllowedStorageMedia(file) {
   return !!getStorageMediaKind(file);
 }
 
+async function hydrateChunkedTextContent(docRef, data, fieldName) {
+  const chunked = Boolean(data && data[`${fieldName}Chunked`]);
+  const chunkCount = Number(data && data[`${fieldName}ChunkCount`] || 0);
+  if (!chunked || chunkCount < 1) {
+    return String(data && data[fieldName] || data && (fieldName === 'htmlContent' ? data.content : '') || '');
+  }
+
+  const chunkRefs = Array.from({ length: chunkCount }, (_, index) => docRef.collection('chunks').doc(String(index).padStart(6, '0')));
+  const chunkSnaps = await Promise.all(chunkRefs.map(chunkRef => chunkRef.get()));
+  return chunkSnaps.map(snap => {
+    if (!snap.exists) return '';
+    const chunkData = snap.data() || {};
+    return String(chunkData.text || '');
+  }).join('');
+}
+
+async function hydrateSubmitPageContent(docRef, pageData) {
+  const page = { ...pageData };
+  if (page.htmlContentChunked) {
+    page.htmlContent = await hydrateChunkedTextContent(docRef, page, 'htmlContent');
+  } else if (!page.htmlContent && page.contentChunked) {
+    const restoredContent = await hydrateChunkedTextContent(docRef, page, 'content');
+    page.content = restoredContent;
+    page.htmlContent = restoredContent;
+  } else if (!page.htmlContent && page.content) {
+    page.htmlContent = page.content;
+  }
+  return page;
+}
+
 function getUploadedMediaCollection(kind) {
   if (kind === 'image') return uploadedImages;
   return uploadedMediaFiles;
@@ -1305,15 +1335,6 @@ async function saveDraft(options = {}) {
   };
 
   const draftSubmission = removeClientOnlySubmissionFields(draftPayload);
-  const payloadJson = JSON.stringify(draftSubmission);
-  const payloadBytes = typeof Blob !== 'undefined' ? new Blob([payloadJson]).size : payloadJson.length;
-  if (payloadBytes > 950000) {
-    const warning = 'Draft is too large to save (' + payloadBytes + ' bytes, near the Firestore 1 MB limit). Please shorten the content or remove large embedded images/media.';
-    setDraftStatus(warning, true);
-    window.rogAlert(warning);
-    return null;
-  }
-
   draftSaveInFlight = true;
   try {
     const result = await callSubmissionApi('POST', {
@@ -1642,6 +1663,10 @@ async function initializeSubmitEditModeFromUrl() {
     }
 
     const page = pageDoc.data() || {};
+    if (pageDoc.ref) {
+      const hydratedPage = await hydrateSubmitPageContent(pageDoc.ref, page);
+      Object.assign(page, hydratedPage);
+    }
     submitEditTarget = { id: pageDoc.id || null, seeded: !pageDoc.id, seedSlug: page.slug || editSlug || '' };
     activeDraftId = pageDoc.id || null;
 
